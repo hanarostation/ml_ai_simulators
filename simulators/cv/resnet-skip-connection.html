@@ -1,0 +1,910 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ResNet 스킵 커넥션 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 주 경로 F(x) 파랑 · 지름길 주황 · 합(+) 보라 · 음수 자홍 · 데이터 두 부류 */
+:root{ --sk-accent: var(--cat-cv);
+  --f:#2563EB; --sc:#EA580C; --sum:#7C3AED; --neg:#D6336C; --c0:#0D9488; --c1:#D6336C; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --f:#6AA5FF; --sc:#FF914D; --sum:#B294FF; --neg:#F2678F; --c0:#33D1BD; --c1:#F2678F; } }
+:root[data-theme="dark"]{ --f:#6AA5FF; --sc:#FF914D; --sum:#B294FF; --neg:#F2678F; --c0:#33D1BD; --c1:#F2678F; }
+
+.rs-f{color:var(--f)} .rs-sc{color:var(--sc)} .rs-sum{color:var(--sum)} .rs-neg{color:var(--neg)}
+.rs-dot{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+
+/* 블록 다이어그램 */
+.rs-diagram{width:100%;min-width:0}
+.rs-diagram svg{display:block;width:100%;height:auto;margin:0 auto}
+.rs-diagram .bx{fill:var(--surface);stroke-width:1.6}
+.rs-diagram .bx.m{stroke:var(--f)} .rs-diagram .bx.p{stroke:var(--sum)}
+.rs-diagram .bt{font-size:12.5px;font-weight:700;fill:var(--ink);font-family:var(--sans)}
+.rs-diagram .lb{font-size:12px;font-weight:700;font-family:var(--sans)}
+.rs-diagram .ln{fill:none;stroke-linecap:round;stroke-linejoin:round}
+.rs-diagram .ln.m{stroke:var(--f)} .rs-diagram .ln.s{stroke:var(--sc)} .rs-diagram .ln.p{stroke:var(--sum)}
+.rs-diagram .ln.off{stroke:var(--faint);stroke-dasharray:4 5}
+.rs-diagram .flow{fill:none;stroke-linecap:round;stroke-dasharray:2 12;animation:rs-flow 1.1s linear infinite;stroke:var(--surface);opacity:.9}
+.rs-diagram .io{fill:var(--surface-2);stroke:var(--line-strong);stroke-width:1.5}
+.rs-diagram .pl{fill:var(--sum);} .rs-diagram .plt{fill:var(--on-ink);font-size:20px;font-weight:700;font-family:var(--mono)}
+.rs-diagram g.dim{opacity:.28}
+.rs-diagram g.hl .bx,.rs-diagram g.hl .io{stroke-width:3}
+.rs-diagram g{transition:opacity .25s}
+@keyframes rs-flow{to{stroke-dashoffset:-14}}
+
+/* 히트맵 */
+.rs-maps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+@media (max-width:760px){.rs-maps{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}}
+.rs-map{display:flex;flex-direction:column;gap:6px;border:2px solid transparent;border-radius:12px;padding:6px;transition:border-color .2s,background .2s;min-width:0}
+.rs-map.on{border-color:var(--role,var(--ink));background:color-mix(in srgb,var(--role,var(--ink)) 6%,var(--surface))}
+.rs-map h3{font-size:13.5px;margin:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.rs-map h3 i{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--role)}
+.rs-map canvas{width:100%;aspect-ratio:1/1;display:block;border-radius:8px;cursor:crosshair;touch-action:manipulation}
+.rs-map .sub{font-size:12px;color:var(--muted);font-family:var(--mono)}
+.rs-scale{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.rs-scale .bar{width:150px;max-width:40vw;height:10px;border-radius:5px;border:1px solid var(--line)}
+.rs-caption{min-height:3.2em;font-size:14.5px;margin:0;line-height:1.6}
+.rs-caption b{color:var(--ink)}
+
+/* 차트 */
+.rs-chart{width:100%;min-width:0}
+.rs-chart svg{display:block;width:100%;height:auto}
+.rs-chart .gl{stroke:var(--line);stroke-width:1}
+.rs-chart .gl0{stroke:var(--line-strong);stroke-width:1}
+.rs-chart .ax{fill:var(--muted);font-size:11px;font-family:var(--mono)}
+.rs-chart .axl{fill:var(--muted);font-size:11.5px;font-family:var(--sans);font-weight:600}
+.rs-chart .ref{stroke:var(--faint);stroke-dasharray:4 4;stroke-width:1.2}
+.rs-chart .reft{fill:var(--faint);font-size:11px;font-family:var(--sans)}
+.rs-chart .sr{fill:none;stroke-width:2.4;stroke-linejoin:round;stroke-linecap:round}
+.rs-chart .sr.f{stroke:var(--f)} .rs-chart .sr.s{stroke:var(--sc)}
+.rs-chart .ep{stroke:var(--surface);stroke-width:1.5}
+.rs-chart .ep.f{fill:var(--f)} .rs-chart .ep.s{fill:var(--sc)}
+.rs-chart .el{font-size:11.5px;font-weight:700;font-family:var(--mono)}
+.rs-chart .el.f{fill:var(--f)} .rs-chart .el.s{fill:var(--sc)}
+
+.rs-table td.cur, .rs-table th.cur{background:color-mix(in srgb,var(--sk-accent) 10%,var(--surface))}
+.rs-table td.big{font-weight:700;color:var(--ink)}
+.rs-orders{font-size:12px;color:var(--muted)}
+
+/* 결정 경계 */
+.rs-bnds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.rs-bnd{display:flex;flex-direction:column;gap:6px;min-width:0}
+.rs-bnd h3{font-size:14px;margin:0}
+.rs-bnd canvas{width:100%;aspect-ratio:1/1;display:block;border-radius:10px;border:1px solid var(--line)}
+
+/* 파라미터 막대 */
+.rs-pbar{display:grid;grid-template-columns:110px minmax(0,1fr);gap:6px 10px;align-items:center;font-size:13.5px}
+.rs-pbar .tr{height:22px;background:var(--surface-2);border-radius:6px;overflow:hidden;position:relative}
+.rs-pbar .fl{height:100%;border-radius:6px;transition:width .35s}
+.rs-pbar .vv{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--muted);grid-column:2}
+.rs-big{font-family:var(--mono);font-size:26px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* shape 맞추기 */
+.rs-shape{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:10px;align-items:center}
+.rs-tensor{border:2px solid var(--role);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:3px;min-width:0;background:color-mix(in srgb,var(--role) 6%,var(--surface))}
+.rs-tensor .t{font-size:12.5px;font-weight:700;color:var(--muted)}
+.rs-tensor .v{font-family:var(--mono);font-size:17px;font-weight:600;color:var(--ink);overflow-wrap:anywhere}
+.rs-tensor .d{font-size:12px;color:var(--muted)}
+.rs-plus{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-family:var(--mono);font-size:22px;font-weight:700;color:var(--on-ink);background:var(--sum)}
+.rs-plus.bad{background:var(--neg)}
+.rs-verdict{font-size:15px;font-weight:700}
+.rs-verdict.ok{color:var(--c0)} .rs-verdict.bad{color:var(--neg)}
+@media (max-width:520px){.rs-shape{grid-template-columns:minmax(0,1fr)} .rs-plus{justify-self:center}}
+
+.rs-stack{display:flex;gap:3px;align-items:flex-end;height:64px}
+.rs-stack span{flex:1 1 0;border-radius:3px}
+.rs-cmp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:520px){.rs-cmp{grid-template-columns:minmax(0,1fr)}}
+.rs-cmp .sk-card{gap:8px}
+.rs-quote{font-size:15px;font-weight:700;margin:0;color:var(--ink)}
+.rs-kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--ink)}
+details.rs-more{font-size:13.5px;color:var(--muted)}
+details.rs-more summary{cursor:pointer;font-weight:600;color:var(--ink)}
+details.rs-more summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.sk-stepper li{cursor:default}
+@media (max-width:520px){ .sk-slider{min-width:0;width:100%} .rs-pbar{grid-template-columns:84px minmax(0,1fr)}
+  #shOpt{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line-strong)} #shOpt button+button{border-left:0}
+  .rs-map h3{min-height:2.7em;align-items:flex-start} }
+.rs-pre{white-space:pre-wrap}
+@media (prefers-reduced-motion: reduce){ .rs-diagram .flow{animation:none;display:none} .rs-map,.rs-diagram g,.rs-pbar .fl{transition:none} }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)" aria-current="page">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">ResNet 스킵 커넥션 시뮬레이터</h1>
+      <p class="ds-hero__lede">층을 더 쌓았는데 훈련 오차가 오히려 높아지는 퇴화(degradation) 문제를, 입력을 그대로 더해 주는 지름길 y = F(x) + x 로 푼 것이 ResNet입니다. 잔차 블록 안을 들여다보고, 깊게 쌓았을 때 신호와 기울기가 어떻게 달라지는지 직접 확인합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button type="button" class="sk-tab" role="tab" id="tab-block" aria-controls="pane-block" aria-selected="true"><span class="sk-num">1</span>잔차 블록 들여다보기</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-deep" aria-controls="pane-deep" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>깊게 쌓으면: 신호와 기울기</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-train" aria-controls="pane-train" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>학습해 보기 (퇴화 현상)</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-design" aria-controls="pane-design" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>블록 설계와 shape</button>
+  </nav>
+
+  <!-- ================= 1. 잔차 블록 ================= -->
+  <section id="pane-block" role="tabpanel" aria-labelledby="tab-block">
+    <div class="sk-card">
+      <div class="sk-head"><h2>BasicBlock: 주 경로 F(x)와 지름길 x</h2>
+        <div class="sk-legend"><span><i class="rs-dot" style="background:var(--f)"></i>주 경로 F(x)</span><span><i class="rs-dot" style="background:var(--sc)"></i>지름길 (항등, 가중치 없음)</span><span><i class="rs-dot" style="background:var(--sum)"></i>덧셈 → ReLU</span></div>
+      </div>
+      <div class="rs-diagram" id="diagram" role="img" aria-label="잔차 블록 구조: 입력 x가 3×3 합성곱, BN, ReLU, 3×3 합성곱, BN을 거친 F(x)와 지름길로 온 x가 더해진 뒤 ReLU를 거쳐 출력된다"></div>
+      <div class="sk-controls">
+        <div class="sk-slider" style="min-width:230px">
+          <div class="sk-sl-head"><label for="sW">F 가중치 크기 s</label><b id="sWv">0.80</b></div>
+          <input type="range" id="sW" min="0" max="1.5" step="0.05" value="0.8">
+        </div>
+        <button type="button" class="sk-btn sk-btn--sm" id="sZero">s = 0 (가중치 0)</button>
+        <label class="sk-check"><input type="checkbox" id="scOn" checked>지름길 켬</label>
+        <div class="sk-group"><span class="sk-label">ReLU 위치</span>
+          <div class="sk-seg" id="reluSeg" role="group" aria-label="ReLU 위치">
+            <button type="button" data-v="post" aria-pressed="true">덧셈 뒤 (표준)</button>
+            <button type="button" data-v="pre" aria-pressed="false">덧셈 앞</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sk-card" style="margin-top:16px">
+      <div class="sk-head"><h2>8×8 특성맵이 블록을 지나가는 모습</h2><span class="sk-hint">칸을 누르면 그 칸의 계산을 따라갑니다 · 키보드 <span class="rs-kbd">→</span> 다음 단계</span></div>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--sm" id="stFirst">처음</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="stPrev">이전</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="stNext">다음</button>
+          <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="stPlay">재생</button>
+        </div>
+        <div class="sk-slider" style="min-width:150px">
+          <div class="sk-sl-head"><label for="stSpeed">속도</label><b id="stSpeedV">1×</b></div>
+          <input type="range" id="stSpeed" min="0.5" max="3" step="0.5" value="1">
+        </div>
+      </div>
+      <ol class="sk-stepper" id="stepper"><li>① 입력 x</li><li>② 주 경로 F(x)</li><li>③ 지름길 x</li><li>④ 더하기</li><li>⑤ ReLU → 출력</li></ol>
+      <p class="rs-caption" id="stepCap" aria-live="polite"></p>
+      <div class="rs-maps" id="maps">
+        <div class="rs-map" id="mp0" style="--role:var(--sc)"><h3><i></i>입력 x</h3><canvas id="cv0" aria-label="입력 특성맵 x 히트맵"></canvas><span class="sub" id="sub0"></span></div>
+        <div class="rs-map" id="mp1" style="--role:var(--f)"><h3><i></i>F(x) 잔차</h3><canvas id="cv1" aria-label="잔차 F(x) 히트맵"></canvas><span class="sub" id="sub1"></span></div>
+        <div class="rs-map" id="mp2" style="--role:var(--sum)"><h3><i></i><span id="t2">F(x) + x</span></h3><canvas id="cv2" aria-label="덧셈 결과 히트맵"></canvas><span class="sub" id="sub2"></span></div>
+        <div class="rs-map" id="mp3" style="--role:var(--ink)"><h3><i></i><span id="t3">출력 ReLU(F(x)+x)</span></h3><canvas id="cv3" aria-label="블록 출력 히트맵"></canvas><span class="sub" id="sub3"></span></div>
+      </div>
+      <div class="rs-scale"><span>값:</span><span class="rs-neg">음수</span><span class="bar" id="scaleBar"></span><span>양수 (1 이상은 가장 진하게)</span><span>· 선택한 칸은 네모로 표시</span></div>
+      <div class="sk-formula" id="cellFormula"></div>
+      <div class="sk-stats" id="blockStats"></div>
+      <div id="blockNote"></div>
+    </div>
+
+    <div class="sk-grid2" style="margin-top:16px">
+      <div class="sk-card">
+        <h2>왜 x를 더할까: 항등 사상은 배우기 어렵다</h2>
+        <div class="sk-formula rs-pre">H(x) = ReLU(W₂·ReLU(W₁x))  ← 이걸로 항등(출력 = x)을 만들려면<br>W₁, W₂가 정확히 '가운데 1, 나머지 0' 모양이어야 함 (초기값에서 멀다)<br><br>좌표계를 바꾸면:  y = F(x) + x,   F(x) = H(x) − x<br>항등 함수  ⇔  F(x) = 0  ⇔  가중치 ≈ 0  (초기값에서 가장 가깝다)</div>
+        <p class="sk-note"><b>잔차 블록의 기본값은 "아무것도 하지 않는 것"</b>입니다. 위에서 s = 0 을 눌러 보세요. 잔차 블록은 출력이 x 그대로, 지름길을 끈 plain 블록은 출력이 0(정보 소실)이 됩니다.</p>
+      </div>
+      <div class="sk-card">
+        <h2>ReLU는 덧셈 뒤에</h2>
+        <div class="sk-formula rs-pre">표준:     y = ReLU(F(x) + x)   → F가 음수면 x를 줄일 수 있음<br>순서 바꿈: y = ReLU(F(x)) + x   → F가 0 이상만 남아 더하기만 가능</div>
+        <p class="sk-lead">이 예시의 F(x)는 '가장자리 강조분'입니다. 밝은 쪽은 더 밝게(양수), 어두운 쪽은 더 어둡게(음수) 고치려 합니다. ReLU를 덧셈 앞에 두면 음수 수정이 모두 잘려 어두운 쪽을 고치지 못합니다.</p>
+        <details class="rs-more"><summary>이 예시의 F(x)는 어떻게 계산하나요?</summary>
+          <p>첫 3×3 합성곱이 채널 2개를 만듭니다: ① 가운데 1인 필터(그대로 통과), ② 3×3 평균 필터(흐리게). ReLU를 거친 뒤 두 번째 합성곱이 (①) − (②)에 가중치 크기 s 를 곱합니다. 즉 F(x) = s·(x − 흐린 x). 개념을 보려고 BN은 생략했습니다(가장자리 밖은 0으로 채움).</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 2. 깊게 쌓으면 ================= -->
+  <section id="pane-deep" role="tabpanel" aria-labelledby="tab-deep" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>plain vs residual: 층을 쌓을수록 신호와 기울기는?</h2><span class="sk-hint">폭 d = 16, 배치 64개, 난수 고정</span></div>
+      <p class="sk-lead">한 층 = ReLU → 가중치 W → (BN). plain은 h' = 층(h), residual은 h' = h + 층(h). 역전파는 층마다 야코비안(J)을 곱해 첫 층까지 거슬러 올라갑니다.</p>
+      <div class="sk-controls">
+        <div class="sk-slider"><div class="sk-sl-head"><label for="dL">층 수 L</label><b id="dLv">22</b></div><input type="range" id="dL" min="2" max="60" step="1" value="22"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="dG">초기 가중치 크기 g (표준편차 g/√d)</label><b id="dGv">1.00</b></div><input type="range" id="dG" min="0.5" max="1.6" step="0.05" value="1"></div>
+        <label class="sk-check"><input type="checkbox" id="dBN">정규화(BN) 켬</label>
+        <button type="button" class="sk-btn sk-btn--sm" id="dSeed">다른 난수로</button>
+      </div>
+      <p class="sk-hint" style="margin:0">g = 1.00 은 표준편차 1/√d(기본 초기화), g ≈ 1.41 은 He 초기화(√(2/d))입니다.</p>
+    </div>
+    <div class="sk-grid2" style="margin-top:16px">
+      <div class="sk-card">
+        <div class="sk-head"><h3>순전파: 층별 신호 크기 (RMS, 로그 축)</h3><div class="sk-legend"><span><i style="background:var(--f)"></i>plain</span><span><i style="background:var(--sc)"></i>residual</span></div></div>
+        <div class="rs-chart" id="chFwd" role="img" aria-label="층별 순전파 신호 크기 로그 차트"></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h3>역전파: 층별 기울기 크기 (출력 쪽 = 1, 로그 축)</h3><div class="sk-legend"><span><i style="background:var(--f)"></i>plain</span><span><i style="background:var(--sc)"></i>residual</span></div></div>
+        <div class="rs-chart" id="chBwd" role="img" aria-label="층별 역전파 기울기 크기 로그 차트"></div>
+      </div>
+    </div>
+    <div class="sk-grid2" style="margin-top:16px">
+      <div class="sk-card">
+        <h2>곱셈 사슬 안에 1이 남는다</h2>
+        <div class="sk-formula rs-pre">plain:     ∂L/∂x = ∂L/∂y · ∂F/∂x          J = diag(relu′)·W 형태<br>residual:  ∂L/∂x = ∂L/∂y · (I + ∂F/∂x)    J = I + (…)<br><br>L층을 거슬러 가면  plain: J₁·J₂·…·J_L   residual: (I+…)(I+…)…(I+…)</div>
+        <div class="sk-stats" id="deepStats"></div>
+        <p class="sk-note" id="deepNote"></p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>첫 층 가중치 기울기 ‖∂L/∂W₁‖</h2><span class="sk-hint" id="deepTblHint"></span></div>
+        <div class="sk-scroll"><table class="sk-table rs-table" id="deepTable"></table></div>
+        <p class="sk-hint" style="margin:0">절대값은 손실 크기·모형 크기에 따라 다릅니다. 비교할 것은 <b>자릿수(10의 몇 제곱인가)</b>입니다. 강의 실측은 22층 CNN의 첫 합성곱 층 값입니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 3. 학습 ================= -->
+  <section id="pane-train" role="tabpanel" aria-labelledby="tab-train" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>같은 깊이 · 같은 폭 · 같은 초기값 규칙: plain MLP vs residual MLP</h2><span class="sk-hint">폭 16, 점 240개, Adam(학습률 0.003), 난수 고정</span></div>
+      <p class="sk-note"><b>보는 곳은 훈련 손실입니다.</b> 시험(검증) 성능이 아니라 훈련 데이터조차 plain이 더 못 맞춘다면, 과적합이 아니라 최적화 문제(퇴화)입니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--primary" id="trStart">학습 시작</button>
+          <button type="button" class="sk-btn" id="trStop">멈춤</button>
+          <button type="button" class="sk-btn" id="trReset">초기화</button>
+        </div>
+        <div class="sk-group"><span class="sk-label">층 수</span>
+          <div class="sk-seg" id="trDepth" role="group" aria-label="층 수"><button type="button" data-v="10" aria-pressed="false">10</button><button type="button" data-v="20" aria-pressed="true">20</button><button type="button" data-v="40" aria-pressed="false">40</button></div></div>
+        <div class="sk-group"><span class="sk-label">데이터</span>
+          <div class="sk-seg" id="trData" role="group" aria-label="데이터"><button type="button" data-v="spiral" aria-pressed="true">나선</button><button type="button" data-v="circle" aria-pressed="false">동심원</button></div></div>
+        <div class="sk-group"><span class="sk-label">초기화</span>
+          <div class="sk-seg" id="trInit" role="group" aria-label="초기화 방식"><button type="button" data-v="pt" aria-pressed="true">기본 (PyTorch)</button><button type="button" data-v="he" aria-pressed="false">He</button></div></div>
+        <div class="sk-group"><span class="sk-label">손실 축</span>
+          <div class="sk-seg" id="trAxis" role="group" aria-label="손실 축"><button type="button" data-v="lin" aria-pressed="true">선형</button><button type="button" data-v="log" aria-pressed="false">로그</button></div></div>
+      </div>
+      <div class="sk-stats" id="trStats"></div>
+    </div>
+    <div class="sk-grid2" style="margin-top:16px">
+      <div class="sk-card">
+        <div class="sk-head"><h3>훈련 손실 (이진 교차 엔트로피)</h3><div class="sk-legend"><span><i style="background:var(--f)"></i>plain</span><span><i style="background:var(--sc)"></i>residual</span></div></div>
+        <div class="rs-chart" id="chLoss" role="img" aria-label="학습 단계별 훈련 손실 차트"></div>
+        <p class="sk-hint" style="margin:0">점선 0.693 = ln 2, 두 부류를 반반으로 찍는 수준의 손실입니다.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h3>결정 경계 (훈련 데이터 위)</h3><div class="sk-legend"><span><i style="background:var(--c0)"></i>부류 0</span><span><i style="background:var(--c1)"></i>부류 1</span></div></div>
+        <div class="rs-bnds">
+          <div class="rs-bnd"><h3 class="rs-f">plain</h3><canvas id="bnP" aria-label="plain 모형의 결정 경계"></canvas></div>
+          <div class="rs-bnd"><h3 class="rs-sc">residual</h3><canvas id="bnR" aria-label="residual 모형의 결정 경계"></canvas></div>
+        </div>
+      </div>
+    </div>
+    <div class="sk-card" style="margin-top:16px">
+      <h2>결과 읽기</h2>
+      <p class="sk-lead" id="trRead"></p>
+      <p class="sk-note">결과가 항상 극적이지는 않습니다. 이 장난감 문제는 작고 쉬워서, He 초기화를 고르면 plain도 잘 배웁니다. 강의의 퇴화(56층 &gt; 20층 훈련 오차)는 BN으로 기울기가 흐르는 큰 CNN에서도 나타난 현상입니다. 여기서는 BN 없이 기본 초기화로 "plain은 훈련 손실조차 잘 줄지 않는다"를 먼저 눈으로 봅니다.</p>
+    </div>
+  </section>
+
+  <!-- ================= 4. 설계와 shape ================= -->
+  <section id="pane-design" role="tabpanel" aria-labelledby="tab-design" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>(a) BasicBlock vs Bottleneck 파라미터</h2><span class="sk-hint">합성곱 가중치만 셈 (Conv 뒤 BN이 있어 bias 없음, BN 파라미터 제외)</span></div>
+      <div class="sk-controls">
+        <div class="sk-slider" style="min-width:260px"><div class="sk-sl-head"><label for="pC">채널 수 C</label><b id="pCv">256</b></div><input type="range" id="pC" min="0" max="5" step="1" value="2"></div>
+      </div>
+      <div class="sk-grid2">
+        <div class="sk-formula" id="pBasic"></div>
+        <div class="sk-formula" id="pBottle"></div>
+      </div>
+      <div class="rs-pbar" id="pBars"></div>
+      <p class="sk-note" id="pNote"></p>
+    </div>
+
+    <div class="sk-card" style="margin-top:16px">
+      <div class="sk-head"><h2>(b) 지름길 shape 맞추기</h2><span class="sk-hint">Add는 두 텐서의 shape이 완전히 같아야 합니다</span></div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">입력 H=W</span><div class="sk-seg" id="shH" role="group" aria-label="입력 크기"><button type="button" data-v="56" aria-pressed="true">56</button><button type="button" data-v="28" aria-pressed="false">28</button><button type="button" data-v="14" aria-pressed="false">14</button></div></div>
+        <div class="sk-group"><span class="sk-label">입력 채널</span><div class="sk-seg" id="shCi" role="group" aria-label="입력 채널"><button type="button" data-v="64" aria-pressed="true">64</button><button type="button" data-v="128" aria-pressed="false">128</button><button type="button" data-v="256" aria-pressed="false">256</button></div></div>
+        <div class="sk-group"><span class="sk-label">stride</span><div class="sk-seg" id="shS" role="group" aria-label="stride"><button type="button" data-v="1" aria-pressed="false">1</button><button type="button" data-v="2" aria-pressed="true">2</button></div></div>
+        <div class="sk-group"><span class="sk-label">출력 채널</span><div class="sk-seg" id="shCo" role="group" aria-label="출력 채널"><button type="button" data-v="64" aria-pressed="false">64</button><button type="button" data-v="128" aria-pressed="true">128</button><button type="button" data-v="256" aria-pressed="false">256</button><button type="button" data-v="512" aria-pressed="false">512</button></div></div>
+      </div>
+      <div class="rs-shape" id="shView"></div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">지름길 처리</span><div class="sk-seg" id="shOpt" role="group" aria-label="지름길 처리 방식"><button type="button" data-v="none" aria-pressed="true">그대로(항등)</button><button type="button" data-v="A" aria-pressed="false">옵션 A 0-패딩</button><button type="button" data-v="B" aria-pressed="false">옵션 B 1×1 Conv</button><button type="button" data-v="C" aria-pressed="false">옵션 C 모두 1×1</button></div></div>
+      </div>
+      <div id="shResult"></div>
+    </div>
+
+    <div class="sk-card" style="margin-top:16px">
+      <div class="sk-head"><h2>(c) 더하기(Add) vs 잇기(Concat)</h2><span class="sk-hint">다음 층: 3×3 Conv, 출력 채널 K</span></div>
+      <div class="sk-controls">
+        <div class="sk-slider"><div class="sk-sl-head"><label for="cC">두 텐서의 채널 C</label><b id="cCv">64</b></div><input type="range" id="cC" min="0" max="4" step="1" value="1"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="cK">다음 층 출력 채널 K</label><b id="cKv">64</b></div><input type="range" id="cK" min="0" max="4" step="1" value="1"></div>
+      </div>
+      <div class="rs-cmp" id="catView"></div>
+      <div class="sk-scroll"><table class="sk-table">
+        <thead><tr><th>스킵 연결 4형제</th><th>합치는 방식</th><th>목적</th><th>채널</th></tr></thead>
+        <tbody>
+          <tr><td><b>ResNet 잔차</b></td><td>덧셈 (+)</td><td>최적화: 더 깊게 쌓기</td><td>그대로</td></tr>
+          <tr><td><b>U-Net skip</b></td><td>연결 (concat)</td><td>위치 정보 복원 (인코더 → 디코더)</td><td>늘어남</td></tr>
+          <tr><td><b>DenseNet</b></td><td>연결 (concat)</td><td>특징 재사용</td><td>층마다 누적</td></tr>
+          <tr><td><b>Transformer 잔차</b></td><td>덧셈 (+)</td><td>ResNet과 같은 원리 (깊은 층 최적화)</td><td>그대로 (d_model)</td></tr>
+        </tbody>
+      </table></div>
+      <p class="rs-quote">"ResNet은 더 깊게 만들려고 더하고, U-Net은 어디에 있었는지 되찾으려고 잇는다."</p>
+    </div>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js"></script>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const reduceMotion=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+function gauss(r){let u=0;while(!u)u=r();const v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const fmt=(v,d=2)=>{const s=v.toFixed(d);return s==="-0.00"||s==="-0.0"?s.slice(1):s;};
+const sgn=(v,d=2)=>(v<0?"−":"")+fmt(Math.abs(v),d);
+const comma=n=>Math.round(n).toLocaleString("en-US");
+const SUP={"-":"⁻","0":"⁰","1":"¹","2":"²","3":"³","4":"⁴","5":"⁵","6":"⁶","7":"⁷","8":"⁸","9":"⁹"};
+const pow10=e=>e===0?"1":(e===1?"10":"10"+String(e).split("").map(c=>SUP[c]).join(""));
+function sci(v){ if(!isFinite(v)) return "∞"; if(v===0) return "0"; const e=Math.floor(Math.log10(Math.abs(v))); if(e>=-1&&e<=3) return v>=100?comma(v):v.toPrecision(2); const m=v/Math.pow(10,e); return m.toFixed(1)+"×"+pow10(e); }
+function css(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
+function hexRgb(h){h=h.replace("#","");if(h.length===3)h=h.split("").map(c=>c+c).join("");const n=parseInt(h,16);return[(n>>16)&255,(n>>8)&255,n&255];}
+function mix(a,b,t){return[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
+const rgb=c=>`rgb(${c[0]|0},${c[1]|0},${c[2]|0})`;
+function fitCanvas(cv){const dpr=window.devicePixelRatio||1;const w=Math.max(40,cv.clientWidth),h=Math.max(40,cv.clientHeight||w);cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);const ctx=cv.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);return{ctx,w,h};}
+function segInit(el,onChange){
+  el.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b?"true":"false"));onChange(b.dataset.v);}));
+  return ()=>el.querySelector('button[aria-pressed="true"]').dataset.v;
+}
+function segSet(el,v){el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x.dataset.v===String(v)?"true":"false"));}
+
+/* ---------------- 공통: 선 그래프(SVG) ---------------- */
+function drawChart(host,o){
+  const W=Math.max(260,Math.round(host.clientWidth||600)),H=o.h||250;
+  const mL=o.log?50:44,mR=o.endLabels?64:14,mT=14,mB=38;
+  const pw=W-mL-mR,ph=H-mT-mB;
+  let lo,hi;
+  if(o.log){
+    let mn=Infinity,mx=-Infinity;o.series.forEach(s=>s.vals.forEach(v=>{if(v>0&&isFinite(v)){mn=Math.min(mn,v);mx=Math.max(mx,v);}}));
+    if(!isFinite(mn)){mn=1e-3;mx=1;}
+    lo=Math.floor(Math.log10(mn));hi=Math.ceil(Math.log10(mx));
+    if(o.logMin!==undefined)lo=Math.max(lo,o.logMin); if(o.logMax!==undefined)hi=Math.min(hi,o.logMax);
+    if(hi-lo<2){hi=Math.max(hi,lo+2);}
+  }else{lo=o.yMin;hi=o.yMax;}
+  const X=i=>mL+pw*(o.xMax>0?i/o.xMax:0);
+  const Y=v=>{let t;if(o.log){t=(Math.log10(Math.max(v,1e-300))-lo)/(hi-lo);}else t=(v-lo)/(hi-lo);t=Math.max(0,Math.min(1,t));return mT+ph*(1-t);};
+  let s="";
+  if(o.log){const span=hi-lo,step=span>12?3:span>7?2:1;
+    for(let e=lo;e<=hi;e++){const y=Y(Math.pow(10,e));s+=`<line class="${e===0?"gl0":"gl"}" x1="${mL}" x2="${mL+pw}" y1="${y}" y2="${y}"/>`;if((e-lo)%step===0)s+=`<text class="ax" x="${mL-6}" y="${y+4}" text-anchor="end">${pow10(e)}</text>`;}
+  }else{o.yTicks.forEach(v=>{const y=Y(v);s+=`<line class="gl" x1="${mL}" x2="${mL+pw}" y1="${y}" y2="${y}"/><text class="ax" x="${mL-6}" y="${y+4}" text-anchor="end">${v}</text>`;});}
+  (o.refs||[]).forEach(r=>{if(!o.log&&(r.v<lo||r.v>hi))return;const y=Y(r.v);s+=`<line class="ref" x1="${mL}" x2="${mL+pw}" y1="${y}" y2="${y}"/><text class="reft" x="${mL+6}" y="${y-5}">${r.label}</text>`;});
+  const nt=Math.min(o.xMax,W<420?4:7),xt=[];
+  if(o.xMax>0){const raw=o.xMax/nt,mag=Math.pow(10,Math.floor(Math.log10(raw))),st=[1,2,5,10].map(k=>k*mag).find(k=>k>=raw)||raw;for(let v=0;v<=o.xMax+1e-9;v+=st)xt.push(Math.round(v));}
+  xt.forEach(v=>{s+=`<text class="ax" x="${X(v)}" y="${mT+ph+16}" text-anchor="middle">${v}</text>`;});
+  s+=`<line class="gl0" x1="${mL}" x2="${mL+pw}" y1="${mT+ph}" y2="${mT+ph}"/>`;
+  s+=`<text class="axl" x="${mL+pw/2}" y="${H-4}" text-anchor="middle">${o.xLabel||""}</text>`;
+  const ends=[];
+  o.series.forEach(se=>{
+    const n=se.vals.length;if(!n)return;const stride=Math.max(1,Math.ceil(n/500));let d="";
+    for(let i=0;i<n;i+=stride){const v=se.vals[i];d+=(d?"L":"M")+X(se.x?se.x(i):i).toFixed(1)+","+Y(v).toFixed(1);}
+    if((n-1)%stride){const i=n-1;d+="L"+X(se.x?se.x(i):i).toFixed(1)+","+Y(se.vals[i]).toFixed(1);}
+    s+=`<path class="sr ${se.cls}" d="${d}"/>`;
+    const li=n-1,ex=X(se.x?se.x(li):li),ey=Y(se.vals[li]);s+=`<circle class="ep ${se.cls}" cx="${ex}" cy="${ey}" r="4"/>`;
+    if(o.endLabels)ends.push({y:ey,x:ex,t:o.endLabels(se.vals[li]),cls:se.cls});
+    (se.marks||[]).forEach(m=>{s+=`<circle class="ep ${se.cls}" cx="${X(m)}" cy="${Y(se.vals[m])}" r="3.5"/>`;});
+  });
+  if(ends.length===2&&Math.abs(ends[0].y-ends[1].y)<14){const a=ends[0].y<=ends[1].y?ends[0]:ends[1],b=a===ends[0]?ends[1]:ends[0];const mid=(a.y+b.y)/2;a.y=mid-7;b.y=mid+7;}
+  ends.forEach(e=>{s+=`<text class="el ${e.cls}" x="${e.x+8}" y="${e.y+4}">${e.t}</text>`;});
+  (o.notes||[]).forEach(t=>{s+=`<text class="reft" x="${t.x==="r"?mL+pw-4:mL+6}" y="${mT+12}" text-anchor="${t.x==="r"?"end":"start"}">${t.text}</text>`;});
+  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${s}</svg>`;
+}
+
+/* ================= 탭 ================= */
+const TABS=["block","deep","train","design"];let curTab="block";
+const onShow={};
+function showTab(k,focus){
+  if(!TABS.includes(k))k="block";
+  TABS.forEach(t=>{const b=$("tab-"+t),p=$("pane-"+t),on=t===k;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;p.hidden=!on;});
+  const prev=curTab;curTab=k;
+  if(focus)$("tab-"+k).focus();
+  if(location.hash!=="#"+k)history.replaceState(null,"","#"+k);
+  if(prev==="train"&&k!=="train")TR.pause();
+  if(prev==="block"&&k!=="block")BL.stop();
+  onShow[k]&&onShow[k]();
+}
+TABS.forEach(t=>$("tab-"+t).addEventListener("click",()=>showTab(t)));
+document.querySelector(".sk-tabs").addEventListener("keydown",e=>{
+  if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;e.preventDefault();e.stopPropagation();
+  const i=TABS.indexOf(curTab),n=(i+(e.key==="ArrowRight"?1:-1)+TABS.length)%TABS.length;showTab(TABS[n],true);
+});
+window.addEventListener("hashchange",()=>{const k=location.hash.slice(1);if(TABS.includes(k)&&k!==curTab)showTab(k);});
+
+/* ================= 1. 잔차 블록 ================= */
+const BL=(function(){
+  const X0=[
+    [0,0,0,0,0,0,0,0],
+    [0,.2,.2,.2,.2,0,0,0],
+    [0,.2,1,1,.9,.2,0,0],
+    [0,.2,1,1,1,.2,0,0],
+    [0,.2,.9,1,1,.2,.3,.3],
+    [0,0,.2,.2,.2,.3,.7,.6],
+    [0,0,0,0,0,.3,.6,.5],
+    [0,0,0,0,0,0,0,0]];
+  const N=8;
+  const st={s:0.8,sc:true,relu:"post",step:-1,sel:[1,2],playing:false,timer:null};
+  const relu=v=>v>0?v:0;
+  function blur(x){const o=[];for(let r=0;r<N;r++){o.push([]);for(let c=0;c<N;c++){let t=0;for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){const rr=r+dr,cc=c+dc;if(rr>=0&&rr<N&&cc>=0&&cc<N)t+=x[rr][cc];}o[r].push(t/9);}}return o;}
+  const B0=blur(X0);
+  function compute(){
+    const F=[],S=[],Y=[];
+    for(let r=0;r<N;r++){F.push([]);S.push([]);Y.push([]);for(let c=0;c<N;c++){
+      const f=st.s*(relu(X0[r][c])-relu(B0[r][c]));F[r].push(f);
+      let sum,y;
+      if(!st.sc){sum=f;y=relu(f);}
+      else if(st.relu==="post"){sum=f+X0[r][c];y=relu(sum);}
+      else{sum=relu(f)+X0[r][c];y=sum;}
+      S[r].push(sum);Y[r].push(y);}}
+    return{F,S,Y};
+  }
+  function drawMap(cv,M,sel,role){
+    const {ctx,w}=fitCanvas(cv);const z=hexRgb(css("--surface-2")),p=hexRgb(css("--ink")),ng=hexRgb(css("--neg")),ln=css("--line"),rc=css(role);
+    const cs=w/N;ctx.clearRect(0,0,w,w);
+    for(let r=0;r<N;r++)for(let c=0;c<N;c++){const v=M[r][c];const t=Math.min(1,Math.abs(v));ctx.fillStyle=rgb(mix(z,v<0?ng:p,Math.pow(t,0.85)));ctx.fillRect(c*cs,r*cs,cs+.5,cs+.5);}
+    ctx.strokeStyle=ln;ctx.lineWidth=1;ctx.globalAlpha=.55;
+    for(let i=1;i<N;i++){ctx.beginPath();ctx.moveTo(i*cs,0);ctx.lineTo(i*cs,w);ctx.moveTo(0,i*cs);ctx.lineTo(w,i*cs);ctx.stroke();}
+    ctx.globalAlpha=1;
+    const [sr,sc]=sel;ctx.lineWidth=3;ctx.strokeStyle=rc;ctx.strokeRect(sc*cs+1.5,sr*cs+1.5,cs-3,cs-3);
+  }
+  function stats(M){let mn=Infinity,mx=-Infinity;M.forEach(r=>r.forEach(v=>{mn=Math.min(mn,v);mx=Math.max(mx,v);}));return{mn,mx};}
+  const STEP_ROLE=[0,1,0,2,3];
+  function diagram(){
+    const host=$("diagram"),vw=host.clientWidth||800,vert=vw<640;
+    const items=[{l:"3×3 Conv"},{l:"BN"},{l:"ReLU"},{l:"3×3 Conv"},{l:"BN"}];
+    if(st.relu==="pre")items.push({l:"ReLU",pre:1});
+    const bw=vert?132:78,bh=vert?30:36,sp=vert?44:88;
+    const cM=vert?196:132,cS=vert?44:46;
+    let t=vert?28:40;const tx=t;t+=vert?50:86;
+    items.forEach(it=>{it.t=t;t+=sp;});
+    const tp=t-(vert?4:10);t=tp+(vert?48:74);let tr=null;
+    if(st.relu==="post"){tr=t;t+=sp;}
+    const to=t;const total=to+(vert?30:40);
+    const P=(tt,cc)=>vert?[cc,tt]:[tt,cc];
+    const Wd=vert?336:total,Ht=vert?total:200;
+    const hl=k=>st.step<0?"":(st.step===k?"hl":"dim");
+    const sw=1.5+2.5*Math.min(1,st.s/1.2),op=st.s===0?.35:1;
+    let s="";
+    // 지름길
+    const scPts=[P(tx,cM),P(tx,cS),P(tp,cS),P(tp,cM)].map(p=>p.join(",")).join(" ");
+    s+=`<g class="${hl(2)}">`;
+    if(st.sc){s+=`<polyline class="ln s" points="${scPts}" stroke-width="4"/>`;if(!reduceMotion)s+=`<polyline class="flow" points="${scPts}" stroke-width="2.4"/>`;}
+    else s+=`<polyline class="ln off" points="${scPts}" stroke-width="2.5"/>`;
+    const mid=P((tx+tp)/2,cS);
+    const scLab=st.sc?"지름길: x 그대로 (가중치 없음)":"지름길 끔 (plain 블록)";
+    if(vert){const a=st.sc?["지름길","x 그대로"]:["지름길 끔","(plain)"];s+=`<text class="lb" x="${cS+10}" y="${mid[1]-14}" fill="${st.sc?"var(--sc)":"var(--faint)"}">${a.map((w,i)=>`<tspan x="${cS+10}" dy="${i?16:0}">${w}</tspan>`).join("")}</text>`;}
+    else s+=`<text class="lb" x="${mid[0]}" y="${mid[1]-10}" text-anchor="middle" fill="${st.sc?"var(--sc)":"var(--faint)"}">${scLab}</text>`;
+    if(!st.sc){const q=P((tx+tp)/2+(vert?40:0),cS);s+=`<text class="lb" x="${q[0]}" y="${q[1]+5}" text-anchor="middle" fill="var(--neg)" font-size="18">✕</text>`;}
+    s+=`</g>`;
+    // 주 경로
+    const mA=P(tx,cM),mB=P(tp,cM);
+    s+=`<g class="${hl(1)}" opacity="${op}"><line class="ln m" x1="${mA[0]}" y1="${mA[1]}" x2="${mB[0]}" y2="${mB[1]}" stroke-width="${sw}"/>`;
+    if(!reduceMotion&&st.s>0)s+=`<line class="flow" x1="${mA[0]}" y1="${mA[1]}" x2="${mB[0]}" y2="${mB[1]}" stroke-width="2"/>`;
+    items.forEach(it=>{const c=P(it.t,cM);s+=`<rect class="bx ${it.pre?"p":"m"}" x="${c[0]-bw/2}" y="${c[1]-bh/2}" width="${bw}" height="${bh}" rx="7" ${it.pre?'stroke-dasharray="4 3"':""}/><text class="bt" x="${c[0]}" y="${c[1]+4.5}" text-anchor="middle">${it.l}</text>`;});
+    const fl=P((items[0].t+items[items.length-1].t)/2,cM+(vert?0:bh/2+18));
+    if(vert){const lx=cM+bw/2+8;s+=`<text class="lb" x="${lx}" y="${fl[1]-8}" fill="var(--f)"><tspan x="${lx}">F(x)</tspan><tspan x="${lx}" dy="16">s=${fmt(st.s)}</tspan></text>`;}
+    else s+=`<text class="lb" x="${fl[0]}" y="${fl[1]}" text-anchor="middle" fill="var(--f)">주 경로 F(x) · 가중치 크기 s = ${fmt(st.s)}</text>`;
+    s+=`</g>`;
+    // 덧셈 뒤
+    const pp=P(tp,cM),po=P(to,cM);
+    s+=`<g class="${hl(4)}"><line class="ln p" x1="${pp[0]}" y1="${pp[1]}" x2="${po[0]}" y2="${po[1]}" stroke-width="3"/>`;
+    if(tr!==null){const c=P(tr,cM);s+=`<rect class="bx p" x="${c[0]-bw/2}" y="${c[1]-bh/2}" width="${bw}" height="${bh}" rx="7"/><text class="bt" x="${c[0]}" y="${c[1]+4.5}" text-anchor="middle">ReLU</text>`;}
+    s+=`<circle class="io" cx="${po[0]}" cy="${po[1]}" r="17"/><text class="bt" x="${po[0]}" y="${po[1]+5}" text-anchor="middle">y</text></g>`;
+    s+=`<g class="${hl(3)}"><circle class="pl" cx="${pp[0]}" cy="${pp[1]}" r="17"/><text class="plt" x="${pp[0]}" y="${pp[1]+7}" text-anchor="middle">+</text></g>`;
+    s+=`<g class="${hl(0)}"><circle class="io" cx="${mA[0]}" cy="${mA[1]}" r="17"/><text class="bt" x="${mA[0]}" y="${mA[1]+5}" text-anchor="middle">x</text></g>`;
+    if(st.relu==="pre"){const c=P(items[items.length-1].t,cM);s+=`<text class="lb" x="${c[0]+(vert?bw/2+8:0)}" y="${c[1]+(vert?4:-bh/2-8)}" text-anchor="${vert?"start":"middle"}" fill="var(--neg)">음수 잘림</text>`;}
+    host.innerHTML=`<svg viewBox="0 0 ${Wd} ${Ht}" style="max-width:${vert?380:Wd}px" aria-hidden="true">${s}</svg>`;
+  }
+  function render(){
+    const {F,S,Y}=compute();
+    $("sWv").textContent=fmt(st.s);
+    const off=!st.sc,pre=st.relu==="pre";
+    $("t2").textContent=off?"F(x) (더할 x 없음)":(pre?"ReLU(F(x)) + x":"F(x) + x");
+    $("t3").textContent=off?"출력 ReLU(F(x))":(pre?"출력 ReLU(F(x)) + x":"출력 ReLU(F(x) + x)");
+    const mats=[X0,F,S,Y],roles=["--sc","--f","--sum","--ink"];
+    mats.forEach((M,i)=>{drawMap($("cv"+i),M,st.sel,roles[i]);const q=stats(M);$("sub"+i).textContent=`범위 ${sgn(q.mn)} ~ ${sgn(q.mx)}`;});
+    // 선택 칸
+    const [r,c]=st.sel,x=X0[r][c],f=F[r][c],sm=S[r][c],y=Y[r][c];
+    let fl=`칸 (${r+1}행, ${c+1}열):  x = ${fmt(x)},  흐린 x = ${fmt(B0[r][c])},  F(x) = ${fmt(st.s)} × (${fmt(x)} − ${fmt(B0[r][c])}) = <span class="rs-f">${sgn(f)}</span><br>`;
+    if(off)fl+=`지름길 없음:  y = ReLU(F(x)) = ReLU(${sgn(f)}) = <b>${fmt(y)}</b>`;
+    else if(!pre)fl+=`y = ReLU(F(x) + x) = ReLU(${sgn(f)} + ${fmt(x)}) = ReLU(<span class="rs-sum">${sgn(sm)}</span>) = <b>${fmt(y)}</b>`;
+    else fl+=`y = ReLU(F(x)) + x = ReLU(${sgn(f)}) + ${fmt(x)} = <b>${fmt(y)}</b>`;
+    $("cellFormula").innerHTML=fl;
+    // 통계
+    let d2=0,y2=0,negF=0,darker=0,bright=0;
+    for(let i=0;i<N;i++)for(let j=0;j<N;j++){d2+=(Y[i][j]-X0[i][j])**2;y2+=Y[i][j]**2;if(F[i][j]<-0.005)negF++;if(Y[i][j]<X0[i][j]-0.005)darker++;if(Y[i][j]>X0[i][j]+0.005)bright++;}
+    let x2=0;X0.forEach(rw=>rw.forEach(v=>x2+=v*v));
+    $("blockStats").innerHTML=
+      `<div class="sk-stat"><b>${fmt(Math.sqrt(d2))}</b><span>‖y − x‖ 항등에서 벗어난 정도</span></div>`+
+      `<div class="sk-stat"><b>${fmt(Math.sqrt(y2))}</b><span>‖y‖ 출력 크기 (‖x‖ = ${fmt(Math.sqrt(x2))})</span></div>`+
+      `<div class="sk-stat"><b>${negF}</b><span>F(x)가 음수인 칸</span></div>`+
+      `<div class="sk-stat"><b>${darker} / ${bright}</b><span>x보다 어두워진 칸 / 밝아진 칸</span></div>`;
+    let note="";
+    if(st.s===0&&st.sc)note=`<p class="sk-note"><b>가중치 0 → 잔차 블록 출력 = x (항등).</b> 입력이 0 이상이라 ReLU(0 + x) = x 입니다. ‖y − x‖ = ${fmt(Math.sqrt(d2))}.</p>`;
+    else if(st.s===0&&!st.sc)note=`<p class="sk-note sk-note--warn"><b>가중치 0 → plain 블록 출력 = 0.</b> 입력 정보가 모두 사라졌습니다. plain으로 항등을 만들려면 가중치를 정확한 모양으로 배워야 합니다.</p>`;
+    else if(!st.sc)note=`<p class="sk-note sk-note--warn"><b>지름길 끔:</b> 출력에는 가장자리 강조분만 남고 원래 모양(x)이 사라집니다.</p>`;
+    else if(pre)note=`<p class="sk-note sk-note--warn"><b>ReLU를 덧셈 앞에 두면</b> F(x)의 음수 ${negF}칸이 모두 0으로 잘려, x보다 어두워진 칸이 ${darker}개입니다. 잔차가 "빼기"를 못 합니다.</p>`;
+    else note=`<p class="sk-note"><b>표준 순서 ReLU(F(x) + x):</b> F(x)의 음수로 x보다 어두워진 칸 ${darker}개, 밝아진 칸 ${bright}개. 잔차는 더하기와 빼기를 모두 할 수 있습니다.</p>`;
+    $("blockNote").innerHTML=note;
+    // 단계 표시
+    document.querySelectorAll("#stepper li").forEach((li,i)=>{li.className=st.step<0?"":(i===st.step?"on":(i<st.step?"done":""));});
+    for(let i=0;i<4;i++)$("mp"+i).classList.toggle("on",st.step>=0&&STEP_ROLE[st.step]===i);
+    const caps=[
+      `<b>① 입력 x</b>: 앞 층 ReLU를 지나온 특성맵이라 모두 0 이상입니다. 선택한 칸 x = <b>${fmt(x)}</b>.`,
+      `<b>② 주 경로</b>가 잔차 F(x)를 계산합니다 (3×3 Conv → BN → ReLU → 3×3 Conv → BN). s = ${fmt(st.s)} → F = <b class="rs-f">${sgn(f)}</b>.${st.s===0?" 가중치가 0이면 F(x) = 0, 즉 아무것도 하지 않습니다.":""}`,
+      off?`<b>③ 지름길 끔</b>: x가 출력 쪽으로 전달되지 않습니다. 이것이 plain 블록입니다.`:`<b>③ 지름길</b>은 x를 계산 없이 그대로 옮깁니다. 가중치도, 파라미터도 없습니다. 옮겨진 값 = <b class="rs-sc">${fmt(x)}</b>.`,
+      off?`<b>④ 더하기 없음</b>: 더할 x가 없어 F(x) = <b>${sgn(f)}</b> 가 그대로 갑니다.`:(pre?`<b>④ 더하기</b>: 덧셈 앞에서 이미 ReLU를 거쳐 ReLU(F) = ${fmt(relu(f))}, 여기에 x를 더해 <b class="rs-sum">${fmt(sm)}</b>.`:`<b>④ 더하기</b>: F(x) + x = ${sgn(f)} + ${fmt(x)} = <b class="rs-sum">${sgn(sm)}</b>. shape이 같아야 더할 수 있습니다.`),
+      pre&&!off?`<b>⑤ 출력</b>: 덧셈 뒤 ReLU가 없으므로 y = <b>${fmt(y)}</b>. F의 음수는 반영되지 못했습니다.`:`<b>⑤ ReLU → 출력</b>: y = ReLU(${sgn(sm)}) = <b>${fmt(y)}</b>.`
+    ];
+    $("stepCap").innerHTML=st.step<0?`<b>이전 · 다음</b>으로 한 단계씩, <b>재생</b>으로 자동 진행합니다. 네 그림은 같은 색 기준(0 = 바탕색)으로 칠했습니다.`:caps[st.step];
+    diagram();
+  }
+  function stop(){st.playing=false;clearTimeout(st.timer);$("stPlay").textContent="재생";}
+  function go(k){st.step=Math.max(0,Math.min(4,k));render();}
+  function tick(){if(!st.playing)return;if(st.step>=4){st.step=0;}else st.step++;render();st.timer=setTimeout(tick,1500/parseFloat($("stSpeed").value));}
+  function init(){
+    $("sW").addEventListener("input",e=>{st.s=parseFloat(e.target.value);render();});
+    $("sZero").addEventListener("click",()=>{st.s=0;$("sW").value=0;render();});
+    $("scOn").addEventListener("change",e=>{st.sc=e.target.checked;render();});
+    segInit($("reluSeg"),v=>{st.relu=v;render();});
+    $("stFirst").addEventListener("click",()=>{stop();go(0);});
+    $("stPrev").addEventListener("click",()=>{stop();go(st.step<0?0:st.step-1);});
+    $("stNext").addEventListener("click",()=>{stop();go(st.step+1);});
+    $("stPlay").addEventListener("click",()=>{if(st.playing){stop();return;}st.playing=true;$("stPlay").textContent="멈춤";if(st.step<0||st.step>=4)st.step=-1;tick();});
+    $("stSpeed").addEventListener("input",e=>{$("stSpeedV").textContent=e.target.value+"×";});
+    for(let i=0;i<4;i++){$("cv"+i).addEventListener("click",e=>{const rc=e.currentTarget.getBoundingClientRect();const c=Math.floor((e.clientX-rc.left)/rc.width*N),r=Math.floor((e.clientY-rc.top)/rc.height*N);if(r>=0&&r<N&&c>=0&&c<N){st.sel=[r,c];render();}});}
+    document.addEventListener("keydown",e=>{
+      if(curTab!=="block"||e.key!=="ArrowRight")return;
+      const tg=e.target;if(tg&&(/INPUT|TEXTAREA|SELECT/.test(tg.tagName)||tg.closest(".sk-tabs")))return;
+      e.preventDefault();stop();go(st.step+1);
+    });
+    // 색 막대
+    const z=css("--surface-2");
+    $("scaleBar").style.background=`linear-gradient(90deg,var(--neg),${z} 50%,var(--ink))`;
+    render();
+  }
+  return{init,render,stop,st};
+})();
+
+/* ================= 2. 깊게 쌓으면 ================= */
+const DP=(function(){
+  const d=16,Bn=64;const st={L:22,g:1,bn:false,seed:7};
+  function run(L,g,bn,res,seed){
+    const r=mulberry32(seed);const Ws=[];for(let l=0;l<L;l++){const W=new Float64Array(d*d);for(let i=0;i<d*d;i++)W[i]=gauss(r)*g/Math.sqrt(d);Ws.push(W);}
+    const r2=mulberry32(seed*31+99);let H=[];for(let b=0;b<Bn;b++){const h=new Float64Array(d);for(let i=0;i<d;i++)h[i]=gauss(r2);H.push(h);}
+    // 손실 L = (1/(B·d)) Σ ⟨c_b, h_L,b⟩  →  ∂L/∂h_L = c/(B·d)
+    const G0=[];for(let b=0;b<Bn;b++){const gg=new Float64Array(d);for(let i=0;i<d;i++)gg[i]=gauss(r2)/(Bn*d);G0.push(gg);}
+    const rms=M=>{let s=0;for(const v of M)for(const x of v)s+=x*x;return Math.sqrt(s/(M.length*d));};
+    const cache=[],fwd=[rms(H)];
+    for(let l=0;l<L;l++){
+      const W=Ws[l],A=H.map(h=>h.map(x=>x>0?x:0));
+      const U=A.map(a=>{const u=new Float64Array(d);for(let i=0;i<d;i++){let s=0;const o=i*d;for(let j=0;j<d;j++)s+=W[o+j]*a[j];u[i]=s;}return u;});
+      let V=U,sd=null;
+      if(bn){sd=new Float64Array(d);const mu=new Float64Array(d);for(let i=0;i<d;i++){let m=0;for(const u of U)m+=u[i];m/=Bn;let v=0;for(const u of U)v+=(u[i]-m)*(u[i]-m);v/=Bn;mu[i]=m;sd[i]=Math.sqrt(v+1e-5);}V=U.map(u=>u.map((x,i)=>(x-mu[i])/sd[i]));}
+      cache.push({H,A,V,sd});
+      H=res?H.map((h,b)=>h.map((x,i)=>x+V[b][i])):V;fwd.push(rms(H));
+    }
+    let G=G0;const bwd=new Array(L+1);bwd[L]=rms(G);let gW1=0;
+    for(let l=L-1;l>=0;l--){
+      const c=cache[l];let GU=G;
+      if(bn){GU=G.map(()=>new Float64Array(d));for(let i=0;i<d;i++){let m1=0,m2=0;for(let b=0;b<Bn;b++){m1+=G[b][i];m2+=G[b][i]*c.V[b][i];}m1/=Bn;m2/=Bn;for(let b=0;b<Bn;b++)GU[b][i]=(G[b][i]-m1-c.V[b][i]*m2)/c.sd[i];}}
+      const W=Ws[l];
+      if(l===0){let s=0;for(let i=0;i<d;i++)for(let j=0;j<d;j++){let t=0;for(let b=0;b<Bn;b++)t+=GU[b][i]*c.A[b][j];s+=t*t;}gW1=Math.sqrt(s);}
+      G=c.H.map((h,b)=>{const gh=new Float64Array(d);for(let j=0;j<d;j++){if(h[j]<=0)continue;let s=0;for(let i=0;i<d;i++)s+=W[i*d+j]*GU[b][i];gh[j]=s;}if(res)for(let j=0;j<d;j++)gh[j]+=G[b][j];return gh;});
+      bwd[l]=rms(G);
+    }
+    return{fwd,bwd:bwd.map(v=>v/bwd[L]),gW1};
+  }
+  let last=null;
+  function compute(){
+    const {L,g,seed}=st;
+    const R={};[false,true].forEach(bn=>[false,true].forEach(res=>{R[(bn?"bn":"no")+(res?"R":"P")]=run(L,g,bn,res,seed);}));
+    last=R;return R;
+  }
+  function draw(){
+    if(!last)compute();
+    const R=last,k=st.bn?"bn":"no",P=R[k+"P"],Q=R[k+"R"],L=st.L;
+    const lab=v=>sci(v);
+    drawChart($("chFwd"),{log:true,xMax:L,xLabel:"층 번호 (0 = 입력)  →  순전파 방향",series:[{vals:P.fwd,cls:"f"},{vals:Q.fwd,cls:"s"}],endLabels:lab,logMin:-30,logMax:30});
+    drawChart($("chBwd"),{log:true,xMax:L,xLabel:"층 번호  ←  역전파 방향 (출력 L에서 출발)",series:[{vals:P.bwd,cls:"f",marks:[0]},{vals:Q.bwd,cls:"s",marks:[0]}],endLabels:null,logMin:-30,logMax:30});
+  }
+  function render(){
+    compute();
+    $("dLv").textContent=st.L;$("dGv").textContent=fmt(st.g);
+    const R=last,k=st.bn?"bn":"no",P=R[k+"P"],Q=R[k+"R"],L=st.L;
+    const gm=a=>Math.pow(a[0],1/L); // 층당 평균 배율 (출력 쪽 = 1)
+    $("deepStats").innerHTML=
+      `<div class="sk-stat"><b class="rs-f">${gm(P.bwd).toFixed(3)}</b><span>plain 층당 평균 배율</span></div>`+
+      `<div class="sk-stat"><b class="rs-sc">${gm(Q.bwd).toFixed(3)}</b><span>residual 층당 평균 배율</span></div>`+
+      `<div class="sk-stat"><b class="rs-f">${sci(P.bwd[0])}</b><span>plain: 첫 층에 도착한 기울기</span></div>`+
+      `<div class="sk-stat"><b class="rs-sc">${sci(Q.bwd[0])}</b><span>residual: 첫 층에 도착한 기울기</span></div>`;
+    const orders=Math.log10(Q.bwd[0]/P.bwd[0]);
+    let note;
+    if(!st.bn){
+      note=orders>=1.5?`BN 없이 ${L}층: 평균 배율 ${gm(P.bwd).toFixed(2)}가 ${L}번 곱해져 plain의 기울기는 약 <b>${Math.round(orders)}자릿수</b> 더 작게 도착합니다. residual은 곱셈마다 I(=1)가 남아 사라지지 않습니다. (BN 없는 residual은 층이 깊으면 오히려 조금씩 커질 수 있어, 실무에선 BN과 함께 씁니다.)`
+                   :`이 설정에서는 plain도 기울기가 크게 줄지 않습니다. 층 수를 늘리거나 g를 1 이하로 낮춰 보세요.`;
+    }else{
+      note=`BN을 켜면 plain도 기울기가 사라지지 않습니다 (강의 표: 1.0). 그런데도 깊은 plain은 훈련 오차가 더 높았습니다 → 기울기 소실만으로는 설명이 안 되는 <b>퇴화</b>. residual은 BN 유무와 상관없이 1이 남는 통로가 있습니다.${P.bwd[0]>100?` (지금 plain은 층당 ${gm(P.bwd).toFixed(2)}배씩 곱해져 첫 층에서 ${sci(P.bwd[0])}배로 커졌습니다. BN이 있어도 plain은 곱셈 사슬이라 깊어지면 불안정해질 수 있습니다.)`:""}`;
+    }
+    $("deepNote").innerHTML=note;
+    // 표
+    const lect={noP:"2.6×10⁻⁵",noR:"3.5×10⁻¹",bnP:"1.0",bnR:"0.2 ~ 0.3"};
+    const rows=[["noP","BN 없음","plain"],["noR","BN 없음","residual"],["bnP","BN 있음","plain"],["bnR","BN 있음","residual"]];
+    let h=`<thead><tr><th>정규화</th><th>구조</th><th>이 시뮬레이션 (${L}층)</th><th>자릿수</th><th>참고: 강의 실측 (22층)</th></tr></thead><tbody>`;
+    rows.forEach(([key,a,b])=>{const v=R[key].gW1,cur=(key.slice(0,2)===k)?" cur":"";const e=Math.floor(Math.log10(v));
+      h+=`<tr><td class="${cur.trim()}">${a}</td><td class="${cur.trim()}"><span class="${b==="plain"?"rs-f":"rs-sc"}">${b}</span></td><td class="n big${cur}">${sci(v)}</td><td class="n${cur}">${pow10(e)}</td><td class="n${cur}">${lect[key]}</td></tr>`;});
+    $("deepTable").innerHTML=h+"</tbody>";
+    $("deepTblHint").textContent=`g = ${fmt(st.g)}, 강조 = 지금 차트`;
+    draw();
+  }
+  function init(){
+    $("dL").addEventListener("input",e=>{st.L=+e.target.value;render();});
+    $("dG").addEventListener("input",e=>{st.g=+e.target.value;render();});
+    $("dBN").addEventListener("change",e=>{st.bn=e.target.checked;render();});
+    $("dSeed").addEventListener("click",()=>{st.seed=st.seed*7+13;render();});
+  }
+  return{init,render,draw,run,st};
+})();
+
+/* ================= 3. 학습 ================= */
+const TR=(function(){
+  const W=16,NPT=240,LR=0.003,MAXSTEP=1500;
+  const st={depth:20,data:"spiral",init:"pt",axis:"lin",running:false,raf:0,step:0,lossP:[],lossR:[],accP:0,accR:0,gP:0,gR:0,started:false,lastBnd:0};
+  let D=null,P=null,R=null;
+  function makeData(kind,n,seed){const r=mulberry32(seed);const X=new Float64Array(n*2),Y=new Float64Array(n);
+    for(let i=0;i<n;i++){const c=i%2;let x,y;
+      if(kind==="spiral"){const t=0.15+0.85*r();const a=t*3.2*Math.PI+c*Math.PI;x=t*Math.cos(a)+gauss(r)*0.03;y=t*Math.sin(a)+gauss(r)*0.03;}
+      else{const rad=c?0.75:0.35;const a=r()*2*Math.PI;const rr=rad+gauss(r)*0.07;x=rr*Math.cos(a);y=rr*Math.sin(a);}
+      X[2*i]=x;X[2*i+1]=y;Y[i]=c;}
+    return{X,Y,n};}
+  function makeNet(L,res,init,seed){const r=mulberry32(seed);
+    const lin=(o,i)=>{const Wt=new Float64Array(o*i),b=new Float64Array(o);
+      if(init==="he"){const s=Math.sqrt(2/i);for(let k=0;k<o*i;k++)Wt[k]=gauss(r)*s;}
+      else{const bd=1/Math.sqrt(i);for(let k=0;k<o*i;k++)Wt[k]=(r()*2-1)*bd;for(let k=0;k<o;k++)b[k]=(r()*2-1)*bd;}
+      return{W:Wt,b,o,i};};
+    const net={L,res,layers:[lin(W,2)]};for(let l=0;l<L;l++)net.layers.push(lin(W,W));net.layers.push(lin(1,W));
+    net.opt=net.layers.map(p=>({mW:new Float64Array(p.W.length),vW:new Float64Array(p.W.length),mb:new Float64Array(p.b.length),vb:new Float64Array(p.b.length)}));net.t=0;return net;}
+  function linF(p,A,N){const {W:Wt,b,o,i}=p;const Z=new Float64Array(N*o);for(let n=0;n<N;n++){const ao=n*i;for(let k=0;k<o;k++){let s=b[k];const wo=k*i;for(let j=0;j<i;j++)s+=Wt[wo+j]*A[ao+j];Z[n*o+k]=s;}}return Z;}
+  function relu(Z){const R=new Float64Array(Z.length);for(let k=0;k<Z.length;k++)R[k]=Z[k]>0?Z[k]:0;return R;}
+  function forward(net,X,N){const Ls=net.layers;const c={acts:[]};
+    let h=relu(linF(Ls[0],X,N));c.h0=h;
+    if(!net.res){for(let l=1;l<=net.L;l++){const a=h,z=linF(Ls[l],a,N);h=relu(z);c.acts.push({a,z});}}
+    else{for(let l=1;l<=net.L;l+=2){const a=h,z1=linF(Ls[l],a,N),r1=relu(z1),z2=linF(Ls[l+1],r1,N);const s=new Float64Array(N*W);for(let k=0;k<s.length;k++)s[k]=z2[k]+a[k];h=relu(s);c.acts.push({a,z1,r1,s});}}
+    c.hL=h;c.out=linF(Ls[net.L+1],h,N);return c;}
+  function linB(p,A,dZ,N,g){const {W:Wt,o,i}=p;const dA=new Float64Array(N*i);
+    for(let n=0;n<N;n++){const ao=n*i;for(let k=0;k<o;k++){const dd=dZ[n*o+k];if(dd===0)continue;g.b[k]+=dd;const wo=k*i;for(let j=0;j<i;j++){g.W[wo+j]+=dd*A[ao+j];dA[ao+j]+=dd*Wt[wo+j];}}}return dA;}
+  function step(net){
+    const N=D.n,c=forward(net,D.X,N),Ls=net.layers;const grads=Ls.map(p=>({W:new Float64Array(p.W.length),b:new Float64Array(p.b.length)}));
+    let loss=0,acc=0;const dO=new Float64Array(N);
+    for(let n=0;n<N;n++){const z=c.out[n],y=D.Y[n];loss+=Math.max(z,0)-z*y+Math.log1p(Math.exp(-Math.abs(z)));dO[n]=(1/(1+Math.exp(-z))-y)/N;if((z>0)===(y>0.5))acc++;}
+    loss/=N;
+    let dh=linB(Ls[net.L+1],c.hL,dO,N,grads[net.L+1]);
+    if(!net.res){for(let l=net.L;l>=1;l--){const {a,z}=c.acts[l-1];for(let k=0;k<dh.length;k++)if(z[k]<=0)dh[k]=0;dh=linB(Ls[l],a,dh,N,grads[l]);}}
+    else{for(let bi=c.acts.length-1;bi>=0;bi--){const l=1+2*bi,{a,z1,r1,s}=c.acts[bi];const ds=new Float64Array(dh.length);for(let k=0;k<ds.length;k++)ds[k]=s[k]>0?dh[k]:0;
+      const dr=linB(Ls[l+1],r1,ds,N,grads[l+1]);for(let k=0;k<dr.length;k++)if(z1[k]<=0)dr[k]=0;const da=linB(Ls[l],a,dr,N,grads[l]);for(let k=0;k<da.length;k++)da[k]+=ds[k];dh=da;}}
+    for(let k=0;k<dh.length;k++)if(c.h0[k]<=0)dh[k]=0;linB(Ls[0],D.X,dh,N,grads[0]);
+    let g1=0;for(const v of grads[1].W)g1+=v*v;g1=Math.sqrt(g1);
+    net.t++;const b1=0.9,b2=0.999,eps=1e-8,t=net.t,c1=1-Math.pow(b1,t),c2=1-Math.pow(b2,t);
+    Ls.forEach((p,li)=>{const o=net.opt[li],g=grads[li];[[p.W,g.W,o.mW,o.vW],[p.b,g.b,o.mb,o.vb]].forEach(([Pm,G,M,V])=>{for(let k=0;k<Pm.length;k++){M[k]=b1*M[k]+(1-b1)*G[k];V[k]=b2*V[k]+(1-b2)*G[k]*G[k];Pm[k]-=LR*(M[k]/c1)/(Math.sqrt(V[k]/c2)+eps);}});});
+    return{loss,acc:acc/N,g1};
+  }
+  function evalNet(net){ // 손실/정확도/첫 층 기울기 (학습 전 상태 표시용)
+    const N=D.n,c=forward(net,D.X,N);let loss=0,acc=0;for(let n=0;n<N;n++){const z=c.out[n],y=D.Y[n];loss+=Math.max(z,0)-z*y+Math.log1p(Math.exp(-Math.abs(z)));if((z>0)===(y>0.5))acc++;}return{loss:loss/N,acc:acc/N};
+  }
+  function reset(){
+    pause();
+    D=makeData(st.data,NPT,11);
+    P=makeNet(st.depth,false,st.init,2026);R=makeNet(st.depth,true,st.init,2026);
+    // 같은 난수 → 두 모형은 같은 초기 가중치에서 출발
+    st.step=0;const e1=evalNet(P),e2=evalNet(R);st.lossP=[e1.loss];st.lossR=[e2.loss];st.accP=e1.acc;st.accR=e2.acc;st.gP=NaN;st.gR=NaN;
+    drawAll(true);
+  }
+  function pause(){st.running=false;cancelAnimationFrame(st.raf);$("trStart").textContent=st.step>0?"이어서 학습":"학습 시작";}
+  function start(){if(st.running)return;if(st.step>=MAXSTEP){reset();}st.running=true;st.started=true;$("trStart").textContent="학습 중…";loop();}
+  function loop(){
+    if(!st.running)return;
+    const t0=performance.now();
+    do{const a=step(P),b=step(R);st.step++;st.lossP.push(a.loss);st.lossR.push(b.loss);st.accP=a.acc;st.accR=b.acc;st.gP=a.g1;st.gR=b.g1;}
+    while(performance.now()-t0<12&&st.step<MAXSTEP);
+    const now=performance.now();const bnd=now-st.lastBnd>300||st.step>=MAXSTEP;
+    drawAll(bnd);
+    if(st.step>=MAXSTEP){pause();$("trStart").textContent="다시 학습";return;}
+    st.raf=requestAnimationFrame(loop);
+  }
+  function drawLoss(){
+    const log=st.axis==="log";const n=st.lossP.length;
+    const xMax=Math.max(100,Math.ceil((n-1)/100)*100);
+    const endLab=v=>v.toFixed(3);
+    drawChart($("chLoss"),log?{log:true,logMin:-5,logMax:2,xMax,xLabel:"학습 단계 (전체 배치 1회 = 1단계)",series:[{vals:st.lossP,cls:"f"},{vals:st.lossR,cls:"s"}],endLabels:endLab,refs:[{v:Math.LN2,label:"0.693"}]}
+      :{yMin:0,yMax:0.8,yTicks:[0,0.2,0.4,0.6,0.8],xMax,xLabel:"학습 단계 (전체 배치 1회 = 1단계)",series:[{vals:st.lossP,cls:"f"},{vals:st.lossR,cls:"s"}],endLabels:endLab,refs:[{v:Math.LN2,label:"찍기 수준 0.693"}]});
+  }
+  function drawBoundary(cv,net){
+    const {ctx,w}=fitCanvas(cv);const G=44,lim=1.25;
+    const Xg=new Float64Array(G*G*2);for(let i=0;i<G;i++)for(let j=0;j<G;j++){const k=i*G+j;Xg[2*k]=-lim+2*lim*(j+.5)/G;Xg[2*k+1]=lim-2*lim*(i+.5)/G;}
+    const out=forward(net,Xg,G*G).out;
+    const bg=hexRgb(css("--surface")),c0=hexRgb(css("--c0")),c1=hexRgb(css("--c1"));
+    const cs=w/G;
+    for(let i=0;i<G;i++)for(let j=0;j<G;j++){const z=out[i*G+j];const p=1/(1+Math.exp(-Math.max(-30,Math.min(30,z))));const t=Math.abs(p-.5)*2;ctx.fillStyle=rgb(mix(bg,p>.5?c1:c0,0.12+0.38*t));ctx.fillRect(j*cs,i*cs,cs+.6,cs+.6);}
+    // 경계선 (p=0.5)
+    ctx.strokeStyle=css("--ink");ctx.lineWidth=1.4;ctx.globalAlpha=.55;ctx.beginPath();
+    for(let i=0;i<G;i++)for(let j=0;j<G;j++){const a=out[i*G+j]>0;if(j+1<G&&(out[i*G+j+1]>0)!==a){ctx.moveTo((j+1)*cs,i*cs);ctx.lineTo((j+1)*cs,(i+1)*cs);}if(i+1<G&&(out[(i+1)*G+j]>0)!==a){ctx.moveTo(j*cs,(i+1)*cs);ctx.lineTo((j+1)*cs,(i+1)*cs);}}
+    ctx.stroke();ctx.globalAlpha=1;
+    const sf=css("--surface"),col=[css("--c0"),css("--c1")];
+    for(let n=0;n<D.n;n++){const x=(D.X[2*n]+lim)/(2*lim)*w,y=(lim-D.X[2*n+1])/(2*lim)*w;ctx.beginPath();ctx.arc(x,y,Math.max(2.2,w/95),0,Math.PI*2);ctx.fillStyle=col[D.Y[n]];ctx.fill();ctx.lineWidth=1;ctx.strokeStyle=sf;ctx.stroke();}
+  }
+  function drawAll(bnd){
+    drawLoss();
+    if(bnd){drawBoundary($("bnP"),P);drawBoundary($("bnR"),R);st.lastBnd=performance.now();}
+    const lp=st.lossP[st.lossP.length-1],lr=st.lossR[st.lossR.length-1];
+    const g=v=>isNaN(v)?"—":sci(v);
+    $("trStats").innerHTML=
+      `<div class="sk-stat"><b>${st.step}</b><span>학습 단계</span></div>`+
+      `<div class="sk-stat"><b class="rs-f">${lp.toFixed(3)}</b><span>plain 훈련 손실</span></div>`+
+      `<div class="sk-stat"><b class="rs-sc">${lr.toFixed(3)}</b><span>residual 훈련 손실</span></div>`+
+      `<div class="sk-stat"><b class="rs-f">${Math.round(st.accP*100)}%</b><span>plain 훈련 정확도</span></div>`+
+      `<div class="sk-stat"><b class="rs-sc">${Math.round(st.accR*100)}%</b><span>residual 훈련 정확도</span></div>`+
+      `<div class="sk-stat"><b class="rs-f">${g(st.gP)}</b><span>plain 첫 은닉층 기울기</span></div>`+
+      `<div class="sk-stat"><b class="rs-sc">${g(st.gR)}</b><span>residual 첫 은닉층 기울기</span></div>`;
+    let t;
+    if(st.step===0)t=`두 모형은 같은 난수로 초기화되어 같은 조건에서 출발합니다. <b>학습 시작</b>을 누르세요. (${st.depth}층 = plain은 은닉층 ${st.depth}개, residual은 2층짜리 잔차 블록 ${st.depth/2}개)`;
+    else{
+      const d=lp-lr;
+      if(d>0.15)t=`${st.step}단계: residual 훈련 손실 ${lr.toFixed(3)}, plain ${lp.toFixed(3)}. 같은 깊이·같은 폭인데 plain은 <b>훈련 데이터조차</b> 잘 못 맞춥니다.${st.init==="pt"&&isFinite(st.gP)&&st.gP<1e-5?` plain의 첫 은닉층 기울기가 ${sci(st.gP)}로 거의 오지 않습니다 (탭 2의 BN 없음·plain 상황).`:""}`;
+      else if(d<-0.15)t=`${st.step}단계: 이번 설정에서는 plain 손실(${lp.toFixed(3)})이 residual(${lr.toFixed(3)})보다 낮습니다. 작은 문제에서는 이런 결과도 나옵니다.`;
+      else t=`${st.step}단계: 두 모형의 훈련 손실이 비슷합니다 (plain ${lp.toFixed(3)}, residual ${lr.toFixed(3)}). 깊이를 늘리거나 초기화를 '기본'으로 바꿔 비교해 보세요.`;
+    }
+    $("trRead").innerHTML=t;
+  }
+  function init(){
+    $("trStart").addEventListener("click",start);
+    $("trStop").addEventListener("click",pause);
+    $("trReset").addEventListener("click",reset);
+    segInit($("trDepth"),v=>{st.depth=+v;reset();});
+    segInit($("trData"),v=>{st.data=v;reset();});
+    segInit($("trInit"),v=>{st.init=v;reset();});
+    segInit($("trAxis"),v=>{st.axis=v;drawLoss();});
+    reset();
+  }
+  function onShow(){drawAll(true);if(!st.started&&!reduceMotion)start();}
+  return{init,pause,drawAll,onShow,st,
+    _test:{run:(n)=>{for(let i=0;i<n;i++){const a=step(P),b=step(R);st.step++;st.lossP.push(a.loss);st.lossR.push(b.loss);st.accP=a.acc;st.accR=b.acc;st.gP=a.g1;st.gR=b.g1;}drawAll(true);}}};
+})();
+
+/* ================= 4. 설계와 shape ================= */
+const DS=(function(){
+  const CH=[64,128,256,512,1024,2048];
+  const st={H:56,Ci:64,S:2,Co:128,opt:"none"};
+  function params(){
+    const C=CH[+$("pC").value];$("pCv").textContent=C;const m=C/4;
+    const basic=2*9*C*C,b1=C*m,b2=9*m*m,b3=m*C,bott=b1+b2+b3;
+    $("pBasic").innerHTML=`<b class="rs-f">BasicBlock</b> (3×3 → 3×3)<br>(3×3×${C}×${C}) × 2<br>= ${comma(9*C*C)} × 2 = <b>${comma(basic)}</b>`;
+    $("pBottle").innerHTML=`<b class="rs-sc">Bottleneck</b> (1×1 축소 → 3×3 → 1×1 복원, 가운데 ${m}채널)<br>1×1×${C}×${m} + 3×3×${m}×${m} + 1×1×${m}×${C}<br>= ${comma(b1)} + ${comma(b2)} + ${comma(b3)} = <b>${comma(bott)}</b>`;
+    const r=basic/bott;
+    $("pBars").innerHTML=`<span>BasicBlock</span><div class="tr"><div class="fl" style="width:100%;background:var(--f)"></div></div><span class="vv">${comma(basic)}</span>`+
+      `<span>Bottleneck</span><div class="tr"><div class="fl" style="width:${Math.max(1,bott/basic*100)}%;background:var(--sc)"></div></div><span class="vv">${comma(bott)}  (${(bott/basic*100).toFixed(1)}%)</span>`;
+    $("pNote").innerHTML=`<span class="rs-big">${r.toFixed(2)}배</span> &nbsp; Bottleneck이 약 <b>${Math.round(r)}배</b> 가볍습니다. 두 식 모두 C²에 비례(18C² vs 17C²/16)라서 채널 수를 바꿔도 비율은 같습니다. 그래서 ResNet-50 이상의 깊은 모형은 Bottleneck을 씁니다.`;
+  }
+  function shape(){
+    const {H,Ci,S,Co,opt}=st;const Ho=Math.ceil(H/S);
+    const same=S===1&&Ci===Co;
+    let scShape=`(${H}, ${H}, ${Ci})`,scDesc="x 그대로 (항등)",ok=same,cost=0,msg="",costTxt="";
+    const main=`(${Ho}, ${Ho}, ${Co})`;
+    const mainParams=9*Ci*Co+9*Co*Co;
+    if(opt==="A"){
+      if(Co<Ci){ok=false;scDesc="옵션 A: 0-패딩은 채널을 늘릴 때만 가능";msg=`출력 채널(${Co})이 입력(${Ci})보다 작아 0을 채워 넣는 방식으로는 맞출 수 없습니다. 옵션 B를 쓰세요.`;}
+      else{ok=true;scShape=`(${Ho}, ${Ho}, ${Co})`;scDesc=S>1?`${S}칸마다 1칸 골라 크기 ↓, 채널 ${Ci} → ${Co}은 0으로 채움`:(Co>Ci?`채널 ${Ci} → ${Co}은 0으로 채움`:"x 그대로 (맞출 것 없음)");cost=0;costTxt="추가 파라미터 0개 (계산만, 학습할 것 없음)";}
+    }else if(opt==="B"){
+      ok=true;scShape=`(${Ho}, ${Ho}, ${Co})`;
+      if(same){scDesc="shape이 같으므로 항등 그대로";cost=0;costTxt="shape이 같은 곳은 항등 → 추가 파라미터 0개";}
+      else{cost=Ci*Co+2*Co;scDesc=`1×1 Conv (stride ${S}) + BN`;costTxt=`1×1×${Ci}×${Co} = ${comma(Ci*Co)}  + BN 2×${Co} = ${comma(2*Co)}  →  ${comma(cost)}개 (주 경로 ${comma(mainParams)}의 ${(cost/mainParams*100).toFixed(1)}%)`;}
+    }else if(opt==="C"){
+      ok=true;scShape=`(${Ho}, ${Ho}, ${Co})`;cost=Ci*Co+2*Co;scDesc=`모든 지름길에 1×1 Conv (stride ${S}) + BN`;
+      costTxt=`1×1×${Ci}×${Co} + BN = ${comma(cost)}개${same?" — shape이 같아도 넣으므로 항등 통로가 사라짐":""} (주 경로의 ${(cost/mainParams*100).toFixed(1)}%)`;
+    }
+    if(opt==="none"&&!same)msg=`주 경로는 ${S>1?`stride ${S}로 크기가 ${H} → ${Ho}`:""}${S>1&&Ci!==Co?", ":""}${Ci!==Co?`채널이 ${Ci} → ${Co}`:""}로 바뀌었는데 지름길은 그대로입니다. 아래에서 해결 방법을 고르세요.`;
+    $("shView").innerHTML=
+      `<div class="rs-tensor" style="--role:var(--f)"><span class="t">주 경로 출력 F(x)</span><span class="v">${main}</span><span class="d">3×3 Conv(stride ${S}) → BN → ReLU → 3×3 Conv → BN · 파라미터 ${comma(mainParams)}</span></div>`+
+      `<div class="rs-plus${ok?"":" bad"}" aria-hidden="true">${ok?"+":"✕"}</div>`+
+      `<div class="rs-tensor" style="--role:var(--sc)"><span class="t">지름길 출력</span><span class="v">${scShape}</span><span class="d">${scDesc}</span></div>`;
+    let h="";
+    if(ok)h=`<p class="sk-note"><span class="rs-verdict ok">Add 가능</span> &nbsp; ${main} + ${scShape} → ${main}${costTxt?`<br>${costTxt}`:""}</p>`;
+    else h=`<p class="sk-note sk-note--warn"><span class="rs-verdict bad">Add 불가: shape 불일치</span><br>${msg}</p>`;
+    if(opt==="B")h+=`<p class="sk-hint" style="margin:0">옵션 B가 실무 표준입니다 (torchvision ResNet의 downsample). shape이 바뀌는 블록에만 1×1 Conv를 넣고 나머지는 항등으로 둡니다.</p>`;
+    if(opt==="C")h+=`<p class="sk-hint" style="margin:0">논문에서 C가 B보다 아주 조금 나았지만, 파라미터가 늘어나는 것에 비해 이득이 작아 잘 쓰지 않습니다.</p>`;
+    if(opt==="A")h+=`<p class="sk-hint" style="margin:0">옵션 A는 파라미터가 없지만, 0으로 채운 채널은 잔차를 배우지 못합니다.</p>`;
+    $("shResult").innerHTML=h;
+  }
+  function cat(){
+    const C=[32,64,128,256,512][+$("cC").value],K=[32,64,128,256,512][+$("cK").value];$("cCv").textContent=C;$("cKv").textContent=K;
+    const pa=9*C*K,pc=9*2*C*K;
+    const stack=(colA,colB,both)=>{let s="";const n=16;for(let i=0;i<n;i++)s+=`<span style="background:${colA};height:100%"></span>`;if(both)for(let i=0;i<n;i++)s+=`<span style="background:${colB};height:100%"></span>`;return s;};
+    $("catView").innerHTML=
+      `<div class="sk-card sk-card--sunk"><h3>더하기 (Add) · ResNet</h3><div class="rs-stack" aria-hidden="true">${stack("var(--sum)","",false)}</div>`+
+      `<div class="sk-formula">(H, W, ${C}) + (H, W, ${C}) → (H, W, <b>${C}</b>)<br>다음 층: 3×3×${C}×${K} = <b>${comma(pa)}</b></div></div>`+
+      `<div class="sk-card sk-card--sunk"><h3>잇기 (Concat) · U-Net, DenseNet</h3><div class="rs-stack" aria-hidden="true">${stack("var(--f)","var(--sc)",true)}</div>`+
+      `<div class="sk-formula">(H, W, ${C}) ⊕ (H, W, ${C}) → (H, W, <b>${2*C}</b>)<br>다음 층: 3×3×${2*C}×${K} = <b>${comma(pc)}</b>  (${(pc/pa).toFixed(0)}배)</div></div>`;
+  }
+  function init(){
+    $("pC").addEventListener("input",params);
+    const sh=(id,k,num)=>segInit($(id),v=>{st[k]=num?+v:v;shape();});
+    sh("shH","H",1);sh("shCi","Ci",1);sh("shS","S",1);sh("shCo","Co",1);sh("shOpt","opt",0);
+    $("cC").addEventListener("input",cat);$("cK").addEventListener("input",cat);
+    params();shape();cat();
+  }
+  return{init,st};
+})();
+
+/* ================= 시작 ================= */
+onShow.block=()=>BL.render();
+onShow.deep=()=>DP.render();
+onShow.train=()=>TR.onShow();
+BL.init();DP.init();TR.init();DS.init();
+const start=(location.hash||"").slice(1);
+showTab(TABS.includes(start)?start:"block");
+function redraw(){
+  $("scaleBar").style.background=`linear-gradient(90deg,var(--neg),${css("--surface-2")} 50%,var(--ink))`;
+  if(curTab==="block")BL.render();
+  if(curTab==="deep")DP.draw();
+  if(curTab==="train")TR.drawAll(true);
+}
+new MutationObserver(redraw).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",redraw);}catch(e){}
+let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(redraw,150);});
+window.__rs={BL,DP,TR,DS};
+})();
+</script>
+</body>
+</html>

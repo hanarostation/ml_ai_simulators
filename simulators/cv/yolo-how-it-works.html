@@ -1,0 +1,1167 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>YOLO 작동 원리 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 스케일(P3/P4/P5), 정답 박스, 클래스, 층 종류 — 밝은/어두운 화면 둘 다 정의 */
+:root{
+  --sk-accent: var(--cat-cv);
+  --p3:#F76707; --p4:#7950F2; --p5:#1C7ED6; --gt:#2FB344; --heat:#FD7E14;
+  --c0:#F59F00; --c1:#F03E3E; --c2:#15AABF; --c3:#CC5DE8;
+  --t-conv:#1C7ED6; --t-c2f:#0D9488; --t-sppf:#7950F2; --t-up:#E8590C; --t-cat:#868E96; --t-det:#D6336C; --t-in:#5A6477;
+  --img-ink:#0B0F14;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --p3:#FF922B; --p4:#9775FA; --p5:#4DABF7; --gt:#51CF66; --heat:#FF922B;
+  --c0:#FCC419; --c1:#FF6B6B; --c2:#3BC9DB; --c3:#DA77F2;
+  --t-conv:#4DABF7; --t-c2f:#33D1BD; --t-sppf:#9775FA; --t-up:#FF922B; --t-cat:#ADB5BD; --t-det:#F06595; --t-in:#A0A8B8;
+} }
+:root[data-theme="dark"]{
+  --p3:#FF922B; --p4:#9775FA; --p5:#4DABF7; --gt:#51CF66; --heat:#FF922B;
+  --c0:#FCC419; --c1:#FF6B6B; --c2:#3BC9DB; --c3:#DA77F2;
+  --t-conv:#4DABF7; --t-c2f:#33D1BD; --t-sppf:#9775FA; --t-up:#FF922B; --t-cat:#ADB5BD; --t-det:#F06595; --t-in:#A0A8B8;
+}
+
+.yl-split{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.yl-split{grid-template-columns:minmax(0,1fr)}}
+.yl-cv{display:block;width:100%;max-width:640px;height:auto;aspect-ratio:1/1;border-radius:10px;background:var(--surface-2);touch-action:manipulation;cursor:crosshair}
+.yl-cv:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.yl-sum{font-size:14px;color:var(--muted)}
+.yl-sum b{font-family:var(--mono);color:var(--ink);font-weight:600}
+.sk-legend i.yl-dash{background:none;border:2px dashed currentColor;height:11px}
+.yl-p3{color:var(--p3)} .yl-p4{color:var(--p4)} .yl-p5{color:var(--p5)} .yl-gt{color:var(--gt)}
+.sk-legend i.b-p3{background:var(--p3)} .sk-legend i.b-p4{background:var(--p4)} .sk-legend i.b-p5{background:var(--p5)} .sk-legend i.b-gt{background:var(--gt)} .sk-legend i.b-heat{background:var(--heat)}
+.sk-legend i.b-c0{background:var(--c0)} .sk-legend i.b-c1{background:var(--c1)} .sk-legend i.b-c2{background:var(--c2)} .sk-legend i.b-c3{background:var(--c3)}
+.sk-table tr.yl-best td{font-weight:700;color:var(--ink)}
+.sk-table tr.yl-top td{background:color-mix(in srgb,var(--sk-accent) 12%,var(--surface))}
+.sk-table tr.yl-sel td{box-shadow:inset 0 0 0 9999px color-mix(in srgb,var(--focus) 16%,transparent)}
+.sk-table tbody tr[data-k]{cursor:pointer}
+.yl-tscroll{max-height:380px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.yl-tscroll .sk-table th{z-index:1}
+.yl-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:0}
+.yl-dot.s0{background:var(--p3)} .yl-dot.s1{background:var(--p4)} .yl-dot.s2{background:var(--p5)}
+.yl-muted{color:var(--muted)} .yl-small{font-size:13px}
+.yl-kv2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 18px}
+@media (max-width:520px){.yl-kv2{grid-template-columns:minmax(0,1fr)}}
+
+/* 네트워크 도식 */
+.yl-arch{display:block;width:100%;min-width:1180px;height:auto}
+.yl-arch text{font-family:var(--mono);fill:var(--ink)}
+.yl-arch .rowlab{font-size:12px;fill:var(--muted)}
+.yl-arch .band{fill:var(--surface-2)}
+.yl-arch .bandlab{font-family:var(--sans);font-size:14px;font-weight:700}
+.yl-arch .bandsub{font-family:var(--sans);font-size:12px;fill:var(--muted)}
+.yl-arch .edge{fill:none;stroke:var(--muted);stroke-width:1.4}
+.yl-arch .skip{fill:none;stroke:var(--sk-accent);stroke-width:1.6;stroke-dasharray:5 4}
+.yl-arch .ah{fill:var(--muted)} .yl-arch .ahs{fill:var(--sk-accent)}
+.yl-arch .blk{cursor:pointer;outline:none}
+.yl-arch .blk rect{stroke-width:1.5}
+.yl-arch .blk .id{font-size:12px;font-weight:600}
+.yl-arch .blk .ty{font-size:10.5px;fill:var(--muted);font-family:var(--sans)}
+.yl-arch .blk:hover rect,.yl-arch .blk:focus-visible rect{stroke-width:3}
+.yl-arch .blk:focus-visible rect{stroke:var(--focus)}
+.yl-arch .blk.on rect{stroke:var(--ink);stroke-width:3}
+.yl-arch .t-in rect{fill:color-mix(in srgb,var(--t-in) 16%,var(--surface));stroke:var(--t-in)}
+.yl-arch .t-conv rect{fill:color-mix(in srgb,var(--t-conv) 18%,var(--surface));stroke:var(--t-conv)}
+.yl-arch .t-c2f rect{fill:color-mix(in srgb,var(--t-c2f) 20%,var(--surface));stroke:var(--t-c2f)}
+.yl-arch .t-sppf rect{fill:color-mix(in srgb,var(--t-sppf) 20%,var(--surface));stroke:var(--t-sppf)}
+.yl-arch .t-up rect{fill:color-mix(in srgb,var(--t-up) 16%,var(--surface));stroke:var(--t-up)}
+.yl-arch .t-cat rect{fill:color-mix(in srgb,var(--t-cat) 16%,var(--surface));stroke:var(--t-cat)}
+.yl-arch .t-det rect{fill:color-mix(in srgb,var(--t-det) 16%,var(--surface));stroke:var(--t-det)}
+.yl-arch .ptag{font-size:11px;font-weight:700;font-family:var(--mono)}
+.sk-legend i.lg-conv{background:var(--t-conv)} .sk-legend i.lg-c2f{background:var(--t-c2f)} .sk-legend i.lg-sppf{background:var(--t-sppf)}
+.sk-legend i.lg-up{background:var(--t-up)} .sk-legend i.lg-cat{background:var(--t-cat)} .sk-legend i.lg-det{background:var(--t-det)}
+.yl-info h3{font-size:16px}
+.yl-info p{margin:0;font-size:14px;color:var(--text)}
+
+/* DFL */
+.yl-sides{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:560px){.yl-sides{grid-template-columns:minmax(0,1fr)}}
+.yl-side{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:var(--surface)}
+.yl-side.on{border-color:var(--sk-accent);box-shadow:0 0 0 1px var(--sk-accent)}
+.yl-side-h{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 10px;font-size:13.5px;align-items:baseline}
+.yl-side-h b.nm{font-family:var(--mono);font-size:15px}
+.yl-side-h .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)}
+.yl-bars{display:block;width:100%;height:auto;touch-action:none;cursor:ns-resize}
+.yl-bars .bar{fill:color-mix(in srgb,var(--sk-accent) 70%,var(--surface))}
+.yl-bars .bar.pk{fill:var(--sk-accent)}
+.yl-bars .base{stroke:var(--line-strong);stroke-width:1}
+.yl-bars .tick{font-family:var(--mono);font-size:9px;fill:var(--faint)}
+.yl-bars .ev{stroke:var(--ink);stroke-width:2}
+.yl-bars .evt{fill:var(--ink);font-family:var(--mono);font-size:10px;font-weight:600}
+.yl-bars:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.yl-side .sk-slider{min-width:0}
+.yl-side-ctl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px}
+.yl-flow{display:flex;flex-direction:column;gap:8px}
+.yl-flow-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.yl-chip{border:1px solid var(--line-strong);background:var(--surface-2);border-radius:8px;padding:5px 9px;font-size:12.5px;line-height:1.35;white-space:nowrap}
+.yl-chip b{font-family:var(--mono);font-weight:600}
+.yl-chip.box{border-color:var(--p5)} .yl-chip.cls{border-color:var(--c1)} .yl-chip.hi{background:var(--ink);color:var(--on-ink);border-color:var(--ink)}
+.yl-arr{color:var(--faint);font-weight:700}
+.yl-brl{font-size:12.5px;font-weight:700;color:var(--muted);min-width:70px}
+.yl-cbar{display:grid;grid-template-columns:64px minmax(0,1fr) 120px;gap:8px;align-items:center;font-size:13.5px}
+.yl-cbar .tr{display:block;height:16px;background:var(--surface-2);border-radius:4px;overflow:hidden}
+.yl-cbar .fl{display:block;height:100%;background:var(--c1);border-radius:4px}
+.yl-cbar .vv{font-family:var(--mono);font-size:12.5px;text-align:right;white-space:nowrap}
+.yl-cbar.top .nm{font-weight:700}
+
+/* 후처리 · 학습 */
+.yl-stage{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media (max-width:520px){.yl-stage{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.yl-stage .sk-stat{min-width:0}
+.yl-stage .sk-stat.on{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.yl-desc{min-height:3.2em}
+.yl-lbar{display:grid;grid-template-columns:110px minmax(0,1fr) 72px;gap:8px;align-items:center;font-size:13.5px}
+.yl-lbar .tr{display:block;height:18px;background:var(--surface-2);border-radius:4px;overflow:hidden}
+.yl-lbar .fl{display:block;height:100%;border-radius:4px}
+.yl-lbar .vv{font-family:var(--mono);text-align:right}
+.yl-in3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.yl-in3 label{display:flex;flex-direction:column;gap:3px;font-size:12.5px;color:var(--muted);font-weight:600}
+.yl-in3 .sk-input{width:100%}
+.yl-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;list-style:none;margin:0;padding:0}
+.yl-steps li{border-radius:8px;padding:7px 6px;font-size:12.5px;font-weight:600;text-align:center;background:var(--surface-2);color:var(--faint);line-height:1.3}
+.yl-steps li.done{color:var(--muted)}
+.yl-steps li.on{background:var(--ink);color:var(--on-ink)}
+.yl-stepbody{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-height:118px}
+.yl-stepbody b.t{font-size:15px}
+.yl-stepbody p{margin:0;font-size:14px;color:var(--text)}
+.yl-chart{display:block;width:100%;max-width:480px;height:auto}
+.yl-chart text{font-family:var(--mono);font-size:10px;fill:var(--muted)}
+.yl-chart .ax{stroke:var(--line-strong)}
+.yl-chart .gr{stroke:var(--line)}
+.yl-chart .cu1{fill:none;stroke:var(--c1);stroke-width:2.2}
+.yl-chart .cu2{fill:none;stroke:var(--p5);stroke-width:2.2}
+.yl-chart .pt1{fill:var(--c1)} .yl-chart .pt2{fill:var(--p5)}
+.yl-chart .lab1{fill:var(--c1);font-weight:600} .yl-chart .lab2{fill:var(--p5);font-weight:600}
+.yl-ll{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:3px;margin-right:5px}
+.yl-ll.c1{background:var(--c1)} .yl-ll.p5{background:var(--p5)}
+@media (max-width:520px){ .yl-cbar{grid-template-columns:46px minmax(0,1fr) 114px} .yl-lbar{grid-template-columns:92px minmax(0,1fr) 60px} .yl-steps{grid-template-columns:repeat(2,minmax(0,1fr))} }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)" aria-current="page">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">YOLO 작동 원리 시뮬레이터</h1>
+      <p class="ds-hero__lede">YOLOv8n이 640×640 영상을 8,400개의 칸으로 나눠 박스를 예측하고, 걸러 내고, 학습하는 과정을 단계별로 조작해 봅니다. 기준: ultralytics 8.4의 YOLOv8n.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <p class="sk-note"><b>시뮬레이션:</b> 화면의 예측 박스·점수는 실제 가중치로 추론한 값이 아니라 원리를 보여 주려고 만든 값입니다. 층 구성·크기·파라미터 수·기본 설정값은 실제 모형과 같습니다.</p>
+
+  <div class="sk-card sk-card--sunk" style="padding:12px 16px">
+    <div class="sk-controls">
+      <div class="sk-group"><span class="sk-label">입력 크기 imgsz</span>
+        <div class="sk-seg" id="segSz" role="group" aria-label="입력 크기">
+          <button type="button" data-v="320" aria-pressed="false">320</button><button type="button" data-v="480" aria-pressed="false">480</button><button type="button" data-v="640" aria-pressed="true">640</button><button type="button" data-v="800" aria-pressed="false">800</button>
+        </div>
+      </div>
+      <div class="yl-sum">칸 <b id="sumCells">8,400</b>개 → 출력 텐서 <b id="sumOut">1×84×8,400</b> · 계산량 <b id="sumFlops">약 8.7~8.9</b> GFLOPs</div>
+    </div>
+  </div>
+
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button class="sk-tab" type="button" role="tab" id="tab-a" aria-controls="pane-a" aria-selected="true"><span class="sk-num">1</span>격자와 세 개의 스케일</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-b" aria-controls="pane-b" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>네트워크 구조</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-c" aria-controls="pane-c" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>헤드와 박스 디코딩(DFL)</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-d" aria-controls="pane-d" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>후처리 8,400 → 최종</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-e" aria-controls="pane-e" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>학습: 정답 배정과 손실</button>
+  </nav>
+
+  <!-- ================= 1. 격자 ================= -->
+  <section id="pane-a" role="tabpanel" aria-labelledby="tab-a">
+    <div class="yl-split">
+      <div class="sk-card">
+        <div class="sk-head"><h2>영상 위의 세 격자 (P3 · P4 · P5)</h2><span class="sk-hint">영상 위에 마우스를 올리거나 눌러 칸을 확인</span></div>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">격자 표시</span>
+            <label class="sk-check"><input type="checkbox" id="gA3" checked><span class="yl-p3">P3</span></label>
+            <label class="sk-check"><input type="checkbox" id="gA4"><span class="yl-p4">P4</span></label>
+            <label class="sk-check"><input type="checkbox" id="gA5" checked><span class="yl-p5">P5</span></label>
+          </div>
+          <div class="sk-group"><span class="sk-label">볼 칸의 스케일</span>
+            <div class="sk-seg" id="segHA" role="group" aria-label="칸을 확인할 스케일"><button type="button" data-v="0" aria-pressed="false">P3</button><button type="button" data-v="1" aria-pressed="true">P4</button><button type="button" data-v="2" aria-pressed="false">P5</button></div>
+          </div>
+          <label class="sk-check"><input type="checkbox" id="gAgt" checked>병변 박스</label>
+        </div>
+        <canvas class="yl-cv" id="cvA" aria-label="흉부 X선 모사 영상 위에 P3, P4, P5 격자와 선택한 칸, 그 칸이 그릴 수 있는 최대 박스 범위를 표시한 그림"></canvas>
+        <div class="sk-legend"><span><i class="b-p3"></i>P3 격자(stride 8)</span><span><i class="b-p4"></i>P4 격자(stride 16)</span><span><i class="b-p5"></i>P5 격자(stride 32)</span><span><i class="b-gt"></i>병변(정답 박스)</span><span class="yl-muted">점선 사각형: 이 칸이 그릴 수 있는 최대 범위</span></div>
+      </div>
+      <div class="sk-card">
+        <h2>칸 수와 출력 크기</h2>
+        <div class="sk-stats" id="statsA"></div>
+        <div class="sk-formula" id="fmA"></div>
+        <p class="sk-lead">칸(anchor point) 하나가 예측 하나를 냅니다. 예측 하나 = 박스 4값 + 클래스 80점수 = <b>84</b>값. 그래서 출력은 <span class="sk-mono" id="outA">1×84×8,400</span>입니다.</p>
+        <h3>선택한 칸</h3>
+        <dl class="sk-kv" id="kvA"></dl>
+        <div class="sk-formula" id="fmA2"></div>
+        <p class="sk-note">박스 한 변은 칸 중심에서 <b>최대 15칸</b>까지만 뻗을 수 있습니다 (DFL 구간 0~15). 그래서 stride가 작은 P3는 작은 물체, stride가 큰 P5는 큰 물체에 알맞습니다.</p>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>물체 크기와 담당 스케일</h2><span class="sk-hint">imgsz를 바꾸면 같은 병변도 픽셀 크기가 달라집니다</span></div>
+      <div class="sk-scroll"><table class="sk-table" id="tblA"></table></div>
+      <p class="sk-note">경험칙: 물체의 긴 변이 <b>stride × 약 6</b>(한 변 4~8칸)일 때 그 스케일이 다루기 좋습니다. 실제 학습에서는 스케일을 미리 정하지 않고, 세 스케일의 칸을 모두 후보로 놓고 TAL이 점수로 고릅니다(5번 탭). imgsz를 320으로 줄이면 미세 석회화는 P3 한 칸보다도 작아집니다.</p>
+    </div>
+  </section>
+
+  <!-- ================= 2. 네트워크 구조 ================= -->
+  <section id="pane-b" role="tabpanel" aria-labelledby="tab-b" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>YOLOv8n 네트워크 구조 (L0 ~ L22)</h2><span class="sk-hint">블록 높이 = 특성맵 해상도, 너비 = 채널 수 · 블록을 누르면 설명 · ←/→ 로 층 이동</span></div>
+      <div class="sk-stats" id="statsB"></div>
+      <div class="sk-legend"><span><i class="lg-conv"></i>Conv (3×3, stride 2)</span><span><i class="lg-c2f"></i>C2f</span><span><i class="lg-sppf"></i>SPPF</span><span><i class="lg-up"></i>Upsample ×2</span><span><i class="lg-cat"></i>Concat</span><span><i class="lg-det"></i>Detect (헤드)</span><span class="yl-muted">점선 = Concat 건너뛰기 연결</span></div>
+      <div class="sk-scroll" id="archWrap"><svg class="yl-arch" id="archSvg" role="img" aria-label="YOLOv8n 층 구성 도식: Backbone, Neck(FPN, PAN), Head"></svg></div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card yl-info" id="infoB" aria-live="polite"></div>
+      <div class="sk-card">
+        <h2>세 부분이 하는 일</h2>
+        <p class="sk-lead"><b>Backbone (L0~L9)</b>: stride 2 합성곱 5번으로 640 → 20까지 줄이며 채널을 16 → 256으로 늘립니다. C2f 반복 수는 1·2·2·1, 마지막은 SPPF.</p>
+        <p class="sk-lead"><b>Neck · FPN (L10~L15)</b>: 깊은 층 → 얕은 층. 깊은 층의 "무엇인지" 정보를 Upsample로 키워 L6, L4와 이어 붙입니다(Concat).</p>
+        <p class="sk-lead"><b>Neck · PAN (L16~L21)</b>: 얕은 층 → 깊은 층. 얕은 층의 "어디인지" 정보를 stride 2 합성곱으로 줄여 L12, L9와 이어 붙입니다.</p>
+        <p class="sk-lead"><b>Head (L22)</b>: P3(L15) · P4(L18) · P5(L21) 세 특성맵마다 분리형 헤드를 붙여 칸마다 박스 64ch + 클래스 80ch를 냅니다.</p>
+        <div class="sk-formula" id="fmB"></div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>층별 출력 크기와 파라미터</h2><span class="sk-hint">행을 누르면 위 도식에서 선택</span></div>
+      <div class="yl-tscroll"><table class="sk-table" id="tblB"></table></div>
+    </div>
+  </section>
+
+  <!-- ================= 3. 헤드와 DFL ================= -->
+  <section id="pane-c" role="tabpanel" aria-labelledby="tab-c" hidden>
+    <div class="yl-split">
+      <div class="sk-card">
+        <div class="sk-head"><h2>anchor point 고르기</h2><span class="sk-hint">영상을 눌러 칸 선택</span></div>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">스케일</span>
+            <div class="sk-seg" id="segSC" role="group" aria-label="스케일"><button type="button" data-v="0" aria-pressed="true">P3 · s8</button><button type="button" data-v="1" aria-pressed="false">P4 · s16</button><button type="button" data-v="2" aria-pressed="false">P5 · s32</button></div>
+          </div>
+          <div class="sk-group">
+            <button class="sk-btn sk-btn--sm" type="button" id="btnExC">강의 예시 (5.84칸)</button>
+            <button class="sk-btn sk-btn--sm" type="button" id="btnPredC">이 칸의 예측 불러오기</button>
+          </div>
+        </div>
+        <canvas class="yl-cv" id="cvC" aria-label="선택한 anchor point와 네 변 거리로 그린 예측 박스, 정답 박스를 표시한 영상"></canvas>
+        <div class="sk-legend"><span><i class="b-c1"></i>디코딩한 박스</span><span><i class="b-gt"></i>병변(정답)</span><span class="yl-muted">흰 점 = anchor point, 선 = l · t · r · b</span></div>
+        <div class="sk-formula" id="fmC"></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>박스 가지: 변마다 16구간 분포 (DFL)</h2><span class="sk-hint">막대를 끌거나 슬라이더로 분포 조절</span></div>
+        <p class="sk-lead">한 변의 거리를 숫자 하나로 바로 내지 않고, 0~15칸 16구간의 확률분포(softmax)로 낸 뒤 <b>기댓값 Σ i·p<sub>i</sub></b>를 거리로 씁니다. 분포가 넓으면 "경계가 애매하다"는 뜻입니다.</p>
+        <div class="yl-sides" id="sidesC"></div>
+        <div class="sk-formula" id="fmC2"></div>
+        <div class="sk-formula" id="fmC3"></div>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <h2>분리형 헤드 (decoupled head)</h2>
+        <p class="sk-lead">박스와 분류를 서로 다른 가지로 따로 계산합니다. 세 스케일마다 같은 구조가 하나씩 있습니다.</p>
+        <div class="yl-flow" id="flowC"></div>
+        <div class="sk-formula" id="fmC4"></div>
+        <p class="sk-note"><b>objectness 없음:</b> YOLOv5처럼 "물체가 있을 확률"을 따로 내지 않습니다. 80개 클래스 점수 중 가장 큰 값이 곧 그 예측의 신뢰도(conf)입니다.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>분류 가지: 80개 클래스 점수</h2><span class="sk-hint">클래스마다 독립 sigmoid (합이 1이 아님)</span></div>
+        <div id="clsC" class="yl-flow"></div>
+        <p class="sk-lead yl-small">80개는 COCO 사전학습 기준 클래스 수입니다. 여기서는 의료 예시 이름을 붙였습니다. 의료 데이터로 다시 학습하면 클래스 수(nc)에 맞춰 출력이 4 + nc로 바뀝니다 (예: nc=4 → 8×8,400).</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 4. 후처리 ================= -->
+  <section id="pane-d" role="tabpanel" aria-labelledby="tab-d" hidden>
+    <div class="yl-split">
+      <div class="sk-card">
+        <div class="sk-head"><h2>8,400개 예측이 걸러지는 과정</h2><span class="sk-hint" id="hintD"></span></div>
+        <canvas class="yl-cv" id="cvD" aria-label="후처리 단계별 예측 점과 박스를 표시한 영상"></canvas>
+        <div class="sk-legend" id="legD"><span><i class="b-c0"></i>결절</span><span><i class="b-c1"></i>종괴</span><span><i class="b-c2"></i>석회화</span><span><i class="b-c3"></i>기타 클래스</span><span><i class="b-gt"></i>병변(정답)</span></div>
+      </div>
+      <div class="sk-card">
+        <h2>후처리 단계</h2>
+        <ol class="yl-steps" id="stepsD">
+          <li>① 원시 출력</li><li>② conf 거르기</li><li>③ 클래스별 NMS</li><li>④ 최대 개수</li>
+        </ol>
+        <div class="sk-controls" id="navD">
+          <div class="sk-group">
+            <button class="sk-btn sk-btn--sm" type="button" data-act="first">처음</button>
+            <button class="sk-btn sk-btn--sm" type="button" data-act="prev">이전</button>
+            <button class="sk-btn sk-btn--sm" type="button" data-act="next">다음</button>
+            <button class="sk-btn sk-btn--sm sk-btn--primary" type="button" data-act="play">▶ 재생</button>
+          </div>
+          <label class="sk-slider" style="min-width:130px"><span class="sk-sl-head">속도 <b data-spdv>보통</b></span><input type="range" min="1" max="5" step="1" value="3" data-spd aria-label="재생 속도"></label>
+        </div>
+        <div class="yl-stage" id="stageD"></div>
+        <p class="sk-lead yl-desc" id="descD" aria-live="polite"></p>
+        <div class="sk-controls">
+          <label class="sk-slider"><span class="sk-sl-head">conf 기준 <b id="confV">0.250</b></span><input type="range" id="confD" min="0.001" max="0.9" step="0.001" value="0.25"></label>
+          <label class="sk-slider"><span class="sk-sl-head">NMS IoU 기준 <b id="iouV">0.70</b></span><input type="range" id="iouD" min="0.1" max="0.95" step="0.01" value="0.7"></label>
+        </div>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">conf 예시</span>
+            <button class="sk-btn sk-btn--sm" type="button" data-conf="0.25">추론 기본 0.25</button>
+            <button class="sk-btn sk-btn--sm" type="button" data-conf="0.12">민감하게 0.12</button>
+            <button class="sk-btn sk-btn--sm" type="button" data-conf="0.001">검증용 0.001</button>
+          </div>
+        </div>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">max_det</span>
+            <div class="sk-seg" id="segMD" role="group" aria-label="최대 개수"><button type="button" data-v="300" aria-pressed="true">300</button><button type="button" data-v="3" aria-pressed="false">3</button><button type="button" data-v="1" aria-pressed="false">1</button></div>
+          </div>
+          <div class="sk-group"><span class="sk-label">①의 점 표시</span>
+            <div class="sk-seg" id="segHD" role="group" aria-label="원시 출력 표시 스케일"><button type="button" data-v="-1" aria-pressed="true">모두</button><button type="button" data-v="0" aria-pressed="false">P3</button><button type="button" data-v="1" aria-pressed="false">P4</button><button type="button" data-v="2" aria-pressed="false">P5</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>최종 탐지 결과</h2><span class="sk-hint" id="finHint"></span></div>
+        <div class="yl-tscroll" style="max-height:300px"><table class="sk-table" id="tblD"></table></div>
+      </div>
+      <div class="sk-card">
+        <h2>의료 영상에 적용할 때 조정 포인트</h2>
+        <dl class="sk-kv" style="grid-template-columns:auto minmax(0,1fr)">
+          <dt>conf ↓</dt><dd style="text-align:left;font-family:var(--sans)">민감도↑ 놓치는 병변↓ · 오탐↑ (선별 검사에 유리)</dd>
+          <dt>conf ↑</dt><dd style="text-align:left;font-family:var(--sans)">오탐↓ · 작은 병변을 놓칠 위험↑</dd>
+          <dt>iou ↓</dt><dd style="text-align:left;font-family:var(--sans)">겹친 박스를 더 많이 지움 (붙어 있는 병변 둘이 하나로 합쳐질 수 있음)</dd>
+          <dt>iou ↑</dt><dd style="text-align:left;font-family:var(--sans)">겹친 박스가 더 많이 남음 (중복 탐지↑)</dd>
+          <dt>imgsz ↑</dt><dd style="text-align:left;font-family:var(--sans)">작은 병변이 칸 여러 개에 걸침 · 계산량은 (imgsz/640)²배</dd>
+        </dl>
+        <p class="sk-note" id="noteD"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 5. 학습 ================= -->
+  <section id="pane-e" role="tabpanel" aria-labelledby="tab-e" hidden>
+    <div class="yl-split">
+      <div class="sk-card">
+        <div class="sk-head"><h2>정답 배정: Task-Aligned Assigner (TAL)</h2><span class="sk-hint">정답 박스(GT)를 고르세요</span></div>
+        <div class="sk-controls"><div class="sk-group"><span class="sk-label">정답 박스</span><div class="sk-seg" id="segGT" role="group" aria-label="정답 박스 선택"></div></div></div>
+        <canvas class="yl-cv" id="cvE" aria-label="정답 박스 안에 중심이 있는 후보 anchor와 상위 10개 anchor를 표시한 영상"></canvas>
+        <div class="sk-legend"><span><i class="b-gt"></i>정답 박스</span><span><i class="b-p3"></i>P3 후보</span><span><i class="b-p4"></i>P4 후보</span><span><i class="b-p5"></i>P5 후보</span><span class="yl-muted">큰 고리 = 상위 10개(양성) · 가는 박스 = 그 칸의 예측</span></div>
+        <div class="sk-formula" id="fmE"></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>후보 anchor 정렬 표</h2><span class="sk-hint">행을 누르면 영상에서 강조</span></div>
+        <div class="sk-stats" id="statsE"></div>
+        <div class="yl-tscroll"><table class="sk-table" id="tblE"></table></div>
+        <p class="sk-lead yl-small">후보 = 중심이 정답 박스 안에 있는 칸(세 스케일 모두). s = 그 칸이 정답 클래스에 준 점수, IoU = 그 칸의 예측 박스와 정답 박스의 겹침. 정답 점수 = t ÷ 최대 t × 양성 중 최대 IoU (분류 BCE의 목표값). ultralytics 구현은 IoU 자리에 CIoU를 씁니다.</p>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <h2>IoU<sup>6</sup>은 얼마나 가혹한가</h2>
+        <div class="sk-controls">
+          <label class="sk-slider"><span class="sk-sl-head">점수 s <b id="sEv">0.80</b></span><input type="range" id="sE" min="0" max="1" step="0.01" value="0.8"></label>
+          <label class="sk-slider"><span class="sk-sl-head">IoU <b id="uEv">0.80</b></span><input type="range" id="uE" min="0" max="1" step="0.01" value="0.8"></label>
+        </div>
+        <div class="sk-formula" id="fmE2"></div>
+        <svg class="yl-chart" id="chartE" viewBox="0 0 360 200" role="img" aria-label="s의 0.5제곱과 IoU의 6제곱 곡선 비교"></svg>
+        <div class="sk-legend"><span><span class="yl-ll p5"></span>s<sup>0.5</sup> (점수는 너그럽게)</span><span><span class="yl-ll c1"></span>IoU<sup>6</sup> (위치는 엄격하게)</span></div>
+      </div>
+      <div class="sk-card">
+        <h2>손실 = 7.5·CIoU + 1.5·DFL + 0.5·BCE</h2>
+        <div class="yl-in3">
+          <label>CIoU 손실 (박스)<input class="sk-input" type="number" id="lBox" min="0" step="0.01" value="0.16"></label>
+          <label>DFL 손실 (분포)<input class="sk-input" type="number" id="lDfl" min="0" step="0.01" value="0.80"></label>
+          <label>BCE 손실 (분류)<input class="sk-input" type="number" id="lCls" min="0" step="0.01" value="1.40"></label>
+        </div>
+        <div class="yl-flow" id="lossBars"></div>
+        <div class="sk-formula" id="fmL"></div>
+        <p class="sk-lead yl-small">CIoU·DFL은 양성(배정된) anchor에서만, BCE는 8,400칸 전부에서 계산합니다. 학습 로그의 box_loss · dfl_loss · cls_loss는 가중치를 곱한 뒤의 값입니다.</p>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>Mosaic 증강</h2><span class="sk-hint">영상 4장을 한 장으로</span></div>
+        <div class="sk-controls">
+          <label class="sk-slider"><span class="sk-sl-head">epoch (전체 100) <b id="epV">1</b></span><input type="range" id="epE" min="1" max="100" step="1" value="1"></label>
+          <button class="sk-btn sk-btn--sm" type="button" id="btnMos">다시 섞기</button>
+        </div>
+        <canvas class="yl-cv" id="cvM" style="max-width:420px" aria-label="Mosaic 증강 예시: 네 장의 영상을 한 장으로 합친 그림"></canvas>
+        <p class="sk-note" id="noteM"></p>
+      </div>
+      <div class="sk-card">
+        <h2>학습 8단계</h2>
+        <ol class="yl-steps" id="stepsT"></ol>
+        <div class="sk-controls" id="navT">
+          <div class="sk-group">
+            <button class="sk-btn sk-btn--sm" type="button" data-act="first">처음</button>
+            <button class="sk-btn sk-btn--sm" type="button" data-act="prev">이전</button>
+            <button class="sk-btn sk-btn--sm" type="button" data-act="next">다음</button>
+            <button class="sk-btn sk-btn--sm sk-btn--primary" type="button" data-act="play">▶ 재생</button>
+          </div>
+          <label class="sk-slider" style="min-width:130px"><span class="sk-sl-head">속도 <b data-spdv>보통</b></span><input type="range" min="1" max="5" step="1" value="3" data-spd aria-label="재생 속도"></label>
+        </div>
+        <div class="yl-stepbody" id="bodyT" aria-live="polite"></div>
+        <h3>추론 흐름</h3>
+        <div class="yl-flow-row" id="inferT"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js"></script>
+<script>
+(function () {
+"use strict";
+/* ===================== 공통 도구 ===================== */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const fmt = n => Math.round(n).toLocaleString("en-US");
+const f1 = n => n.toFixed(1), f2 = n => n.toFixed(2), f3 = n => n.toFixed(3);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const REDUCE = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const STR = [8, 16, 32], SN = ["P3", "P4", "P5"], REG = 16;
+const CLS = ["결절", "종괴", "석회화", "경화", "흉수", "기흉", "무기폐", "심비대"];
+const G = { sz: 640 };
+
+function colors() {
+  const cs = getComputedStyle(document.documentElement), g = n => cs.getPropertyValue(n).trim();
+  return { ink: g("--ink"), muted: g("--muted"), line: g("--line"), surface: g("--surface"), focus: g("--focus"),
+    p: [g("--p3"), g("--p4"), g("--p5")], gt: g("--gt"), heat: g("--heat"),
+    c: [g("--c0"), g("--c1"), g("--c2"), g("--c3")], imgInk: g("--img-ink") };
+}
+const clsColor = (C, c) => C.c[Math.min(c, 3)];
+function hsh(a, b, c, d) {
+  let h = 2166136261 >>> 0;
+  for (const v of [a, b, c, d]) { h ^= (v + 0x9e3779b9) >>> 0; h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); h ^= h >>> 16; }
+  return (h >>> 0) / 4294967296;
+}
+function mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function prep(cv) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.max(10, cv.clientWidth || 300), h = w;
+  const W = Math.round(w * dpr), H = Math.round(h * dpr);
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+  return { ctx, w, h };
+}
+function iou(a, b) {
+  const ix = Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])), iy = Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+  const I = ix * iy, U = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - I;
+  return U > 0 ? I / U : 0;
+}
+function seg(el, cb) {
+  el.addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b || !el.contains(b)) return;
+    $$("button", el).forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false")); cb(b.dataset.v);
+  });
+}
+function segSet(el, v) { $$("button", el).forEach(x => x.setAttribute("aria-pressed", x.dataset.v === String(v) ? "true" : "false")); }
+function evPos(cv, e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * G.sz, (e.clientY - r.top) / r.height * G.sz]; }
+const nCell = si => G.sz / STR[si];
+const totalCells = sz => STR.reduce((a, s) => a + (sz / s) * (sz / s), 0);
+function flatIndex(si, i, j) { let off = 0; for (let k = 0; k < si; k++) off += nCell(k) * nCell(k); return off + i * nCell(si) + j; }
+
+/* ===================== 흉부 X선 모사 영상 (640, 절차적 생성) ===================== */
+const LES0 = [
+  { name: "미세 석회화", cls: 2, box: [497, 352, 513, 368], peak: 0.55, amp: 0.36 },
+  { name: "작은 결절", cls: 0, box: [236, 177, 264, 203], peak: 0.82, amp: 0.17 },
+  { name: "중간 결절", cls: 0, box: [413, 200, 493, 272], peak: 0.93, amp: 0.16 },
+  { name: "큰 종괴", cls: 1, box: [116, 300, 284, 448], peak: 0.90, amp: 0.19, alt: 0 }
+];
+const FP0 = [{ x: 300, y: 146, r: 11, peak: 0.21, cls: 0 }, { x: 392, y: 470, r: 14, peak: 0.17, cls: 3 }];
+function les(sz) {
+  const K = sz / 640;
+  return LES0.map((L, idx) => { const b = L.box.map(v => v * K); return Object.assign({}, L, { idx, box: b, x1: b[0], y1: b[1], x2: b[2], y2: b[3], w: b[2] - b[0], h: b[3] - b[1], cx: (b[0] + b[2]) / 2, cy: (b[1] + b[3]) / 2 }); });
+}
+let BASE = null; const IMGC = {};
+function makeXray() {
+  const N = 640, c = document.createElement("canvas"); c.width = c.height = N;
+  const ctx = c.getContext("2d"), im = ctx.createImageData(N, N), d = im.data, rnd = mulberry(20260930);
+  const ss = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  const lung = (x, y, cx, cy, rx, ry) => { const ux = Math.abs(x - cx) / rx, uy = Math.abs(y - cy) / ry; const r = Math.pow(Math.pow(ux, 2.4) + Math.pow(uy, 2.4), 1 / 2.4); return 1 - ss(0.8, 1.0, r); };
+  const segD = (x, y, ax, ay, bx, by) => { const vx = bx - ax, vy = by - ay, t = clamp(((x - ax) * vx + (y - ay) * vy) / (vx * vx + vy * vy), 0, 1); return Math.hypot(x - ax - t * vx, y - ay - t * vy); };
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const bx = (x - 320) / 300, by = (y - 390) / 370, rb = Math.sqrt(bx * bx + by * by);
+    let v = 0.05 + 0.42 * (1 - ss(0.86, 1.0, rb));
+    const L = Math.max(lung(x, y, 208, 300, 118, 190), lung(x, y, 436, 296, 112, 184));
+    v -= 0.28 * L;
+    v += 0.2 * Math.exp(-Math.pow((x - 322) / 36, 2)) * (1 - 0.4 * L);
+    const hx = (x - 372) / 100, hy = (y - 440) / 82; v += 0.2 * (1 - ss(0.72, 1.02, Math.sqrt(hx * hx + hy * hy)));
+    v += 0.16 * ss(470, 540, y + 0.0009 * (x - 320) * (x - 320)) * (1 - L) * (1 - ss(0.86, 1.0, rb));
+    const ax = Math.abs(x - 322);
+    if (ax > 30) for (let k = 0; k < 9; k++) {
+      const yc = 128 + 40 * k + 0.0019 * Math.pow(ax - 30, 2) - 0.0000032 * Math.pow(ax - 30, 3);
+      const dd = Math.abs(y - yc); if (dd < 10) v += (0.09 * L + 0.04) * (1 - ss(3.5, 8.5, dd));
+    }
+    for (const s of [-1, 1]) { const dc = segD(x, y, 322 + s * 36, 150, 322 + s * 232, 104); if (dc < 12) v += 0.13 * (1 - ss(4, 10, dc)); }
+    for (const Ls of LES0) {
+      const b = Ls.box, cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2, rx = (b[2] - b[0]) / 2, ry = (b[3] - b[1]) / 2;
+      let ux = (x - cx) / rx, uy = (y - cy) / ry; let r = Math.sqrt(ux * ux + uy * uy);
+      if (r > 1.3) continue;
+      if (Ls.cls === 1) r *= 1 + 0.07 * Math.sin(5 * Math.atan2(uy, ux) + 1);
+      v += Ls.amp * (1 - ss(Ls.cls === 2 ? 0.55 : 0.45, 1.0, r));
+    }
+    for (const F of FP0) { const r = Math.hypot(x - F.x, y - F.y) / F.r; if (r < 1.2) v += 0.06 * (1 - ss(0.4, 1.1, r)); }
+    v += (rnd() - 0.5) * 0.04;
+    const g = Math.round(255 * Math.pow(clamp(v, 0, 1), 0.92)), p = (y * N + x) * 4;
+    d[p] = d[p + 1] = d[p + 2] = g; d[p + 3] = 255;
+  }
+  ctx.putImageData(im, 0, 0); return c;
+}
+function imgAt(sz) {
+  if (!BASE) BASE = makeXray();
+  if (sz === 640) return BASE;
+  if (!IMGC[sz]) { const c = document.createElement("canvas"); c.width = c.height = sz; const x = c.getContext("2d"); x.imageSmoothingQuality = "high"; x.drawImage(BASE, 0, 0, sz, sz); IMGC[sz] = c; }
+  return IMGC[sz];
+}
+
+/* ===================== 시뮬레이션된 예측 (칸 하나) ===================== */
+function fitFn(r, si) {
+  let f = Math.exp(-Math.pow(Math.log2(r / 6), 2) / (2 * 0.55 * 0.55));
+  if (si === 0 && r < 6) f = Math.max(f, 0.5 + 0.5 * r / 6);
+  if (si === 2 && r > 6) f = Math.max(f, 1 - 0.02 * (r - 6));
+  return f;
+}
+function anchorPred(sz, si, i, j) {
+  const s = STR[si], ax = (j + 0.5) * s, ay = (i + 0.5) * s, K = sz / 640, L = les(sz);
+  const scores = new Array(8);
+  for (let c = 0; c < 8; c++) scores[c] = 0.0002 + 0.03 * Math.pow(hsh(si, i, j, 40 + c), 6);
+  const bc = Math.floor(hsh(si, i, j, 50) * 8); scores[bc] = Math.max(scores[bc], 0.0002 + 0.07 * Math.pow(hsh(si, i, j, 51), 3));
+  let best = null, bestSc = 0, fp = null;
+  for (const Ls of L) {
+    if (!(ax > Ls.x1 && ax < Ls.x2 && ay > Ls.y1 && ay < Ls.y2)) continue;
+    const dx = (ax - Ls.cx) / Math.max(Ls.w / 2, 1.5 * s), dy = (ay - Ls.cy) / Math.max(Ls.h / 2, 1.5 * s), d = Math.sqrt(dx * dx + dy * dy);
+    const fit = fitFn(Math.max(Ls.w, Ls.h) / s, si);
+    let sc = Ls.peak * fit * Math.exp(-d * d / (2 * 0.42 * 0.42)) * (0.9 + 0.2 * hsh(si, i, j, 7));
+    let c = Ls.cls;
+    if (Ls.alt !== undefined && si === 1 && hsh(si, i, j, 8) > 0.55) { c = Ls.alt; sc *= 1.3; }
+    if (sc > scores[c]) scores[c] = sc;
+    const sec = Ls.cls === 0 ? 1 : 0; scores[sec] = Math.max(scores[sec], sc * 0.12);
+    if (sc > bestSc) { bestSc = sc; best = { Ls, d }; }
+  }
+  for (const F of FP0) {
+    const dist = Math.hypot(ax - F.x * K, ay - F.y * K) / (F.r * K * 1.6);
+    if (dist < 1.6) { const sc = F.peak * Math.exp(-dist * dist) * (0.85 + 0.3 * hsh(si, i, j, 9)); if (sc > scores[F.cls]) scores[F.cls] = sc; if (sc > bestSc) { bestSc = sc; best = null; fp = F; } }
+  }
+  let cls = 0; for (let c = 1; c < 8; c++) if (scores[c] > scores[cls]) cls = c;
+  let x1, y1, x2, y2;
+  if (best) {
+    const Ls = best.Ls, amt = (0.025 + 0.1 * best.d) * Math.max(Ls.w, Ls.h), jt = k => (hsh(si, i, j, 20 + k) - 0.5) * 2 * amt;
+    x1 = Ls.x1 + jt(0); y1 = Ls.y1 + jt(1); x2 = Ls.x2 + jt(2); y2 = Ls.y2 + jt(3);
+  } else if (fp) {
+    const r = fp.r * K * (1 + 0.3 * (hsh(si, i, j, 24) - 0.5)); x1 = fp.x * K - r; x2 = fp.x * K + r; y1 = fp.y * K - r; y2 = fp.y * K + r;
+  } else {
+    const bw = s * (0.8 + 2.2 * hsh(si, i, j, 25)), bh = s * (0.8 + 2.2 * hsh(si, i, j, 26));
+    const ox = (hsh(si, i, j, 27) - 0.5) * s, oy = (hsh(si, i, j, 28) - 0.5) * s;
+    x1 = ax + ox - bw / 2; x2 = ax + ox + bw / 2; y1 = ay + oy - bh / 2; y2 = ay + oy + bh / 2;
+  }
+  const M = (REG - 1) * s;
+  const l = clamp(ax - x1, 0, M), t = clamp(ay - y1, 0, M), r = clamp(x2 - ax, 0, M), b = clamp(y2 - ay, 0, M);
+  return { si, i, j, s, ax, ay, scores, cls, score: scores[cls], ltrb: [l / s, t / s, r / s, b / s], box: [ax - l, ay - t, ax + r, ay + b] };
+}
+const PRED = {};
+function allPreds(sz) {
+  if (PRED[sz]) return PRED[sz];
+  const out = [];
+  for (let si = 0; si < 3; si++) { const n = sz / STR[si]; for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) out.push(anchorPred(sz, si, i, j)); }
+  return (PRED[sz] = out);
+}
+function postprocess(preds, conf, iouT, maxDet) {
+  const f = preds.filter(p => p.score >= conf).sort((a, b) => b.score - a.score);
+  const byC = {}, kept = [], sup = [];
+  for (const p of f) {
+    const arr = byC[p.cls] || (byC[p.cls] = []); let ok = true;
+    for (const q of arr) if (iou(p.box, q.box) > iouT) { ok = false; break; }
+    if (ok) { arr.push(p); kept.push(p); } else sup.push(p);
+  }
+  return { f, kept, sup, fin: kept.slice(0, maxDet) };
+}
+
+/* ===================== 탭 ===================== */
+const TABS = ["a", "b", "c", "d", "e"];
+let cur = "a";
+function showTab(k, focus) {
+  if (!TABS.includes(k)) k = "a";
+  TABS.forEach(t => {
+    const b = $("#tab-" + t), p = $("#pane-" + t), on = t === k;
+    b.setAttribute("aria-selected", on ? "true" : "false"); b.tabIndex = on ? 0 : -1; p.hidden = !on;
+  });
+  if (cur !== k) Object.values(STEPPERS).forEach(s => s && s.stop && s.stop());
+  cur = k;
+  if (location.hash !== "#" + k) history.replaceState(null, "", "#" + k);
+  if (focus) $("#tab-" + k).focus();
+  drawActive();
+}
+TABS.forEach(t => $("#tab-" + t).addEventListener("click", () => showTab(t)));
+function moveTab(d, focus) { const i = TABS.indexOf(cur); showTab(TABS[(i + d + TABS.length) % TABS.length], focus); }
+const STEPPERS = {};
+document.addEventListener("keydown", e => {
+  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+  if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  const t = e.target;
+  if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
+  const d = e.key === "ArrowRight" ? 1 : -1;
+  if (t && t.closest && t.closest(".sk-tabs")) { e.preventDefault(); moveTab(d, true); return; }
+  if (t && t.closest && t.closest(".yl-bars")) return;
+  const st = STEPPERS[cur];
+  if (st) { e.preventDefault(); st.stop && st.stop(); st.go(d); return; }
+  e.preventDefault(); moveTab(d, false);
+});
+window.addEventListener("hashchange", () => showTab((location.hash || "").slice(1)));
+
+function makeStepper(root, n, onChange) {
+  const st = { i: 0, timer: null };
+  const btn = a => $(`[data-act=${a}]`, root), spd = $("[data-spd]", root), spdv = $("[data-spdv]", root);
+  const MS = [2600, 1900, 1300, 900, 600], NM = ["아주 느림", "느림", "보통", "빠름", "아주 빠름"];
+  function ui() {
+    btn("first").disabled = st.i === 0; btn("prev").disabled = st.i === 0; btn("next").disabled = st.i === n - 1;
+    btn("play").textContent = st.timer ? "❚❚ 멈춤" : "▶ 재생"; spdv.textContent = NM[spd.value - 1];
+  }
+  function set(i) { st.i = clamp(i, 0, n - 1); onChange(st.i); ui(); }
+  function stop() { if (st.timer) { clearInterval(st.timer); st.timer = null; ui(); } }
+  function tick() { if (st.i >= n - 1) { stop(); return; } set(st.i + 1); if (st.i >= n - 1) stop(); }
+  function play() { if (st.timer) { stop(); return; } if (st.i >= n - 1) set(0); st.timer = setInterval(tick, MS[spd.value - 1]); ui(); }
+  btn("first").onclick = () => { stop(); set(0); };
+  btn("prev").onclick = () => { stop(); set(st.i - 1); };
+  btn("next").onclick = () => { stop(); set(st.i + 1); };
+  btn("play").onclick = play;
+  spd.addEventListener("input", () => { if (st.timer) { clearInterval(st.timer); st.timer = setInterval(tick, MS[spd.value - 1]); } ui(); });
+  ui();
+  return { go: d => set(st.i + d), set, stop, get i() { return st.i; } };
+}
+
+/* ===================== 1. 격자와 세 스케일 ===================== */
+const A = { show: [true, false, true], hs: 1, cell: null, gt: true };
+function defaultCellA() { const L = les(G.sz)[2], s = STR[A.hs], n = nCell(A.hs); return { si: A.hs, i: clamp(Math.floor(L.cy / s), 0, n - 1), j: clamp(Math.floor(L.cx / s), 0, n - 1) }; }
+function drawA() {
+  const cv = $("#cvA"), { ctx, w } = prep(cv), C = colors(), sz = G.sz, k = w / sz;
+  ctx.imageSmoothingEnabled = true; ctx.drawImage(imgAt(sz), 0, 0, w, w);
+  for (let si = 2; si >= 0; si--) {
+    if (!A.show[si]) continue;
+    const st = STR[si] * k; ctx.strokeStyle = C.p[si]; ctx.globalAlpha = si === 0 ? 0.45 : 0.75; ctx.lineWidth = si === 0 ? 0.6 : si === 1 ? 1 : 1.6;
+    ctx.beginPath(); for (let x = 0; x <= w + 0.1; x += st) { ctx.moveTo(x, 0); ctx.lineTo(x, w); ctx.moveTo(0, x); ctx.lineTo(w, x); } ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  if (A.gt) { ctx.strokeStyle = C.gt; ctx.lineWidth = 2; for (const L of les(sz)) ctx.strokeRect(L.x1 * k, L.y1 * k, L.w * k, L.h * k); }
+  const c = A.cell; if (c) {
+    const s = STR[c.si], ax = (c.j + 0.5) * s, ay = (c.i + 0.5) * s, M = 15 * s;
+    ctx.fillStyle = C.p[c.si]; ctx.globalAlpha = 0.45; ctx.fillRect(c.j * s * k, c.i * s * k, s * k, s * k); ctx.globalAlpha = 1;
+    ctx.strokeStyle = C.p[c.si]; ctx.lineWidth = 2; ctx.strokeRect(c.j * s * k, c.i * s * k, s * k, s * k);
+    ctx.setLineDash([6, 4]); ctx.lineWidth = 1.8; ctx.strokeRect((ax - M) * k, (ay - M) * k, 2 * M * k, 2 * M * k); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(ax * k, ay * k, 4, 0, Math.PI * 2); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = C.imgInk; ctx.stroke();
+  }
+}
+function infoA() {
+  const sz = G.sz, n = STR.map(s => sz / s), tot = totalCells(sz);
+  $("#statsA").innerHTML = STR.map((s, si) => `<div class="sk-stat"><b class="yl-p${si + 3}">${n[si]}×${n[si]}</b><span>${SN[si]} · stride ${s} · ${fmt(n[si] * n[si])}칸</span></div>`).join("") +
+    `<div class="sk-stat"><b>${fmt(tot)}</b><span>칸 합계</span></div>`;
+  $("#fmA").innerHTML = `(${sz}/8)² + (${sz}/16)² + (${sz}/32)²<br>= ${n[0]}² + ${n[1]}² + ${n[2]}²<br>= ${fmt(n[0] * n[0])} + ${fmt(n[1] * n[1])} + ${fmt(n[2] * n[2])} = <b>${fmt(tot)}</b>칸`;
+  $("#outA").textContent = `1×84×${fmt(tot)}`;
+  const c = A.cell || defaultCellA(), s = STR[c.si], ax = (c.j + 0.5) * s, ay = (c.i + 0.5) * s;
+  $("#kvA").innerHTML = `<dt>스케일</dt><dd class="yl-p${c.si + 3}">${SN[c.si]} (${n[c.si]}×${n[c.si]})</dd><dt>stride s</dt><dd>${s}px</dd>
+    <dt>칸 위치 (행 i, 열 j)</dt><dd>(${c.i}, ${c.j})</dd><dt>출력 8,400 중 번호</dt><dd>${fmt(flatIndex(c.si, c.i, c.j))} / ${fmt(tot)}</dd>
+    <dt>anchor point (x, y)</dt><dd>(${ax}, ${ay})</dd><dt>한 변 최대 거리</dt><dd>15칸 × ${s} = ${15 * s}px</dd><dt>그릴 수 있는 최대 박스</dt><dd>${30 * s}×${30 * s}px</dd>`;
+  $("#fmA2").innerHTML = `anchor point = ((j + 0.5)·s, (i + 0.5)·s) = ((${c.j} + 0.5)×${s}, (${c.i} + 0.5)×${s}) = (${ax}, ${ay})<br>한 변 최대 15칸 × stride → P3 ${15 * 8}px · P4 ${15 * 16}px · P5 ${15 * 32}px`;
+  const L = les(sz);
+  let h = `<thead><tr><th>병변</th><th>크기 (px)</th>${SN.map((x, si) => `<th>${x} (${STR[si]}px 칸)</th>`).join("")}<th>담당 추천</th></tr></thead><tbody>`;
+  for (const Ls of L) {
+    const m = Math.max(Ls.w, Ls.h); let best = 0, bf = -1;
+    const cells = STR.map((s, si) => { const f = fitFn(m / s, si) * ((m / 2) / s <= 15 ? 1 : 0.2); if (f > bf) { bf = f; best = si; } return m / s; });
+    h += `<tr><td>${Ls.name}</td><td class="n">${f1(Ls.w)}×${f1(Ls.h)}</td>${cells.map((v, si) => `<td class="n">${v < 1 ? "<b>" + f1(v) + "칸</b> (1칸보다 작음)" : f1(v) + "칸"}${(m / 2) / STR[si] > 15 ? " 범위 초과" : ""}</td>`).join("")}<td><span class="sk-pill yl-p${best + 3}">${SN[best]}</span></td></tr>`;
+  }
+  $("#tblA").innerHTML = h + "</tbody>";
+}
+function pickA(e, commit) {
+  const [x, y] = evPos($("#cvA"), e), s = STR[A.hs], n = nCell(A.hs);
+  if (x < 0 || y < 0 || x >= G.sz || y >= G.sz) return;
+  A.cell = { si: A.hs, i: clamp(Math.floor(y / s), 0, n - 1), j: clamp(Math.floor(x / s), 0, n - 1) };
+  drawA(); infoA();
+}
+$("#cvA").addEventListener("pointermove", e => pickA(e));
+$("#cvA").addEventListener("pointerdown", e => pickA(e, true));
+[0, 1, 2].forEach(si => $("#gA" + (si + 3)).addEventListener("change", e => { A.show[si] = e.target.checked; drawA(); }));
+$("#gAgt").addEventListener("change", e => { A.gt = e.target.checked; drawA(); });
+seg($("#segHA"), v => { const old = A.cell; A.hs = +v; if (old) { const s0 = STR[old.si], x = (old.j + 0.5) * s0, y = (old.i + 0.5) * s0, s = STR[A.hs]; A.cell = { si: A.hs, i: Math.floor(y / s), j: Math.floor(x / s) }; } else A.cell = defaultCellA(); drawA(); infoA(); });
+
+/* ===================== 2. 네트워크 구조 ===================== */
+const convP = (c1, c2, k) => c1 * c2 * k * k + 2 * c2;
+const c2fP = (c1, c2, n) => { const c = c2 / 2; return convP(c1, 2 * c, 1) + convP((2 + n) * c, c2, 1) + n * 2 * convP(c, c, 3); };
+const sppfP = (c1, c2) => { const c = c1 / 2; return convP(c1, c, 1) + convP(4 * c, c2, 1); };
+const detP = (chs, nc) => { const c2 = Math.max(16, chs[0] / 4, 4 * REG), c3 = Math.max(chs[0], Math.min(nc, 100)); let t = 0; for (const x of chs) { t += convP(x, c2, 3) + convP(c2, c2, 3) + (c2 * 4 * REG + 4 * REG); t += convP(x, c3, 3) + convP(c3, c3, 3) + (c3 * nc + nc); } return t + REG; };
+const TYK = { Conv: "conv", C2f: "c2f", SPPF: "sppf", Upsample: "up", Concat: "cat", Detect: "det" };
+const TYN = { Conv: "합성곱(Conv)", C2f: "C2f 블록", SPPF: "SPPF (빠른 공간 피라미드 풀링)", Upsample: "업샘플(Upsample, 최근접 ×2)", Concat: "이어 붙이기(Concat)", Detect: "검출 헤드(Detect)" };
+const LAYERS = [
+  { t: "Conv", c: 16, d: 2, a: "3×3, stride 2, 3→16", p: convP(3, 16, 3), r: "RGB 3채널을 16채널로 바꾸며 해상도를 절반으로. 명암 경계 같은 가장 기초적인 패턴을 잡습니다." },
+  { t: "Conv", c: 32, d: 4, a: "3×3, stride 2, 16→32", p: convP(16, 32, 3), r: "다시 절반(stride 4). 채널 32." },
+  { t: "C2f", c: 32, d: 4, n: 1, a: "n=1, shortcut 있음", p: c2fP(32, 32, 1), r: "C2f: 1×1 합성곱 뒤 채널을 둘로 나눠 한쪽만 Bottleneck을 거치고, 모든 중간 결과를 이어 붙여 합칩니다. 크기·채널은 유지." },
+  { t: "Conv", c: 64, d: 8, a: "3×3, stride 2, 32→64", p: convP(32, 64, 3), r: "stride 8 도달. 이 해상도가 P3(작은 물체)의 기준 격자가 됩니다." },
+  { t: "C2f", c: 64, d: 8, n: 2, a: "n=2, shortcut 있음", p: c2fP(64, 64, 2), r: "Bottleneck 2번. 결과는 L14에서 다시 쓰입니다(Concat) — P3용 얕은 특징." },
+  { t: "Conv", c: 128, d: 16, a: "3×3, stride 2, 64→128", p: convP(64, 128, 3), r: "stride 16 도달 (P4 기준 격자)." },
+  { t: "C2f", c: 128, d: 16, n: 2, a: "n=2, shortcut 있음", p: c2fP(128, 128, 2), r: "Bottleneck 2번. 결과는 L11에서 다시 쓰입니다 — P4용 특징." },
+  { t: "Conv", c: 256, d: 32, a: "3×3, stride 2, 128→256", p: convP(128, 256, 3), r: "stride 32 도달 (P5 기준 격자). 가장 작고 가장 두꺼운 특성맵." },
+  { t: "C2f", c: 256, d: 32, n: 1, a: "n=1, shortcut 있음", p: c2fP(256, 256, 1), r: "Backbone 마지막 C2f." },
+  { t: "SPPF", c: 256, d: 32, a: "5×5 최대풀링 3번 연속", p: sppfP(256, 256), r: "같은 5×5 최대풀링을 연달아 세 번 적용해 여러 크기의 주변 정보를 한꺼번에 모읍니다. 크기 유지. L20에서 다시 쓰입니다." },
+  { t: "Upsample", c: 256, d: 16, a: "×2, 최근접(nearest)", p: 0, r: "FPN 시작. 깊은 층의 의미 정보를 두 배로 키워 위(고해상도)로 보냅니다. 학습할 가중치 없음." },
+  { t: "Concat", c: 384, d: 16, f: [10, 6], a: "L10 + L6 → 256 + 128", p: 0, r: "건너뛰기 연결: 업샘플한 깊은 특징(256ch)과 Backbone의 L6(128ch)을 채널 방향으로 이어 붙입니다." },
+  { t: "C2f", c: 128, d: 16, n: 1, a: "n=1, shortcut 없음, 384→128", p: c2fP(384, 128, 1), r: "합친 특징을 128채널로 정리. L17에서 다시 쓰입니다." },
+  { t: "Upsample", c: 128, d: 8, a: "×2, 최근접(nearest)", p: 0, r: "한 번 더 키워 stride 8로." },
+  { t: "Concat", c: 192, d: 8, f: [13, 4], a: "L13 + L4 → 128 + 64", p: 0, r: "건너뛰기 연결: Backbone의 L4(64ch)와 이어 붙입니다." },
+  { t: "C2f", c: 64, d: 8, n: 1, a: "n=1, shortcut 없음, 192→64", p: c2fP(192, 64, 1), out: "P3", r: "P3 출력 (stride 8). 작은 물체를 담당하는 특성맵. FPN 끝, PAN 시작점." },
+  { t: "Conv", c: 64, d: 16, a: "3×3, stride 2, 64→64", p: convP(64, 64, 3), r: "PAN 시작. 얕은 층의 정확한 위치 정보를 절반 크기로 줄여 아래(저해상도)로 보냅니다." },
+  { t: "Concat", c: 192, d: 16, f: [16, 12], a: "L16 + L12 → 64 + 128", p: 0, r: "건너뛰기 연결: FPN의 L12와 이어 붙입니다." },
+  { t: "C2f", c: 128, d: 16, n: 1, a: "n=1, shortcut 없음, 192→128", p: c2fP(192, 128, 1), out: "P4", r: "P4 출력 (stride 16). 중간 물체 담당." },
+  { t: "Conv", c: 128, d: 32, a: "3×3, stride 2, 128→128", p: convP(128, 128, 3), r: "다시 절반 (stride 32)." },
+  { t: "Concat", c: 384, d: 32, f: [19, 9], a: "L19 + L9 → 128 + 256", p: 0, r: "건너뛰기 연결: SPPF 출력(L9)과 이어 붙입니다." },
+  { t: "C2f", c: 256, d: 32, n: 1, a: "n=1, shortcut 없음, 384→256", p: c2fP(384, 256, 1), out: "P5", r: "P5 출력 (stride 32). 큰 물체 담당." },
+  { t: "Detect", c: 84, d: 0, f: [15, 18, 21], a: "nc=80, reg_max=16", p: detP([64, 128, 256], 80), r: "P3·P4·P5 각각에 분리형 헤드. 박스 가지 Conv3×3(64)→Conv3×3(64)→Conv1×1(64 = 4변×16구간), 분류 가지 Conv3×3(80)→Conv3×3(80)→Conv1×1(80). DFL로 64→4값 변환 후 세 스케일을 이어 붙입니다." }
+];
+const TOTALP = LAYERS.reduce((a, L) => a + L.p, 0);
+const B = { sel: 22 };
+function part(k) { return k <= 9 ? "Backbone" : k <= 15 ? "Neck · FPN" : k <= 21 ? "Neck · PAN" : "Head"; }
+function fromOf(k) { const L = LAYERS[k]; return L.f ? L.f.map(x => "L" + x).join(", ") : k === 0 ? "입력 영상" : "L" + (k - 1); }
+function outOf(k) { const L = LAYERS[k], sz = G.sz; if (L.t === "Detect") return `1×84×${fmt(totalCells(sz))}`; const h = sz / L.d; return `${L.c}×${h}×${h}`; }
+function renderArch() {
+  const sz = G.sz, COL = 60, X0 = 92, gap = 40;
+  const RH = [66, 58, 48, 38, 30, 24];
+  const cy = [58 + RH[0] / 2]; for (let v = 1; v < 6; v++) cy[v] = cy[v - 1] + RH[v - 1] / 2 + gap + RH[v] / 2;
+  const lv = d => Math.round(Math.log2(d));
+  const cx = col => X0 + col * COL, bw = c => 26 + c * 0.08;
+  const W = cx(23) + 60, H = cy[5] + RH[5] / 2 + 56;
+  const svg = $("#archSvg"); svg.setAttribute("viewBox", `0 0 ${W} ${H}`); 
+  const box = k => { if (k < 0) return { x: cx(0), y: cy[0], w: 34, h: RH[0] }; const L = LAYERS[k]; if (L.t === "Detect") { const y1 = cy[3] - RH[3] / 2, y2 = cy[5] + RH[5] / 2; return { x: cx(23) + 6, y: (y1 + y2) / 2, w: 58, h: y2 - y1 }; } return { x: cx(k + 1), y: cy[lv(L.d)], w: bw(L.c), h: RH[lv(L.d)] }; };
+  let s = `<defs><marker id="ahA" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0,0 L8,4 L0,8 z"/></marker><marker id="ahS" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path class="ahs" d="M0,0 L8,4 L0,8 z"/></marker></defs>`;
+  const bands = [["Backbone", "L0~L9 · 작아지고 두꺼워짐", 1, 10], ["Neck · FPN", "L10~L15 · 깊은→얕은", 11, 16], ["Neck · PAN", "L16~L21 · 얕은→깊은", 17, 22], ["Head", "L22", 23, 23]];
+  for (const [t, sub, a, b] of bands) { const x1 = cx(a) - COL / 2 + 3, x2 = cx(b) + COL / 2 - 3; s += `<rect class="band" x="${x1}" y="6" width="${x2 - x1}" height="${H - 12}" rx="10"/><text class="bandlab" x="${x1 + 8}" y="24">${t}</text><text class="bandsub" x="${x1 + 8}" y="40">${sub}</text>`; }
+  for (let v = 0; v < 6; v++) { const n = sz / (1 << v); s += `<text class="rowlab" x="8" y="${cy[v] - 2}">${n}×${n}</text><text class="rowlab" x="8" y="${cy[v] + 12}">${v === 0 ? "입력" : "stride " + (1 << v)}</text>`; }
+  const edge = (a, b) => { const A1 = box(a), B1 = box(b), x1 = A1.x + A1.w / 2, y1 = A1.y, x2 = B1.x - B1.w / 2 - 2, y2 = b === 22 ? (a === 15 ? cy[3] : a === 18 ? cy[4] : cy[5]) : B1.y; const mx = (x1 + x2) / 2; return `<path class="edge" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}" marker-end="url(#ahA)"/>`; };
+  s += edge(-1, 0); for (let k = 0; k < 21; k++) s += edge(k, k + 1);
+  for (const a of [15, 18, 21]) s += edge(a, 22);
+  const skips = [[6, 11, -1], [4, 14, -1], [12, 17, 1], [9, 20, 1]];
+  for (const [a, b, dir] of skips) { const A1 = box(a), B1 = box(b), ya = A1.y + dir * A1.h / 2, yb = B1.y + dir * B1.h / 2, off = dir * 30, xa = dir > 0 ? A1.x + A1.w / 2 - 5 : A1.x, xb = dir > 0 ? B1.x - B1.w / 2 + 5 : B1.x; s += `<path class="skip" d="M${xa},${ya} C${xa},${ya + off} ${xb},${yb + off} ${xb},${yb + dir * 2}" marker-end="url(#ahS)"/>`; }
+  { const D = box(22), dl = D.x - D.w / 2 - 4; for (const [tag, si] of [["P3", 0], ["P4", 1], ["P5", 2]]) s += `<text class="ptag" x="${dl}" y="${si === 2 ? cy[5] + 15 : cy[3 + si] - 6}" text-anchor="end" style="fill:var(--p${si + 3})">${tag}</text>`; }
+  { const I = box(-1); s += `<g class="blk t-in" aria-hidden="true"><rect x="${I.x - I.w / 2}" y="${I.y - I.h / 2}" width="${I.w}" height="${I.h}" rx="5"/><text class="id" x="${I.x}" y="${I.y + 4}" text-anchor="middle">입력</text><text class="ty" x="${I.x}" y="${I.y + I.h / 2 + 12}" text-anchor="middle">${sz}²×3</text></g>`; }
+  LAYERS.forEach((L, k) => {
+    const b = box(k), on = k === B.sel ? " on" : "";
+    const lab = L.t === "Detect" ? `<text class="id" x="${b.x}" y="${b.y - 8}" text-anchor="middle">L22</text><text class="id" x="${b.x}" y="${b.y + 8}" text-anchor="middle">Detect</text>` : `<text class="id" x="${b.x}" y="${b.y + 4}" text-anchor="middle">L${k}</text>`;
+    const ty = L.t === "Detect" ? `<text class="ty" x="${b.x}" y="${b.y + b.h / 2 + 12}" text-anchor="middle">1×84×${fmt(totalCells(sz))}</text>` : `<text class="ty" x="${b.x}" y="${k === 17 || k === 20 ? b.y - b.h / 2 - 5 : b.y + b.h / 2 + 12}" text-anchor="middle">${L.t}</text>`;
+    s += `<g class="blk t-${TYK[L.t]}${on}" data-l="${k}" tabindex="0" role="button" aria-label="L${k} ${L.t}, 출력 ${outOf(k)}"><rect x="${b.x - b.w / 2}" y="${b.y - b.h / 2}" width="${b.w}" height="${b.h}" rx="5"/>${lab}${ty}</g>`;
+  });
+  svg.innerHTML = s;
+}
+function infoB() {
+  const k = B.sel, L = LAYERS[k];
+  let out = outOf(k);
+  if (L.t === "Detect") { const n = STR.map(s => G.sz / s); out = `학습: ${n.map(v => `${v}×${v}×144`).join(" · ")}<br>추론: 1×84×${fmt(totalCells(G.sz))}`; }
+  $("#infoB").innerHTML = `<div class="sk-head"><h3>L${k} · ${TYN[L.t]}</h3><span class="sk-pill" style="color:var(--t-${TYK[L.t]})">${part(k)}</span></div>
+    <dl class="sk-kv"><dt>입력</dt><dd>${fromOf(k)}</dd><dt>설정</dt><dd>${L.a}</dd>${L.n ? `<dt>반복 수 n</dt><dd>${L.n}</dd>` : ""}<dt>출력 텐서 (C×H×W)</dt><dd>${out}</dd><dt>파라미터</dt><dd>${fmt(L.p)}</dd></dl><p>${L.r}</p>`;
+  $$("#archSvg .blk").forEach(g => g.classList.toggle("on", +g.dataset.l === k));
+  $$("#tblB tbody tr").forEach(r => r.classList.toggle("yl-sel", +r.dataset.k === k));
+}
+function tableB() {
+  let h = `<thead><tr><th>층</th><th>구역</th><th>종류</th><th>입력</th><th>n</th><th>출력 (C×H×W)</th><th>파라미터</th></tr></thead><tbody>`;
+  LAYERS.forEach((L, k) => { h += `<tr data-k="${k}" tabindex="0"><td class="n">L${k}</td><td>${part(k)}</td><td>${L.t}${L.out ? ` <b class="yl-p${+L.out[1]}">${L.out}</b>` : ""}</td><td>${fromOf(k)}</td><td class="n">${L.n || ""}</td><td class="n">${outOf(k)}</td><td class="n">${fmt(L.p)}</td></tr>`; });
+  h += `<tr class="yl-best"><td colspan="6">합계</td><td class="n">${fmt(TOTALP)}</td></tr></tbody>`;
+  $("#tblB").innerHTML = h;
+  const n = STR.map(s => G.sz / s), gf = 8.9 * Math.pow(G.sz / 640, 2);
+  $("#statsB").innerHTML = `<div class="sk-stat"><b>${fmt(TOTALP)}</b><span>파라미터 수</span></div><div class="sk-stat"><b>${G.sz === 640 ? "8.7~8.9" : "≈ " + f1(gf)}</b><span>GFLOPs (imgsz ${G.sz})</span></div><div class="sk-stat"><b>23</b><span>층 (L0~L22)</span></div><div class="sk-stat"><b>1×84×${fmt(totalCells(G.sz))}</b><span>추론 출력</span></div>`;
+  $("#fmB").innerHTML = `P3 ${n[0]}×${n[0]} (stride 8) = ${fmt(n[0] * n[0])}<br>P4 ${n[1]}×${n[1]} (stride 16) = ${fmt(n[1] * n[1])}<br>P5 ${n[2]}×${n[2]} (stride 32) = ${fmt(n[2] * n[2])}<br>→ 출력 1×84×${fmt(totalCells(G.sz))} (84 = 4 박스 + 80 클래스)`;
+  infoB();
+}
+function selB(k) { B.sel = clamp(k, 0, 22); infoB(); const g = $(`#archSvg .blk[data-l="${B.sel}"]`); if (g && g.scrollIntoView) { const wrap = $("#archWrap"), r = g.getBoundingClientRect(), wr = wrap.getBoundingClientRect(); if (r.left < wr.left || r.right > wr.right) wrap.scrollLeft += (r.left + r.right) / 2 - (wr.left + wr.right) / 2; } }
+$("#archSvg").addEventListener("click", e => { const g = e.target.closest(".blk[data-l]"); if (g) selB(+g.dataset.l); });
+$("#archSvg").addEventListener("keydown", e => { const g = e.target.closest(".blk[data-l]"); if (g && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); selB(+g.dataset.l); } });
+$("#tblB").addEventListener("click", e => { const r = e.target.closest("tr[data-k]"); if (r) selB(+r.dataset.k); });
+$("#tblB").addEventListener("keydown", e => { const r = e.target.closest("tr[data-k]"); if (r && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); selB(+r.dataset.k); } });
+STEPPERS.b = { go: d => selB(B.sel + d), stop() { } };
+
+/* ===================== 3. 헤드와 DFL ===================== */
+const SIDES = [["l", "왼쪽"], ["t", "위"], ["r", "오른쪽"], ["b", "아래"]];
+const Cst = { si: 0, i: 29, j: 57, focus: 0, D: [] };
+function softmax(z) { const m = Math.max(...z), e = z.map(v => Math.exp(v - m)), S = e.reduce((a, b) => a + b, 0); return e.map(v => v / S); }
+const gaussLogits = (mu, sg) => Array.from({ length: REG }, (_, i) => -((i - mu) * (i - mu)) / (2 * sg * sg));
+const expect = p => p.reduce((a, v, i) => a + i * v, 0);
+function solveMu(target, sg) { let lo = 0, hi = 15; for (let it = 0; it < 60; it++) { const m = (lo + hi) / 2; if (expect(softmax(gaussLogits(m, sg))) < target) lo = m; else hi = m; } return (lo + hi) / 2; }
+function setSide(k, mu, sg) { Cst.D[k] = { mu, sg, p: softmax(gaussLogits(mu, sg)) }; }
+function lectureC() {
+  const sz = G.sz, K = sz / 640, s = 8;
+  Cst.si = 0; Cst.i = clamp(Math.floor(236 * K / s), 0, sz / s - 1); Cst.j = clamp(Math.floor(460 * K / s), 0, sz / s - 1);
+  setSide(0, solveMu(5.844, 0.9), 0.9); setSide(1, 4.5, 0.8); setSide(2, 4.12, 0.85); setSide(3, 4.5, 0.75);
+  segSet($("#segSC"), 0);
+}
+function buildSides() {
+  $("#sidesC").innerHTML = SIDES.map(([nm, ko], k) => `<div class="yl-side" data-k="${k}">
+    <div class="yl-side-h"><span><b class="nm">${nm}</b> ${ko}까지 거리</span><span class="v" data-v></span></div>
+    <svg class="yl-bars" viewBox="0 0 320 118" data-k="${k}" tabindex="0" role="img" aria-label="${nm} 변의 16구간 확률분포. 끌어서 조절, 좌우 화살표로 중심 이동"></svg>
+    <div class="yl-side-ctl">
+      <label class="sk-slider"><span class="sk-sl-head">중심 <b data-muv></b></span><input type="range" min="0" max="15" step="0.01" data-mu aria-label="${nm} 분포 중심"></label>
+      <label class="sk-slider"><span class="sk-sl-head">퍼짐 <b data-sgv></b></span><input type="range" min="0.3" max="4" step="0.05" data-sg aria-label="${nm} 분포 퍼짐"></label>
+    </div></div>`).join("");
+  $$("#sidesC .yl-side").forEach(el => {
+    const k = +el.dataset.k, mu = $("[data-mu]", el), sg = $("[data-sg]", el), sv = $("svg", el);
+    const upd = () => { Cst.focus = k; setSide(k, +mu.value, +sg.value); renderC(); };
+    mu.addEventListener("input", upd); sg.addEventListener("input", upd);
+    let drag = false;
+    const at = e => { const r = sv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * 320, y = (e.clientY - r.top) / r.height * 118; const bin = clamp(Math.floor((x - 8) / 19), 0, 15), val = clamp((100 - y) / 88 * (drag.sc || 0.5), 0.005, 0.97); const p = Cst.D[k].p.slice(), rest = 1 - p[bin]; p[bin] = val; for (let i = 0; i < REG; i++) if (i !== bin) p[i] = rest > 1e-9 ? p[i] / rest * (1 - val) : (1 - val) / 15; Cst.D[k] = { mu: expect(p), sg: Cst.D[k].sg, p, custom: true }; Cst.focus = k; renderC(); };
+    sv.addEventListener("pointerdown", e => { drag = { sc: barScale(Cst.D[k].p) }; Cst.dragSc = drag.sc; sv.setPointerCapture(e.pointerId); at(e); });
+    sv.addEventListener("pointermove", e => { if (drag) at(e); });
+    const end = () => { if (drag) { drag = false; Cst.dragSc = 0; renderC(); } }; sv.addEventListener("pointerup", end); sv.addEventListener("pointercancel", end);
+    sv.addEventListener("keydown", e => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); const D = Cst.D[k]; setSide(k, clamp(D.mu + (e.key === "ArrowRight" ? 0.1 : -0.1), 0, 15), D.sg); Cst.focus = k; renderC(); } });
+    el.addEventListener("focusin", () => { if (Cst.focus !== k) { Cst.focus = k; renderC(); } });
+  });
+}
+function barsSVG(p, E) {
+  const mx = Math.max(...p), sc = barScale(p); let s = `<line class="base" x1="6" y1="100.5" x2="314" y2="100.5"/>`;
+  p.forEach((v, i) => { const h = v / sc * 88, x = 8 + i * 19; s += `<rect class="bar${v === mx ? " pk" : ""}" x="${x}" y="${100 - h}" width="17" height="${Math.max(0.5, h)}" rx="2"/><text class="tick" x="${x + 8.5}" y="112" text-anchor="middle">${i}</text>`; });
+  const ex = 8 + E * 19 + 8.5; s += `<line class="ev" x1="${ex}" y1="4" x2="${ex}" y2="100"/><text class="tick" x="4" y="10">${f2(sc)}</text><line class="base" x1="6" y1="12.5" x2="14" y2="12.5"/>`;
+  return s;
+}
+function barScale(p) { if (Cst.dragSc) return Cst.dragSc; return Math.max(0.5, Math.ceil(Math.max(...p) * 10) / 10); }
+function ltrbC() { return Cst.D.map(D => expect(D.p)); }
+function renderC() {
+  const s = STR[Cst.si], ax = (Cst.j + 0.5) * s, ay = (Cst.i + 0.5) * s, E = ltrbC(), px = E.map(v => v * s);
+  $$("#sidesC .yl-side").forEach(el => {
+    const k = +el.dataset.k, D = Cst.D[k];
+    el.classList.toggle("on", k === Cst.focus);
+    $("svg", el).innerHTML = barsSVG(D.p, E[k]);
+    $("[data-v]", el).textContent = `${f2(E[k])}칸 × ${s} = ${f1(px[k])}px`;
+    const mu = $("[data-mu]", el), sg = $("[data-sg]", el);
+    if (document.activeElement !== mu) mu.value = D.mu; if (document.activeElement !== sg) sg.value = D.sg;
+    $("[data-muv]", el).textContent = f2(D.mu); $("[data-sgv]", el).textContent = D.custom ? "직접" : f2(D.sg);
+  });
+  const k = Cst.focus, D = Cst.D[k], nm = SIDES[k][0];
+  const terms = D.p.map((v, i) => [i, v]).filter(x => x[1] >= 0.01).map(([i, v]) => `${i}×${f2(v)}`);
+  $("#fmC2").innerHTML = `${nm} = Σ i·p<sub>i</sub> = ${terms.join(" + ")}${D.p.some(v => v > 0 && v < 0.01) ? " + …" : ""} = <b>${f2(E[k])}칸</b><br>${nm} × stride = ${f2(E[k])}칸 × ${s} = <b>${f1(px[k])}px</b>`;
+  const x1 = ax - px[0], y1 = ay - px[1], x2 = ax + px[2], y2 = ay + px[3];
+  $("#fmC").innerHTML = `anchor point (a<sub>x</sub>, a<sub>y</sub>) = (${ax}, ${ay}) · ${SN[Cst.si]} stride s = ${s}<br>
+    x1 = a<sub>x</sub> − l·s = ${ax} − ${f1(px[0])} = ${f1(x1)}<br>y1 = a<sub>y</sub> − t·s = ${ay} − ${f1(px[1])} = ${f1(y1)}<br>
+    x2 = a<sub>x</sub> + r·s = ${ax} + ${f1(px[2])} = ${f1(x2)}<br>y2 = a<sub>y</sub> + b·s = ${ay} + ${f1(px[3])} = ${f1(y2)}<br>
+    박스 ${f1(x2 - x1)}×${f1(y2 - y1)}px${bestIoU([x1, y1, x2, y2])}`;
+  $("#fmC3").innerHTML = `한 변 최대 15칸 × stride → P3 ${15 * 8}px · P4 ${15 * 16}px · P5 ${15 * 32}px (지금 ${SN[Cst.si]}: 최대 ${15 * s}px)`;
+  drawC([x1, y1, x2, y2]); flowC(); clsC();
+}
+function bestIoU(bx) { let b = 0, nm = ""; for (const L of les(G.sz)) { const u = iou(bx, L.box); if (u > b) { b = u; nm = L.name; } } return b > 0 ? ` · 가장 많이 겹치는 병변: ${nm}, IoU ${f2(b)}` : ""; }
+function drawC(bx) {
+  const cv = $("#cvC"); if (!cv.clientWidth) return;
+  const { ctx, w } = prep(cv), C = colors(), sz = G.sz, k = w / sz, s = STR[Cst.si], ax = (Cst.j + 0.5) * s, ay = (Cst.i + 0.5) * s;
+  ctx.drawImage(imgAt(sz), 0, 0, w, w);
+  ctx.strokeStyle = C.p[Cst.si]; ctx.globalAlpha = 0.28; ctx.lineWidth = 0.6; ctx.beginPath(); for (let x = 0; x <= w + 0.1; x += s * k) { ctx.moveTo(x, 0); ctx.lineTo(x, w); ctx.moveTo(0, x); ctx.lineTo(w, x); } ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.strokeStyle = C.gt; ctx.lineWidth = 1.6; ctx.setLineDash([5, 3]); for (const L of les(sz)) ctx.strokeRect(L.x1 * k, L.y1 * k, L.w * k, L.h * k); ctx.setLineDash([]);
+  ctx.fillStyle = C.p[Cst.si]; ctx.globalAlpha = 0.5; ctx.fillRect(Cst.j * s * k, Cst.i * s * k, s * k, s * k); ctx.globalAlpha = 1;
+  ctx.strokeStyle = C.c[1]; ctx.lineWidth = 2.4; ctx.strokeRect(bx[0] * k, bx[1] * k, (bx[2] - bx[0]) * k, (bx[3] - bx[1]) * k);
+  ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(bx[0] * k, ay * k); ctx.lineTo(bx[2] * k, ay * k); ctx.moveTo(ax * k, bx[1] * k); ctx.lineTo(ax * k, bx[3] * k); ctx.stroke();
+  ctx.font = "600 12px " + getComputedStyle(document.body).getPropertyValue("--mono");
+  const tag = (t, x, y) => { const m = ctx.measureText(t).width + 8; ctx.fillStyle = C.c[1]; ctx.fillRect(x - m / 2, y - 9, m, 17); ctx.fillStyle = C.imgInk; ctx.textAlign = "center"; ctx.fillText(t, x, y + 4); };
+  const E = ltrbC();
+  if (E[0] * s * k > 30) tag("l", (bx[0] + ax) / 2 * k, ay * k - 12); if (E[2] * s * k > 30) tag("r", (bx[2] + ax) / 2 * k, ay * k - 12);
+  if (E[1] * s * k > 30) tag("t", ax * k + 14, (bx[1] + ay) / 2 * k); if (E[3] * s * k > 30) tag("b", ax * k + 14, (bx[3] + ay) / 2 * k);
+  ctx.beginPath(); ctx.arc(ax * k, ay * k, 4.5, 0, Math.PI * 2); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.strokeStyle = C.imgInk; ctx.lineWidth = 1.5; ctx.stroke();
+}
+function flowC() {
+  const si = Cst.si, n = G.sz / STR[si], ch = [64, 128, 256][si];
+  const chip = (t, v, c) => `<span class="yl-chip ${c || ""}">${t}<br><b>${v}</b></span>`, ar = `<span class="yl-arr" aria-hidden="true">→</span>`;
+  $("#flowC").innerHTML = `<div class="yl-flow-row"><span class="yl-brl">입력</span>${chip(`${SN[si]} 특성맵 (${["L15", "L18", "L21"][si]})`, `${n}×${n}×${ch}`, "hi")}</div>
+    <div class="yl-flow-row"><span class="yl-brl">박스 가지</span>${chip("Conv3×3", "64")}${ar}${chip("Conv3×3", "64")}${ar}${chip("Conv1×1", "64 = 4×16", "box")}${ar}${chip("DFL 기댓값", "4값 (l,t,r,b)", "box")}</div>
+    <div class="yl-flow-row"><span class="yl-brl">분류 가지</span>${chip("Conv3×3", "80")}${ar}${chip("Conv3×3", "80")}${ar}${chip("Conv1×1", "80", "cls")}${ar}${chip("sigmoid", "80점수", "cls")}</div>`;
+  const N = STR.map(s => G.sz / s), tot = totalCells(G.sz);
+  $("#fmC4").innerHTML = `칸마다: 박스 64ch (4변 × 16구간) + 분류 80ch = 144ch  ← 학습 때 출력<br>
+    DFL: 변마다 16구간 → 기댓값 1개 → 64ch가 4값으로<br>
+    예측 1개 = 4 (박스) + 80 (클래스) = <b>84</b><br>
+    ${fmt(N[0] * N[0])} + ${fmt(N[1] * N[1])} + ${fmt(N[2] * N[2])} = ${fmt(tot)}칸 → 출력 <b>1×84×${fmt(tot)}</b>`;
+}
+function clsC() {
+  const p = anchorPred(G.sz, Cst.si, Cst.i, Cst.j), idx = p.scores.map((v, c) => [c, v]).sort((a, b) => b[1] - a[1]);
+  const top = idx.slice(0, 5), lg = v => Math.log(v / (1 - v));
+  $("#clsC").innerHTML = top.map(([c, v], r) => `<div class="yl-cbar${r === 0 ? " top" : ""}"><span class="nm">${CLS[c]}</span><span class="tr"><span class="fl" style="width:${(v * 100).toFixed(1)}%;${r === 0 ? "" : "opacity:.55"}"></span></span><span class="vv">${f3(v)} = σ(${f2(lg(v))})</span></div>`).join("") +
+    `<div class="yl-cbar"><span class="nm">…</span><span class="yl-muted yl-small">나머지 75개 클래스</span><span class="vv">${idx[5][1] < 0.01 ? "모두 0.01 미만" : "최대 " + f3(idx[5][1])}</span></div>
+    <p class="sk-lead yl-small" style="margin:0">이 칸 (${SN[Cst.si]}, 행 ${Cst.i}, 열 ${Cst.j})의 신뢰도 conf = 최대 점수 = <b>${f3(top[0][1])}</b> (${CLS[top[0][0]]}) → ${top[0][1] >= 0.25 ? "conf 0.25 이상이라 conf 거르기를 통과합니다 (4번 탭)." : "conf 0.25 미만이라 후처리 첫 단계에서 버려집니다 (4번 탭)."}</p>`;
+}
+$("#cvC").addEventListener("pointerdown", e => { const [x, y] = evPos($("#cvC"), e), s = STR[Cst.si], n = nCell(Cst.si); Cst.i = clamp(Math.floor(y / s), 0, n - 1); Cst.j = clamp(Math.floor(x / s), 0, n - 1); renderC(); });
+seg($("#segSC"), v => { const s0 = STR[Cst.si], x = (Cst.j + 0.5) * s0, y = (Cst.i + 0.5) * s0; Cst.si = +v; const s = STR[Cst.si]; Cst.i = Math.floor(y / s); Cst.j = Math.floor(x / s); renderC(); });
+$("#btnExC").addEventListener("click", () => { lectureC(); Cst.focus = 0; renderC(); });
+$("#btnPredC").addEventListener("click", () => { const p = anchorPred(G.sz, Cst.si, Cst.i, Cst.j); p.ltrb.forEach((v, k) => setSide(k, solveMu(clamp(v, 0.05, 14.9), 0.7), 0.7)); renderC(); });
+
+/* ===================== 4. 후처리 ===================== */
+const Dst = { step: 0, conf: 0.25, iou: 0.7, md: 300, hs: -1, res: null };
+const DESC = [
+  () => `① 모든 칸이 예측을 하나씩 냅니다: ${fmt(totalCells(G.sz))}개. 점이 진할수록 그 칸의 최대 클래스 점수(conf)가 높습니다. 대부분은 거의 0이고, 병변 근처에 높은 점수가 몰립니다.`,
+  r => `② 최대 클래스 점수가 ${f3(Dst.conf)} 이상인 예측만 남깁니다: ${fmt(totalCells(G.sz))} → <b>${fmt(r.f.length)}</b>개. 같은 병변을 여러 칸이 겹쳐서 예측하고 있습니다.`,
+  r => `③ 클래스마다 점수 높은 순으로, 이미 남긴 박스와 IoU가 ${f2(Dst.iou)}보다 크면 지웁니다: ${fmt(r.f.length)} → <b>${fmt(r.kept.length)}</b>개. 다른 클래스끼리는 서로 지우지 않습니다.`,
+  r => `④ 점수순으로 최대 ${Dst.md}개까지만 최종 결과로: ${fmt(r.kept.length)} → <b>${fmt(r.fin.length)}</b>개.${r.kept.length > Dst.md ? " 개수 제한이 실제로 작동했습니다." : ""}`
+];
+function computeD() { Dst.res = postprocess(allPreds(G.sz), Dst.conf, Dst.iou, Dst.md); }
+function renderD() {
+  const r = Dst.res, st = Dst.step, tot = totalCells(G.sz);
+  $$("#stepsD li").forEach((li, i) => { li.className = i === st ? "on" : i < st ? "done" : ""; });
+  const vals = [[tot, "① 전체 예측"], [r.f.length, `② conf ≥ ${f3(Dst.conf)}`], [r.kept.length, `③ NMS IoU ${f2(Dst.iou)}`], [r.fin.length, `④ 최대 ${Dst.md}개`]];
+  $("#stageD").innerHTML = vals.map(([v, t], i) => `<div class="sk-stat${i === st ? " on" : ""}"><b>${fmt(v)}</b><span>${t}</span></div>`).join("");
+  $("#descD").innerHTML = DESC[st](r);
+  $("#hintD").textContent = `단계 ${st + 1}/4`;
+  const L = les(G.sz);
+  let h = `<thead><tr><th>#</th><th>클래스</th><th>conf</th><th>스케일</th><th>박스 (x1, y1, x2, y2)</th><th>가장 가까운 병변</th></tr></thead><tbody>`;
+  r.fin.slice(0, 60).forEach((p, n) => { let b = 0, nm = "없음 (오탐)"; for (const Ls of L) { const u = iou(p.box, Ls.box); if (u > b && u > 0.3) { b = u; nm = `${Ls.name} (IoU ${f2(u)})`; } } h += `<tr><td class="n">${n + 1}</td><td>${CLS[p.cls]}</td><td class="n">${f3(p.score)}</td><td><span class="yl-dot s${p.si}"></span>${SN[p.si]}</td><td class="n">${p.box.map(v => Math.round(v)).join(", ")}</td><td>${nm}</td></tr>`; });
+  if (r.fin.length > 60) h += `<tr><td colspan="6" class="yl-muted">… 외 ${fmt(r.fin.length - 60)}개</td></tr>`;
+  if (!r.fin.length) h += `<tr><td colspan="6" class="yl-muted">남은 박스가 없습니다.</td></tr>`;
+  $("#tblD").innerHTML = h + "</tbody>";
+  const found = L.map(Ls => r.fin.some(p => iou(p.box, Ls.box) > 0.5));
+  const fp = r.fin.filter(p => !L.some(Ls => iou(p.box, Ls.box) > 0.3)).length;
+  $("#finHint").textContent = `병변 ${found.filter(Boolean).length}/4 찾음 · 오탐 ${fmt(fp)}개`;
+  $("#noteD").innerHTML = found[0] ? `지금 기준(conf ${f3(Dst.conf)})에서는 <b>미세 석회화도 찾았습니다</b>. 대신 병변이 아닌 곳의 박스(오탐) ${fmt(fp)}개가 함께 나옵니다.` : `conf ${f3(Dst.conf)}에서는 점수가 약 0.2인 <b>미세 석회화를 놓칩니다</b>. conf를 0.12로 낮추면 찾지만 오탐도 늘어납니다 — 의료 선별에서는 민감도를 위해 conf를 낮추는 경우가 많습니다.`;
+  drawD();
+}
+function drawD() {
+  const cv = $("#cvD"); if (!cv.clientWidth || !Dst.res) return;
+  const { ctx, w } = prep(cv), C = colors(), sz = G.sz, k = w / sz, r = Dst.res, st = Dst.step;
+  ctx.drawImage(imgAt(sz), 0, 0, w, w);
+  const rect = (p, lw, a, dash) => { ctx.globalAlpha = a; ctx.strokeStyle = clsColor(C, p.cls); ctx.lineWidth = lw; ctx.setLineDash(dash || []); ctx.strokeRect(p.box[0] * k, p.box[1] * k, (p.box[2] - p.box[0]) * k, (p.box[3] - p.box[1]) * k); ctx.setLineDash([]); ctx.globalAlpha = 1; };
+  ctx.strokeStyle = C.gt; ctx.lineWidth = 1.2; ctx.setLineDash([4, 3]); ctx.globalAlpha = 0.9; for (const L of les(sz)) ctx.strokeRect(L.x1 * k, L.y1 * k, L.w * k, L.h * k); ctx.setLineDash([]); ctx.globalAlpha = 1;
+  if (st === 0) {
+    ctx.fillStyle = C.heat;
+    for (const p of allPreds(sz)) {
+      if (Dst.hs >= 0 && p.si !== Dst.hs) continue;
+      const a = clamp(0.16 + p.score * 1.4, 0, 1), rr = Math.max(0.9, STR[p.si] * k * (Dst.hs >= 0 ? 0.32 : 0.2) * (0.5 + p.score));
+      ctx.globalAlpha = a; ctx.beginPath(); ctx.arc(p.ax * k, p.ay * k, rr, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  } else if (st === 1) {
+    for (const p of r.f.slice().reverse()) rect(p, 1, clamp(0.25 + p.score, 0.25, 0.95));
+  } else if (st === 2) {
+    for (const p of r.sup) rect(p, 1, 0.22, [3, 3]);
+    for (const p of r.kept) rect(p, 2.2, 1);
+  } else {
+    const fin = new Set(r.fin);
+    for (const p of r.kept) if (!fin.has(p)) rect(p, 1, 0.25, [3, 3]);
+    ctx.font = "600 12px " + getComputedStyle(document.body).getPropertyValue("--sans");
+    const labs = r.fin.length <= 40;
+    for (const p of r.fin) {
+      rect(p, 2.4, 1);
+      if (labs) { const t = `${CLS[p.cls]} ${f2(p.score)}`, m = ctx.measureText(t).width + 8, x = clamp(p.box[0] * k, 0, w - m), y = Math.max(16, p.box[1] * k); ctx.fillStyle = clsColor(C, p.cls); ctx.fillRect(x, y - 16, m, 16); ctx.fillStyle = C.imgInk; ctx.textAlign = "left"; ctx.fillText(t, x + 4, y - 4); }
+    }
+  }
+}
+const stD = makeStepper($("#navD"), 4, i => { Dst.step = i; renderD(); });
+STEPPERS.d = stD;
+let rafD = 0; const qD = () => { cancelAnimationFrame(rafD); rafD = requestAnimationFrame(() => { computeD(); renderD(); }); };
+$("#confD").addEventListener("input", e => { Dst.conf = +e.target.value; $("#confV").textContent = f3(Dst.conf); qD(); });
+$("#iouD").addEventListener("input", e => { Dst.iou = +e.target.value; $("#iouV").textContent = f2(Dst.iou); qD(); });
+$$("[data-conf]").forEach(b => b.addEventListener("click", () => { Dst.conf = +b.dataset.conf; $("#confD").value = Dst.conf; $("#confV").textContent = f3(Dst.conf); if (stD.i === 0) stD.set(3); qD(); }));
+seg($("#segMD"), v => { Dst.md = +v; qD(); });
+seg($("#segHD"), v => { Dst.hs = +v; if (stD.i !== 0) stD.set(0); else drawD(); });
+
+/* ===================== 5. 학습: TAL · 손실 · Mosaic · 단계 ===================== */
+const Est = { g: 2, sel: null, cands: [] };
+function computeE() {
+  const sz = G.sz, L = les(sz)[Est.g], out = [];
+  for (let si = 0; si < 3; si++) {
+    const s = STR[si], n = sz / s;
+    for (let i = Math.max(0, Math.floor(L.y1 / s) - 1); i <= Math.min(n - 1, Math.ceil(L.y2 / s)); i++)
+      for (let j = Math.max(0, Math.floor(L.x1 / s) - 1); j <= Math.min(n - 1, Math.ceil(L.x2 / s)); j++) {
+        const ax = (j + 0.5) * s, ay = (i + 0.5) * s;
+        if (!(ax > L.x1 && ax < L.x2 && ay > L.y1 && ay < L.y2)) continue;
+        const p = anchorPred(sz, si, i, j), sc = p.scores[L.cls], u = iou(p.box, L.box), t = Math.pow(sc, 0.5) * Math.pow(u, 6);
+        out.push({ key: si + "-" + i + "-" + j, si, i, j, ax, ay, s: sc, u, t, box: p.box });
+      }
+  }
+  out.sort((a, b) => b.t - a.t);
+  const top = out.slice(0, 10), mt = top.length ? top[0].t : 0, mu = top.reduce((a, c) => Math.max(a, c.u), 0);
+  top.forEach(c => { c.top = true; c.tg = mt > 0 ? c.t / mt * mu : 0; });
+  Est.cands = out; Est.mt = mt; Est.mu = mu;
+  if (Est.sel && !out.some(c => c.key === Est.sel)) Est.sel = null;
+}
+function renderE() {
+  const c = Est.cands, L = les(G.sz)[Est.g], nS = [0, 1, 2].map(si => c.filter(x => x.si === si).length);
+  $("#statsE").innerHTML = `<div class="sk-stat"><b>${fmt(c.length)}</b><span>후보 (P3 ${nS[0]} · P4 ${nS[1]} · P5 ${nS[2]})</span></div><div class="sk-stat"><b>${Math.min(10, c.length)}</b><span>양성 (GT당 상위 10)</span></div><div class="sk-stat"><b>${f3(Est.mt)}</b><span>최대 t</span></div>`;
+  let h = `<thead><tr><th>순위</th><th>스케일</th><th>anchor (x, y)</th><th>s</th><th>IoU</th><th>s<sup>0.5</sup></th><th>IoU<sup>6</sup></th><th>t</th><th>정답 점수</th></tr></thead><tbody>`;
+  c.forEach((x, r) => { h += `<tr data-k="${x.key}" tabindex="0" class="${x.top ? "yl-top" : ""}${x.key === Est.sel ? " yl-sel" : ""}${r === 0 ? " yl-best" : ""}"><td class="n">${r + 1}</td><td><span class="yl-dot s${x.si}"></span>${SN[x.si]}</td><td class="n">(${x.ax}, ${x.ay})</td><td class="n">${f3(x.s)}</td><td class="n">${f3(x.u)}</td><td class="n">${f3(Math.sqrt(x.s))}</td><td class="n">${f3(Math.pow(x.u, 6))}</td><td class="n">${x.t < 0.0005 ? x.t.toExponential(1) : f3(x.t)}</td><td class="n">${x.top ? f3(x.tg) : "0 (음성)"}</td></tr>`; });
+  $("#tblE").innerHTML = h + "</tbody>";
+  const b = c[0];
+  $("#fmE").innerHTML = b ? `정렬 지표 t = s<sup>α</sup> × IoU<sup>β</sup>, α = 0.5, β = 6<br>1위 (${SN[b.si]}, anchor (${b.ax}, ${b.ay})): ${f3(b.s)}<sup>0.5</sup> × ${f3(b.u)}<sup>6</sup> = ${f3(Math.sqrt(b.s))} × ${f3(Math.pow(b.u, 6))} = <b>${f3(b.t)}</b><br>${L.name}: 후보 ${fmt(c.length)}개 중 t 상위 10개만 양성, 나머지는 배경(음성)` : "후보가 없습니다.";
+  drawE();
+}
+function drawE() {
+  const cv = $("#cvE"); if (!cv.clientWidth) return;
+  const { ctx, w } = prep(cv), C = colors(), sz = G.sz, k = w / sz, L = les(sz)[Est.g];
+  ctx.drawImage(imgAt(sz), 0, 0, w, w);
+  ctx.strokeStyle = C.gt; ctx.lineWidth = 2.4; ctx.strokeRect(L.x1 * k, L.y1 * k, L.w * k, L.h * k);
+  for (const x of Est.cands.slice().reverse()) {
+    ctx.globalAlpha = x.top ? 1 : 0.8; ctx.fillStyle = C.p[x.si];
+    ctx.beginPath(); ctx.arc(x.ax * k, x.ay * k, x.si === 0 ? 1.8 : x.si === 1 ? 2.6 : 3.4, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  for (const x of Est.cands.filter(c => c.top)) {
+    ctx.strokeStyle = C.p[x.si]; ctx.lineWidth = 1; ctx.globalAlpha = 0.7; ctx.strokeRect(x.box[0] * k, x.box[1] * k, (x.box[2] - x.box[0]) * k, (x.box[3] - x.box[1]) * k); ctx.globalAlpha = 1;
+    ctx.lineWidth = 2.2; ctx.strokeStyle = "#FFFFFF"; ctx.beginPath(); ctx.arc(x.ax * k, x.ay * k, 6.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 1.2; ctx.strokeStyle = C.p[x.si]; ctx.beginPath(); ctx.arc(x.ax * k, x.ay * k, 8, 0, Math.PI * 2); ctx.stroke();
+  }
+  const s = Est.cands.find(c => c.key === Est.sel);
+  if (s) { ctx.strokeStyle = C.c[1]; ctx.lineWidth = 2.4; ctx.strokeRect(s.box[0] * k, s.box[1] * k, (s.box[2] - s.box[0]) * k, (s.box[3] - s.box[1]) * k); ctx.fillStyle = C.c[1]; ctx.beginPath(); ctx.arc(s.ax * k, s.ay * k, 5, 0, Math.PI * 2); ctx.fill(); }
+}
+$("#segGT").innerHTML = LES0.map((L, i) => `<button type="button" data-v="${i}" aria-pressed="${i === Est.g}">${L.name}</button>`).join("");
+seg($("#segGT"), v => { Est.g = +v; Est.sel = null; computeE(); renderE(); });
+$("#tblE").addEventListener("click", e => { const r = e.target.closest("tr[data-k]"); if (r) { Est.sel = Est.sel === r.dataset.k ? null : r.dataset.k; $$("#tblE tr[data-k]").forEach(x => x.classList.toggle("yl-sel", x.dataset.k === Est.sel)); drawE(); } });
+$("#tblE").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { const r = e.target.closest("tr[data-k]"); if (r) { e.preventDefault(); r.click(); } } });
+
+function renderE2() {
+  const s = +$("#sE").value, u = +$("#uE").value, t = Math.sqrt(s) * Math.pow(u, 6);
+  $("#sEv").textContent = f2(s); $("#uEv").textContent = f2(u);
+  $("#fmE2").innerHTML = `t = s<sup>0.5</sup> × IoU<sup>6</sup> = ${f2(s)}<sup>0.5</sup> × ${f2(u)}<sup>6</sup> = ${f3(Math.sqrt(s))} × ${f3(Math.pow(u, 6))} = <b>${f3(t)}</b><br>IoU 0.9 → ${f3(Math.pow(0.9, 6))} · 0.8 → ${f3(Math.pow(0.8, 6))} · 0.7 → ${f3(Math.pow(0.7, 6))} · 0.5 → ${f3(Math.pow(0.5, 6))}<br>점수를 절반으로(1 → 0.5) 줄여도 ×${f3(Math.sqrt(0.5))}, IoU를 1 → 0.5로 줄이면 ×${f3(Math.pow(0.5, 6))}`;
+  const X = v => 36 + v * 306, Y = v => 172 - v * 150;
+  let g = ""; for (let v = 0; v <= 1.001; v += 0.25) g += `<line class="gr" x1="${X(0)}" y1="${Y(v)}" x2="${X(1)}" y2="${Y(v)}"/><text x="${X(0) - 6}" y="${Y(v) + 3}" text-anchor="end">${v.toFixed(2)}</text><text x="${X(v)}" y="188" text-anchor="middle">${v.toFixed(2)}</text>`;
+  const path = f => { let d = ""; for (let i = 0; i <= 100; i++) { const v = i / 100; d += (i ? "L" : "M") + X(v).toFixed(1) + "," + Y(f(v)).toFixed(1); } return d; };
+  g += `<line class="ax" x1="${X(0)}" y1="${Y(0)}" x2="${X(1)}" y2="${Y(0)}"/><line class="ax" x1="${X(0)}" y1="${Y(0)}" x2="${X(0)}" y2="${Y(1)}"/>`;
+  g += `<path class="cu2" d="${path(v => Math.sqrt(v))}"/><path class="cu1" d="${path(v => Math.pow(v, 6))}"/>`;
+  g += `<circle class="pt2" cx="${X(s)}" cy="${Y(Math.sqrt(s))}" r="5"/><circle class="pt1" cx="${X(u)}" cy="${Y(Math.pow(u, 6))}" r="5"/>`;
+  g += `<text class="lab2" x="${X(0.12)}" y="${Y(Math.sqrt(0.12)) - 8}">s^0.5</text><text class="lab1" x="${X(0.8)}" y="${Y(0.02) - 6}" text-anchor="end">IoU^6</text>`;
+  $("#chartE").innerHTML = g;
+}
+$("#sE").addEventListener("input", renderE2); $("#uE").addEventListener("input", renderE2);
+
+function renderLoss() {
+  const v = [+$("#lBox").value || 0, +$("#lDfl").value || 0, +$("#lCls").value || 0].map(x => Math.max(0, x)), wt = [7.5, 1.5, 0.5], wv = v.map((x, i) => x * wt[i]), tot = wv.reduce((a, b) => a + b, 0);
+  const nm = ["7.5 · CIoU", "1.5 · DFL", "0.5 · BCE"], col = ["var(--p5)", "var(--p4)", "var(--c1)"], mx = Math.max(...wv, 1e-9);
+  $("#lossBars").innerHTML = wv.map((x, i) => `<div class="yl-lbar"><span>${nm[i]}</span><span class="tr"><span class="fl" style="width:${(x / mx * 100).toFixed(1)}%;background:${col[i]}"></span></span><span class="vv">${f3(x)}</span></div>`).join("") +
+    `<div class="yl-lbar"><b>합계</b><span class="yl-muted yl-small">${tot > 0 ? wv.map((x, i) => `${nm[i].split(" · ")[1]} ${Math.round(x / tot * 100)}%`).join(" · ") : ""}</span><b class="vv">${f3(tot)}</b></div>`;
+  $("#fmL").innerHTML = `손실 = 7.5 × ${f3(v[0])} + 1.5 × ${f3(v[1])} + 0.5 × ${f3(v[2])}<br>= ${f3(wv[0])} + ${f3(wv[1])} + ${f3(wv[2])} = <b>${f3(tot)}</b> (× 배치 크기)`;
+}
+["#lBox", "#lDfl", "#lCls"].forEach(id => $(id).addEventListener("input", renderLoss));
+
+const Mst = { seed: 3 };
+function drawM() {
+  const cv = $("#cvM"); if (!cv.clientWidth) return;
+  const { ctx, w } = prep(cv), C = colors(), ep = +$("#epE").value, off = ep > 90, rnd = mulberry(Mst.seed * 7919 + 1), base = imgAt(640);
+  $("#epV").textContent = ep;
+  if (off) {
+    ctx.drawImage(base, 0, 0, w, w); ctx.strokeStyle = C.gt; ctx.lineWidth = 2; const k = w / 640;
+    for (const L of LES0) ctx.strokeRect(L.box[0] * k, L.box[1] * k, (L.box[2] - L.box[0]) * k, (L.box[3] - L.box[1]) * k);
+    $("#noteM").innerHTML = `epoch ${ep}: <b>Mosaic 꺼짐</b> (close_mosaic = 10 → 마지막 10 epoch, 91~100). 실제 영상과 같은 모양으로 마무리 학습을 합니다.`;
+    return;
+  }
+  const xc = w * (0.3 + 0.4 * rnd()), yc = w * (0.3 + 0.4 * rnd());
+  const quads = [[0, 0, xc, yc, 1, 1], [xc, 0, w - xc, yc, 0, 1], [0, yc, xc, w - yc, 1, 0], [xc, yc, w - xc, w - yc, 0, 0]];
+  const boxes = [];
+  quads.forEach(([qx, qy, qw, qh, ar, ab], q) => {
+    const z = w * (0.55 + 0.4 * rnd()), flip = rnd() < 0.5, br = (rnd() - 0.5) * 0.35;
+    const ix = ar ? xc - z : xc, iy = ab ? yc - z : yc;
+    ctx.save(); ctx.beginPath(); ctx.rect(qx, qy, qw, qh); ctx.clip();
+    ctx.save(); ctx.translate(ix + (flip ? z : 0), iy); ctx.scale(flip ? -1 : 1, 1); ctx.drawImage(base, 0, 0, z, z); ctx.restore();
+    if (Math.abs(br) > 0.02) { ctx.globalAlpha = Math.abs(br); ctx.fillStyle = br > 0 ? "#FFFFFF" : "#000000"; ctx.fillRect(qx, qy, qw, qh); ctx.globalAlpha = 1; }
+    ctx.restore();
+    const k = z / 640;
+    for (const L of LES0) {
+      let x1 = L.box[0] * k, x2 = L.box[2] * k; if (flip) { const a = z - x2, b = z - x1; x1 = a; x2 = b; }
+      const bx = [ix + x1, iy + L.box[1] * k, ix + x2, iy + L.box[3] * k];
+      const cb = [Math.max(bx[0], qx), Math.max(bx[1], qy), Math.min(bx[2], qx + qw), Math.min(bx[3], qy + qh)];
+      if (cb[2] - cb[0] > 3 && cb[3] - cb[1] > 3 && (cb[2] - cb[0]) * (cb[3] - cb[1]) > 0.25 * (bx[2] - bx[0]) * (bx[3] - bx[1])) boxes.push(cb);
+    }
+  });
+  ctx.strokeStyle = C.gt; ctx.lineWidth = 2; for (const b of boxes) ctx.strokeRect(b[0], b[1], b[2] - b[0], b[3] - b[1]);
+  ctx.strokeStyle = "#FFFFFF"; ctx.globalAlpha = 0.85; ctx.lineWidth = 1.2; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(xc, 0); ctx.lineTo(xc, w); ctx.moveTo(0, yc); ctx.lineTo(w, yc); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+  $("#noteM").innerHTML = `epoch ${ep}: <b>Mosaic 켜짐</b> — 영상 4장(크기·좌우·밝기를 바꾼)을 무작위 중심점에서 이어 붙여 한 장으로 만듭니다. 정답 박스도 함께 옮겨지고 잘립니다 (남은 박스 ${boxes.length}개). 마지막 10 epoch(91~100)에는 꺼집니다.`;
+}
+$("#epE").addEventListener("input", drawM);
+$("#btnMos").addEventListener("click", () => { Mst.seed++; drawM(); });
+
+const TSTEPS = [
+  ["가중치 로드", "사전학습 가중치 yolov8n.pt(COCO, 80클래스)를 불러옵니다. 클래스 수(nc)가 다르면 분류 가지 마지막 층만 새로 만들고 나머지는 그대로 이어 받습니다 (전이학습)."],
+  ["증강", "Mosaic(4장 합치기), 색(HSV) 변화, 좌우 뒤집기, 크기·이동 변환. Mosaic는 마지막 10 epoch에는 끕니다 (close_mosaic = 10)."],
+  ["순전파", "배치를 imgsz로 맞춰 Backbone → Neck → Head. 세 스케일에서 칸마다 144ch(박스 64 + 분류 80)를 냅니다."],
+  ["TAL 배정", "정답 박스마다, 중심이 그 안에 있는 칸을 후보로 놓고 t = s^0.5 × IoU^6이 큰 상위 10개를 양성으로 정합니다. 나머지는 배경."],
+  ["손실 계산", "7.5·CIoU + 1.5·DFL (양성 칸) + 0.5·BCE (모든 칸). 분류 목표값은 정규화한 t."],
+  ["역전파 · 최적화", "optimizer = auto: 반복 수가 적으면 AdamW(학습률 자동), 많으면 SGD(lr 0.01, momentum 0.9). 처음 3 epoch는 warmup."],
+  ["검증", "EMA(가중치 이동평균) 모형으로 검증셋 평가. conf 0.001로 거의 모든 박스를 남겨 mAP를 계산합니다. fitness = mAP50-95 (8.4 기준)."],
+  ["저장 · 조기 종료", "매 epoch last.pt 저장, fitness가 최고일 때 best.pt 저장. 100 epoch(patience) 동안 나아지지 않으면 멈춥니다."]
+];
+$("#stepsT").innerHTML = TSTEPS.map((s, i) => `<li>${i + 1}. ${s[0]}</li>`).join("");
+const stT = makeStepper($("#navT"), 8, i => {
+  $$("#stepsT li").forEach((li, k) => { li.className = k === i ? "on" : k < i ? "done" : ""; });
+  $("#bodyT").innerHTML = `<b class="t">${i + 1}. ${TSTEPS[i][0]}</b><p>${TSTEPS[i][1]}</p>${i === 1 ? `<p class="yl-small yl-muted">왼쪽 Mosaic 데모에서 epoch을 91 이상으로 옮겨 보세요.</p>` : i === 3 ? `<p class="yl-small yl-muted">위의 "후보 anchor 정렬 표"가 이 단계입니다.</p>` : i === 4 ? `<p class="yl-small yl-muted">위의 손실 막대가 이 단계입니다.</p>` : ""}`;
+});
+STEPPERS.e = stT;
+function inferT() {
+  const tot = fmt(totalCells(G.sz)), ar = `<span class="yl-arr" aria-hidden="true">→</span>`, ch = (a, b, c) => `<span class="yl-chip ${c || ""}">${a}<br><b>${b}</b></span>`;
+  $("#inferT").innerHTML = [ch("입력", `letterbox ${G.sz}×${G.sz}`), ch("Backbone · Neck", "P3 · P4 · P5"), ch("Head", `1×84×${tot}`, "hi"), ch("DFL · 디코딩", "l,t,r,b → x1,y1,x2,y2"), ch("conf 거르기", "≥ 0.25"), ch("클래스별 NMS", "IoU 0.7"), ch("최대 개수", "300개")].join(ar);
+}
+
+/* ===================== 전체 갱신 · 시작 ===================== */
+function setSize(sz) {
+  const old = G.sz, re = (c, si) => { const s = STR[si], n = sz / s; c.i = clamp(Math.floor((c.i + 0.5) * sz / old), 0, n - 1); c.j = clamp(Math.floor((c.j + 0.5) * sz / old), 0, n - 1); };
+  if (old !== sz) { if (A.cell) re(A.cell, A.cell.si); re(Cst, Cst.si); }
+  G.sz = sz; segSet($("#segSz"), sz);
+  const tot = totalCells(sz); $("#sumCells").textContent = fmt(tot); $("#sumOut").textContent = `1×84×${fmt(tot)}`;
+  $("#sumFlops").textContent = sz === 640 ? "약 8.7~8.9" : "약 " + f1(8.9 * Math.pow(sz / 640, 2));
+  infoA(); renderArch(); tableB(); computeD(); computeE(); inferT();
+  drawActive();
+}
+function drawActive() {
+  if (cur === "a") drawA();
+  else if (cur === "c") renderC();
+  else if (cur === "d") renderD();
+  else if (cur === "e") { renderE(); drawM(); }
+}
+seg($("#segSz"), v => setSize(+v));
+
+buildSides(); lectureC();
+A.cell = defaultCellA();
+renderE2(); renderLoss(); stT.set(0);
+setSize(640);
+stD.set(0);
+showTab((location.hash || "").slice(1) || "a");
+const redraw = () => drawActive();
+new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", redraw);
+let rz = 0; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(redraw, 120); });
+})();
+</script>
+</body>
+</html>

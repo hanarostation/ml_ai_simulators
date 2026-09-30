@@ -1,0 +1,1012 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>이미지 증강 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+:root{
+  --sk-accent: var(--cat-cv);
+  --role-a:#2563EB; --role-b:#EA580C;
+  --fam-geo:#2563EB; --fam-int:#C2410C; --fam-reg:#7C3AED;
+  --ok:#15803D; --caution:#B45309; --bad:#D6336C;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --role-a:#6AA5FF; --role-b:#FF914D;
+  --fam-geo:#6AA5FF; --fam-int:#FF914D; --fam-reg:#B294FF;
+  --ok:#4ADE80; --caution:#FBBF24; --bad:#F2678F;
+} }
+:root[data-theme="dark"]{
+  --role-a:#6AA5FF; --role-b:#FF914D;
+  --fam-geo:#6AA5FF; --fam-int:#FF914D; --fam-reg:#B294FF;
+  --ok:#4ADE80; --caution:#FBBF24; --bad:#F2678F;
+}
+.f-geo{--fc:var(--fam-geo)} .f-int{--fc:var(--fam-int)} .f-reg{--fc:var(--fam-reg)}
+
+/* ---- 탭1: 실험실 ---- */
+.lab{display:grid;grid-template-columns:340px minmax(0,1fr);grid-template-areas:"a b" "a c";gap:16px;align-items:start}
+.lab-a{grid-area:a;position:sticky;top:78px;align-self:start}
+.ctrl-card{max-height:calc(100vh - 96px);overflow-y:auto;overscroll-behavior:contain}
+.lab-b{grid-area:b;min-width:0}
+.lab-c{grid-area:c;display:flex;flex-direction:column;gap:16px;min-width:0}
+.fams{display:flex;flex-direction:column;gap:14px}
+.fam{display:flex;flex-direction:column;gap:8px}
+.fam-h{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;margin:0}
+.fam-h::before{content:"";width:10px;height:10px;border-radius:3px;background:var(--fc);flex:none}
+.fam-h small{font-weight:600;color:var(--faint);font-size:12px}
+.tq{border:1px solid var(--line);border-radius:10px;padding:8px 11px 9px;display:flex;flex-direction:column;gap:6px;background:var(--surface)}
+.tq.on{border-color:color-mix(in srgb,var(--fc) 60%,var(--line));background:color-mix(in srgb,var(--fc) 6%,var(--surface))}
+.tq:not(.on) .sk-slider,.tq:not(.on) .tq-range{opacity:.55}
+.tq-top{display:flex;align-items:center;gap:6px 8px;flex-wrap:wrap}
+.tq-top .sk-check{font-weight:700}
+.tq-en{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+.tq-nb{margin-left:auto;font-size:11px;font-weight:700;color:var(--sk-accent);border:1px solid currentColor;border-radius:999px;padding:0 7px;line-height:17px}
+.tq-range{font-size:12.5px;color:var(--muted);font-family:var(--mono);line-height:1.45}
+.tq-range b{color:var(--ink);font-weight:600}
+.tq .sk-slider{min-width:0}
+.tq-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.fam-hint{font-size:12.5px;color:var(--muted);margin:0}
+
+.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.cap{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px}
+.cap span{font-weight:600;color:var(--faint);font-size:12px;font-family:var(--mono)}
+.imgbox{position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--line-strong);line-height:0}
+.imgbox canvas.img{display:block;width:100%;height:auto;aspect-ratio:1/1}
+.imgbox canvas.ov{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.pix canvas.img{image-rendering:pixelated}
+#cvOut{cursor:crosshair}
+.drawn{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px 16px;font-size:13.5px;margin:0}
+.drawn div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--line);padding:2px 0}
+.drawn dt{color:var(--muted)} .drawn dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);text-align:right}
+.chain{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:12px}
+.chain span{padding:2px 7px;border-radius:6px;background:var(--surface-2);color:var(--faint);font-weight:600;border:1px solid transparent}
+.chain span.on{color:var(--ink);border-color:var(--fc);background:color-mix(in srgb,var(--fc) 12%,var(--surface))}
+.chain i{font-style:normal;color:var(--faint)}
+.label-line{font-size:14px;font-weight:600}
+.label-line b{font-family:var(--mono)}
+.histwrap canvas{display:block;width:100%;height:150px}
+.upl{position:relative;overflow:hidden}
+.upl input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.upl:focus-within{outline:2px solid var(--focus);outline-offset:2px}
+
+/* ---- 탭2: 배치 ---- */
+.bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px}
+.cell{margin:0;display:flex;flex-direction:column;gap:4px;min-width:0}
+.cell .imgbox{border-color:var(--line)}
+.cell.orig .imgbox{border:2px solid var(--sk-accent)}
+.cell figcaption{font-size:11.5px;color:var(--muted);font-family:var(--mono);display:flex;flex-wrap:wrap;gap:3px;line-height:1.35;min-height:16px}
+.bad-tag{font-family:var(--sans);font-weight:700;font-size:11px;color:var(--bad);border:1px solid currentColor;border-radius:5px;padding:0 4px}
+.epoch{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--ink)}
+.bstat{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+
+/* ---- 탭3: 기법 카드 ---- */
+.effects{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.effect{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface-2)}
+.effect b{display:block;font-size:15px;margin-bottom:3px}
+.effect p{margin:0;font-size:13.5px;color:var(--muted)}
+.tcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.tcard{appearance:none;font:inherit;text-align:left;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--fc);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:7px;cursor:pointer;min-width:0}
+.tcard:hover{border-color:var(--fc);box-shadow:var(--shadow-lift)}
+.tcard:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.tcard canvas{width:100%;height:auto;aspect-ratio:1/1;border-radius:7px;display:block;image-rendering:pixelated}
+.tcard .nm{font-weight:700;font-size:14.5px;display:flex;justify-content:space-between;gap:6px;align-items:baseline;flex-wrap:wrap}
+.tcard .nm code{font-size:11px;color:var(--faint);font-weight:500}
+.tcard .ds{font-size:12.5px;color:var(--muted);line-height:1.45}
+.suit{align-self:flex-start;font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 9px;border:1px solid currentColor}
+.suit.ok{color:var(--ok)} .suit.caution{color:var(--caution)} .suit.bad{color:var(--bad)}
+.rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.rules .sk-note{margin:0}
+
+/* ---- 탭4: 코드 ---- */
+.code{margin:0;font-family:var(--mono);font-size:12.5px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto;color:var(--ink);max-width:100%;white-space:pre}
+.code .c{color:var(--muted)} .code .k{color:var(--sk-accent);font-weight:600}
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.fb{border:1.5px solid var(--line-strong);border-radius:9px;padding:6px 10px;font-size:13px;font-weight:700;background:var(--surface);text-align:center;line-height:1.3}
+.fb small{display:block;font-weight:500;font-size:11.5px;color:var(--muted);font-family:var(--mono)}
+.fb.aug{border-color:var(--sk-accent);background:color-mix(in srgb,var(--sk-accent) 14%,var(--surface))}
+.fb.drop{border-color:var(--fam-reg);background:color-mix(in srgb,var(--fam-reg) 10%,var(--surface))}
+.fb.off{border-style:dashed;background:var(--surface);color:var(--faint)}
+.fb.off small{color:var(--faint)}
+.fa{color:var(--faint);font-weight:700}
+.split3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.sp{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--surface)}
+.sp.train{border:2px solid var(--sk-accent);background:color-mix(in srgb,var(--sk-accent) 6%,var(--surface))}
+.sp h3{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+.sp p{margin:0;font-size:13px;color:var(--muted)}
+.thumbs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.thumbs canvas{width:100%;height:auto;aspect-ratio:1/1;border-radius:6px;display:block}
+.onoff{font-size:12px;font-weight:700;border-radius:999px;padding:1px 9px;border:1px solid currentColor}
+.onoff.y{color:var(--sk-accent)} .onoff.n{color:var(--faint)}
+.sk-table td.wrap, .sk-table th.wrap{white-space:normal}
+.sk-lead,.sk-note,.tq-range,.fam-hint{overflow-wrap:anywhere}
+.concl{display:flex;flex-direction:column;gap:8px}
+
+@media (max-width:1080px){ .effects,.rules{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:900px){
+  .lab{grid-template-columns:minmax(0,1fr);grid-template-areas:"b" "a" "c"}
+  .lab-a{position:static}
+  .ctrl-card{max-height:none;overflow:visible}
+  .split3{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:520px){
+  .pair{gap:8px}
+  .bgrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .cell figcaption{font-size:10.5px}
+  .tcards{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .tcard{padding:8px}
+  .tq-2{grid-template-columns:minmax(0,1fr)}
+  #flowSeg button{white-space:normal}
+}
+@media (prefers-reduced-motion:reduce){ .tcard{transition:none} }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)" aria-current="page">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">이미지 증강 시뮬레이터</h1>
+      <p class="ds-hero__lede">회전·이동·확대, 밝기·대비·노이즈, Random Erasing·Mixup·CutMix를 흑백 의료영상에 직접 걸어 봅니다. 같은 설정에서도 뽑을 때마다 결과가 달라지는 실시간 증강, 학습에만 켜지는 Keras 증강 Layer까지 한 번에 확인합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button class="sk-tab" type="button" role="tab" id="tab-a" aria-controls="pane-a" aria-selected="true"><span class="sk-num">1</span>증강 실험실</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-b" aria-controls="pane-b" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>한 배치 미리보기</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-c" aria-controls="pane-c" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>기법 한눈에</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-d" aria-controls="pane-d" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>파이프라인과 코드</button>
+  </nav>
+
+  <!-- ========== 1. 증강 실험실 ========== -->
+  <section id="pane-a" role="tabpanel" aria-labelledby="tab-a">
+    <div class="lab">
+      <div class="lab-a">
+        <div class="sk-card ctrl-card">
+          <div class="sk-head"><h2>설정</h2><span class="sk-hint">슬라이더를 움직이면 그 기법이 켜집니다</span></div>
+          <div class="sk-group"><span class="sk-label">프리셋</span>
+            <button class="sk-btn sk-btn--sm" type="button" data-preset="nb">노트북 설정</button>
+            <button class="sk-btn sk-btn--sm" type="button" data-preset="over">과한 설정</button>
+            <button class="sk-btn sk-btn--sm" type="button" data-preset="none">모두 끄기</button>
+          </div>
+          <div id="ctrlFams" class="fams"></div>
+        </div>
+      </div>
+
+      <div class="lab-b">
+        <div class="sk-card">
+          <div class="sk-controls">
+            <div class="sk-group">
+              <button class="sk-btn sk-btn--primary" type="button" id="btnReroll">다시 뽑기</button>
+              <span class="sk-hint">seed <b class="sk-mono" id="seedVal">1</b></span>
+            </div>
+            <div class="sk-group"><span class="sk-label">영상</span>
+              <div class="sk-seg" id="imgSeg" role="group" aria-label="원본 영상"></div>
+              <label class="sk-btn sk-btn--sm upl">내 이미지 올리기<input type="file" id="fileIn" accept="image/*" aria-label="내 이미지 올리기"></label>
+            </div>
+          </div>
+          <div class="pair">
+            <div>
+              <div class="cap">원본 <span>128×128</span></div>
+              <div class="imgbox pix" id="boxIn"><canvas class="img" id="cvIn" width="128" height="128" aria-label="원본 영상"></canvas><canvas class="ov" id="ovIn" aria-hidden="true"></canvas></div>
+            </div>
+            <div>
+              <div class="cap">증강 결과 <span id="capOut">training=True</span></div>
+              <div class="imgbox pix" id="boxOut"><canvas class="img sk-focusable" id="cvOut" width="128" height="128" tabindex="0" aria-label="증강 결과 영상. 누르거나 방향키로 픽셀을 골라 역매핑 계산을 봅니다"></canvas><canvas class="ov" id="ovOut" aria-hidden="true"></canvas></div>
+            </div>
+          </div>
+          <div class="sk-controls">
+            <div class="sk-group"><span class="sk-label">표시</span>
+              <div class="sk-seg" id="renderSeg" role="group" aria-label="확대 표시 방식">
+                <button type="button" data-r="pix" aria-pressed="true">픽셀 그대로</button><button type="button" data-r="smooth" aria-pressed="false">부드럽게</button>
+              </div>
+            </div>
+            <label class="sk-check"><input type="checkbox" id="chkGrid"> 원본에 격자 그리기</label>
+            <label class="sk-check"><input type="checkbox" id="chkMap" checked> 역매핑 표시</label>
+            <label class="sk-group" id="img2Wrap"><span class="sk-label">섞을 영상 B</span><select class="sk-select" id="img2"></select></label>
+          </div>
+          <p class="sk-note sk-note--warn" id="warnFlip" hidden><b>의료영상 주의: 좌우 반전.</b> 장기의 좌우 구분이 중요합니다(간은 환자의 오른쪽 = 화면 왼쪽, 심장은 왼쪽). 반전된 영상은 실제로는 드문 내장 역위 영상이 되어 라벨과 어긋날 수 있습니다. 노트북 설정도 좌우 반전은 뺐습니다.</p>
+          <p class="sk-note sk-note--warn" id="warnRot" hidden><b>과도한 회전.</b> 환자는 대개 정해진 자세로 촬영되므로 ±<span id="warnRotDeg"></span>° 같은 큰 회전은 실제로 나오지 않는 영상을 만듭니다. 노트북은 factor 0.03(±10.8°)만 썼습니다.</p>
+          <p class="sk-note" id="warnInt" hidden><b>CT 밝기는 HU 단위.</b> CT는 HU 값을 창(Window)으로 잘라 흑백으로 보여 줍니다. 밝기를 마구 흔들기보다 창의 중심·폭을 조금 흔드는 <b>Window Jittering</b>이 더 자연스럽습니다(강도 변환의 "감마·윈도 지터링").</p>
+        </div>
+      </div>
+
+      <div class="lab-c">
+        <div class="sk-card">
+          <div class="sk-head"><h2>이번에 뽑힌 값</h2><span class="sk-hint">같은 seed면 같은 값, [다시 뽑기]면 새 값</span></div>
+          <dl class="drawn" id="drawn"></dl>
+          <div class="chain" id="chain" aria-label="적용 순서"></div>
+          <div class="label-line" id="labelLine"></div>
+        </div>
+
+        <div class="sk-card">
+          <div class="sk-head"><h2>역매핑 + 이중선형 보간</h2><span class="sk-hint">결과 영상의 픽셀을 눌러 보세요 (방향키 이동)</span></div>
+          <p class="sk-lead">결과의 각 픽셀에서 거꾸로 "원본의 어디를 가져올까"를 계산합니다(역매핑). 회전·이동·확대/축소·반전은 하나의 아핀 행렬 M으로 합쳐지고, 소수 좌표는 주변 4픽셀을 거리로 섞습니다(이중선형 보간). 왼쪽 점선은 결과 화면이 원본에서 가져온 영역입니다.</p>
+          <div class="sk-formula" id="probeF"></div>
+        </div>
+
+        <div class="sk-card">
+          <div class="sk-head"><h2>밝기 분포(히스토그램) 비교</h2>
+            <div class="sk-legend"><span><i style="background:var(--role-a)"></i>원본</span><span><i style="background:var(--role-b)"></i>증강 결과</span></div>
+          </div>
+          <div class="histwrap"><canvas id="cvHist" aria-label="원본과 증강 결과의 픽셀값 히스토그램"></canvas></div>
+          <dl class="sk-kv" id="histKv"></dl>
+          <p class="sk-hint" style="margin:0">가로: 픽셀값 0~255 (64구간). 0 구간이 너무 높으면 잘라서 표시합니다. 강도 변환(밝기·대비·감마·노이즈·블러)을 켜면 분포가 옮겨지거나 퍼지는 것을 볼 수 있습니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 2. 한 배치 미리보기 ========== -->
+  <section id="pane-b" role="tabpanel" aria-labelledby="tab-b" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>실시간 증강(Online): 에폭마다 다른 변형</h2><span class="sk-hint">키보드 <span class="sk-mono">← →</span> 에폭 이동</span></div>
+      <p class="sk-lead">같은 원본 한 장이 배치 안에서, 그리고 에폭마다 매번 다른 모습으로 모델에 들어갑니다. 모델은 같은 영상을 두 번 똑같이 보지 않습니다. 추론(training=False)으로 바꾸면 증강 Layer가 그냥 통과시킵니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">프리셋</span>
+          <button class="sk-btn sk-btn--sm" type="button" data-preset="nb">노트북 설정 불러오기</button>
+          <button class="sk-btn sk-btn--sm" type="button" data-preset="over">과한 설정</button>
+          <button class="sk-btn sk-btn--sm" type="button" data-preset="none">모두 끄기</button>
+        </div>
+        <div class="sk-group"><span class="sk-label">모드 (학습 / 추론)</span>
+          <div class="sk-seg" id="trainSeg" role="group" aria-label="학습 또는 추론">
+            <button type="button" data-tr="1" aria-pressed="true" title="학습">training=True</button><button type="button" data-tr="0" aria-pressed="false" title="추론">training=False</button>
+          </div>
+        </div>
+        <label class="sk-group"><span class="sk-label">영상</span><select class="sk-select" id="imgB"></select></label>
+        <div class="sk-group"><span class="sk-label">배치 크기</span>
+          <div class="sk-seg" id="bsSeg" role="group" aria-label="배치 크기">
+            <button type="button" data-bs="8" aria-pressed="false">8</button><button type="button" data-bs="12" aria-pressed="false">12</button><button type="button" data-bs="16" aria-pressed="true">16</button>
+          </div>
+        </div>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button class="sk-btn" type="button" id="epFirst">처음</button>
+          <button class="sk-btn" type="button" id="epPrev">이전</button>
+          <button class="sk-btn sk-btn--primary" type="button" id="epNext">다음 에폭 →</button>
+          <button class="sk-btn" type="button" id="epPlay">재생</button>
+        </div>
+        <div class="sk-group"><span class="sk-label">속도</span>
+          <div class="sk-seg" id="spdSeg" role="group" aria-label="재생 속도">
+            <button type="button" data-sp="1500" aria-pressed="false">느리게</button><button type="button" data-sp="800" aria-pressed="true">보통</button><button type="button" data-sp="350" aria-pressed="false">빠르게</button>
+          </div>
+        </div>
+        <div class="bstat"><span class="sk-label">에폭</span><span class="epoch" id="epNum">1</span><span class="sk-hint" id="epHint">/ 40 (노트북 epochs=40)</span></div>
+      </div>
+      <p class="sk-hint" id="bCfgTxt" style="margin:0"></p>
+      <div class="bgrid" id="bgrid" aria-live="polite"></div>
+      <p class="sk-note" id="bNote"></p>
+    </div>
+  </section>
+
+  <!-- ========== 3. 기법 한눈에 ========== -->
+  <section id="pane-c" role="tabpanel" aria-labelledby="tab-c" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>증강의 3대 효과</h2></div>
+      <div class="effects">
+        <div class="effect"><b>① 데이터 확장</b><p>한 장을 여러 모습으로 바꿔 적은 데이터를 늘린 효과를 냅니다.</p></div>
+        <div class="effect"><b>② 불변성 학습</b><p>조금 돌거나 밀리거나 어두워져도 같은 장기라는 것을 배웁니다. 위치·밝기 변화에 덜 흔들립니다.</p></div>
+        <div class="effect"><b>③ 정칙화</b><p>매번 입력이 달라 훈련 데이터를 통째로 외우기 어렵습니다. Dropout·L2와 같은 계열입니다.</p></div>
+      </div>
+    </div>
+    <div class="sk-card" style="margin-top:16px">
+      <div class="sk-head"><h2>기법 세 계열</h2><span class="sk-hint">카드를 누르면 그 기법만 켠 채로 실험실이 열립니다</span></div>
+      <p class="sk-lead" id="cardsLead">같은 원본에 해당 기법 하나만 적용한 모습입니다. 의료영상 적합도: <span class="suit ok">권장</span> <span class="suit caution">주의</span> <span class="suit bad">비권장</span></p>
+      <h3 class="fam-h f-geo">기하 변환 <small>위치·모양을 바꿈 (픽셀값은 그대로)</small></h3>
+      <div class="tcards" id="cardsGeo"></div>
+      <h3 class="fam-h f-int">강도 변환 <small>픽셀값을 바꿈 (위치는 그대로)</small></h3>
+      <div class="tcards" id="cardsInt"></div>
+      <h3 class="fam-h f-reg">영역 변환 <small>일부 영역을 지우거나 다른 영상과 섞음</small></h3>
+      <div class="tcards" id="cardsReg"></div>
+    </div>
+    <div class="sk-card" style="margin-top:16px">
+      <div class="sk-head"><h2>반드시 지킬 세 가지</h2></div>
+      <div class="rules">
+        <p class="sk-note"><b>1. 학습 데이터에만 적용.</b> Train에만 증강하고 Validation·Test는 원본 그대로 둡니다. 평가까지 흔들면 성능을 제대로 잴 수 없습니다.</p>
+        <p class="sk-note"><b>2. 증강은 새로운 정보가 아님.</b> 이미 있는 영상을 비튼 것일 뿐, 새 환자나 새 병변을 만들지 않습니다. 데이터를 대신하지 못합니다.</p>
+        <p class="sk-note sk-note--warn"><b>3. 의료영상 주의.</b> 좌우반전(장기 좌우 구분이 중요), 과도한 회전, CT 밝기는 HU 단위이므로 밝기 대신 Window Jittering.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 4. 파이프라인과 코드 ========== -->
+  <section id="pane-d" role="tabpanel" aria-labelledby="tab-d" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>모델 흐름: 증강 Layer는 Rescaling 앞</h2>
+        <div class="sk-seg" id="flowSeg" role="group" aria-label="학습 또는 추론">
+          <button type="button" data-fl="1" aria-pressed="true">fit (training=True)</button><button type="button" data-fl="0" aria-pressed="false">predict·evaluate (False)</button>
+        </div>
+      </div>
+      <div class="flow" id="flow"></div>
+      <p class="sk-note" id="flowNote"></p>
+      <div class="sk-formula" id="rangeF"></div>
+    </div>
+
+    <div class="sk-card" style="margin-top:16px">
+      <div class="sk-head"><h2>지금 설정으로 만든 Keras 코드</h2>
+        <div class="sk-group"><span class="sk-hint" id="copyMsg" aria-live="polite"></span><button class="sk-btn sk-btn--sm" type="button" id="btnCopy">코드 복사</button></div>
+      </div>
+      <p class="sk-lead">실험실에서 켠 기법과 세기가 그대로 들어갑니다. 노트북 5종(RandomRotation, RandomTranslation, RandomZoom, RandomContrast, RandomBrightness) 밖의 기법은 주석으로 안내합니다.</p>
+      <pre class="code" id="code" tabindex="0" aria-label="Keras 코드"></pre>
+    </div>
+
+    <div class="sk-card" style="margin-top:16px">
+      <div class="sk-head"><h2>Train에만 적용</h2><span class="sk-hint">Train / Validation / Test</span></div>
+      <div class="split3">
+        <div class="sp train"><h3>Train 학습 <span class="onoff y">증강 ON</span></h3><div class="thumbs" id="thTrain"></div><p>매 에폭 새 변형이 들어갑니다.</p></div>
+        <div class="sp"><h3>Validation 검증 <span class="onoff n">증강 OFF</span></h3><div class="thumbs" id="thVal"></div><p>원본 그대로. 에폭마다 같은 기준으로 비교합니다.</p></div>
+        <div class="sp"><h3>Test 평가 <span class="onoff n">증강 OFF</span></h3><div class="thumbs" id="thTest"></div><p>원본 그대로. 실제 성능을 잽니다.</p></div>
+      </div>
+    </div>
+
+    <div class="sk-card" style="margin-top:16px">
+      <div class="sk-head"><h2>사전 증강(Offline) vs 실시간 증강(Online)</h2></div>
+      <div class="sk-scroll">
+        <table class="sk-table">
+          <thead><tr><th></th><th>사전 증강 (Offline)</th><th>실시간 증강 (Online)</th></tr></thead>
+          <tbody>
+            <tr><th>언제</th><td class="wrap">학습 전에 한 번 만들어 둠</td><td class="wrap">배치를 꺼낼 때마다 즉석에서</td></tr>
+            <tr><th>저장 공간</th><td class="wrap">늘어남 (n배로 파일 저장)</td><td class="wrap">그대로 (원본만)</td></tr>
+            <tr><th>다양성</th><td class="wrap">만들어 둔 n개로 고정</td><td class="wrap">에폭마다 새 변형 (탭 2)</td></tr>
+            <tr><th>수렴</th><td class="wrap">빠른 편</td><td class="wrap">느린 편 → epoch를 넉넉히</td></tr>
+            <tr><th>구현</th><td class="wrap">변환 후 파일로 저장</td><td class="wrap">Keras 증강 Layer, tf.data</td></tr>
+            <tr><th>이 노트북</th><td class="wrap">-</td><td class="wrap"><b>사용</b> (모델 안 증강 Layer, epochs=40)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sk-card" style="margin-top:16px">
+      <div class="sk-head"><h2>결론</h2><span class="sk-hint">OrganAMNIST 11클래스 · 550장 · epochs=40</span></div>
+      <div class="concl">
+        <p class="sk-note"><b>데이터가 적을수록 이득이 큽니다.</b> 550장처럼 작은 학습 세트에서는 증강이 과적합을 크게 줄입니다.</p>
+        <p class="sk-note"><b>증강은 데이터 대체 수단이 아닙니다.</b> 새 정보를 만들지 않으므로 진짜 데이터를 더 모으는 것을 대신하지 못합니다.</p>
+        <p class="sk-note"><b>실시간 증강은 수렴이 느립니다.</b> 매번 문제가 바뀌기 때문이니 epoch를 넉넉히 줍니다.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js"></script>
+<script>
+(function(){
+"use strict";
+const N=128, NN=N*N, C=N/2;
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+const fx=(x,d=2)=>{const v=+(+x).toFixed(d);return (Object.is(v,-0)?0:v).toString();};
+const f2=x=>(+x).toFixed(2);
+const sg=(x,d=2)=>(x>=0?"+":"−")+fx(Math.abs(x),d);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+
+/* ---------- 난수 (seed 고정) ---------- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function hash(){let h=2166136261>>>0;for(let i=0;i<arguments.length;i++){h^=(arguments[i]|0);h=Math.imul(h,16777619);h^=h>>>13;h=Math.imul(h,0x5bd1e995);h^=h>>>15;}return h>>>0;}
+const U=(r,a,b)=>a+(b-a)*r();
+function gauss(r){let u=0;while(u===0)u=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*r());}
+
+/* ---------- 가우시안 블러 (분리형) ---------- */
+function gblur(src,sigma){
+  if(sigma<0.05)return Float32Array.from(src);
+  const r=Math.max(1,Math.ceil(sigma*3)),k=new Float32Array(2*r+1);let s=0;
+  for(let i=-r;i<=r;i++){k[i+r]=Math.exp(-i*i/(2*sigma*sigma));s+=k[i+r];}
+  for(let i=0;i<k.length;i++)k[i]/=s;
+  const tmp=new Float32Array(NN),out=new Float32Array(NN);
+  for(let y=0;y<N;y++){const o=y*N;for(let x=0;x<N;x++){let a=0;for(let j=-r;j<=r;j++){const xx=x+j<0?0:x+j>=N?N-1:x+j;a+=src[o+xx]*k[j+r];}tmp[o+x]=a;}}
+  for(let y=0;y<N;y++){for(let x=0;x<N;x++){let a=0;for(let j=-r;j<=r;j++){const yy=y+j<0?0:y+j>=N?N-1:y+j;a+=tmp[yy*N+x]*k[j+r];}out[y*N+x]=a;}}
+  return out;
+}
+
+/* ---------- 흑백 의료영상 모사 (코드로 생성) ---------- */
+function mk(w,h){const c=document.createElement("canvas");c.width=w;c.height=h;return c;}
+function g(v){return "rgb("+v+","+v+","+v+")";}
+function E(ctx,x,y,rx,ry,rot,v){ctx.fillStyle=g(v);ctx.beginPath();ctx.ellipse(x,y,rx,ry,rot,0,Math.PI*2);ctx.fill();}
+function readGray(cv){const d=cv.getContext("2d").getImageData(0,0,N,N).data,o=new Float32Array(NN);for(let i=0;i<NN;i++)o[i]=0.299*d[4*i]+0.587*d[4*i+1]+0.114*d[4*i+2];return o;}
+function finish(cv,blur,noise,seed,floor){
+  let a=gblur(readGray(cv),blur);const r=mulberry32(seed);
+  for(let i=0;i<NN;i++){const n=a[i]>floor?gauss(r)*noise:0;a[i]=clamp(a[i]+n,0,255);}
+  return a;
+}
+function genCT(){
+  const cv=mk(N,N),x=cv.getContext("2d");x.fillStyle="#000";x.fillRect(0,0,N,N);
+  x.fillStyle=g(58);x.fillRect(14,111,100,3);                 // 검사대
+  E(x,64,64,55,42,0,74);                                      // 피하지방
+  E(x,64,64,50,37,0,120);                                     // 복벽 근육
+  E(x,64,63,46,33,0,84);                                      // 복강 지방
+  x.save();x.beginPath();x.ellipse(64,63,46,33,0,0,Math.PI*2);x.clip();
+  E(x,37,57,25,22,-0.35,142);                                  // 간 (환자 오른쪽 = 화면 왼쪽)
+  E(x,49,67,4,3,0,72);                                        // 담낭
+  E(x,82,45,14,9,0.25,112);E(x,80,41,9,3.5,0.25,18);           // 위 + 공기
+  E(x,101,63,7,13,0.45,138);                                   // 비장
+  [[60,43,5,1],[70,51,4,0],[55,52,4,1],[89,70,4,0],[76,58,3.5,1],[64,40,3,0]].forEach(b=>{E(x,b[0],b[1],b[2],b[2],0,106);if(b[3])E(x,b[0]+0.5,b[1]-0.5,b[2]*0.45,b[2]*0.45,0,20);});
+  E(x,71,63,11,2.8,-0.2,128);                                  // 췌장
+  E(x,40,79,6.5,10,0.45,168);E(x,88,79,6.5,10,-0.45,168);      // 신장
+  E(x,43.5,79,2,3,0.45,96);E(x,84.5,79,2,3,-0.45,96);
+  E(x,51,88,5,4.5,0,118);E(x,77,88,5,4.5,0,118);               // 요근
+  x.restore();
+  E(x,61,73,4,4,0,188);E(x,70,71,4,3,0,150);                   // 대동맥 · 하대정맥
+  E(x,53,100,9,6,0.15,122);E(x,75,100,9,6,-0.15,122);          // 척추 주위 근육
+  E(x,64,86,9,8.5,0,228);E(x,64,86,6.5,6,0,172);               // 척추체
+  E(x,64,97,6.5,5,0,215);E(x,64,97,3,2.6,0,60);                 // 후궁 + 척수강
+  x.fillStyle=g(208);x.fillRect(62.5,101,3,7);                 // 극돌기
+  return finish(cv,0.7,4,11,20);
+}
+function genCXR(){
+  const cv=mk(N,N),x=cv.getContext("2d");x.fillStyle="#000";x.fillRect(0,0,N,N);
+  x.fillStyle=g(104);x.beginPath();x.moveTo(6,128);x.lineTo(9,42);x.quadraticCurveTo(12,18,40,17);x.lineTo(88,17);x.quadraticCurveTo(116,18,119,42);x.lineTo(122,128);x.closePath();x.fill();
+  x.fillStyle=g(112);x.fillRect(50,0,28,20);                  // 목
+  E(x,41,66,20,38,0.05,46);E(x,88,66,18,36,-0.05,46);          // 폐야
+  E(x,41,106,25,10,0,122);E(x,88,112,25,10,0,122);             // 횡격막 (오른쪽이 더 높음)
+  E(x,92,118,6,3.5,0,38);                                      // 위 공기방울
+  x.globalAlpha=0.55;x.strokeStyle=g(160);x.lineWidth=1.6;
+  for(let i=0;i<8;i++){const y=30+i*9.5;
+    x.beginPath();x.moveTo(60,y);x.quadraticCurveTo(22,y-9,19,y+15);x.stroke();
+    x.beginPath();x.moveTo(68,y);x.quadraticCurveTo(106,y-9,109,y+15);x.stroke();}
+  x.globalAlpha=0.45;x.strokeStyle=g(95);x.lineWidth=0.9;
+  [[52,58,30,40],[52,62,26,70],[52,66,34,90],[76,58,98,42],[76,64,102,70],[76,68,94,92]].forEach(l=>{x.beginPath();x.moveTo(l[0],l[1]);x.lineTo(l[2],l[3]);x.stroke();});
+  x.globalAlpha=1;
+  x.fillStyle=g(172);x.fillRect(55,18,18,64);                  // 종격동
+  E(x,74,40,6,6,0,182);                                        // 대동맥궁
+  E(x,73,88,23,17,-0.22,192);                                  // 심장 (화면 오른쪽 = 환자 왼쪽)
+  x.globalAlpha=0.5;x.fillStyle=g(215);x.fillRect(60,14,8,114);x.globalAlpha=1; // 척추
+  x.fillStyle=g(64);x.fillRect(62,4,4,44);                     // 기관
+  x.strokeStyle=g(182);x.lineWidth=3;
+  x.beginPath();x.moveTo(58,28);x.quadraticCurveTo(40,20,14,27);x.stroke();
+  x.beginPath();x.moveTo(70,28);x.quadraticCurveTo(88,20,114,27);x.stroke();
+  x.fillStyle=g(250);x.font="bold 15px Arial, Helvetica, sans-serif";x.textBaseline="top";x.fillText("R",5,4);
+  return finish(cv,0.6,3,22,15);
+}
+function genSitus(){
+  const cv=mk(N,N),x=cv.getContext("2d");x.fillStyle="#000";x.fillRect(0,0,N,N);
+  x.fillStyle=g(78);x.beginPath();x.moveTo(20,124);x.lineTo(18,24);x.quadraticCurveTo(20,10,40,10);x.lineTo(88,10);x.quadraticCurveTo(108,10,110,24);x.lineTo(108,124);x.closePath();x.fill();
+  E(x,43,38,16,21,0,34);E(x,86,38,15,20,0,34);                // 폐
+  x.fillStyle=g(205);x.beginPath();x.moveTo(56,32);x.bezierCurveTo(70,28,86,40,90,60);x.bezierCurveTo(78,62,62,58,54,48);x.closePath();x.fill(); // 심장, 첨부가 오른쪽 아래
+  x.fillStyle=g(162);x.beginPath();x.moveTo(20,66);x.lineTo(72,64);x.quadraticCurveTo(66,84,40,92);x.quadraticCurveTo(22,92,20,84);x.closePath();x.fill(); // 간 (화면 왼쪽)
+  E(x,88,76,13,9,0.45,122);E(x,86,73,7,3,0.45,30);             // 위
+  E(x,104,80,4.5,10,0.3,146);                                 // 비장
+  E(x,64,104,26,10,0,110);                                    // 장
+  x.fillStyle=g(250);x.font="bold 15px Arial, Helvetica, sans-serif";x.textBaseline="top";x.fillText("R",4,4);
+  return finish(cv,0.5,3,33,15);
+}
+
+const IMGS={
+  ct:{name:"복부 CT 모사",short:"복부 CT"},
+  cxr:{name:"흉부 X선 모사",short:"흉부 X선"},
+  situs:{name:"흉복부 모식도 (좌우 비대칭)",short:"모식도"},
+  user:{name:"내 이미지",short:"내 이미지"}
+};
+IMGS.ct.data=genCT();IMGS.cxr.data=genCXR();IMGS.situs.data=genSitus();
+
+/* ---------- 기법 정의 ---------- */
+const TECH=[
+ {id:"hflip",fam:"geo",name:"좌우 반전",en:"RandomFlip(\"horizontal\")",params:[],suit:"bad",suitTxt:"비권장",
+  range:()=>"50% 확률로 좌우를 뒤집음",desc:"장기 좌우 구분이 중요해 의료영상에서는 위험. 좌우가 의미 없는 병리 슬라이드 등은 가능.",demoP:{hflip:true},demoV:{}},
+ {id:"vflip",fam:"geo",name:"상하 반전",en:"RandomFlip(\"vertical\")",params:[],suit:"bad",suitTxt:"비권장",
+  range:()=>"50% 확률로 위아래를 뒤집음",desc:"머리·발 방향이 정해진 촬영에는 나오지 않는 영상.",demoP:{vflip:true},demoV:{}},
+ {id:"rot",fam:"geo",name:"회전",en:"RandomRotation",nb:1,params:[{k:"f",l:"factor",min:0,max:0.5,step:0.01,def:0.03}],suit:"caution",suitTxt:"주의 (작은 각)",
+  range:v=>"각도 <b>±"+fx(v.f*360)+"°</b> = factor × 360°",desc:"환자 자세의 작은 기울어짐을 흉내. 큰 각도는 비현실적.",demoP:{rot:18},demoV:{f:0.05}},
+ {id:"trans",fam:"geo",name:"이동",en:"RandomTranslation",nb:1,params:[{k:"h",l:"height_factor",min:0,max:0.3,step:0.01,def:0.06},{k:"w",l:"width_factor",min:0,max:0.3,step:0.01,def:0.06}],suit:"ok",suitTxt:"권장",
+  range:v=>"세로 ±"+fx(v.h*100,1)+"% · 가로 ±"+fx(v.w*100,1)+"%<br>64px 입력 기준 <b>±"+fx(v.h*64)+"px · ±"+fx(v.w*64)+"px</b> (여기 128px: ±"+fx(v.h*N)+"·±"+fx(v.w*N)+")",desc:"촬영 위치가 조금씩 다른 것을 흉내.",demoP:{tx:14,ty:-9},demoV:{h:0.1,w:0.12}},
+ {id:"zoom",fam:"geo",name:"확대/축소",en:"RandomZoom",nb:1,params:[{k:"f",l:"height_factor",min:0,max:0.5,step:0.01,def:0.10}],suit:"ok",suitTxt:"권장",
+  range:v=>"샘플링 배율 <b>"+fx(1-v.f)+" ~ "+fx(1+v.f)+"</b> (1보다 크면 축소, 작으면 확대)",desc:"환자 체격·촬영 거리 차이를 흉내.",demoP:{zoom:0.78},demoV:{f:0.22}},
+ {id:"elastic",fam:"geo",name:"탄성 변형",en:"Elastic",params:[{k:"a",l:"세기 α (px)",min:0,max:14,step:0.5,def:4},{k:"s",l:"부드러움 σ (px)",min:2,max:16,step:1,def:8}],suit:"caution",suitTxt:"주의",
+  range:v=>"픽셀마다 최대 <b>"+fx(v.a,1)+"px</b> 밀기, 흔들림 폭 σ="+v.s+"px",desc:"연조직이 눌리고 늘어나는 모습. 과하면 해부 구조가 뒤틀림.",demoP:{elSeed:7},demoV:{a:6,s:6}},
+ {id:"gamma",fam:"int",name:"감마·윈도 지터링",en:"Window Jittering",params:[{k:"g",l:"감마 범위",min:0,max:0.8,step:0.05,def:0.2},{k:"w",l:"창 흔들기",min:0,max:0.3,step:0.01,def:0.05}],suit:"ok",suitTxt:"권장",
+  range:v=>"γ "+fx(1/(1+v.g))+" ~ "+fx(1+v.g)+" · 창 중심 ±"+fx(v.w*255,1)+" · 창 폭 ×"+fx(1-v.w)+"~"+fx(1+v.w),desc:"CT는 HU를 창으로 잘라 보므로 창의 중심·폭을 흔드는 것이 자연스러움.",demoP:{gam:0.62,wc:-18,ww:0.82},demoV:{g:0.6,w:0.12}},
+ {id:"contrast",fam:"int",name:"대비",en:"RandomContrast",nb:1,params:[{k:"f",l:"factor",min:0,max:0.9,step:0.01,def:0.10}],suit:"ok",suitTxt:"권장",
+  range:v=>"계수 <b>"+fx(1-v.f)+" ~ "+fx(1+v.f)+"</b>: (x − 평균) × 계수 + 평균",desc:"장비·설정마다 다른 대비를 흉내.",demoP:{con:1.7},demoV:{f:0.7}},
+ {id:"bright",fam:"int",name:"밝기",en:"RandomBrightness",nb:1,params:[{k:"f",l:"factor",min:0,max:0.5,step:0.01,def:0.05}],suit:"ok",suitTxt:"권장 (작게)",
+  range:v=>"더하는 값 <b>±"+fx(v.f*255)+"</b> 픽셀값 = factor × 255 (value_range=(0,255))",desc:"전체를 밝게·어둡게. CT에서는 크게 흔들지 않음.",demoP:{bri:55},demoV:{f:0.22}},
+ {id:"blur",fam:"int",name:"블러",en:"Gaussian Blur",params:[{k:"s",l:"최대 σ (px)",min:0.2,max:4,step:0.1,def:1.2}],suit:"caution",suitTxt:"주의",
+  range:v=>"가우시안 σ <b>0.2 ~ "+fx(v.s,1)+"px</b>",desc:"초점·움직임 흐림을 흉내. 작은 병변이 사라질 수 있음.",demoP:{blur:2.2},demoV:{s:2.4}},
+ {id:"noise",fam:"int",name:"가우시안 노이즈",en:"GaussianNoise",params:[{k:"sd",l:"표준편차 σ",min:0,max:50,step:1,def:8}],suit:"ok",suitTxt:"권장",
+  range:v=>"픽셀마다 N(0, "+v.sd+"²) 더하기",desc:"저선량 촬영의 잡음을 흉내.",demoP:{noiseSeed:5},demoV:{sd:22}},
+ {id:"erase",fam:"reg",name:"Random Erasing",en:"RandomErasing",params:[{k:"a",l:"최대 면적 비율",min:0.02,max:0.4,step:0.01,def:0.12}],suit:"caution",suitTxt:"주의",
+  range:v=>"면적 <b>2% ~ "+fx(v.a*100,0)+"%</b> 상자를 무작위 값으로 덮음",desc:"일부가 가려져도 맞히게 함. 병변을 지우면 라벨이 틀어짐.",demoP:{erase:{x:66,y:30,w:34,h:26}},demoV:{a:0.2}},
+ {id:"mixup",fam:"reg",name:"Mixup",en:"MixUp",params:[{k:"l",l:"λ (A 비중)",min:0.5,max:1,step:0.01,def:0.7}],suit:"caution",suitTxt:"주의",
+  range:v=>"결과 = <b>"+fx(v.l)+"·A + "+fx(1-v.l)+"·B</b>, 라벨도 같은 비율",desc:"두 영상을 투명하게 겹치고 라벨도 섞음.",demoP:{lam:0.6},demoV:{l:0.6}},
+ {id:"cutmix",fam:"reg",name:"CutMix",en:"CutMix",params:[{k:"r",l:"붙일 면적 비율",min:0.05,max:0.6,step:0.01,def:0.25}],suit:"caution",suitTxt:"주의",
+  range:v=>"B에서 면적 약 <b>"+fx(v.r*100,0)+"%</b> 상자를 잘라 A에 붙임, 라벨 = 면적 비율",desc:"잘라 붙인 면적만큼 라벨을 섞음. 병변 위치와 어긋날 수 있음.",demoP:{cut:{x:58,y:54,w:52,h:52}},demoV:{r:0.3}}
+];
+const TMAP={};TECH.forEach((t,i)=>{t.tag=i+1;TMAP[t.id]=t;});
+const ORDER=["hflip","vflip","rot","trans","zoom","elastic","gamma","contrast","bright","blur","noise","erase","mixup","cutmix"];
+const GEO=["hflip","vflip","rot","trans","zoom","elastic"];
+const INTEN=["gamma","contrast","bright","blur","noise"];
+
+/* ---------- 설정 상태 ---------- */
+const cfg={on:{},v:{},fill:"constant",seed:41,img:"ct",img2:"cxr",grid:false};
+TECH.forEach(t=>{cfg.on[t.id]=false;cfg.v[t.id]={};t.params.forEach(p=>cfg.v[t.id][p.k]=p.def);});
+const PRESETS={
+  nb:{on:["rot","trans","zoom","contrast","bright"],v:{rot:{f:0.03},trans:{h:0.06,w:0.06},zoom:{f:0.10},contrast:{f:0.10},bright:{f:0.05}},fill:"constant"},
+  over:{on:["hflip","vflip","rot","trans","zoom","elastic","contrast","bright","noise","erase"],v:{rot:{f:0.5},trans:{h:0.3,w:0.3},zoom:{f:0.4},elastic:{a:10,s:6},contrast:{f:0.6},bright:{f:0.4},noise:{sd:30},erase:{a:0.3}},fill:"constant"},
+  none:{on:[],v:{},fill:null}
+};
+function applyPreset(name){
+  const p=PRESETS[name];TECH.forEach(t=>cfg.on[t.id]=p.on.indexOf(t.id)>=0);
+  TECH.forEach(t=>t.params.forEach(q=>cfg.v[t.id][q.k]=q.def));
+  Object.keys(p.v).forEach(id=>Object.assign(cfg.v[id],p.v[id]));
+  if(p.fill)cfg.fill=p.fill;
+  syncControls();changed();
+}
+
+/* ---------- 파라미터 뽑기 (기법마다 독립 난수 → 하나를 꺼도 다른 값은 그대로) ---------- */
+function drawParams(seed,idx){
+  const P={},on=cfg.on,v=cfg.v,R=id=>mulberry32(hash(seed,idx,TMAP[id].tag));
+  if(on.hflip)P.hflip=R("hflip")()<0.5;
+  if(on.vflip)P.vflip=R("vflip")()<0.5;
+  if(on.rot)P.rot=U(R("rot"),-v.rot.f,v.rot.f)*360;
+  if(on.trans){const r=R("trans");P.ty=U(r,-v.trans.h,v.trans.h)*N;P.tx=U(r,-v.trans.w,v.trans.w)*N;}
+  if(on.zoom)P.zoom=1+U(R("zoom"),-v.zoom.f,v.zoom.f);
+  if(on.elastic)P.elSeed=hash(seed,idx,991);
+  if(on.gamma){const r=R("gamma");P.gam=Math.pow(1+v.gamma.g,U(r,-1,1));P.wc=U(r,-1,1)*v.gamma.w*255;P.ww=1+U(r,-1,1)*v.gamma.w;}
+  if(on.contrast)P.con=1+U(R("contrast"),-v.contrast.f,v.contrast.f);
+  if(on.bright)P.bri=U(R("bright"),-v.bright.f,v.bright.f)*255;
+  if(on.blur)P.blur=U(R("blur"),0.2,Math.max(0.2,v.blur.s));
+  if(on.noise)P.noiseSeed=hash(seed,idx,773);
+  if(on.erase){const r=R("erase"),area=U(r,0.02,Math.max(0.02,v.erase.a))*NN,ar=Math.exp(U(r,Math.log(0.3),Math.log(3.3)));
+    const h=clamp(Math.round(Math.sqrt(area*ar)),2,N-2),w=clamp(Math.round(Math.sqrt(area/ar)),2,N-2);
+    P.erase={x:Math.floor(r()*(N-w)),y:Math.floor(r()*(N-h)),w,h};}
+  if(on.mixup)P.lam=v.mixup.l;
+  if(on.cutmix){const r=R("cutmix"),s=Math.sqrt(v.cutmix.r)*N,cx=r()*N,cy=r()*N;
+    const x0=clamp(Math.round(cx-s/2),0,N),x1=clamp(Math.round(cx+s/2),0,N),y0=clamp(Math.round(cy-s/2),0,N),y1=clamp(Math.round(cy+s/2),0,N);
+    P.cut={x:x0,y:y0,w:x1-x0,h:y1-y0};}
+  return P;
+}
+
+/* ---------- 아핀 행렬 (출력 → 입력, 역매핑) ---------- */
+function mul3(a,b){const o=new Array(9);for(let i=0;i<3;i++)for(let j=0;j<3;j++)o[i*3+j]=a[i*3]*b[j]+a[i*3+1]*b[3+j]+a[i*3+2]*b[6+j];return o;}
+function affine(P){
+  // 앞으로 방향: 반전 → 회전 → 이동 → 확대/축소 (Keras 순서). 역매핑은 거꾸로.
+  let M=[1,0,0,0,1,0,0,0,1];
+  if(P.zoom!==undefined){const z=P.zoom;M=mul3([z,0,C-C*z,0,z,C-C*z,0,0,1],M);}
+  if(P.tx!==undefined)M=mul3([1,0,-P.tx,0,1,-P.ty,0,0,1],M);
+  if(P.rot!==undefined){const t=P.rot*Math.PI/180,c=Math.cos(t),s=Math.sin(t);M=mul3([c,-s,C-c*C+s*C,s,c,C-s*C-c*C,0,0,1],M);}
+  if(P.hflip)M=mul3([-1,0,N,0,1,0,0,0,1],M);
+  if(P.vflip)M=mul3([1,0,0,0,-1,N,0,0,1],M);
+  return M;
+}
+function fillIdx(i,mode){
+  if(i>=0&&i<N)return i;
+  if(mode==="nearest")return i<0?0:N-1;
+  if(mode==="wrap")return ((i%N)+N)%N;
+  if(mode==="reflect"){const p=2*N;const m=((i%p)+p)%p;return m<N?m:p-1-m;}
+  return -1;
+}
+function pix(src,x,y,mode){const xi=fillIdx(x,mode),yi=fillIdx(y,mode);return (xi<0||yi<0)?0:src[yi*N+xi];}
+function bilinear(src,sx,sy,mode){
+  const fx_=sx-0.5,fy_=sy-0.5,x0=Math.floor(fx_),y0=Math.floor(fy_),ax=fx_-x0,ay=fy_-y0;
+  return pix(src,x0,y0,mode)*(1-ax)*(1-ay)+pix(src,x0+1,y0,mode)*ax*(1-ay)+pix(src,x0,y0+1,mode)*(1-ax)*ay+pix(src,x0+1,y0+1,mode)*ax*ay;
+}
+const elCache=new Map();
+function elasticField(seed,a,s){
+  const key=seed+"|"+a+"|"+s;if(elCache.has(key))return elCache.get(key);
+  const r=mulberry32(seed);let dx=new Float32Array(NN),dy=new Float32Array(NN);
+  for(let i=0;i<NN;i++){dx[i]=r()*2-1;dy[i]=r()*2-1;}
+  dx=gblur(dx,s);dy=gblur(dy,s);let m=1e-9;for(let i=0;i<NN;i++)m=Math.max(m,Math.abs(dx[i]),Math.abs(dy[i]));
+  for(let i=0;i<NN;i++){dx[i]*=a/m;dy[i]*=a/m;}
+  const f=[dx,dy];if(elCache.size>80)elCache.clear();elCache.set(key,f);return f;
+}
+
+/* ---------- 증강 실행 ---------- */
+function augment(src,src2,P,v,fill){
+  const hasGeo=["hflip","vflip","rot","tx","zoom","elSeed"].some(k=>P[k]!==undefined);
+  const M=affine(P);let disp=null;
+  if(P.elSeed!==undefined&&v.elastic.a>0)disp=elasticField(P.elSeed,v.elastic.a,v.elastic.s);
+  let out=new Float32Array(NN),outside=0;
+  if(hasGeo){
+    for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+      const i=y*N+x;let px=x+0.5,py=y+0.5;if(disp){px+=disp[0][i];py+=disp[1][i];}
+      const sx=M[0]*px+M[1]*py+M[2],sy=M[3]*px+M[4]*py+M[5];
+      if(sx<0||sy<0||sx>=N||sy>=N)outside++;
+      out[i]=bilinear(src,sx,sy,fill);
+    }
+  }else out.set(src);
+  const geo=Float32Array.from(out);
+  if(P.gam!==undefined){const W=255*P.ww,lo=127.5+P.wc-W/2;for(let i=0;i<NN;i++){const t=clamp((out[i]-lo)/W,0,1);out[i]=Math.pow(t,P.gam)*255;}}
+  let mean=null;
+  if(P.con!==undefined){let s=0;for(let i=0;i<NN;i++)s+=out[i];mean=s/NN;for(let i=0;i<NN;i++)out[i]=clamp((out[i]-mean)*P.con+mean,0,255);}
+  if(P.bri!==undefined)for(let i=0;i<NN;i++)out[i]=clamp(out[i]+P.bri,0,255);
+  if(P.blur!==undefined)out=gblur(out,P.blur);
+  if(P.noiseSeed!==undefined){const r=mulberry32(P.noiseSeed),sd=v.noise.sd;for(let i=0;i<NN;i++)out[i]=clamp(out[i]+gauss(r)*sd,0,255);}
+  if(P.erase){const e=P.erase,r=mulberry32(hash(e.x,e.y,e.w,e.h));for(let y=e.y;y<e.y+e.h;y++)for(let x=e.x;x<e.x+e.w;x++)out[y*N+x]=r()*255;}
+  let wA=1;
+  if(P.lam!==undefined&&src2){const l=P.lam;for(let i=0;i<NN;i++)out[i]=l*out[i]+(1-l)*src2[i];wA=l;}
+  if(P.cut&&src2){const c=P.cut;for(let y=c.y;y<c.y+c.h;y++)for(let x=c.x;x<c.x+c.w;x++)out[y*N+x]=src2[y*N+x];wA=wA*(1-c.w*c.h/NN);}
+  return {img:out,geo,M,disp,hasGeo,outside:outside/NN,mean,wA};
+}
+
+function srcA(){let a=IMGS[cfg.img].data;if(cfg.grid){a=Float32Array.from(a);for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(x%16===0||y%16===0)a[y*N+x]=255;}return a;}
+function srcB(){const k=cfg.img2===cfg.img?(cfg.img==="ct"?"cxr":"ct"):cfg.img2;return IMGS[k].data?k:"ct";}
+
+/* ---------- 캔버스 도우미 ---------- */
+function put(cv,img){const ctx=cv.getContext("2d"),id=ctx.createImageData(N,N),d=id.data;for(let i=0;i<NN;i++){const v=img[i];d[4*i]=d[4*i+1]=d[4*i+2]=v;d[4*i+3]=255;}ctx.putImageData(id,0,0);}
+function css(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
+function fitCanvas(cv,hCss){const dpr=window.devicePixelRatio||1,w=cv.clientWidth||300,h=hCss||cv.clientHeight||w;cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);const ctx=cv.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);return {ctx,w,h};}
+
+/* ---------- 탭1: 조작 패널 만들기 ---------- */
+function buildControls(){
+  const fams=[["geo","기하 변환","위치·모양"],["int","강도 변환","픽셀값"],["reg","영역 변환","지우기·섞기"]];
+  let h="";
+  fams.forEach(f=>{
+    h+='<div class="fam f-'+f[0]+'"><h3 class="fam-h">'+f[1]+' <small>'+f[2]+'</small></h3>';
+    if(f[0]==="geo")h+='<div class="sk-group"><span class="sk-label">fill_mode</span><div class="sk-seg" id="fillSeg" role="group" aria-label="빈 곳 채우기">'+["constant","reflect","nearest","wrap"].map(m=>'<button type="button" data-fill="'+m+'" aria-pressed="false">'+m+'</button>').join("")+'</div></div><p class="fam-hint" id="fillHint"></p>';
+    if(f[0]==="int")h+='<p class="fam-hint">순서: 감마·윈도 → 대비 → 밝기 → 블러 → 노이즈. 매 단계 0~255로 자릅니다.</p>';
+    if(f[0]==="reg")h+='<p class="fam-hint">Mixup·CutMix는 "섞을 영상 B"와 섞고, 라벨도 같은 비율로 섞습니다.</p>';
+    TECH.filter(t=>t.fam===f[0]).forEach(t=>{
+      h+='<div class="tq" data-t="'+t.id+'"><div class="tq-top"><label class="sk-check"><input type="checkbox" data-on="'+t.id+'"> '+t.name+'</label><span class="tq-en">'+t.en+'</span>'+(t.nb?'<span class="tq-nb" title="Day04 노트북에서 쓴 Layer">노트북</span>':'')+'</div>';
+      if(t.params.length){
+        h+='<div class="'+(t.params.length>1?"tq-2":"")+'">';
+        t.params.forEach(p=>{const id="s-"+t.id+"-"+p.k;
+          h+='<div class="sk-slider"><div class="sk-sl-head"><label for="'+id+'">'+p.l+'</label><b id="v-'+t.id+'-'+p.k+'"></b></div><input type="range" id="'+id+'" data-t="'+t.id+'" data-k="'+p.k+'" min="'+p.min+'" max="'+p.max+'" step="'+p.step+'"></div>';});
+        h+='</div>';
+      }
+      h+='<div class="tq-range" id="r-'+t.id+'"></div></div>';
+    });
+    h+='</div>';
+  });
+  $("#ctrlFams").innerHTML=h;
+  $$("#ctrlFams input[type=checkbox]").forEach(el=>el.addEventListener("change",()=>{cfg.on[el.dataset.on]=el.checked;syncControls();changed();}));
+  $$("#ctrlFams input[type=range]").forEach(el=>el.addEventListener("input",()=>{cfg.v[el.dataset.t][el.dataset.k]=parseFloat(el.value);cfg.on[el.dataset.t]=true;syncControls();changed();}));
+  $$("#fillSeg button").forEach(b=>b.addEventListener("click",()=>{cfg.fill=b.dataset.fill;syncControls();changed();}));
+}
+const FILL_TXT={constant:"빈 곳을 0(검정)으로 채움 · 노트북 설정",reflect:"가장자리에서 거울처럼 접어 채움 (Keras 기본값)",nearest:"가장 가까운 가장자리 픽셀을 늘려 채움",wrap:"반대편 가장자리에서 이어 붙여 채움"};
+function syncControls(){
+  TECH.forEach(t=>{
+    const box=$('.tq[data-t="'+t.id+'"]');box.classList.toggle("on",!!cfg.on[t.id]);
+    box.querySelector("input[type=checkbox]").checked=!!cfg.on[t.id];
+    t.params.forEach(p=>{const el=$("#s-"+t.id+"-"+p.k);el.value=cfg.v[t.id][p.k];$("#v-"+t.id+"-"+p.k).textContent=(+cfg.v[t.id][p.k]).toFixed(p.step>=1?0:p.step>=0.1?1:2);});
+    $("#r-"+t.id).innerHTML=t.range(cfg.v[t.id]);
+  });
+  $$("#fillSeg button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.fill===cfg.fill));
+  $("#fillHint").textContent=FILL_TXT[cfg.fill];
+}
+
+/* ---------- 영상 선택 ---------- */
+function buildImagePickers(){
+  const keys=Object.keys(IMGS).filter(k=>IMGS[k].data);
+  $("#imgSeg").innerHTML=keys.map(k=>'<button type="button" data-img="'+k+'" aria-pressed="'+(k===cfg.img)+'">'+IMGS[k].short+'</button>').join("");
+  $$("#imgSeg button").forEach(b=>b.addEventListener("click",()=>{cfg.img=b.dataset.img;buildImagePickers();changed();}));
+  $("#img2").innerHTML=keys.filter(k=>k!==cfg.img).map(k=>'<option value="'+k+'"'+(k===srcB()?" selected":"")+'>'+IMGS[k].name+'</option>').join("");
+  $("#imgB").innerHTML=keys.map(k=>'<option value="'+k+'"'+(k===cfg.img?" selected":"")+'>'+IMGS[k].name+'</option>').join("");
+}
+$("#img2").addEventListener("change",e=>{cfg.img2=e.target.value;changed();});
+$("#imgB").addEventListener("change",e=>{cfg.img=e.target.value;buildImagePickers();changed();});
+$("#fileIn").addEventListener("change",e=>{
+  const f=e.target.files&&e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{const im=new Image();im.onload=()=>{
+    const cv=mk(N,N),x=cv.getContext("2d"),s=Math.min(im.width,im.height);
+    x.fillStyle="#000";x.fillRect(0,0,N,N);x.drawImage(im,(im.width-s)/2,(im.height-s)/2,s,s,0,0,N,N);
+    IMGS.user.data=readGray(cv);cfg.img="user";buildImagePickers();changed();};im.src=rd.result;};
+  rd.readAsDataURL(f);e.target.value="";
+});
+
+/* ---------- 탭1 그리기 ---------- */
+const LAB={probe:{x:96,y:40}};
+function renderLab(){
+  const A=srcA(),kB=srcB(),B=IMGS[kB].data;
+  const P=drawParams(cfg.seed,0),res=augment(A,B,P,cfg.v,cfg.fill);
+  LAB.A=A;LAB.P=P;LAB.res=res;
+  put($("#cvIn"),A);put($("#cvOut"),res.img);
+  $("#seedVal").textContent=cfg.seed;
+  $("#img2Wrap").style.display=(cfg.on.mixup||cfg.on.cutmix)?"":"none";
+  $("#warnFlip").hidden=!cfg.on.hflip;
+  $("#warnRot").hidden=!(cfg.on.rot&&cfg.v.rot.f>0.1);$("#warnRotDeg").textContent=fx(cfg.v.rot.f*360,1);
+  $("#warnInt").hidden=!(cfg.img==="ct"&&(cfg.on.bright&&cfg.v.bright.f>0.1));
+  // 뽑힌 값
+  const rows=[];
+  if(cfg.on.hflip)rows.push(["좌우 반전",P.hflip?"예":"아니오"]);
+  if(cfg.on.vflip)rows.push(["상하 반전",P.vflip?"예":"아니오"]);
+  if(cfg.on.rot)rows.push(["회전 θ",sg(P.rot)+"°"]);
+  if(cfg.on.trans)rows.push(["이동 (x, y)",sg(P.tx,1)+", "+sg(P.ty,1)+" px"]);
+  if(cfg.on.zoom)rows.push(["샘플링 배율 z",fx(P.zoom,3)+(P.zoom>1?" (축소)":" (확대)")]);
+  if(cfg.on.elastic)rows.push(["탄성 변형","최대 "+fx(cfg.v.elastic.a,1)+"px"]);
+  if(cfg.on.gamma)rows.push(["감마 γ · 창",fx(P.gam,3)+" · "+sg(P.wc,1)+" · ×"+fx(P.ww,3)]);
+  if(cfg.on.contrast)rows.push(["대비 계수",fx(P.con,3)+" (평균 "+fx(res.mean,1)+")"]);
+  if(cfg.on.bright)rows.push(["밝기 더하기",sg(P.bri)]);
+  if(cfg.on.blur)rows.push(["블러 σ",fx(P.blur,2)+" px"]);
+  if(cfg.on.noise)rows.push(["노이즈 σ",String(cfg.v.noise.sd)]);
+  if(cfg.on.erase)rows.push(["지운 상자",P.erase.w+"×"+P.erase.h+" @("+P.erase.x+","+P.erase.y+")"]);
+  if(cfg.on.mixup)rows.push(["Mixup λ",fx(P.lam)]);
+  if(cfg.on.cutmix)rows.push(["CutMix 상자",P.cut.w+"×"+P.cut.h+" @("+P.cut.x+","+P.cut.y+")"]);
+  if(res.hasGeo&&cfg.fill==="constant")rows.push(["빈 영역(0으로 채움)",fx(res.outside*100,1)+"%"]);
+  $("#drawn").innerHTML=rows.length?rows.map(r=>"<div><dt>"+r[0]+"</dt><dd>"+r[1]+"</dd></div>").join(""):'<div><dt>켜진 기법 없음</dt><dd>원본 그대로</dd></div>';
+  $("#chain").innerHTML='<i>적용 순서</i> '+ORDER.map(id=>'<span class="f-'+TMAP[id].fam+(cfg.on[id]?" on":"")+'">'+TMAP[id].name+'</span>').join('<i>›</i>');
+  const nm=IMGS[cfg.img].short,nmB=IMGS[kB].short;
+  let lab=res.wA<1?'라벨: <b>'+nm+' '+fx(res.wA*100,1)+'%</b> + <b>'+nmB+' '+fx((1-res.wA)*100,1)+'%</b>':'라벨: <b>'+nm+' 100%</b>';
+  if(P.hflip)lab+=' <span class="bad-tag">좌우 뒤바뀜: 해부학적으로는 다른 영상</span>';
+  $("#labelLine").innerHTML=lab;
+  renderProbe();drawHist();
+}
+function renderProbe(){
+  const {x,y}=LAB.probe,res=LAB.res,M=res.M,i=y*N+x;
+  let px=x+0.5,py=y+0.5,dtxt="";
+  if(res.disp){const dx=res.disp[0][i],dy=res.disp[1][i];px+=dx;py+=dy;dtxt="탄성 변형 밀기 ("+sg(dx)+", "+sg(dy)+") → ("+fx(px)+", "+fx(py)+")<br>";}
+  const sx=M[0]*px+M[1]*py+M[2],sy=M[3]*px+M[4]*py+M[5];
+  const fX=sx-0.5,fY=sy-0.5,x0=Math.floor(fX),y0=Math.floor(fY),ax=fX-x0,ay=fY-y0;
+  const nb=[[x0,y0,(1-ax)*(1-ay)],[x0+1,y0,ax*(1-ay)],[x0,y0+1,(1-ax)*ay],[x0+1,y0+1,ax*ay]];
+  const val=nb.reduce((s,n)=>s+pix(LAB.A,n[0],n[1],cfg.fill)*n[2],0);
+  LAB.map={sx,sy,x0,y0};
+  let h="";
+  if(res.hasGeo){
+    h+="M (출력→입력) = [ "+fx(M[0],3)+"  "+fx(M[1],3)+"  "+fx(M[2],2)+" ; "+fx(M[3],3)+"  "+fx(M[4],3)+"  "+fx(M[5],2)+" ]<br>";
+  }else h+="기하 변환 없음: M = 단위행렬 (입력 좌표 = 출력 좌표)<br>";
+  h+="출력 픽셀 ("+x+", "+y+") 중심 ("+fx(x+0.5)+", "+fx(y+0.5)+")<br>"+dtxt;
+  h+="→ 역매핑 입력 좌표 ("+fx(sx)+", "+fx(sy)+")"+((sx<0||sy<0||sx>=N||sy>=N)?" <b>원본 밖 → fill_mode="+cfg.fill+"</b>":"")+"<br>";
+  h+="→ 이웃 4픽셀 "+nb.map(n=>"("+n[0]+","+n[1]+")="+fx(pix(LAB.A,n[0],n[1],cfg.fill),1)+"×"+fx(n[2],3)).join("  ")+"<br>";
+  h+="→ 이중선형 보간 = <b>"+fx(val,2)+"</b>";
+  const fin=res.img[i];
+  if(Math.abs(fin-res.geo[i])>1e-6)h+="  → 강도·영역 변환 후 최종 <b>"+fx(fin,2)+"</b>";
+  $("#probeF").innerHTML=h;
+  drawOverlays();
+}
+function drawOverlays(){
+  const show=$("#chkMap").checked,acc=css("--sk-accent")||"#0D9488",ra=css("--role-b")||"#EA580C";
+  [["#ovIn",true],["#ovOut",false]].forEach(([sel,isIn])=>{
+    const cv=$(sel),{ctx,w}=fitCanvas(cv);const k=w/N;ctx.clearRect(0,0,w,w);if(!show)return;
+    ctx.lineWidth=2;
+    if(isIn){
+      const M=LAB.res.M;
+      if(LAB.res.hasGeo){
+        const pts=[[0,0],[N,0],[N,N],[0,N]].map(p=>[M[0]*p[0]+M[1]*p[1]+M[2],M[3]*p[0]+M[4]*p[1]+M[5]]);
+        ctx.setLineDash([6,4]);ctx.strokeStyle=acc;ctx.beginPath();pts.forEach((p,j)=>j?ctx.lineTo(p[0]*k,p[1]*k):ctx.moveTo(p[0]*k,p[1]*k));ctx.closePath();ctx.stroke();ctx.setLineDash([]);
+        // 결과 화면의 위쪽 변 표시
+        ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(pts[0][0]*k,pts[0][1]*k);ctx.lineTo(pts[1][0]*k,pts[1][1]*k);ctx.stroke();ctx.lineWidth=2;
+      }
+      const m=LAB.map;ctx.strokeStyle=ra;ctx.strokeRect((m.x0+0.5)*k,(m.y0+0.5)*k,k,k);
+      ctx.beginPath();ctx.arc(m.sx*k,m.sy*k,Math.max(5,k*1.2),0,Math.PI*2);ctx.stroke();
+    }else{
+      const {x,y}=LAB.probe;ctx.strokeStyle=ra;
+      ctx.strokeRect(x*k,y*k,k,k);ctx.beginPath();ctx.arc((x+0.5)*k,(y+0.5)*k,Math.max(5,k*1.2),0,Math.PI*2);ctx.stroke();
+      if(LAB.res.hasGeo){ctx.strokeStyle=acc;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(1,2);ctx.lineTo(w-1,2);ctx.stroke();}
+    }
+  });
+}
+function hist(img){const b=new Array(64).fill(0);for(let i=0;i<NN;i++)b[Math.min(63,Math.floor(img[i]/4))]++;return b;}
+function stats(img){let s=0,q=0;for(let i=0;i<NN;i++){s+=img[i];q+=img[i]*img[i];}const m=s/NN;return [m,Math.sqrt(Math.max(0,q/NN-m*m))];}
+function drawHist(){
+  const cv=$("#cvHist");if(!cv.clientWidth)return;
+  const {ctx,w,h}=fitCanvas(cv,150),ha=hist(LAB.A),hb=hist(LAB.res.img);
+  const L=34,R=8,T=8,B=22,pw=w-L-R,ph=h-T-B;
+  let ymax=1;for(let j=1;j<64;j++)ymax=Math.max(ymax,ha[j],hb[j]);ymax*=1.08;
+  ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle=css("--line");ctx.lineWidth=1;ctx.fillStyle=css("--faint");ctx.font="11px "+css("--mono");ctx.textAlign="center";
+  [0,64,128,192,255].forEach(v=>{const X=L+pw*v/256;ctx.beginPath();ctx.moveTo(X,T);ctx.lineTo(X,T+ph);ctx.stroke();ctx.fillText(String(v),X,h-6);});
+  ctx.beginPath();ctx.moveTo(L,T+ph+0.5);ctx.lineTo(L+pw,T+ph+0.5);ctx.stroke();
+  const bw=pw/64;
+  const series=(arr,col,fill)=>{
+    ctx.beginPath();ctx.moveTo(L,T+ph);
+    for(let j=0;j<64;j++){const y=T+ph-ph*Math.min(1,arr[j]/ymax);ctx.lineTo(L+j*bw,y);ctx.lineTo(L+(j+1)*bw,y);}
+    ctx.lineTo(L+pw,T+ph);
+    if(fill){ctx.globalAlpha=0.22;ctx.fillStyle=col;ctx.fill();ctx.globalAlpha=1;}
+    ctx.strokeStyle=col;ctx.lineWidth=fill?1.2:2;ctx.stroke();
+    if(arr[0]>ymax){ctx.fillStyle=col;ctx.textAlign="left";ctx.fillText("▲"+arr[0],L+2,T+(fill?10:22));}
+  };
+  series(ha,css("--role-a"),true);series(hb,css("--role-b"),false);
+  const sa=stats(LAB.A),sb=stats(LAB.res.img);
+  $("#histKv").innerHTML="<dt>원본 평균 · 표준편차</dt><dd>"+fx(sa[0],1)+" · "+fx(sa[1],1)+"</dd><dt>결과 평균 · 표준편차</dt><dd>"+fx(sb[0],1)+" · "+fx(sb[1],1)+"</dd>";
+}
+$("#btnReroll").addEventListener("click",()=>{cfg.seed++;renderLab();});
+$$("#renderSeg button").forEach(b=>b.addEventListener("click",()=>{$$("#renderSeg button").forEach(x=>x.setAttribute("aria-pressed",x===b));const p=b.dataset.r==="pix";$$(".imgbox").forEach(x=>x.classList.toggle("pix",p));}));
+$("#chkGrid").addEventListener("change",e=>{cfg.grid=e.target.checked;changed();});
+$("#chkMap").addEventListener("change",drawOverlays);
+function setProbe(x,y){LAB.probe={x:clamp(x,0,N-1),y:clamp(y,0,N-1)};renderProbe();}
+$("#cvOut").addEventListener("pointerdown",e=>{const r=e.currentTarget.getBoundingClientRect();setProbe(Math.floor((e.clientX-r.left)/r.width*N),Math.floor((e.clientY-r.top)/r.height*N));});
+$("#cvOut").addEventListener("keydown",e=>{const d={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];if(!d)return;e.preventDefault();e.stopPropagation();const s=e.shiftKey?8:1;setProbe(LAB.probe.x+d[0]*s,LAB.probe.y+d[1]*s);});
+
+/* ---------- 탭2: 배치 ---------- */
+const BAT={epoch:1,bs:16,train:true,speed:800,timer:null};
+function buildBatchGrid(){
+  let h='<figure class="cell orig"><div class="imgbox pix"><canvas class="img" width="128" height="128" aria-label="원본"></canvas></div><figcaption><b>원본</b></figcaption></figure>';
+  for(let i=0;i<BAT.bs;i++)h+='<figure class="cell"><div class="imgbox pix"><canvas class="img" width="128" height="128" aria-label="배치 '+(i+1)+'번 영상"></canvas></div><figcaption></figcaption></figure>';
+  $("#bgrid").innerHTML=h;
+  $$("#bgrid .imgbox").forEach(x=>x.classList.toggle("pix",$('#renderSeg button[data-r="pix"]').getAttribute("aria-pressed")==="true"));
+}
+function renderBatch(){
+  if($$("#bgrid .cell").length!==BAT.bs+1)buildBatchGrid();
+  const A=srcA(),B=IMGS[srcB()].data,cells=$$("#bgrid .cell");
+  put(cells[0].querySelector("canvas"),A);
+  let nFlip=0,nBad=0;
+  for(let i=0;i<BAT.bs;i++){
+    const cell=cells[i+1],cap=cell.querySelector("figcaption");
+    if(!BAT.train){put(cell.querySelector("canvas"),A);cap.innerHTML="#"+(i+1)+" 그대로";continue;}
+    const P=drawParams(cfg.seed,BAT.epoch*1000+i),res=augment(A,B,P,cfg.v,cfg.fill),tags=[];
+    put(cell.querySelector("canvas"),res.img);
+    if(P.hflip){tags.push("좌우 뒤바뀜");nFlip++;}
+    if(P.vflip)tags.push("위아래 뒤집힘");
+    if(P.rot!==undefined&&Math.abs(P.rot)>30)tags.push("회전 "+fx(P.rot,0)+"°");
+    if(res.hasGeo&&cfg.fill==="constant"&&res.outside>0.25)tags.push("빈 곳 "+fx(res.outside*100,0)+"%");
+    if(tags.length)nBad++;
+    const brief=(P.rot!==undefined&&Math.abs(P.rot)<=30)?sg(P.rot,1)+"°":(P.rot===undefined&&P.bri!==undefined?"밝기 "+sg(P.bri,1):"");
+    cap.innerHTML="#"+(i+1)+" "+brief+" "+tags.map(t=>'<span class="bad-tag">'+t+'</span>').join(" ");
+  }
+  $("#epNum").textContent=BAT.epoch;
+  $("#epPrev").disabled=BAT.epoch<=1;$("#epFirst").disabled=BAT.epoch<=1;
+  const onList=ORDER.filter(id=>cfg.on[id]).map(id=>TMAP[id].name);
+  $("#bCfgTxt").innerHTML="현재 설정: "+(onList.length?onList.join(" · "):"켜진 기법 없음")+" · fill_mode="+cfg.fill+" · seed "+cfg.seed+" (설정은 탭 1과 같이 씁니다)";
+  let note;
+  if(!BAT.train)note="<b>training=False:</b> 모든 칸이 원본과 같습니다. keras 증강 Layer는 predict·evaluate에서 자동으로 통과하므로 <b>검증·평가 데이터는 증강되지 않습니다.</b>";
+  else if(!onList.length)note="켜진 증강이 없어 모든 칸이 원본과 같습니다. [노트북 설정 불러오기]를 눌러 보세요.";
+  else if(nBad)note="<b>라벨이 망가질 수 있는 칸 "+nBad+"개</b>"+(nFlip?" (좌우가 뒤바뀐 칸 "+nFlip+"개)":"")+". 과한 증강은 실제로 존재하지 않는 영상을 만들어 오히려 학습을 방해합니다. 흉복부 모식도로 바꿔 보면 좌우 뒤바뀜이 잘 보입니다.";
+  else note="같은 원본인데 칸마다, 그리고 [다음 에폭]을 누를 때마다 다른 변형이 뽑힙니다. 노트북 설정처럼 약한 증강은 해부 구조를 해치지 않으면서 다양성만 더합니다.";
+  $("#bNote").innerHTML=note;
+  $("#bNote").classList.toggle("sk-note--warn",BAT.train&&nBad>0);
+}
+function goEpoch(e){BAT.epoch=Math.max(1,e);renderBatch();}
+function stopPlay(){if(BAT.timer){clearInterval(BAT.timer);BAT.timer=null;}$("#epPlay").textContent="재생";}
+$("#epFirst").addEventListener("click",()=>{stopPlay();goEpoch(1);});
+$("#epPrev").addEventListener("click",()=>{stopPlay();goEpoch(BAT.epoch-1);});
+$("#epNext").addEventListener("click",()=>{stopPlay();goEpoch(BAT.epoch+1);});
+$("#epPlay").addEventListener("click",()=>{if(BAT.timer){stopPlay();return;}$("#epPlay").textContent="멈춤";BAT.timer=setInterval(()=>goEpoch(BAT.epoch+1),BAT.speed);});
+function segBind(sel,attr,fn){$$(sel+" button").forEach(b=>b.addEventListener("click",()=>{$$(sel+" button").forEach(x=>x.setAttribute("aria-pressed",x===b));fn(b.dataset[attr]);}));}
+segBind("#trainSeg","tr",v=>{BAT.train=v==="1";renderBatch();});
+segBind("#bsSeg","bs",v=>{BAT.bs=+v;renderBatch();});
+segBind("#spdSeg","sp",v=>{BAT.speed=+v;if(BAT.timer){stopPlay();$("#epPlay").click();}});
+$$("[data-preset]").forEach(b=>b.addEventListener("click",()=>applyPreset(b.dataset.preset)));
+
+/* ---------- 탭3: 기법 카드 ---------- */
+function buildCards(){
+  const box={geo:"#cardsGeo",int:"#cardsInt",reg:"#cardsReg"};
+  Object.keys(box).forEach(f=>{
+    $(box[f]).innerHTML=TECH.filter(t=>t.fam===f).map(t=>'<button type="button" class="tcard f-'+t.fam+'" data-card="'+t.id+'"><canvas width="128" height="128" aria-label="'+t.name+' 적용 예시"></canvas><span class="nm">'+t.name+' <code>'+t.en+'</code></span><span class="ds">'+t.desc+'</span><span class="suit '+t.suit+'">'+t.suitTxt+'</span></button>').join("");
+  });
+  $$(".tcard").forEach(c=>c.addEventListener("click",()=>{
+    const t=TMAP[c.dataset.card];TECH.forEach(x=>cfg.on[x.id]=false);cfg.on[t.id]=true;
+    t.params.forEach(p=>cfg.v[t.id][p.k]=t.demoV[p.k]!==undefined?t.demoV[p.k]:p.def);
+    syncControls();changed();showTab("a",true);window.scrollTo({top:0,behavior:"auto"});
+  }));
+}
+function renderCards(){
+  const A=IMGS[cfg.img].data,B=IMGS[srcB()].data;
+  TECH.forEach(t=>{
+    const v=JSON.parse(JSON.stringify(cfg.v));Object.assign(v[t.id],t.demoV);
+    const res=augment(A,B,Object.assign({},t.demoP),v,"constant");
+    put($('.tcard[data-card="'+t.id+'"] canvas'),res.img);
+  });
+}
+
+/* ---------- 탭4: 코드와 도식 ---------- */
+function kerasCode(){
+  const on=cfg.on,v=cfg.v,fm='fill_mode="'+cfg.fill+'"',L=[],X=[];
+  if(on.hflip||on.vflip){const m=on.hflip&&on.vflip?"horizontal_and_vertical":on.hflip?"horizontal":"vertical";L.push(['layers.RandomFlip("'+m+'", seed=SEED),','# 의료영상 주의: 장기 좌우 구분']);}
+  if(on.rot)L.push(["layers.RandomRotation("+f2(v.rot.f)+", "+fm+", seed=SEED),","# ±"+fx(v.rot.f*360)+"°"]);
+  if(on.trans)L.push(["layers.RandomTranslation("+f2(v.trans.h)+", "+f2(v.trans.w)+", "+fm+", seed=SEED),","# 64px 기준 ±"+fx(v.trans.h*64)+"px"]);
+  if(on.zoom)L.push(["layers.RandomZoom("+f2(v.zoom.f)+", "+fm+", seed=SEED),","# 배율 "+fx(1-v.zoom.f)+"~"+fx(1+v.zoom.f)]);
+  if(on.elastic)X.push("# 탄성 변형(α="+fx(v.elastic.a,1)+", σ="+v.elastic.s+"): 노트북 5종 밖. Keras 버전에 따라 전용 Layer가 없으면 별도 라이브러리 사용");
+  if(on.gamma)X.push("# 감마·윈도 지터링: 기본 Layer 없음. CT는 HU 창(중심·폭)을 흔드는 사용자 정의 Layer로");
+  if(on.contrast)L.push(["layers.RandomContrast("+f2(v.contrast.f)+", seed=SEED),","# 계수 "+fx(1-v.contrast.f)+"~"+fx(1+v.contrast.f)]);
+  if(on.bright)L.push(["layers.RandomBrightness("+f2(v.bright.f)+", value_range=(0, 255), seed=SEED),","# ±"+fx(v.bright.f*255)+" 픽셀값"]);
+  if(on.blur)X.push("# 블러(σ≤"+fx(v.blur.s,1)+"): 노트북 5종 밖. 사용자 정의 Layer 또는 별도 라이브러리");
+  if(on.noise)L.push(["layers.GaussianNoise("+v.noise.sd+", seed=SEED),","# 0~255 단위, 학습 때만"]);
+  if(on.erase)X.push("# Random Erasing(면적 ≤"+fx(v.erase.a*100,0)+"%): 노트북 5종 밖");
+  if(on.mixup||on.cutmix)X.push("# "+[on.mixup?"Mixup(λ="+fx(v.mixup.l)+")":"",on.cutmix?"CutMix":""].filter(Boolean).join("·")+": 라벨도 섞으므로 모델 안이 아니라 tf.data 배치 단계에서 적용");
+  const w=L.reduce((m,l)=>Math.max(m,l[0].length),0);
+  let s="from tensorflow import keras\nfrom tensorflow.keras import layers\n\nSEED = 42  # seed 고정\n\n";
+  if(L.length){
+    s+="data_augmentation = keras.Sequential([\n";
+    L.forEach(l=>{s+="    "+l[0].padEnd(w+2," ")+l[1]+"\n";});
+    s+='], name="augmentation")\n';
+  }else s+="# 켜진 증강 Layer가 없습니다 (실험실에서 기법을 켜 보세요)\n";
+  if(X.length)s+="\n"+X.join("\n")+"\n";
+  s+="\ninputs = keras.Input(shape=(64, 64, 1))\n";
+  s+=L.length?"x = data_augmentation(inputs)            # training=True일 때만 동작\nx = layers.Rescaling(1./255)(x)          # 증강 뒤에 0~1로 (value_range=(0,255)와 일치)\n":"x = layers.Rescaling(1./255)(inputs)\n";
+  s+='x = layers.Conv2D(32, 3, activation="relu")(x)\nx = layers.MaxPooling2D()(x)\nx = layers.Conv2D(32, 3, activation="relu")(x)\nx = layers.MaxPooling2D()(x)\nx = layers.Flatten()(x)\nx = layers.Dense(128, activation="relu")(x)\nx = layers.Dropout(0.5)(x)                # 정칙화: 증강과 같은 계열\noutputs = layers.Dense(11, activation="softmax")(x)   # OrganAMNIST 11클래스\nmodel = keras.Model(inputs, outputs)\n\n';
+  s+="# 실시간 증강은 수렴이 느리므로 epoch를 넉넉히\nhistory = model.fit(x_train, y_train, validation_data=(x_val, y_val), epochs=40)\n";
+  s+="# model.predict / model.evaluate 에서는 증강 Layer가 자동으로 통과(training=False)\n";
+  return s;
+}
+function esc(t){return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function hl(code){return code.split("\n").map(line=>{const e=esc(line),i=e.indexOf("#");const body=i>=0?e.slice(0,i):e,cm=i>=0?'<span class="c">'+e.slice(i)+'</span>':"";return body.replace(/\b(layers\.Random\w+|layers\.GaussianNoise)\b/g,'<span class="k">$1</span>')+cm;}).join("\n");}
+let FLOW_TRAIN=true;
+function renderCode(){
+  const code=kerasCode();$("#code").innerHTML=hl(code);$("#code").dataset.raw=code;
+  const on=ORDER.filter(id=>cfg.on[id]&&["hflip","vflip","rot","trans","zoom","contrast","bright","noise"].indexOf(id)>=0).length;
+  const t=FLOW_TRAIN;
+  const box=(txt,sm,cls)=>'<div class="fb '+(cls||"")+'">'+txt+(sm?"<small>"+sm+"</small>":"")+"</div>";
+  const ar='<span class="fa" aria-hidden="true">→</span>';
+  $("#flow").innerHTML=[box("Input","(64, 64, 1)"),box("증강 Layer "+on+"개",t?"training=True: 켜짐":"training=False: 통과",t?"aug":"aug off"),box("Rescaling","1/255"),box("Conv2D 32"),box("MaxPool"),box("Conv2D 32"),box("MaxPool"),box("Flatten"),box("Dense 128"),box("Dropout 0.5",t?"켜짐":"통과",t?"drop":"off"),box("Dense 11","softmax")].join(ar);
+  $("#flowNote").innerHTML=t?"<b>model.fit:</b> 증강 Layer와 Dropout이 모두 켜집니다. 둘 다 학습 때만 동작하는 정칙화입니다.":"<b>predict · evaluate:</b> 증강 Layer와 Dropout이 자동으로 통과됩니다. 그래서 같은 모델에 넣어 두어도 검증·평가 데이터는 증강되지 않습니다.";
+  const bf=cfg.on.bright?cfg.v.bright.f:0.05;
+  $("#rangeF").innerHTML="픽셀 0~255 → [증강: 밝기 ±"+fx(bf*255)+" = "+fx(bf)+" × (255 − 0)] → Rescaling ÷255 → 0~1<br>증강을 Rescaling <b>앞</b>에 두어야 value_range=(0, 255)가 실제 값 범위와 맞습니다. 뒤에 두면 0~1 값에 ±"+fx(bf*255)+"를 더하는 셈이 됩니다.";
+  // Train / Val / Test 썸네일
+  const A=IMGS[cfg.img].data,B=IMGS[srcB()].data;
+  const fillThumbs=(sel,aug)=>{const el=$(sel);if(!el.children.length)el.innerHTML='<canvas width="128" height="128"></canvas>'.repeat(3);
+    Array.from(el.children).forEach((cv,i)=>{cv.setAttribute("aria-label",aug?"증강된 학습 영상":"원본 영상");put(cv,aug?augment(A,B,drawParams(cfg.seed,500+i),cfg.v,cfg.fill).img:A);});};
+  fillThumbs("#thTrain",true);fillThumbs("#thVal",false);fillThumbs("#thTest",false);
+}
+segBind("#flowSeg","fl",v=>{FLOW_TRAIN=v==="1";renderCode();});
+$("#btnCopy").addEventListener("click",()=>{
+  const raw=$("#code").dataset.raw,done=ok=>{$("#copyMsg").textContent=ok?"복사했습니다":"복사하지 못했습니다";setTimeout(()=>$("#copyMsg").textContent="",1800);};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(raw).then(()=>done(true),()=>fallback());else fallback();
+  function fallback(){const ta=document.createElement("textarea");ta.value=raw;document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand("copy");}catch(e){}ta.remove();done(ok);}
+});
+
+/* ---------- 탭 전환 (URL 해시 동기화, ←/→) ---------- */
+const TABS=["a","b","c","d"];let cur="a";
+function renderCurrent(){if(cur==="a")renderLab();else if(cur==="b")renderBatch();else if(cur==="c")renderCards();else renderCode();}
+function showTab(id,focus){
+  if(TABS.indexOf(id)<0)id="a";cur=id;
+  TABS.forEach(t=>{const tb=$("#tab-"+t),on=t===id;tb.setAttribute("aria-selected",on);tb.tabIndex=on?0:-1;$("#pane-"+t).hidden=!on;});
+  if(location.hash!=="#"+id)history.replaceState(null,"","#"+id);
+  if(id!=="b")stopPlay();
+  if(focus)$("#tab-"+id).focus();
+  renderCurrent();
+}
+TABS.forEach(t=>$("#tab-"+t).addEventListener("click",()=>showTab(t)));
+$(".sk-tabs").addEventListener("keydown",e=>{
+  const i=TABS.indexOf(cur);let n=null;
+  if(e.key==="ArrowRight")n=TABS[(i+1)%TABS.length];else if(e.key==="ArrowLeft")n=TABS[(i+TABS.length-1)%TABS.length];else if(e.key==="Home")n=TABS[0];else if(e.key==="End")n=TABS[TABS.length-1];
+  if(n){e.preventDefault();e.stopPropagation();showTab(n,true);}
+});
+window.addEventListener("hashchange",()=>showTab(location.hash.slice(1)));
+document.addEventListener("keydown",e=>{
+  if(cur!=="b"||e.defaultPrevented)return;
+  const tg=e.target;if(tg&&(/INPUT|TEXTAREA|SELECT/.test(tg.tagName)||tg.closest(".sk-tabs")))return;
+  if(e.key==="ArrowRight"){e.preventDefault();stopPlay();goEpoch(BAT.epoch+1);}
+  else if(e.key==="ArrowLeft"){e.preventDefault();stopPlay();goEpoch(BAT.epoch-1);}
+});
+
+function changed(){renderCurrent();}
+function rethem(){if(cur==="a"){drawOverlays();drawHist();}}
+new MutationObserver(rethem).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",rethem);}catch(e){}
+let rz;window.addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(rethem,120);});
+
+/* ---------- 시작 ---------- */
+buildControls();buildImagePickers();buildCards();
+applyPreset("nb");
+showTab((location.hash||"#a").slice(1));
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1400 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>객체 탐지 평가 지표 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 글자·배지용(테마별) + 영상 위 표시용(영상은 항상 어두우므로 밝은 색 고정) */
+:root{
+  --sk-accent: var(--cat-cv);
+  --gt:#15803D; --pred:#C2410C; --pred2:#1D4ED8; --tp:#15803D; --fp:#DC2626; --fn:#64748B; --inter:#A21CAF;
+  --img-gt:#4ADE80; --img-pred:#FB923C; --img-pred2:#60A5FA; --img-tp:#4ADE80; --img-fp:#F87171; --img-fn:#CBD5E1; --img-inter:#E879F9; --img-ink:#0B0F14;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --gt:#4ADE80; --pred:#FB923C; --pred2:#7AA7FF; --tp:#4ADE80; --fp:#F87171; --fn:#A3AEC0; --inter:#E879F9;
+  --img-gt:#4ADE80; --img-pred:#FB923C; --img-pred2:#60A5FA; --img-tp:#4ADE80; --img-fp:#F87171; --img-fn:#CBD5E1; --img-inter:#E879F9; --img-ink:#0B0F14;
+} }
+:root[data-theme="dark"]{
+  --gt:#4ADE80; --pred:#FB923C; --pred2:#7AA7FF; --tp:#4ADE80; --fp:#F87171; --fn:#A3AEC0; --inter:#E879F9;
+  --img-gt:#4ADE80; --img-pred:#FB923C; --img-pred2:#60A5FA; --img-tp:#4ADE80; --img-fp:#F87171; --img-fn:#CBD5E1; --img-inter:#E879F9; --img-ink:#0B0F14;
+}
+
+[role=tabpanel]{display:flex;flex-direction:column;gap:16px}
+.sk-card > .sk-seg{align-self:flex-start;max-width:100%;overflow-x:auto}
+.dm-thumbs--wide{grid-template-columns:repeat(4,minmax(0,1fr))}
+.dm-split{display:grid;grid-template-columns:minmax(0,560px) minmax(0,1fr);gap:16px;align-items:start}
+.dm-split--even{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.dm-col{display:flex;flex-direction:column;gap:16px;min-width:0}
+@media (max-width:980px){.dm-split,.dm-split--even{grid-template-columns:minmax(0,1fr)}}
+
+.dm-img{display:block;width:100%;aspect-ratio:1/1;border-radius:10px;touch-action:none;outline-offset:3px}
+.dm-img:focus-visible{outline:2px solid var(--focus)}
+.dm-chart{display:block;width:100%;aspect-ratio:4/3;border-radius:10px}
+.dm-mini{display:block;width:100%;aspect-ratio:1/1;border-radius:8px;border:1px solid var(--line)}
+
+.dm-big{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px}
+.dm-big b{font-family:var(--mono);font-size:40px;line-height:1;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.dm-big span{font-size:14px;color:var(--muted);font-weight:600}
+.dm-badges{display:flex;flex-wrap:wrap;gap:8px}
+.dm-badge{display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--line-strong);border-radius:10px;padding:6px 11px;font-size:13.5px;color:var(--text);background:var(--surface-2)}
+.dm-badge b{font-family:var(--mono);font-size:14px}
+.dm-badge.tp{border-color:var(--tp)} .dm-badge.tp b{color:var(--tp)}
+.dm-badge.fp{border-color:var(--fp)} .dm-badge.fp b{color:var(--fp)}
+
+.dm-tag{display:inline-block;font-family:var(--mono);font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;border:1.5px solid currentColor;line-height:1.5}
+.dm-tag.tp{color:var(--tp)} .dm-tag.fp{color:var(--fp)} .dm-tag.fn{color:var(--fn);border-style:dashed}
+.dm-tag.keep{color:var(--sk-accent)} .dm-tag.sup{color:var(--fp)} .dm-tag.low{color:var(--fn);border-style:dashed}
+.dm-tag.wait{color:var(--faint)} .dm-tag.cand{color:var(--muted)}
+.dm-c-gt{color:var(--gt)} .dm-c-tp{color:var(--tp)} .dm-c-fp{color:var(--fp)} .dm-c-fn{color:var(--fn)}
+.dm-c-pred{color:var(--pred)} .dm-c-pred2{color:var(--pred2)} .dm-c-inter{color:var(--inter)}
+.dm-sw{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:5px;vertical-align:0;border:2px solid currentColor}
+.dm-sw--dash{border-style:dashed}
+.dm-sw--fill{background:currentColor;opacity:.7}
+
+.sk-table tr.dm-cur td{background:color-mix(in srgb,var(--sk-accent) 14%,var(--surface))}
+.sk-table tr.dm-dim td{color:var(--faint)}
+.sk-table tr.dm-click{cursor:pointer}
+.sk-table tr.dm-click:hover td{background:var(--surface-2)}
+.sk-table tr.dm-cut td{border-bottom:2.5px solid var(--sk-accent)}
+.sk-table td.wrap{white-space:normal;min-width:190px}
+.dm-tablebox{max-height:430px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.dm-tablebox .sk-table th{z-index:1}
+
+.dm-status{font-size:14.5px;color:var(--text);min-height:3em;margin:0}
+.dm-status b{color:var(--ink)}
+.dm-thumbs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.dm-thumbs figure{margin:0;display:flex;flex-direction:column;gap:3px}
+.dm-thumbs figcaption{font-size:12px;color:var(--muted);font-weight:600}
+@media (max-width:520px){.dm-thumbs{grid-template-columns:repeat(2,minmax(0,1fr))}.dm-big b{font-size:32px}}
+
+.dm-compare{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:620px){.dm-compare{grid-template-columns:minmax(0,1fr)}}
+.dm-compare > div{display:flex;flex-direction:column;gap:8px;min-width:0}
+.dm-mini-wrap{max-width:220px}
+
+.dm-sent{border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface-2);display:flex;flex-direction:column;gap:6px}
+.dm-sent h3{font-size:13px;color:var(--muted)}
+.dm-sent p{margin:0;font-size:15px;color:var(--ink);line-height:1.6}
+.dm-sent p b{font-family:var(--mono)}
+.dm-sent--froc{border-color:var(--sk-accent)}
+.dm-order{margin:0;padding-left:20px;font-size:14px;color:var(--text);display:grid;gap:3px}
+.dm-order b{color:var(--ink)}
+.dm-pdot{font-family:var(--mono)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)" aria-current="page">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">객체 탐지 평가 지표 시뮬레이터</h1>
+      <p class="ds-hero__lede">요추 MRI 모사 영상 위에서 박스를 직접 움직이며 IoU, TP·FP·FN 매칭, NMS, PR 곡선과 AP·mAP, FROC가 어떻게 계산되는지 한 단계씩 확인합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button class="sk-tab" type="button" role="tab" id="tab-iou" data-tab="iou" aria-controls="pane-iou" aria-selected="true"><span class="sk-num">1</span>IoU</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-match" data-tab="match" aria-controls="pane-match" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>TP · FP · FN 매칭</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-nms" data-tab="nms" aria-controls="pane-nms" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>NMS</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-ap" data-tab="ap" aria-controls="pane-ap" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>PR 곡선 · AP · mAP</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-froc" data-tab="froc" aria-controls="pane-froc" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>FROC</button>
+  </nav>
+
+  <!-- ================= 1. IoU ================= -->
+  <section id="pane-iou" role="tabpanel" aria-labelledby="tab-iou">
+    <div class="dm-split">
+      <div class="sk-card">
+        <div class="sk-head"><h2>두 박스가 얼마나 겹치나 — IoU</h2><span class="sk-hint">박스 안을 끌면 이동, 모서리를 끌면 크기 조절</span></div>
+        <canvas id="iouCanvas" class="dm-img" tabindex="0" aria-label="요추 MRI 모사 영상 위의 정답 박스와 예측 박스. 끌어서 이동하거나 모서리로 크기를 바꿀 수 있습니다. 화살표 키로 이동, Shift+화살표로 크기 조절."></canvas>
+        <div class="sk-legend">
+          <span class="dm-c-gt" style="color:var(--img-gt)"><i class="dm-sw"></i><span style="color:var(--muted)">정답(GT)</span></span>
+          <span style="color:var(--img-pred)"><i class="dm-sw"></i><span style="color:var(--muted)">예측</span></span>
+          <span style="color:var(--img-inter)"><i class="dm-sw dm-sw--fill"></i><span style="color:var(--muted)">교집합</span></span>
+        </div>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">키보드로 움직일 박스</span>
+            <div class="sk-seg" id="iouSel"><button type="button" data-v="pd" aria-pressed="true">예측</button><button type="button" data-v="gt" aria-pressed="false">정답(GT)</button></div>
+          </div>
+          <span class="sk-hint">영상을 누른 뒤 화살표 = 이동, Shift+화살표 = 크기</span>
+        </div>
+      </div>
+      <div class="dm-col">
+        <div class="sk-card">
+          <div class="sk-head"><h2>프리셋</h2><span class="sk-hint" id="iouFrame">영상 128×128</span></div>
+          <div class="sk-group"><span class="sk-label">강의 4케이스 (GT = (16,26,64,74))</span></div>
+          <div class="sk-seg" id="iouPresetA" role="group" aria-label="강의 케이스">
+            <button type="button" data-p="c17" aria-pressed="false">0.17</button><button type="button" data-p="c41" aria-pressed="false">0.41</button><button type="button" data-p="c70" aria-pressed="true">0.70</button><button type="button" data-p="c85" aria-pressed="false">0.85</button>
+          </div>
+          <div class="sk-group"><span class="sk-label">작은 물체 vs 큰 물체 (가로 10px 오차)</span></div>
+          <div class="sk-seg" id="iouPresetB" role="group" aria-label="크기 비교">
+            <button type="button" data-p="big" aria-pressed="false">큰 물체 200×200</button><button type="button" data-p="small" aria-pressed="false">작은 물체 20×20</button>
+          </div>
+        </div>
+        <div class="sk-card">
+          <div class="dm-big"><b id="iouVal">0.70</b><span>IoU = 교집합 ÷ 합집합</span></div>
+          <div class="dm-badges" id="iouBadges"></div>
+          <div class="sk-formula" id="iouFormula"></div>
+        </div>
+        <div class="sk-card">
+          <div class="sk-head"><h2>박스 좌표 표기 3가지</h2><span class="sk-hint">정규화 = 영상 폭·높이로 나눈 값 (YOLO 라벨 형식)</span></div>
+          <div class="sk-scroll"><table class="sk-table" id="iouCoords"></table></div>
+        </div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>같은 10px 오차, 크기에 따라 판정이 달라진다</h2><span class="sk-hint">두 그림은 각자 크기에 맞게 확대해 표시</span></div>
+      <div class="dm-compare" id="sizeCompare">
+        <div>
+          <h3>큰 물체 200×200 — 가로로 10px 어긋남</h3>
+          <div class="dm-mini-wrap"><canvas class="dm-mini" id="miniBig" aria-label="200×200 박스와 가로로 10px 어긋난 예측 박스"></canvas></div>
+          <div class="sk-formula" id="bigF"></div>
+        </div>
+        <div>
+          <h3>작은 물체 20×20 — 가로로 10px 어긋남</h3>
+          <div class="dm-mini-wrap"><canvas class="dm-mini" id="miniSmall" aria-label="20×20 박스와 가로로 10px 어긋난 예측 박스"></canvas></div>
+          <div class="sk-formula" id="smallF"></div>
+        </div>
+      </div>
+      <p class="sk-note">작은 병변일수록 몇 픽셀의 어긋남이 IoU를 크게 떨어뜨립니다. 그래서 작은 물체는 같은 모형이라도 AP가 낮게 나오기 쉽고, COCO는 AP<sub>small</sub>(32×32 미만)을 따로 보고합니다.</p>
+    </div>
+  </section>
+
+  <!-- ================= 2. 매칭 ================= -->
+  <section id="pane-match" role="tabpanel" aria-labelledby="tab-match" hidden>
+    <div class="dm-split">
+      <div class="sk-card">
+        <div class="sk-head"><h2>예측을 정답에 짝짓기</h2>
+          <div class="sk-seg" id="mScene" role="group" aria-label="장면"><button type="button" data-v="0" aria-pressed="true">강의 장면 (정답 2 · 예측 3)</button><button type="button" data-v="1" aria-pressed="false">여러 병변</button></div>
+        </div>
+        <canvas id="mCanvas" class="dm-img" aria-label="요추 MRI 모사 영상 위 정답 박스와 예측 박스의 매칭 과정"></canvas>
+        <div class="sk-legend">
+          <span style="color:var(--img-gt)"><i class="dm-sw"></i><span style="color:var(--muted)">정답(GT)</span></span>
+          <span style="color:var(--img-pred)"><i class="dm-sw dm-sw--dash"></i><span style="color:var(--muted)">아직 판정 전 예측</span></span>
+          <span style="color:var(--img-tp)"><i class="dm-sw"></i><span style="color:var(--muted)">TP</span></span>
+          <span style="color:var(--img-fp)"><i class="dm-sw"></i><span style="color:var(--muted)">FP</span></span>
+          <span style="color:var(--img-fn)"><i class="dm-sw dm-sw--dash"></i><span style="color:var(--muted)">FN (못 찾은 정답)</span></span>
+        </div>
+      </div>
+      <div class="dm-col">
+        <div class="sk-card">
+          <div class="sk-controls">
+            <label class="sk-slider"><span class="sk-sl-head">IoU 임계값 <b id="mIouV">0.50</b></span><input type="range" id="mIou" min="0.1" max="0.95" step="0.05" value="0.5"></label>
+            <label class="sk-slider"><span class="sk-sl-head">신뢰도 임계값 <b id="mConfV">0.25</b></span><input type="range" id="mConf" min="0" max="0.95" step="0.05" value="0.25"></label>
+          </div>
+          <div class="sk-controls" id="mPlayer"></div>
+          <p class="dm-status" id="mStatus" aria-live="polite"></p>
+          <p class="sk-note">규칙: 신뢰도가 높은 예측부터 하나씩, <b>가장 큰 IoU를 가진 정답</b>을 찾는다. IoU가 임계값 이상이고 그 정답이 아직 짝이 없으면 TP. 이미 짝이 있으면 <b>중복 예측 → FP</b>. 정답 1개에는 예측 1개만 TP.</p>
+        </div>
+        <div class="sk-card">
+          <div class="sk-head"><h2>판정 표</h2><span class="sk-hint">신뢰도 내림차순</span></div>
+          <div class="sk-scroll"><table class="sk-table" id="mTable"></table></div>
+        </div>
+        <div class="sk-card">
+          <div class="sk-stats" id="mStats"></div>
+          <div class="sk-formula" id="mFormula"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 3. NMS ================= -->
+  <section id="pane-nms" role="tabpanel" aria-labelledby="tab-nms" hidden>
+    <div class="dm-split">
+      <div class="sk-card">
+        <div class="sk-head"><h2>겹친 박스 정리 — NMS</h2><span class="sk-hint">척추뼈 2개 + 붙어 있는 병변 2개</span></div>
+        <canvas id="nCanvas" class="dm-img" aria-label="요추 MRI 모사 영상 위 겹친 예측 박스들과 NMS 진행 상황"></canvas>
+        <div class="sk-legend">
+          <span style="color:var(--img-pred2)"><i class="dm-sw"></i><span style="color:var(--muted)">척추뼈 예측</span></span>
+          <span style="color:var(--img-pred)"><i class="dm-sw"></i><span style="color:var(--muted)">병변 예측</span></span>
+          <span style="color:var(--img-fn)"><i class="dm-sw dm-sw--dash"></i><span style="color:var(--muted)">저신뢰 제거 / 억제됨(흐림)</span></span>
+        </div>
+      </div>
+      <div class="dm-col">
+        <div class="sk-card">
+          <div class="sk-controls">
+            <label class="sk-slider"><span class="sk-sl-head">① 신뢰도 임계값 <b id="nConfV">0.25</b></span><input type="range" id="nConf" min="0" max="0.95" step="0.05" value="0.25"></label>
+            <label class="sk-slider"><span class="sk-sl-head">② NMS IoU 임계값 <b id="nIouV">0.45</b></span><input type="range" id="nIou" min="0.05" max="0.95" step="0.05" value="0.45"></label>
+          </div>
+          <div class="sk-controls">
+            <label class="sk-check"><input type="checkbox" id="nAgn"> 클래스 무시하고 한꺼번에 NMS</label>
+          </div>
+          <div class="sk-controls" id="nPlayer"></div>
+          <ol class="sk-stepper" id="nStepper" aria-label="NMS 단계"><li>원본</li><li>저신뢰 제거</li><li>정렬</li><li>채택·억제 반복</li><li>최종</li></ol>
+          <p class="dm-status" id="nStatus" aria-live="polite"></p>
+        </div>
+        <div class="sk-card">
+          <div class="sk-head"><h2>박스 목록</h2><span class="sk-hint" id="nSummary"></span></div>
+          <div class="sk-scroll"><table class="sk-table" id="nTable"></table></div>
+        </div>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <h2>두 임계값은 서로 다른 일을 한다</h2>
+        <div class="sk-formula">① 신뢰도 임계값 0.25 : "이 박스를 믿을까?" — 박스 하나의 점수만 본다<br>② NMS IoU 임계값 0.45 : "이 두 박스가 같은 물체인가?" — 두 박스의 겹침을 본다</div>
+        <p class="sk-note">NMS는 <b>클래스별</b>로 합니다. 병변 박스는 척추뼈 박스와 비교하지 않으므로, 척추뼈 안의 병변이 척추뼈 박스 때문에 지워지지 않습니다.</p>
+      </div>
+      <div class="sk-card">
+        <h2>너무 높이거나 낮추면</h2>
+        <div class="sk-scroll"><table class="sk-table">
+          <tr><th></th><th>너무 낮게</th><th>너무 높게</th></tr>
+          <tr><td>신뢰도</td><td class="wrap">쓰레기 박스까지 NMS에 올라와 오탐(FP) 증가</td><td class="wrap">약하게 잡힌 진짜 병변까지 버림 → 재현율 감소</td></tr>
+          <tr><td>NMS IoU</td><td class="wrap">붙어 있는 다른 물체(인접 병변)까지 억제 → 놓침(FN)</td><td class="wrap">중복 박스가 안 지워짐 → 한 물체에 박스 여러 개(FP)</td></tr>
+        </table></div>
+        <p class="sk-hint">해 보기: NMS IoU를 0.10으로 낮추면 붙어 있는 병변 하나가 사라지고, 0.85로 올리면 척추뼈에 박스가 겹겹이 남습니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 4. PR · AP · mAP ================= -->
+  <section id="pane-ap" role="tabpanel" aria-labelledby="tab-ap" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>모사 데이터셋 8장 · 클래스 2개로 AP 계산</h2><span class="sk-hint" id="apInfo"></span></div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">클래스</span><div class="sk-seg" id="apCls" role="group" aria-label="클래스"><button type="button" data-v="1" aria-pressed="true">병변</button><button type="button" data-v="0" aria-pressed="false">척추뼈</button></div></div>
+        <label class="sk-slider"><span class="sk-sl-head">IoU 임계값 <b id="apIouV">0.50</b></span><input type="range" id="apIou" min="0.5" max="0.95" step="0.05" value="0.5"></label>
+        <div class="sk-group"><span class="sk-label">보간</span><div class="sk-seg" id="apInterp" role="group" aria-label="보간 방식"><button type="button" data-v="all" aria-pressed="true">모든 점</button><button type="button" data-v="101" aria-pressed="false">COCO 101점</button><button type="button" data-v="11" aria-pressed="false">VOC 11점</button></div></div>
+      </div>
+      <ol class="dm-order">
+        <li><b>신뢰도 내림차순 정렬</b> (전체 영상의 예측을 한 줄로)</li>
+        <li>위에서부터 한 줄씩 <b>누적 TP, 누적 FP</b></li>
+        <li>각 줄에서 <b>Precision = 누적TP ÷ (누적TP+누적FP)</b>, <b>Recall = 누적TP ÷ 정답 수</b></li>
+        <li>PR 곡선 아래 <b>면적 = AP</b> (정밀도는 오른쪽 최댓값으로 보간한 포락선 사용)</li>
+      </ol>
+    </div>
+    <div class="dm-split--even dm-split">
+      <div class="sk-card">
+        <div class="sk-head"><h2>신뢰도 순 표</h2><span class="sk-hint">행을 누르면 "여기까지 양성"</span></div>
+        <div class="dm-tablebox" id="apTableBox"><table class="sk-table" id="apTable"></table></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>PR 곡선</h2><span class="sk-hint">음영 = AP (면적)</span></div>
+        <canvas id="prCanvas" class="dm-chart" aria-label="정밀도-재현율 곡선과 보간 포락선, AP 면적"></canvas>
+        <div class="sk-legend">
+          <span style="color:var(--muted)"><i class="dm-sw" style="color:var(--faint)"></i>원래 PR (지그재그)</span>
+          <span style="color:var(--muted)"><i class="dm-sw" style="color:var(--sk-accent)"></i>보간 포락선</span>
+          <span style="color:var(--muted)"><i class="dm-sw dm-sw--fill" style="color:var(--sk-accent)"></i>AP 면적</span>
+        </div>
+        <label class="sk-slider"><span class="sk-sl-head"><span>여기까지를 양성으로 (신뢰도 상위 N개)</span><b>N = <span id="apCutV">1</span></b></span><input type="range" id="apCut" min="1" max="10" step="1" value="1"></label>
+        <div class="sk-controls">
+          <button class="sk-btn sk-btn--sm" type="button" id="apOne">극단 1: 확실한 1개만</button>
+          <button class="sk-btn sk-btn--sm" type="button" id="apAll">극단 2: 전부 양성</button>
+        </div>
+        <div class="sk-stats" id="apStats"></div>
+        <p class="dm-status" id="apCutText"></p>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>AP 계산식</h2><span class="sk-hint" id="apMethodHint"></span></div>
+        <div class="sk-formula" id="apFormula"></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>클래스별 AP와 mAP</h2><span class="sk-hint">mAP = 클래스 평균</span></div>
+        <div class="sk-scroll"><table class="sk-table" id="mapTable"></table></div>
+        <div class="sk-formula" id="map5095"></div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>데이터셋 보기</h2><span class="sk-hint">현재 양성으로 본 예측만 표시</span></div>
+      <div class="dm-thumbs dm-thumbs--wide" id="apThumbs"></div>
+      <div class="sk-legend">
+        <span style="color:var(--img-gt)"><i class="dm-sw"></i><span style="color:var(--muted)">찾은 정답</span></span>
+        <span style="color:var(--img-fn)"><i class="dm-sw dm-sw--dash"></i><span style="color:var(--muted)">FN</span></span>
+        <span style="color:var(--img-tp)"><i class="dm-sw"></i><span style="color:var(--muted)">TP</span></span>
+        <span style="color:var(--img-fp)"><i class="dm-sw"></i><span style="color:var(--muted)">FP</span></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 5. FROC ================= -->
+  <section id="pane-froc" role="tabpanel" aria-labelledby="tab-froc" hidden>
+    <div class="dm-split">
+      <div class="sk-card">
+        <div class="sk-head"><h2>FROC 곡선</h2><span class="sk-hint">가로 = 영상 1장당 오탐 수, 세로 = 민감도</span></div>
+        <canvas id="frocCanvas" class="dm-chart" aria-label="영상 1장당 오탐 수 대 민감도 FROC 곡선"></canvas>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">클래스</span><div class="sk-seg" id="frCls" role="group" aria-label="클래스"><button type="button" data-v="1" aria-pressed="true">병변</button><button type="button" data-v="0" aria-pressed="false">척추뼈</button></div></div>
+          <label class="sk-slider"><span class="sk-sl-head">IoU 임계값 <b id="frIouV">0.50</b></span><input type="range" id="frIou" min="0.5" max="0.95" step="0.05" value="0.5"></label>
+        </div>
+        <label class="sk-slider"><span class="sk-sl-head">허용 오탐 (FP/영상) <b id="frFpV">2</b></span><input type="range" id="frFp" min="0" max="3" step="0.125" value="2"></label>
+      </div>
+      <div class="dm-col">
+        <div class="sk-card">
+          <div class="dm-big"><b id="frSens">77%</b><span id="frSensSub">민감도</span></div>
+          <div class="dm-sent dm-sent--froc"><h3>FROC 관점 — 판독의가 바로 판단</h3><p id="frSentence"></p></div>
+          <div class="dm-sent"><h3>mAP 관점 — 모형 비교용 한 숫자</h3><p id="frMapSentence"></p></div>
+          <div class="sk-formula" id="frFormula"></div>
+        </div>
+        <div class="sk-card">
+          <div class="sk-head"><h2>표준 지점의 민감도</h2><span class="sk-hint">FP/영상 1/8 ~ 8</span></div>
+          <div class="sk-scroll"><table class="sk-table" id="frTable"></table></div>
+        </div>
+      </div>
+    </div>
+    <p class="sk-note">같은 예측 목록이라도 <b>mAP</b>는 "모든 임계값에서 정밀도·재현율이 얼마나 좋은가"를 한 숫자로 요약하고, <b>FROC</b>는 "영상 한 장에 오탐을 몇 개까지 참으면 병변을 몇 % 찾는가"를 보여 줍니다. 판독 현장에서는 FROC 문장이 바로 쓰입니다.</p>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js"></script>
+<script>
+(function(){
+"use strict";
+/* ================================================================
+   공통 도구
+   ================================================================ */
+const root = document.documentElement;
+const $ = (s, el) => (el || document).querySelector(s);
+const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
+const cssv = n => getComputedStyle(root).getPropertyValue(n).trim();
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const f2 = v => v.toFixed(2), f3 = v => v.toFixed(3);
+const pct = v => Math.round(v * 100) + "%";
+const nf = v => (Math.abs(v - Math.round(v)) < 1e-9 ? String(Math.round(v)) : String(Math.round(v * 10) / 10));
+const REDUCE = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function area(b){ return Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]); }
+function interBox(a, b){ const x1 = Math.max(a[0], b[0]), y1 = Math.max(a[1], b[1]), x2 = Math.min(a[2], b[2]), y2 = Math.min(a[3], b[3]); return (x2 > x1 && y2 > y1) ? [x1, y1, x2, y2] : null; }
+function iou(a, b){ const i = interBox(a, b); if (!i) return 0; const ia = area(i); return ia / (area(a) + area(b) - ia); }
+
+/* 캔버스 준비 (devicePixelRatio 대응) */
+function prep(cv){
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (!w || !h) return null;
+  const dpr = Math.min(3, window.devicePixelRatio || 1);
+  const W = Math.round(w * dpr), H = Math.round(h * dpr);
+  if (cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; }
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  return { ctx, w, h };
+}
+
+/* ================================================================
+   요추 MRI(시상면) 모사 영상 — 절차적 흑백 생성
+   ================================================================ */
+function valueNoise(rng, gw, gh){
+  const g = new Float32Array((gw + 1) * (gh + 1));
+  for (let i = 0; i < g.length; i++) g[i] = rng();
+  return function(u, v){
+    const fx = clamp(u, 0, 0.9999) * gw, fy = clamp(v, 0, 0.9999) * gh;
+    const i = fx | 0, j = fy | 0; let tx = fx - i, ty = fy - j;
+    tx = tx * tx * (3 - 2 * tx); ty = ty * ty * (3 - 2 * ty);
+    const a = g[j * (gw + 1) + i], b = g[j * (gw + 1) + i + 1], c = g[(j + 1) * (gw + 1) + i], d = g[(j + 1) * (gw + 1) + i + 1];
+    return a + (b - a) * tx + (c - a) * ty + (a - b - c + d) * tx * ty;
+  };
+}
+function sdRRect(px, py, b, r){
+  const cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2, hx = (b[2] - b[0]) / 2 - r, hy = (b[3] - b[1]) / 2 - r;
+  const qx = Math.abs(px - cx) - hx, qy = Math.abs(py - cy) - hy;
+  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r;
+}
+const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+
+function spineScene(W, H, seed, opt){
+  opt = opt || {}; const z = opt.zoom || 1;
+  const r = mulberry32(seed);
+  const vw = W * (0.185 + 0.03 * r()) * z, vh = H * (0.112 + 0.012 * r()) * z, gap = H * (0.04 + 0.012 * r()) * z;
+  let y0 = H * (0.07 + 0.035 * r()); if (opt.y0 != null) y0 = opt.y0;
+  const base = W * (0.40 + 0.05 * r()) * (z > 1 ? 0.92 : 1), amp = W * (0.03 + 0.025 * r());
+  const spineX = y => base - amp * Math.sin(Math.PI * clamp(y / H, 0, 1));
+  const mk = y1 => { const cx = spineX(y1 + vh / 2); return [Math.round(cx - vw / 2), Math.round(y1), Math.round(cx + vw / 2), Math.round(y1 + vh)]; };
+  const bodies = [{ name: "T12", box: mk(y0 - gap - vh), gt: false }];
+  ["L1", "L2", "L3", "L4", "L5"].forEach((n, i) => bodies.push({ name: n, box: mk(y0 + i * (vh + gap)), gt: true }));
+  bodies.push({ name: "S1", box: mk(y0 + 5 * (vh + gap)), gt: false });
+  return { W, H, seed: seed * 7 + 3, vw, spineX, bodies, fatX: W * (0.84 + 0.05 * r()), conusY: y0 + (vh + gap) * 1.4, lesions: [] };
+}
+
+function renderMRI(sc){
+  const { W, H } = sc, rng = mulberry32(sc.seed || 1);
+  const nA = valueNoise(rng, 5, 5), nB = valueNoise(rng, 18, 18), nC = valueNoise(rng, 42, 42);
+  const f = new Float32Array(W * H), vw = sc.vw;
+  for (let y = 0; y < H; y++){
+    const v = y / H, cx = sc.spineX(y);
+    const cl = cx + vw / 2 + 2, cr = cl + vw * 0.27;
+    for (let x = 0; x < W; x++){
+      const u = x / W;
+      let val = 0.13 + 0.10 * nA(u, v) + 0.05 * nB(u, v);
+      if (x < cx - vw * 0.62) val += 0.05 + 0.07 * nC(u, v);
+      if (x > cx + vw * 1.05) val = 0.19 + 0.08 * nB(u, v) + 0.05 * nC(u, v);
+      // 척추관(CSF 밝음) + 척수(위쪽)
+      const inCanal = sstep(cl - 1, cl + 1, x) * (1 - sstep(cr - 1, cr + 1, x));
+      if (inCanal > 0){
+        let c = 0.80 + 0.06 * nB(u, v);
+        if (y < sc.conusY){ const mid = (cl + cr) / 2, hw = (cr - cl) * 0.24 * (1 - sstep(sc.conusY - 20, sc.conusY, y)); if (Math.abs(x - mid) < hw) c = 0.42; }
+        val = val * (1 - inCanal) + c * inCanal;
+      }
+      const fx = sc.fatX;
+      if (x > fx) val = 0.55 + 0.13 * nB(u, v);
+      if (x > fx + W * 0.07) val = 0.03;
+      f[y * W + x] = val;
+    }
+  }
+  const paint = (bb, fn) => {
+    const x0 = Math.max(0, Math.floor(bb[0])), x1 = Math.min(W - 1, Math.ceil(bb[2])), y0 = Math.max(0, Math.floor(bb[1])), y1 = Math.min(H - 1, Math.ceil(bb[3]));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++){ const k = y * W + x; f[k] = fn(x + 0.5, y + 0.5, f[k]); }
+  };
+  const bodies = sc.bodies;
+  // 극돌기(뒤쪽 뼈)
+  bodies.forEach(bd => {
+    const b = bd.box, h = b[3] - b[1], ex = b[2] + vw * 0.62, ey = (b[1] + b[3]) / 2 + h * 0.1, rx = vw * 0.22, ry = h * 0.34;
+    paint([ex - rx - 2, ey - ry - 2, ex + rx + 2, ey + ry + 2], (x, y, o) => {
+      const rr = Math.hypot((x - ex) / rx, (y - ey) / ry); if (rr > 1.05) return o;
+      const a = 1 - sstep(0.9, 1.05, rr); const c = rr > 0.8 ? 0.12 : 0.34 + 0.12 * nC(x / W, y / H);
+      return o * (1 - a) + c * a;
+    });
+  });
+  // 추간판
+  for (let i = 0; i + 1 < bodies.length; i++){
+    const a = bodies[i].box, b = bodies[i + 1].box;
+    const ex = (a[0] + a[2] + b[0] + b[2]) / 4, ey = (a[3] + b[1]) / 2, rx = vw * 0.5, ry = Math.max(2.5, (b[1] - a[3]) / 2 + 1.5);
+    paint([ex - rx - 2, ey - ry - 2, ex + rx + 2, ey + ry + 2], (x, y, o) => {
+      const rr = Math.hypot((x - ex) / rx, (y - ey) / ry); if (rr > 1.1) return o;
+      const al = 1 - sstep(0.85, 1.1, rr); const c = 0.30 + 0.45 * Math.pow(Math.max(0, 1 - rr * rr), 1.5);
+      return o * (1 - al) + c * al;
+    });
+  }
+  // 척추뼈 몸통
+  bodies.forEach(bd => {
+    const b = bd.box, rad = Math.min(b[2] - b[0], b[3] - b[1]) * 0.2;
+    paint([b[0] - 2, b[1] - 2, b[2] + 2, b[3] + 2], (x, y, o) => {
+      const d = sdRRect(x, y, b, rad); if (d > 1) return o;
+      const al = clamp(0.5 - d, 0, 1);
+      const c = d > -2.2 ? 0.13 : 0.43 + 0.17 * nC(x / W, y / H) + 0.07 * nB(x / W, y / H);
+      return o * (1 - al) + c * al;
+    });
+  });
+  // 병변 (밝은/어두운 덩이)
+  sc.lesions.forEach(L => {
+    const b = L.box, ex = (b[0] + b[2]) / 2, ey = (b[1] + b[3]) / 2, rx = (b[2] - b[0]) / 2, ry = (b[3] - b[1]) / 2, t = L.dark ? 0.06 : 0.97;
+    paint([b[0] - 2, b[1] - 2, b[2] + 2, b[3] + 2], (x, y, o) => {
+      const rr = Math.hypot((x - ex) / rx, (y - ey) / ry); if (rr > 1.1) return o;
+      const w = 1 - sstep(0.6, 1.08, rr); return o + (t - o) * w * 0.95;
+    });
+  });
+  const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const cx = cv.getContext("2d"), im = cx.createImageData(W, H);
+  for (let k = 0; k < W * H; k++){
+    const n = (rng() + rng() + rng() - 1.5) * 0.055;
+    const g = Math.round(Math.pow(clamp(f[k] + n, 0, 1), 0.95) * 255);
+    im.data[k * 4] = im.data[k * 4 + 1] = im.data[k * 4 + 2] = g; im.data[k * 4 + 3] = 255;
+  }
+  cx.putImageData(im, 0, 0);
+  return cv;
+}
+
+/* 정답 박스 근처에서 목표 IoU를 갖는 예측 박스 찾기 (고정 seed) */
+function boxNear(gt, target, rng, W, H, step){
+  step = step || 1;
+  let best = null, bd = 1e9; const w = gt[2] - gt[0], h = gt[3] - gt[1];
+  for (let t = 0; t < 6000; t++){
+    const s = t < 2500 ? 0.3 : 0.6;
+    const sw = 1 + (rng() * 2 - 1) * s * 0.8, sh = 1 + (rng() * 2 - 1) * s * 0.8;
+    const cx = (gt[0] + gt[2]) / 2 + (rng() * 2 - 1) * w * s, cy = (gt[1] + gt[3]) / 2 + (rng() * 2 - 1) * h * s;
+    let b = [cx - w * sw / 2, cy - h * sh / 2, cx + w * sw / 2, cy + h * sh / 2].map(v => Math.round(v / step) * step);
+    b = [clamp(b[0], 0, W), clamp(b[1], 0, H), clamp(b[2], 0, W), clamp(b[3], 0, H)];
+    if (b[2] - b[0] < 3 || b[3] - b[1] < 3) continue;
+    const d = Math.abs(iou(b, gt) - target);
+    if (d < bd){ bd = d; best = b; if (d < 0.003) break; }
+  }
+  return best;
+}
+
+/* 영상 위 박스 그리기 */
+function drawBox(ctx, b, s, color, o){
+  o = o || {};
+  const x = b[0] * s, y = b[1] * s, w = (b[2] - b[0]) * s, h = (b[3] - b[1]) * s;
+  ctx.save();
+  ctx.globalAlpha = o.alpha == null ? 1 : o.alpha;
+  if (!o.labelOnly){
+    if (o.fill){ ctx.fillStyle = o.fill; ctx.fillRect(x, y, w, h); }
+    ctx.lineWidth = o.lw || 2; ctx.strokeStyle = color; ctx.setLineDash(o.dash || []);
+    if (o.halo){ ctx.save(); ctx.lineWidth = (o.lw || 2) + 3; ctx.strokeStyle = "rgba(0,0,0,.55)"; ctx.setLineDash([]); ctx.strokeRect(x, y, w, h); ctx.restore(); }
+    ctx.strokeRect(x, y, w, h);
+  }
+  ctx.setLineDash([]);
+  if (o.label){
+    ctx.font = "600 " + (o.fs || 11) + "px " + (cssv("--mono") || "monospace");
+    const tw = ctx.measureText(o.label).width + 8, th = (o.fs || 11) + 5;
+    const CW = ctx.canvas.clientWidth, CH = ctx.canvas.clientHeight, hl = (o.lw || 2) / 2;
+    const fix = (lx, ly) => { if (ly < 0) ly = y + 1; if (ly + th > CH) ly = y + h - th; if (lx + tw > CW) lx = CW - tw; if (lx < 0) lx = 0; return [lx, ly]; };
+    let cands = [[o.right ? x + w - tw + hl : x - hl, o.below ? y + h + 1 : y - th]];
+    if (o.placed) cands = cands.concat([[x + w - tw + hl, y - th], [x - hl, y + h + 1], [x + w - tw + hl, y + h + 1], [x + w + 2, y], [x - tw - 2, y]]);
+    let lx, ly, ok = false;
+    for (const c of cands){
+      [lx, ly] = fix(c[0], c[1]);
+      if (!o.placed || !o.placed.some(q => lx < q[0] + q[2] && lx + tw > q[0] && ly < q[1] + q[3] && ly + th > q[1])){ ok = true; break; }
+    }
+    if (!ok) [lx, ly] = fix(cands[0][0], cands[0][1]);
+    if (o.placed) o.placed.push([lx, ly, tw, th]);
+    ctx.fillStyle = color; ctx.fillRect(lx, ly, tw, th);
+    ctx.fillStyle = cssv("--img-ink"); ctx.textBaseline = "middle"; ctx.fillText(o.label, lx + 4, ly + th / 2 + 0.5);
+  }
+  ctx.restore();
+}
+function drawImage(ctx, img, w, h){ ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high"; ctx.drawImage(img, 0, 0, w, h); }
+
+/* 단계 진행 컨트롤 (처음/이전/다음/재생 + 속도) */
+function makePlayer(host, api){
+  host.innerHTML =
+    '<div class="sk-group"><button class="sk-btn sk-btn--sm" type="button" data-a="first">처음</button>' +
+    '<button class="sk-btn sk-btn--sm" type="button" data-a="prev">이전</button>' +
+    '<button class="sk-btn sk-btn--sm" type="button" data-a="next">다음 →</button>' +
+    '<button class="sk-btn sk-btn--sm sk-btn--primary" type="button" data-a="play" style="min-width:82px">재생</button></div>' +
+    '<label class="sk-group"><span class="sk-label">속도</span><select class="sk-select" data-a="speed"><option value="1500">느리게</option><option value="900" selected>보통</option><option value="450">빠르게</option></select></label>' +
+    '<span class="sk-hint">→ 키 = 다음</span>';
+  let timer = null;
+  const playBtn = $("[data-a=play]", host), speed = $("[data-a=speed]", host);
+  const P = {
+    step: 0,
+    stop(){ if (timer){ clearInterval(timer); timer = null; } playBtn.textContent = "재생"; },
+    go(s){ P.step = clamp(s, 0, api.max()); api.render(); P.sync(); },
+    next(){ if (P.step < api.max()) P.go(P.step + 1); else P.stop(); },
+    sync(){ $("[data-a=prev]", host).disabled = P.step <= 0; $("[data-a=first]", host).disabled = P.step <= 0; $("[data-a=next]", host).disabled = P.step >= api.max(); },
+    play(){
+      if (timer){ P.stop(); return; }
+      if (P.step >= api.max()) P.go(0);
+      playBtn.textContent = "멈춤";
+      timer = setInterval(() => { if (P.step >= api.max()) P.stop(); else P.next(); }, +speed.value);
+    }
+  };
+  host.addEventListener("click", e => {
+    const a = e.target.closest("button[data-a]"); if (!a) return;
+    const k = a.dataset.a;
+    if (k === "play") P.play(); else { P.stop(); if (k === "first") P.go(0); else if (k === "prev") P.go(P.step - 1); else if (k === "next") P.next(); }
+  });
+  speed.addEventListener("change", () => { if (timer){ P.stop(); P.play(); } });
+  return P;
+}
+function segSet(seg, v){ $$("button", seg).forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === v || b.dataset.p === v))); }
+
+/* ================================================================
+   1. IoU
+   ================================================================ */
+const IOU = (function(){
+  const GT = [16, 26, 64, 74];
+  const PRESETS = {
+    c17: { W: 128, gt: GT, pd: [36, 50, 84, 98] },
+    c41: { W: 128, gt: GT, pd: [32, 32, 80, 80] },
+    c70: { W: 128, gt: GT, pd: [20, 30, 68, 80] },
+    c85: { W: 128, gt: GT, pd: [18, 28, 66, 76] },
+    big: { W: 256, gt: [28, 28, 228, 228], pd: [38, 28, 238, 228] },
+    small: { W: 256, gt: [118, 118, 138, 138], pd: [128, 118, 148, 138] }
+  };
+  // 배경 영상: 128 = L3 몸통 확대, 256 = 요추 전체
+  const zoom = { W: 128, H: 128, seed: 91, vw: 48, spineX: () => 40, fatX: 112, conusY: -1, lesions: [],
+    bodies: [{ box: [16, -22, 64, 18] }, { box: [16, 27, 64, 73] }, { box: [17, 83, 65, 129] }] };
+  const bg = { 128: renderMRI(zoom), 256: renderMRI(spineScene(256, 256, 5)) };
+  const cv = $("#iouCanvas");
+  const S = { W: 128, gt: GT.slice(), pd: [20, 30, 68, 80], sel: "pd", drag: null, preset: "c70" };
+
+  function load(id){
+    const p = PRESETS[id]; S.W = p.W; S.gt = p.gt.slice(); S.pd = p.pd.slice(); S.preset = id;
+    segSet($("#iouPresetA"), id); segSet($("#iouPresetB"), id);
+    draw(); readout();
+  }
+  function draw(){
+    const P = prep(cv); if (!P) return;
+    const { ctx, w } = P, s = w / S.W;
+    drawImage(ctx, bg[S.W], w, w);
+    const I = interBox(S.gt, S.pd);
+    if (I){ ctx.save(); ctx.globalAlpha = 0.55; ctx.fillStyle = cssv("--img-inter"); ctx.fillRect(I[0] * s, I[1] * s, (I[2] - I[0]) * s, (I[3] - I[1]) * s); ctx.restore(); }
+    drawBox(ctx, S.gt, s, cssv("--img-gt"), { lw: S.sel === "gt" ? 3 : 2, label: "정답(GT)", halo: true });
+    drawBox(ctx, S.pd, s, cssv("--img-pred"), { lw: S.sel === "pd" ? 3 : 2, label: "예측", below: true, halo: true });
+    [["gt", S.gt, cssv("--img-gt")], ["pd", S.pd, cssv("--img-pred")]].forEach(([k, b, c]) => {
+      const hs = S.sel === k ? 7 : 5;
+      [[b[0], b[1]], [b[2], b[1]], [b[0], b[3]], [b[2], b[3]]].forEach(([x, y]) => {
+        ctx.fillStyle = c; ctx.strokeStyle = "rgba(0,0,0,.6)"; ctx.lineWidth = 1;
+        ctx.fillRect(x * s - hs / 2, y * s - hs / 2, hs, hs); ctx.strokeRect(x * s - hs / 2, y * s - hs / 2, hs, hs);
+      });
+    });
+  }
+  function coordRow(name, b, cls){
+    const W = S.W, H = S.W, bw = b[2] - b[0], bh = b[3] - b[1], cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2;
+    return '<tr><td class="' + cls + '"><b>' + name + '</b></td><td class="n">(' + b.join(", ") + ')</td><td class="n">(' + [cx, cy, bw, bh].map(nf).join(", ") + ')</td><td class="n">(' + [cx / W, cy / H, bw / W, bh / H].map(f3).join(", ") + ')</td></tr>';
+  }
+  function readout(){
+    const g = S.gt, p = S.pd;
+    const ix1 = Math.max(g[0], p[0]), iy1 = Math.max(g[1], p[1]), ix2 = Math.min(g[2], p[2]), iy2 = Math.min(g[3], p[3]);
+    const iw = Math.max(0, ix2 - ix1), ih = Math.max(0, iy2 - iy1), I = iw * ih, A = area(g), B = area(p), U = A + B - I, v = U ? I / U : 0;
+    $("#iouVal").textContent = f2(v);
+    $("#iouBadges").innerHTML = [0.5, 0.75].map(t => {
+      const ok = v >= t;
+      return '<span class="dm-badge ' + (ok ? "tp" : "fp") + '">기준 ' + f2(t) + ' (AP' + Math.round(t * 100) + ') <b>' + (ok ? "TP" : "FP") + '</b></span>';
+    }).join("");
+    $("#iouFormula").innerHTML =
+      '교집합 폭 = min(' + g[2] + ', ' + p[2] + ') − max(' + g[0] + ', ' + p[0] + ') = ' + (iw > 0 ? iw : '0 (안 겹침)') + '<br>' +
+      '교집합 높이 = min(' + g[3] + ', ' + p[3] + ') − max(' + g[1] + ', ' + p[1] + ') = ' + (ih > 0 ? ih : '0 (안 겹침)') + '<br>' +
+      '<span class="dm-c-inter">교집합</span> = ' + iw + ' × ' + ih + ' = <b>' + I + '</b><br>' +
+      '합집합 = GT ' + A + ' + 예측 ' + B + ' − 교집합 ' + I + ' = <b>' + U + '</b><br>' +
+      'IoU = ' + I + ' / ' + U + ' = ' + v.toFixed(4) + ' ≈ <b>' + f2(v) + '</b>';
+    $("#iouFrame").textContent = "영상 " + S.W + "×" + S.W + " (W×H)";
+    $("#iouCoords").innerHTML = '<tr><th>박스</th><th>(xmin, ymin, xmax, ymax)</th><th>(cx, cy, w, h)</th><th>정규화 (cx/W, cy/H, w/W, h/H)</th></tr>' +
+      coordRow("정답(GT)", g, "dm-c-gt") + coordRow("예측", p, "dm-c-pred");
+  }
+  // 끌기
+  function toImg(e){ const r = cv.getBoundingClientRect(); const s = S.W / r.width; return [(e.clientX - r.left) * s, (e.clientY - r.top) * s, s]; }
+  function hit(x, y, s){
+    const tol = 13 * s;
+    for (const k of ["pd", "gt"]){
+      const b = S[k], cs = [[0, 1], [2, 1], [0, 3], [2, 3]];
+      for (const c of cs) if (Math.abs(x - b[c[0]]) <= tol && Math.abs(y - b[c[1]]) <= tol) return { k, mode: "corner", c };
+    }
+    for (const k of ["pd", "gt"]){ const b = S[k]; if (x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3]) return { k, mode: "move" }; }
+    return null;
+  }
+  function clearPreset(){ S.preset = null; segSet($("#iouPresetA"), "_"); segSet($("#iouPresetB"), "_"); }
+  cv.addEventListener("pointerdown", e => {
+    const [x, y, s] = toImg(e), h = hit(x, y, s); if (!h) return;
+    e.preventDefault(); cv.setPointerCapture(e.pointerId);
+    S.sel = h.k; segSet($("#iouSel"), h.k);
+    S.drag = { ...h, x0: x, y0: y, b0: S[h.k].slice(), id: e.pointerId };
+    draw();
+  });
+  cv.addEventListener("pointermove", e => {
+    const [x, y, s] = toImg(e);
+    if (!S.drag){ const h = hit(x, y, s); cv.style.cursor = !h ? "default" : h.mode === "move" ? "move" : ((h.c[0] === 0) === (h.c[1] === 1) ? "nwse-resize" : "nesw-resize"); return; }
+    const d = S.drag, b = d.b0.slice(), W = S.W, minS = 2;
+    const dx = Math.round(x - d.x0), dy = Math.round(y - d.y0);
+    if (d.mode === "move"){
+      const bw = b[2] - b[0], bh = b[3] - b[1];
+      const nx = clamp(b[0] + dx, 0, W - bw), ny = clamp(b[1] + dy, 0, W - bh);
+      S[d.k] = [nx, ny, nx + bw, ny + bh];
+    } else {
+      const [ci, cj] = d.c;
+      b[ci] = clamp(d.b0[ci] + dx, 0, W); b[cj] = clamp(d.b0[cj] + dy, 0, W);
+      if (ci === 0) b[0] = Math.min(b[0], b[2] - minS); else b[2] = Math.max(b[2], b[0] + minS);
+      if (cj === 1) b[1] = Math.min(b[1], b[3] - minS); else b[3] = Math.max(b[3], b[1] + minS);
+      S[d.k] = b;
+    }
+    clearPreset(); draw(); readout();
+  });
+  const end = () => { S.drag = null; };
+  cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+  cv.addEventListener("keydown", e => {
+    const map = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    if (!map[e.key]) return; e.preventDefault(); e.stopPropagation();
+    const [dx, dy] = map[e.key], b = S[S.sel].slice(), W = S.W;
+    if (e.shiftKey){ b[2] = clamp(b[2] + dx, b[0] + 2, W); b[3] = clamp(b[3] + dy, b[1] + 2, W); }
+    else { const bw = b[2] - b[0], bh = b[3] - b[1]; b[0] = clamp(b[0] + dx, 0, W - bw); b[1] = clamp(b[1] + dy, 0, W - bh); b[2] = b[0] + bw; b[3] = b[1] + bh; }
+    S[S.sel] = b; clearPreset(); draw(); readout();
+  });
+  $("#iouSel").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.sel = b.dataset.v; segSet($("#iouSel"), S.sel); draw(); });
+  [$("#iouPresetA"), $("#iouPresetB")].forEach(sg => sg.addEventListener("click", e => { const b = e.target.closest("button"); if (b) load(b.dataset.p); }));
+
+  // 크기 비교 (고정 계산)
+  const cmp = [
+    { id: "#miniBig", f: "#bigF", gt: PRESETS.big.gt, pd: PRESETS.big.pd },
+    { id: "#miniSmall", f: "#smallF", gt: PRESETS.small.gt, pd: PRESETS.small.pd }
+  ];
+  function drawCompare(){
+    cmp.forEach(c => {
+      const P = prep($(c.id)); if (!P) return;
+      const { ctx, w } = P, g = c.gt, p = c.pd;
+      const x0 = Math.min(g[0], p[0]), x1 = Math.max(g[2], p[2]), y0 = Math.min(g[1], p[1]), y1 = Math.max(g[3], p[3]);
+      const span = Math.max(x1 - x0, y1 - y0), s = (w * 0.8) / span, ox = (w - (x1 - x0) * s) / 2 - x0 * s, oy = (w - (y1 - y0) * s) / 2 - y0 * s;
+      ctx.fillStyle = cssv("--surface-2"); ctx.fillRect(0, 0, w, w);
+      const T = b => [(b[0] * s + ox) / 1, (b[1] * s + oy), (b[2] * s + ox), (b[3] * s + oy)];
+      const I = interBox(g, p);
+      ctx.fillStyle = cssv("--inter"); ctx.globalAlpha = 0.35; const ti = T(I); ctx.fillRect(ti[0], ti[1], ti[2] - ti[0], ti[3] - ti[1]); ctx.globalAlpha = 1;
+      [[g, "--gt", []], [p, "--pred", [6, 4]]].forEach(([b, col, dash]) => { const t = T(b); ctx.strokeStyle = cssv(col); ctx.lineWidth = 2.5; ctx.setLineDash(dash); ctx.strokeRect(t[0], t[1], t[2] - t[0], t[3] - t[1]); });
+      ctx.setLineDash([]);
+      ctx.fillStyle = cssv("--muted"); ctx.font = "600 12px " + cssv("--mono"); ctx.textBaseline = "top";
+      const tg = T(g); ctx.fillText("10px", tg[0] + 2, tg[3] + 4);
+    });
+  }
+  function compareText(){
+    cmp.forEach(c => {
+      const I = interBox(c.gt, c.pd), ia = area(I), A = area(c.gt), B = area(c.pd), U = A + B - ia, v = ia / U, ok = v >= 0.5;
+      $(c.f).innerHTML = '교집합 = ' + (I[2] - I[0]) + ' × ' + (I[3] - I[1]) + ' = ' + ia + '<br>합집합 = ' + A + ' + ' + B + ' − ' + ia + ' = ' + U +
+        '<br>IoU = ' + ia + ' / ' + U + ' = <b>' + f2(v) + '</b> → 기준 0.50에서 <b class="' + (ok ? "dm-c-tp" : "dm-c-fp") + '">' + (ok ? "TP" : "FP") + '</b>';
+      c.iou = v;
+    });
+  }
+  compareText();
+  return { draw(){ draw(); drawCompare(); }, init(){ load("c70"); drawCompare(); }, PRESETS, S, load, cmp };
+})();
+
+/* ================================================================
+   공통 평가: VOC 방식 매칭 (가장 큰 IoU의 정답, 이미 짝지어졌으면 중복 FP)
+   ================================================================ */
+function matchPreds(preds, gts, thr){
+  // preds: [{id, img, cls, conf, box}] 신뢰도 내림차순 가정, gts: [{id, img, cls, box}]
+  const used = new Map(); // gt id -> pred id
+  return preds.map(p => {
+    let best = -1, bi = null;
+    gts.forEach(g => { if (g.img !== p.img || g.cls !== p.cls) return; const v = iou(p.box, g.box); if (v > best){ best = v; bi = g; } });
+    if (best < 0) best = 0;
+    let tp = false, why;
+    if (!bi || best === 0) why = "bg";
+    else if (best < thr - 1e-9) why = "low";
+    else if (used.has(bi.id)) why = "dup";
+    else { tp = true; used.set(bi.id, p.id); why = "tp"; }
+    return { p, best, g: bi, tp, why, dupOf: why === "dup" ? used.get(bi.id) : null };
+  });
+}
+
+/* ================================================================
+   2. TP · FP · FN 매칭
+   ================================================================ */
+const MATCH = (function(){
+  function build(k){
+    if (k === 0){
+      const sc = spineScene(256, 256, 11, { zoom: 1.5, y0: -30 }), B = sc.bodies;
+      const c1 = [(B[2].box[0] + B[2].box[2]) / 2 - 8, (B[2].box[1] + B[2].box[3]) / 2], c2 = [(B[4].box[0] + B[4].box[2]) / 2 + 8, (B[4].box[1] + B[4].box[3]) / 2 + 1];
+      const L = [[c1, 19, 15], [c2, 16, 13]].map(([c, rx, ry]) => [Math.round(c[0] - rx), Math.round(c[1] - ry), Math.round(c[0] + rx), Math.round(c[1] + ry)]);
+      sc.lesions = L.map(b => ({ box: b }));
+      const gts = L.map((b, i) => ({ id: "GT" + (i + 1), img: 0, cls: 1, box: b }));
+      const r = mulberry32(501);
+      const spec = [["P1", 0.91, 0, 0.74], ["P2", 0.78, 0, 0.58], ["P3", 0.55, 1, 0.35]];
+      const preds = spec.map(([id, conf, gi, t]) => ({ id, img: 0, cls: 1, conf, box: boxNear(L[gi], t, r, 256, 256, 1) }));
+      return { sc, img: renderMRI(sc), gts, preds };
+    }
+    const sc = spineScene(256, 256, 17, { zoom: 1.4, y0: -40 }), B = sc.bodies;
+    const cen = (i, dx, dy) => [(B[i].box[0] + B[i].box[2]) / 2 + dx, (B[i].box[1] + B[i].box[3]) / 2 + dy];
+    const L = [[cen(2, -8, 0), 17, 12], [cen(3, 9, 1), 14, 11], [cen(4, -6, 0), 12, 10], [cen(5, 8, 0), 17, 12]]
+      .map(([c, rx, ry]) => [Math.round(c[0] - rx), Math.round(c[1] - ry), Math.round(c[0] + rx), Math.round(c[1] + ry)]);
+    sc.lesions = L.map((b, i) => ({ box: b, dark: i === 2 }));
+    const gts = L.map((b, i) => ({ id: "GT" + (i + 1), img: 0, cls: 1, box: b }));
+    const r = mulberry32(777);
+    const spec = [["P1", 0.95, 0, 0.81], ["P2", 0.88, 1, 0.67], ["P3", 0.80, 0, 0.55], ["P4", 0.72, -1, 0], ["P5", 0.64, 2, 0.47], ["P6", 0.41, 3, 0.62], ["P7", 0.18, -1, 0]];
+    const bgBox = [[150, 30, 176, 52], [24, 150, 52, 172]];
+    let bi = 0;
+    const preds = spec.map(([id, conf, gi, t]) => ({ id, img: 0, cls: 1, conf, box: gi < 0 ? bgBox[bi++] : boxNear(L[gi], t, r, 256, 256, 1) }));
+    return { sc, img: renderMRI(sc), gts, preds };
+  }
+  const scenes = [build(0), build(1)];
+  const cv = $("#mCanvas");
+  const S = { k: 0, thr: 0.5, conf: 0.25, res: null, elig: [], excl: [] };
+  const player = makePlayer($("#mPlayer"), { max: () => S.elig.length + 1, render: () => render() });
+
+  function compute(){
+    const sc = scenes[S.k];
+    const sorted = sc.preds.slice().sort((a, b) => b.conf - a.conf);
+    S.elig = sorted.filter(p => p.conf >= S.conf - 1e-9);
+    S.excl = sorted.filter(p => p.conf < S.conf - 1e-9);
+    S.res = matchPreds(S.elig, sc.gts, S.thr);
+  }
+  function reason(r){
+    const t = f2(S.thr);
+    if (r.why === "tp") return "가장 큰 IoU " + f2(r.best) + " (" + r.g.id + ") ≥ " + t + ", " + r.g.id + " 아직 짝 없음 → TP";
+    if (r.why === "dup") return r.g.id + "와 IoU " + f2(r.best) + " ≥ " + t + " 이지만 " + r.g.id + "는 이미 " + r.dupOf + "와 짝 → 중복 예측 FP";
+    if (r.why === "low") return "가장 큰 IoU " + f2(r.best) + " (" + r.g.id + ") < " + t + " → 위치 부정확 FP";
+    return "겹치는 정답 없음 (IoU 0) → 오탐 FP";
+  }
+  function render(){
+    const sc = scenes[S.k], n = S.elig.length, st = player.step, done = st >= n + 1, k = Math.min(st, n);
+    // 캔버스
+    const P = prep(cv);
+    if (P){
+      const { ctx, w } = P, s = w / 256;
+      drawImage(ctx, sc.img, w, w);
+      const matched = new Set(S.res.slice(0, k).filter(r => r.tp).map(r => r.g.id)), placed = [];
+      sc.gts.forEach(g => {
+        const fn = done && !matched.has(g.id);
+        drawBox(ctx, g.box, s, fn ? cssv("--img-fn") : cssv("--img-gt"), { lw: 2, dash: fn ? [5, 4] : null, label: g.id + (fn ? " FN" : ""), below: true, halo: true, placed });
+      });
+      S.excl.forEach(p => drawBox(ctx, p.box, s, cssv("--img-fn"), { lw: 1.5, dash: [3, 4], alpha: 0.55, label: p.id + " " + f2(p.conf) + " 제외" }));
+      S.res.forEach((r, i) => {
+        const p = r.p, cur = i === k - 1 && !done;
+        if (i >= k) drawBox(ctx, p.box, s, cssv("--img-pred"), { lw: 2, dash: [6, 4], label: p.id + " " + f2(p.conf), alpha: 0.9, placed });
+        else drawBox(ctx, p.box, s, r.tp ? cssv("--img-tp") : cssv("--img-fp"), { lw: cur ? 4 : 2.5, label: p.id + " " + (r.tp ? "TP" : "FP"), halo: cur, placed });
+        if (cur && r.g && r.best > 0){
+          const a = r.p.box, b = r.g.box, ax = (a[0] + a[2]) / 2 * s, ay = (a[1] + a[3]) / 2 * s, bx = (b[0] + b[2]) / 2 * s, by = (b[1] + b[3]) / 2 * s;
+          ctx.save(); ctx.strokeStyle = "#FFFFFF"; ctx.setLineDash([3, 3]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+          const t = "IoU " + f2(r.best); ctx.font = "600 12px " + cssv("--mono"); const tw = ctx.measureText(t).width + 8;
+          const mx = clamp((ax + bx) / 2 + 26, 0, w - tw), my = (ay + by) / 2 - 8;
+          ctx.fillStyle = "rgba(0,0,0,.75)"; ctx.fillRect(mx, my, tw, 17); ctx.fillStyle = "#FFFFFF"; ctx.textBaseline = "middle"; ctx.fillText(t, mx + 4, my + 9); ctx.restore();
+        }
+      });
+    }
+    // 표
+    let html = '<tr><th>순서</th><th>예측</th><th>신뢰도</th><th>가장 큰 IoU</th><th>판정</th><th>이유</th></tr>';
+    S.res.forEach((r, i) => {
+      const shown = i < k, cur = i === k - 1 && !done;
+      html += '<tr class="' + (cur ? "dm-cur" : shown ? "" : "dm-dim") + '"><td class="n">' + (i + 1) + '</td><td><b>' + r.p.id + '</b></td><td class="n">' + f2(r.p.conf) + '</td>' +
+        '<td class="n">' + (shown ? f2(r.best) + (r.g && r.best > 0 ? " (" + r.g.id + ")" : "") : "·") + '</td>' +
+        '<td>' + (shown ? '<span class="dm-tag ' + (r.tp ? "tp" : "fp") + '">' + (r.tp ? "TP" : "FP") + '</span>' : '<span class="dm-tag wait">대기</span>') + '</td>' +
+        '<td class="wrap">' + (shown ? reason(r) : "") + '</td></tr>';
+    });
+    S.excl.forEach(p => { html += '<tr class="dm-dim"><td class="n">–</td><td><b>' + p.id + '</b></td><td class="n">' + f2(p.conf) + '</td><td class="n">–</td><td><span class="dm-tag low">제외</span></td><td class="wrap">신뢰도 ' + f2(p.conf) + ' < ' + f2(S.conf) + ' → 평가 전에 버림</td></tr>'; });
+    if (done){
+      const matched = new Set(S.res.filter(r => r.tp).map(r => r.g.id));
+      sc.gts.filter(g => !matched.has(g.id)).forEach(g => { html += '<tr><td class="n">–</td><td><b>' + g.id + '</b></td><td class="n">–</td><td class="n">–</td><td><span class="dm-tag fn">FN</span></td><td class="wrap">어떤 예측과도 짝이 안 된 정답 → 놓침(FN)</td></tr>'; });
+    }
+    $("#mTable").innerHTML = html;
+    // 상태 문장
+    const tp = S.res.slice(0, k).filter(r => r.tp).length, fp = k - tp, nG = sc.gts.length;
+    let msg;
+    if (st === 0) msg = "<b>준비</b>: 신뢰도 " + f2(S.conf) + " 이상 예측 " + n + "개를 신뢰도 내림차순으로 정렬했습니다" + (S.excl.length ? " (" + S.excl.length + "개는 신뢰도 미달로 제외)" : "") + ". [다음]을 누르세요.";
+    else if (!done){ const r = S.res[k - 1]; msg = "<b>" + k + "/" + n + " 단계 — " + r.p.id + "</b>: " + reason(r); }
+    else msg = "<b>마무리</b>: 짝이 없는 정답 " + (nG - tp) + "개는 FN. 최종 TP " + tp + ", FP " + fp + ", FN " + (nG - tp) + ".";
+    $("#mStatus").innerHTML = msg;
+    const fn = done ? nG - tp : null;
+    $("#mStats").innerHTML = [["TP", tp, "dm-c-tp"], ["FP", fp, "dm-c-fp"], ["FN", done ? fn : "?", "dm-c-fn"], ["정답 수", nG, ""]]
+      .map(([a, b, c]) => '<div class="sk-stat"><b class="' + c + '">' + b + '</b><span>' + a + '</span></div>').join("");
+    if (done){
+      const Pv = tp + fp ? tp / (tp + fp) : 0, Rv = tp / nG, F = Pv + Rv ? 2 * Pv * Rv / (Pv + Rv) : 0;
+      $("#mFormula").innerHTML = 'Precision = TP / (TP + FP) = ' + tp + ' / (' + tp + ' + ' + fp + ') = <b>' + f2(Pv) + '</b><br>' +
+        'Recall = TP / (TP + FN) = ' + tp + ' / (' + tp + ' + ' + fn + ') = <b>' + f2(Rv) + '</b><br>' +
+        'F1 = 2 × P × R / (P + R) = 2 × ' + f2(Pv) + ' × ' + f2(Rv) + ' / (' + f2(Pv) + ' + ' + f2(Rv) + ') = <b>' + f2(F) + '</b>';
+    } else $("#mFormula").innerHTML = 'Precision = TP / (TP + FP) , Recall = TP / (TP + FN) , F1 = 2PR / (P + R)<br><span style="color:var(--muted)">모든 예측을 판정하고 FN이 확정되면 값이 계산됩니다.</span>';
+  }
+  function reset(){ player.stop(); compute(); player.go(0); }
+  $("#mScene").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.k = +b.dataset.v; segSet($("#mScene"), b.dataset.v); reset(); });
+  $("#mIou").addEventListener("input", e => { S.thr = +e.target.value; $("#mIouV").textContent = f2(S.thr); const st = player.step; compute(); player.go(Math.min(st, S.elig.length + 1)); });
+  $("#mConf").addEventListener("input", e => { S.conf = +e.target.value; $("#mConfV").textContent = f2(S.conf); compute(); player.go(Math.min(player.step, S.elig.length + 1)); });
+  return { init(){ compute(); player.go(0); }, draw: render, player, S, scenes };
+})();
+
+/* ================================================================
+   3. NMS
+   ================================================================ */
+const NMS = (function(){
+  const sc = spineScene(256, 256, 23, { zoom: 1.5, y0: -60 }), B = sc.bodies;
+  const V3 = B[3].box, V4 = B[4].box;
+  const lcy = (V4[1] + V4[3]) / 2, vw4 = V4[2] - V4[0];
+  const LA = [V4[0] + Math.round(vw4 * 0.15), Math.round(lcy - 12), V4[0] + Math.round(vw4 * 0.49), Math.round(lcy + 11)];
+  const LB = [V4[0] + Math.round(vw4 * 0.38), Math.round(lcy - 10), V4[0] + Math.round(vw4 * 0.72), Math.round(lcy + 13)];
+  sc.lesions = [{ box: LA }, { box: LB }];
+  const img = renderMRI(sc);
+  const objs = [{ name: "척추뼈 L3", cls: 0, box: V3 }, { name: "척추뼈 L4", cls: 0, box: V4 }, { name: "병변 A", cls: 1, box: LA }, { name: "병변 B", cls: 1, box: LB }];
+  const r = mulberry32(2323);
+  const spec = [ // id, obj, conf, target IoU
+    ["a", 0, 0.93, 0.90], ["b", 0, 0.82, 0.75], ["c", 0, 0.64, 0.62], ["d", 0, 0.31, 0.56], ["e", 0, 0.14, 0.60],
+    ["f", 1, 0.89, 0.88], ["g", 1, 0.71, 0.70], ["h", 1, 0.22, 0.58],
+    ["j", 2, 0.77, 0.84], ["k", 2, 0.52, 0.66], ["l", 2, 0.19, 0.52],
+    ["m", 3, 0.68, 0.82], ["n", 3, 0.44, 0.64]
+  ];
+  const boxes = spec.map(([id, oi, conf, t]) => ({ id, cls: objs[oi].cls, obj: oi, conf, box: boxNear(objs[oi].box, t, r, 256, 256, 1) }));
+  // 아래로 밀린 척추뼈 박스 (L4와 IoU 약 0.4 → 기본 설정에서 살아남는 중복)
+  const vh4 = V4[3] - V4[1];
+  boxes.push({ id: "i", cls: 0, obj: 1, conf: 0.36, box: [V4[0] + 3, V4[1] + Math.round(vh4 * 0.42), V4[2] + 4, V4[3] + Math.round(vh4 * 0.48)] });
+  boxes.forEach(b => { b.label = b.id.toUpperCase(); });
+  const CLS = ["척추뼈", "병변"];
+
+  const cv = $("#nCanvas");
+  const S = { conf: 0.25, thr: 0.45, agn: false, steps: [] };
+  const player = makePlayer($("#nPlayer"), { max: () => S.steps.length - 1, render: () => render() });
+
+  function run(){
+    const st = {}; boxes.forEach(b => { st[b.id] = { s: "cand" }; });
+    const snap = (type, text, extra) => S.steps.push(Object.assign({ type, text, st: JSON.parse(JSON.stringify(st)) }, extra || {}));
+    S.steps = [];
+    snap("raw", "<b>원본 예측 " + boxes.length + "개</b>: 모형이 내놓은 박스를 그대로 그렸습니다. 같은 물체 주변에 박스가 여러 개 겹쳐 있습니다.");
+    const low = boxes.filter(b => b.conf < S.conf - 1e-9);
+    low.forEach(b => { st[b.id] = { s: "low" }; });
+    snap("filter", "<b>① 신뢰도 " + f2(S.conf) + " 미만 제거</b>: " + (low.length ? low.map(b => b.label + "(" + f2(b.conf) + ")").join(", ") + " → " + low.length + "개 제거" : "제거할 박스 없음") + ". 이 기준은 박스 하나의 점수만 봅니다.");
+    const cand = boxes.filter(b => b.conf >= S.conf - 1e-9).sort((a, b) => b.conf - a.conf);
+    cand.forEach((b, i) => { st[b.id].rank = i + 1; });
+    snap("sort", "<b>② 남은 " + cand.length + "개를 신뢰도 순 정렬</b>: " + cand.map(b => b.label).join(" > "));
+    const alive = cand.slice();
+    while (alive.length){
+      const top = alive.shift();
+      st[top.id].s = "keep";
+      snap("keep", "<b>③ 채택: " + top.label + "</b> (" + CLS[top.cls] + ", " + f2(top.conf) + ") — 남은 후보 중 신뢰도가 가장 높습니다.", { cur: top.id });
+      const cmp = [], sup = [];
+      alive.slice().forEach(b => {
+        if (!S.agn && b.cls !== top.cls) return;
+        const v = iou(top.box, b.box); cmp.push({ id: b.id, v, sup: v >= S.thr - 1e-9 });
+        if (v >= S.thr - 1e-9){ sup.push(b); st[b.id] = { s: "sup", by: top.id, v }; alive.splice(alive.indexOf(b), 1); }
+      });
+      const other = alive.filter(b => !S.agn && b.cls !== top.cls).length;
+      const txt = "<b>④ 억제</b>: " + top.label + "과 " + (S.agn ? "모든" : "같은 클래스(" + CLS[top.cls] + ")") + " 후보 비교 — " +
+        (cmp.length ? cmp.map(c => boxes.find(b => b.id === c.id).label + " IoU " + f2(c.v) + (c.sup ? " ≥ " : " < ") + f2(S.thr) + (c.sup ? " 억제" : " 유지")).join(", ") : "비교할 후보 없음") +
+        (other && !S.agn ? ". 다른 클래스 " + other + "개는 비교하지 않음" : "") + ".";
+      snap("sup", txt, { cur: top.id, cmp });
+    }
+    const kept = boxes.filter(b => st[b.id].s === "keep");
+    // 물체별 남은 박스
+    const per = objs.map((o, oi) => kept.filter(b => b.cls === o.cls && iou(b.box, o.box) >= 0.3).length);
+    const lost = objs.filter((o, oi) => per[oi] === 0).map(o => o.name), dup = objs.filter((o, oi) => per[oi] > 1).map(o => o.name);
+    snap("final", "<b>최종 " + kept.length + "개</b>: " + kept.map(b => b.label).join(", ") + ". " +
+      (lost.length ? '<span class="dm-c-fp">놓친 물체: ' + lost.join(", ") + '</span>. ' : "") +
+      (dup.length ? '<span class="dm-c-fp">박스가 여러 개 남은 물체: ' + dup.join(", ") + '</span> (중복 → FP). ' : "") +
+      (!lost.length && !dup.length ? "물체마다 박스가 정확히 하나씩 남았습니다." : ""), { per });
+  }
+  function stageIdx(t){ return { raw: 0, filter: 1, sort: 2, keep: 3, sup: 3, final: 4 }[t]; }
+  function render(){
+    const step = S.steps[player.step], st = step.st;
+    const P = prep(cv);
+    if (P){
+      const { ctx, w } = P, s = w / 256;
+      drawImage(ctx, img, w, w);
+      const col = c => c === 0 ? cssv("--img-pred2") : cssv("--img-pred");
+      const order = boxes.slice().sort((a, b) => a.conf - b.conf);
+      order.forEach(b => {
+        const x = st[b.id]; const isCur = step.cur === b.id;
+        if (x.s === "low") drawBox(ctx, b.box, s, cssv("--img-fn"), { lw: 1, dash: [2, 4], alpha: 0.45 });
+        else if (x.s === "sup") drawBox(ctx, b.box, s, col(b.cls), { lw: 1.5, dash: [4, 3], alpha: 0.3 });
+      });
+      order.forEach(b => {
+        const x = st[b.id]; const isCur = step.cur === b.id;
+        if (x.s === "cand") drawBox(ctx, b.box, s, col(b.cls), { lw: 1.5, alpha: step.type === "raw" || step.type === "filter" || step.type === "sort" ? 0.95 : 0.75 });
+      });
+      const placed = [];
+      order.slice().reverse().forEach(b => {
+        const x = st[b.id]; const isCur = step.cur === b.id;
+        if (x.s === "keep") drawBox(ctx, b.box, s, col(b.cls), { lw: isCur ? 4 : 3, halo: true });
+      });
+      order.slice().reverse().forEach(b => { if (st[b.id].s === "keep") drawBox(ctx, b.box, s, col(b.cls), { labelOnly: true, lw: 3, label: b.label + " " + f2(b.conf), placed, below: b.cls === 1 }); });
+      // 억제 단계: 비교 선과 IoU
+      if (step.type === "sup" && step.cmp){
+        const top = boxes.find(b => b.id === step.cur), tb = top.box, tx = (tb[0] + tb[2]) / 2 * s, ty = (tb[1] + tb[3]) / 2 * s;
+        step.cmp.forEach((c, i) => {
+          const b = boxes.find(q => q.id === c.id).box, bx = (b[0] + b[2]) / 2 * s, by = (b[1] + b[3]) / 2 * s;
+          drawBox(ctx, b, s, c.sup ? cssv("--img-fp") : cssv("--img-tp"), { lw: 2, dash: c.sup ? [4, 3] : null, alpha: c.sup ? 0.9 : 1 });
+          ctx.save(); ctx.strokeStyle = "#FFFFFF"; ctx.globalAlpha = 0.8; ctx.setLineDash([2, 3]); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(bx, by); ctx.stroke(); ctx.restore();
+          const t = boxes.find(q => q.id === c.id).label + " " + f2(c.v); ctx.font = "600 11px " + cssv("--mono");
+          const tw = ctx.measureText(t).width + 8, lx = clamp(b[2] * s + 4, 0, w - tw), ly = clamp(b[1] * s + i * 16, 0, w - 16);
+          ctx.fillStyle = c.sup ? cssv("--img-fp") : cssv("--img-tp"); ctx.fillRect(lx, ly, tw, 15); ctx.fillStyle = cssv("--img-ink"); ctx.textBaseline = "middle"; ctx.fillText(t, lx + 4, ly + 8);
+        });
+      }
+    }
+    // 단계 표시
+    const si = stageIdx(step.type);
+    $$("#nStepper li").forEach((li, i) => { li.className = i === si ? "on" : i < si ? "done" : ""; });
+    $("#nStatus").innerHTML = step.text;
+    // 표
+    let html = '<tr><th>박스</th><th>클래스</th><th>신뢰도</th><th>상태</th><th>이유</th></tr>';
+    boxes.slice().sort((a, b) => b.conf - a.conf).forEach(b => {
+      const x = st[b.id]; let tag, why = "";
+      if (x.s === "low"){ tag = '<span class="dm-tag low">저신뢰 제거</span>'; why = f2(b.conf) + " < " + f2(S.conf); }
+      else if (x.s === "sup"){ const by = boxes.find(q => q.id === x.by); tag = '<span class="dm-tag sup">억제</span>'; why = by.label + "과 IoU " + f2(x.v) + " ≥ " + f2(S.thr); }
+      else if (x.s === "keep"){ tag = '<span class="dm-tag keep">채택</span>'; why = step.type === "final" ? "최종 결과" : "남은 후보 중 최고 신뢰도"; }
+      else { tag = step.type === "raw" ? '<span class="dm-tag cand">원본</span>' : '<span class="dm-tag cand">후보' + (x.rank ? " #" + x.rank : "") + '</span>'; }
+      const cc = b.cls === 0 ? "dm-c-pred2" : "dm-c-pred";
+      html += '<tr class="' + (step.cur === b.id ? "dm-cur" : x.s === "low" || x.s === "sup" ? "dm-dim" : "") + '"><td><b class="' + cc + '">' + b.label + '</b></td><td>' + CLS[b.cls] + '</td><td class="n">' + f2(b.conf) + '</td><td>' + tag + '</td><td>' + why + '</td></tr>';
+    });
+    $("#nTable").innerHTML = html;
+    const fin = S.steps[S.steps.length - 1].st, nLow = boxes.filter(b => fin[b.id].s === "low").length, nSup = boxes.filter(b => fin[b.id].s === "sup").length;
+    $("#nSummary").textContent = "원본 " + boxes.length + " → 저신뢰 제거 " + nLow + " → 억제 " + nSup + " → 최종 " + (boxes.length - nLow - nSup) + "개";
+  }
+  function rerun(keepEnd){ const atEnd = player.step >= S.steps.length - 1; run(); player.go(keepEnd && atEnd ? S.steps.length - 1 : Math.min(player.step, S.steps.length - 1)); }
+  $("#nConf").addEventListener("input", e => { S.conf = +e.target.value; $("#nConfV").textContent = f2(S.conf); rerun(true); });
+  $("#nIou").addEventListener("input", e => { S.thr = +e.target.value; $("#nIouV").textContent = f2(S.thr); rerun(true); });
+  $("#nAgn").addEventListener("change", e => { S.agn = e.target.checked; rerun(true); });
+  return { init(){ run(); player.go(0); }, draw: render, player, S, boxes, objs, run };
+})();
+
+/* ================================================================
+   4·5. 데이터셋 (8장, 클래스 0=척추뼈, 1=병변) — 고정 seed
+   ================================================================ */
+const DATA = (function(){
+  const W = 256, NIMG = 8, rng = mulberry32(20260930);
+  const imgs = [], gts = [], preds = [];
+  const lesCount = [2, 1, 2, 2, 1, 2, 1, 2];
+  for (let k = 0; k < NIMG; k++){
+    const sc = spineScene(W, W, 1000 + k * 77);
+    const vb = sc.bodies.filter(b => b.gt);
+    vb.forEach((b, i) => gts.push({ id: "V" + (k + 1) + "-" + b.name, img: k, cls: 0, box: [b.box[0], clamp(b.box[1], 0, W), b.box[2], clamp(b.box[3], 0, W)] }));
+    const pick = [0, 1, 2, 3, 4].sort(() => rng() - 0.5).slice(0, lesCount[k]);
+    pick.forEach((vi, j) => {
+      const b = vb[vi].box, bw = b[2] - b[0], bh = b[3] - b[1];
+      const rx = 6 + rng() * 4.5, ry = Math.min(bh / 2 - 3, 5 + rng() * 3.5);
+      const cx = b[0] + rx + 3 + rng() * (bw - 2 * rx - 6), cy = b[1] + ry + 3 + rng() * Math.max(0, bh - 2 * ry - 6);
+      const box = [cx - rx, cy - ry, cx + rx, cy + ry].map(v => Math.round(v * 2) / 2);
+      sc.lesions.push({ box, dark: rng() < 0.3 });
+      gts.push({ id: "L" + (k + 1) + "-" + (j + 1), img: k, cls: 1, box });
+    });
+    imgs.push({ sc, img: null });
+  }
+  const lesG = gts.filter(g => g.cls === 1), vertG = gts.filter(g => g.cls === 0);
+  let pid = 0; const add = (img, cls, conf, box, kind) => preds.push({ id: "p" + (++pid), img, cls, conf, box, kind });
+
+  // --- 병변 예측: 신뢰도 순 사건 목록 (T=정답 검출, F=오탐) ---
+  const ev = "TTTFTTFTFFTFFTFFFTFFFTFFFFFTFFFTFFF";
+  const tpIoU = [0.88, 0.82, 0.79, 0.71, 0.90, 0.66, 0.77, 0.58, 0.85, 0.62, 0.73, 0.56];
+  const order = lesG.map((g, i) => i).sort(() => rng() - 0.5); // 앞 12개 검출, 마지막 1개 끝내 못 찾음
+  let tpi = 0; const found = [];
+  for (let i = 0; i < ev.length; i++){
+    const conf = Math.round((0.965 - i * 0.027) * 1000) / 1000;
+    if (ev[i] === "T"){
+      const g = lesG[order[tpi]]; add(g.img, 1, conf, boxNear(g.box, tpIoU[tpi], rng, W, W, 0.5), "tp"); found.push(g); tpi++;
+    } else {
+      const u = rng();
+      if (u < 0.25 && found.length){ const g = found[Math.floor(rng() * found.length)]; add(g.img, 1, conf, boxNear(g.box, 0.52 + rng() * 0.15, rng, W, W, 0.5), "dup"); }
+      else if (u < 0.45){ const g = lesG[Math.floor(rng() * lesG.length)]; add(g.img, 1, conf, boxNear(g.box, 0.22 + rng() * 0.2, rng, W, W, 0.5), "loc"); }
+      else {
+        const k = Math.floor(rng() * NIMG), sc = imgs[k].sc; let box;
+        for (let t = 0; t < 200; t++){
+          const cy = 20 + rng() * (W - 40), cx = sc.spineX(cy) + (rng() * 2 - 1) * sc.vw * 1.1, rx = 6 + rng() * 5, ry = 5 + rng() * 4;
+          box = [cx - rx, cy - ry, cx + rx, cy + ry].map(v => Math.round(v * 2) / 2);
+          if (lesG.every(g => g.img !== k || iou(g.box, box) < 0.02)) break;
+        }
+        add(k, 1, conf, box, "bg");
+      }
+    }
+  }
+  // --- 척추뼈 예측 ---
+  const miss = new Set([7, 29]);
+  vertG.forEach((g, i) => {
+    if (miss.has(i)) return;
+    const t = 0.55 + 0.42 * Math.pow(rng(), 0.8);
+    const conf = clamp(0.35 + 0.6 * (t - 0.55) / 0.42 + (rng() - 0.5) * 0.35, 0.22, 0.99);
+    add(g.img, 0, Math.round(conf * 1000) / 1000, boxNear(g.box, t, rng, W, W, 0.5), "tp");
+  });
+  [1, 3, 4, 6].forEach(k => { const s1 = imgs[k].sc.bodies[6].box; add(k, 0, Math.round((0.45 + rng() * 0.3) * 1000) / 1000, [s1[0] + 1, s1[1] + 1, s1[2] - 1, Math.min(W, s1[3])], "s1"); });
+  [3, 18, 33].forEach(i => { const g = vertG[i]; add(g.img, 0, Math.round((0.25 + rng() * 0.25) * 1000) / 1000, boxNear(g.box, 0.52 + rng() * 0.12, rng, W, W, 0.5), "dup"); });
+  [12, 24].forEach(i => { const g = vertG[i]; add(g.img, 0, Math.round((0.3 + rng() * 0.25) * 1000) / 1000, boxNear(g.box, 0.33 + rng() * 0.1, rng, W, W, 0.5), "loc"); });
+  // 신뢰도 겹침 방지
+  const seen = new Set(); preds.forEach(p => { while (seen.has(p.cls + ":" + p.conf)) p.conf = Math.round((p.conf - 0.001) * 1000) / 1000; seen.add(p.cls + ":" + p.conf); });
+  imgs.forEach(o => { o.img = renderMRI(o.sc); });
+
+  const THRS = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95];
+  function evalCls(cls, thr){
+    const P = preds.filter(p => p.cls === cls).sort((a, b) => b.conf - a.conf);
+    const G = gts.filter(g => g.cls === cls);
+    const res = matchPreds(P, G, thr);
+    let ctp = 0, cfp = 0;
+    res.forEach(r => { if (r.tp) ctp++; else cfp++; r.ctp = ctp; r.cfp = cfp; r.prec = ctp / (ctp + cfp); r.rec = ctp / G.length; });
+    return { rows: res, nG: G.length, nImg: NIMG };
+  }
+  function pInterp(rows, r){ let m = 0; rows.forEach(x => { if (x.rec >= r - 1e-12 && x.prec > m) m = x.prec; }); return m; }
+  function ap(E, method){
+    const rows = E.rows;
+    if (method === "all"){
+      const mrec = [0].concat(rows.map(x => x.rec), [1]), mpre = [0].concat(rows.map(x => x.prec), [0]);
+      for (let i = mpre.length - 2; i >= 0; i--) mpre[i] = Math.max(mpre[i], mpre[i + 1]);
+      let s = 0; const terms = [];
+      for (let i = 0; i < mrec.length - 1; i++) if (mrec[i + 1] !== mrec[i]){ s += (mrec[i + 1] - mrec[i]) * mpre[i + 1]; if (mpre[i + 1] > 0) terms.push([mrec[i + 1] - mrec[i], mpre[i + 1], mrec[i], mrec[i + 1]]); }
+      return { ap: s, terms, mrec, mpre };
+    }
+    const n = method === "101" ? 101 : 11, d = n - 1, samples = [];
+    for (let j = 0; j < n; j++){ const r = j / d; samples.push([r, pInterp(rows, r)]); }
+    return { ap: samples.reduce((a, b) => a + b[1], 0) / n, samples };
+  }
+  function apMulti(cls, method){ return THRS.map(t => ap(evalCls(cls, t), method).ap); }
+  return { W, NIMG, imgs, gts, preds, evalCls, ap, apMulti, THRS, pInterp };
+})();
+
+/* ================================================================
+   4. PR 곡선 · AP · mAP
+   ================================================================ */
+const AP = (function(){
+  const S = { cls: 1, thr: 0.5, method: "all", cut: 1, E: null, A: null };
+  const CLS = ["척추뼈", "병변"];
+  const cv = $("#prCanvas"), cut = $("#apCut");
+  const thumbs = $("#apThumbs");
+  DATA.imgs.forEach((o, k) => { const f = document.createElement("figure"); f.innerHTML = '<canvas class="dm-img" aria-label="모사 영상 ' + (k + 1) + '"></canvas><figcaption>영상 ' + (k + 1) + '</figcaption>'; thumbs.appendChild(f); });
+  const tcv = $$("canvas", thumbs);
+
+  function compute(resetCut){
+    S.E = DATA.evalCls(S.cls, S.thr); S.A = DATA.ap(S.E, S.method);
+    const n = S.E.rows.length; cut.max = n;
+    if (resetCut){ let c = 0; S.E.rows.forEach((r, i) => { if (r.p.conf >= 0.5) c = i + 1; }); S.cut = Math.max(1, c); }
+    S.cut = clamp(S.cut, 1, n); cut.value = S.cut;
+  }
+  function drawPR(){
+    const P = prep(cv); if (!P) return;
+    const { ctx, w, h } = P, L = 58, R = 14, T = 14, Bm = 40, pw = w - L - R, ph = h - T - Bm;
+    const X = r => L + r * pw, Y = p => T + (1 - p) * ph;
+    const ink = cssv("--ink"), mut = cssv("--muted"), line = cssv("--line"), acc = cssv("--sk-accent"), faint = cssv("--faint"), mono = cssv("--mono");
+    ctx.font = "12px " + mono; ctx.fillStyle = mut; ctx.strokeStyle = line; ctx.lineWidth = 1;
+    for (let i = 0; i <= 5; i++){
+      const v = i / 5; ctx.beginPath(); ctx.moveTo(X(0), Y(v)); ctx.lineTo(X(1), Y(v)); ctx.stroke(); ctx.beginPath(); ctx.moveTo(X(v), Y(0)); ctx.lineTo(X(v), Y(1)); ctx.stroke();
+      ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(v.toFixed(1), L - 6, Y(v));
+      ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(v.toFixed(1), X(v), Y(0) + 5);
+    }
+    ctx.fillStyle = mut; ctx.font = "600 12px " + (cssv("--sans") || "sans-serif"); ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    ctx.fillText("재현율 (Recall)", L + pw / 2, h - 2);
+    ctx.save(); ctx.translate(11, T + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "middle"; ctx.fillText("정밀도 (Precision)", 0, 0); ctx.restore();
+    const rows = S.E.rows, A = S.A;
+    // 면적
+    ctx.save(); ctx.globalAlpha = 0.18; ctx.fillStyle = acc;
+    const env = DATA.ap(S.E, "all");
+    ctx.beginPath(); ctx.moveTo(X(0), Y(0));
+    for (let i = 0; i < env.mrec.length - 1; i++){ ctx.lineTo(X(env.mrec[i]), Y(env.mpre[i + 1])); ctx.lineTo(X(env.mrec[i + 1]), Y(env.mpre[i + 1])); }
+    ctx.lineTo(X(1), Y(0)); ctx.closePath();
+    if (S.method === "all") ctx.fill();
+    ctx.restore();
+    if (S.method !== "all"){
+      ctx.save(); const n = A.samples.length, bw = pw / n;
+      A.samples.forEach(([r, p]) => { ctx.globalAlpha = 0.2; ctx.fillStyle = acc; ctx.fillRect(X(r) - bw / 2, Y(p), bw, Y(0) - Y(p)); });
+      ctx.globalAlpha = 1; ctx.fillStyle = acc;
+      if (n <= 11) A.samples.forEach(([r, p]) => { ctx.beginPath(); ctx.arc(X(r), Y(p), 3.5, 0, 7); ctx.fill(); ctx.strokeStyle = acc; ctx.beginPath(); ctx.moveTo(X(r), Y(0)); ctx.lineTo(X(r), Y(p)); ctx.stroke(); });
+      ctx.restore();
+    }
+    // 원래 PR
+    ctx.save(); ctx.strokeStyle = faint; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X(0), Y(rows.length ? rows[0].prec : 1));
+    rows.forEach(r => ctx.lineTo(X(r.rec), Y(r.prec))); ctx.stroke();
+    ctx.fillStyle = faint; rows.forEach(r => { ctx.beginPath(); ctx.arc(X(r.rec), Y(r.prec), 2, 0, 7); ctx.fill(); });
+    ctx.restore();
+    // 포락선
+    ctx.save(); ctx.strokeStyle = acc; ctx.lineWidth = 2.5; ctx.beginPath();
+    let started = false;
+    for (let i = 0; i < env.mrec.length - 1; i++){
+      if (env.mpre[i + 1] === 0 && env.mrec[i + 1] === 1 && i === env.mrec.length - 2) break;
+      const a = [X(env.mrec[i]), Y(env.mpre[i + 1])], b = [X(env.mrec[i + 1]), Y(env.mpre[i + 1])];
+      if (!started){ ctx.moveTo(a[0], a[1]); started = true; } else ctx.lineTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
+    }
+    ctx.stroke(); ctx.restore();
+    // 현재 지점
+    const c = rows[S.cut - 1];
+    if (c){
+      const x = X(c.rec), y = Y(c.prec);
+      ctx.save(); ctx.strokeStyle = ink; ctx.setLineDash([3, 3]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, Y(0)); ctx.lineTo(x, y); ctx.lineTo(X(0), y); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = c.tp ? cssv("--tp") : cssv("--fp"); ctx.strokeStyle = cssv("--surface"); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 6.5, 0, 7); ctx.fill(); ctx.stroke();
+      const t = "P " + f2(c.prec) + ", R " + f2(c.rec); ctx.font = "600 12px " + mono; const tw = ctx.measureText(t).width + 10;
+      const lx = clamp(x + 10, L, w - R - tw), ly = clamp(y - 26, T, T + ph - 20);
+      ctx.fillStyle = cssv("--surface"); ctx.globalAlpha = 0.92; ctx.fillRect(lx, ly, tw, 20); ctx.globalAlpha = 1; ctx.strokeStyle = line; ctx.strokeRect(lx, ly, tw, 20);
+      ctx.fillStyle = ink; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(t, lx + 5, ly + 10.5);
+      ctx.restore();
+    }
+  }
+  function drawThumbs(){
+    const rows = S.E.rows, pos = rows.slice(0, S.cut), cur = rows[S.cut - 1];
+    const found = new Set(pos.filter(r => r.tp).map(r => r.g.id));
+    tcv.forEach((c, k) => {
+      const P = prep(c); if (!P) return;
+      const { ctx, w } = P, s = w / DATA.W;
+      drawImage(ctx, DATA.imgs[k].img, w, w);
+      DATA.gts.filter(g => g.img === k && g.cls === S.cls).forEach(g => {
+        const f = found.has(g.id); drawBox(ctx, g.box, s, f ? cssv("--img-gt") : cssv("--img-fn"), { lw: 1.2, dash: f ? null : [3, 2] });
+      });
+      pos.filter(r => r.p.img === k).forEach(r => drawBox(ctx, r.p.box, s, r.tp ? cssv("--img-tp") : cssv("--img-fp"), { lw: r === cur ? 3 : 1.6, halo: r === cur }));
+    });
+  }
+  function table(){
+    const rows = S.E.rows;
+    const why = r => r.tp ? "" : r.why === "dup" ? "중복" : r.why === "low" ? "IoU 부족" : "오탐";
+    let h = '<thead><tr><th>순위</th><th>영상</th><th>신뢰도</th><th>IoU</th><th>판정</th><th>누적 TP</th><th>누적 FP</th><th>Precision</th><th>Recall</th></tr></thead><tbody>';
+    rows.forEach((r, i) => {
+      const cls = ["dm-click"]; if (i + 1 === S.cut) cls.push("dm-cur", "dm-cut"); else if (i >= S.cut) cls.push("dm-dim");
+      h += '<tr class="' + cls.join(" ") + '" data-i="' + (i + 1) + '" tabindex="0"><td class="n">' + (i + 1) + '</td><td class="n">' + (r.p.img + 1) + '</td><td class="n">' + f3(r.p.conf) + '</td><td class="n">' + f2(r.best) + '</td>' +
+        '<td><span class="dm-tag ' + (r.tp ? "tp" : "fp") + '">' + (r.tp ? "TP" : "FP") + '</span> <span class="sk-hint">' + why(r) + '</span></td><td class="n">' + r.ctp + '</td><td class="n">' + r.cfp + '</td><td class="n">' + f3(r.prec) + '</td><td class="n">' + f3(r.rec) + '</td></tr>';
+    });
+    $("#apTable").innerHTML = h + "</tbody>";
+  }
+  function scrollToCut(){
+    const box = $("#apTableBox"), tr = $('#apTable tr[data-i="' + S.cut + '"]'); if (!tr || !box.clientHeight) return;
+    const top = tr.offsetTop, hh = tr.offsetHeight;
+    if (top < box.scrollTop + 32 || top + hh > box.scrollTop + box.clientHeight) box.scrollTop = top - box.clientHeight / 2;
+  }
+  function stats(){
+    const rows = S.E.rows, c = rows[S.cut - 1], nG = S.E.nG, first = rows[0], last = rows[rows.length - 1];
+    $("#apCutV").textContent = S.cut;
+    $("#apStats").innerHTML = [["AP (IoU " + f2(S.thr) + ")", f3(S.A.ap)], ["Precision", f3(c.prec)], ["Recall", f3(c.rec)], ["신뢰도 ≥", f3(c.p.conf)]]
+      .map(([a, b]) => '<div class="sk-stat"><b>' + b + '</b><span>' + a + '</span></div>').join("");
+    $("#apCutText").innerHTML = "신뢰도 " + f3(c.p.conf) + " 이상 " + S.cut + "개를 양성으로 보면 TP " + c.ctp + ", FP " + c.cfp + ", FN " + (nG - c.ctp) + " → Precision " + f2(c.prec) + ", Recall " + f2(c.rec) + ".<br>" +
+      '<span class="sk-hint">극단 비교 — 확실한 1개만: P ' + f2(first.prec) + ' · R ' + f2(first.rec) + ' (정밀도↑ 재현율↓) / 전부 ' + rows.length + '개: P ' + f2(last.prec) + ' · R ' + f2(last.rec) + ' (재현율↑ 정밀도↓)</span>';
+    $("#apInfo").textContent = CLS[S.cls] + ": 정답 " + nG + "개, 예측 " + rows.length + "개 / 영상 " + DATA.NIMG + "장, 전체 예측 " + DATA.preds.length + "개";
+  }
+  function formula(){
+    const A = S.A;
+    let t;
+    if (S.method === "all"){
+      $("#apMethodHint").textContent = "모든 점 보간 (VOC 2010 이후 방식)";
+      const shown = A.terms.slice(0, 4).map(x => "(" + f3(x[3]) + "−" + f3(x[2]) + ")×" + f3(x[1])).join(" + ");
+      t = "AP = Σ (r<sub>k</sub> − r<sub>k−1</sub>) × p<sub>interp</sub>(r<sub>k</sub>) &nbsp; (재현율이 늘어나는 구간 " + A.terms.length + "개)<br>= " + shown + (A.terms.length > 4 ? " + …" : "") + "<br>= <b>" + f3(A.ap) + "</b>";
+    } else {
+      const n = A.samples.length;
+      $("#apMethodHint").textContent = n === 101 ? "COCO 101점: 재현율 0, 0.01, …, 1에서 보간 정밀도의 평균" : "VOC 2007 11점: 재현율 0, 0.1, …, 1에서 보간 정밀도의 평균";
+      const vals = n === 11 ? A.samples.map(x => f2(x[1])).join(" + ") : A.samples.slice(0, 6).map(x => f2(x[1])).join(" + ") + " + … + " + f2(A.samples[n - 1][1]);
+      const sum = A.samples.reduce((a, b) => a + b[1], 0);
+      t = "p<sub>interp</sub>(r) = max{ Precision : Recall ≥ r }<br>AP = (1/" + n + ") × (" + vals + ")<br>= " + f3(sum) + " / " + n + " = <b>" + f3(A.ap) + "</b>";
+    }
+    $("#apFormula").innerHTML = t;
+  }
+  function mapTable(){
+    const nm = { all: "모든 점", "101": "COCO 101점", "11": "VOC 11점" }[S.method];
+    const R = [0, 1].map(c => { const m = DATA.apMulti(c, S.method); const cur = DATA.ap(DATA.evalCls(c, S.thr), S.method).ap; return { c, ap50: m[0], ap75: m[5], m, ap5095: m.reduce((a, b) => a + b, 0) / m.length, cur }; });
+    const mean = k => (R[0][k] + R[1][k]) / 2;
+    let h = '<tr><th>클래스</th><th>AP50</th><th>AP75</th><th>AP50-95</th><th>AP@' + f2(S.thr) + '</th></tr>';
+    R.forEach(r => { h += '<tr' + (r.c === S.cls ? ' class="dm-cur"' : '') + '><td>' + CLS[r.c] + '</td><td class="n">' + f3(r.ap50) + '</td><td class="n">' + f3(r.ap75) + '</td><td class="n">' + f3(r.ap5095) + '</td><td class="n">' + f3(r.cur) + '</td></tr>'; });
+    h += '<tr><td><b>평균 = mAP</b></td><td class="n"><b>' + f3(mean("ap50")) + '</b></td><td class="n"><b>' + f3(mean("ap75")) + '</b></td><td class="n"><b>' + f3(mean("ap5095")) + '</b></td><td class="n"><b>' + f3(mean("cur")) + '</b></td></tr>';
+    $("#mapTable").innerHTML = h;
+    const r = R[S.cls];
+    $("#map5095").innerHTML = "mAP50 = (" + f3(R[0].ap50) + " + " + f3(R[1].ap50) + ") / 2 = <b>" + f3(mean("ap50")) + "</b><br>" +
+      CLS[S.cls] + " AP50-95 = (AP50 + AP55 + … + AP95) / 10<br>= (" + r.m.map(f2).join(" + ") + ") / 10 = <b>" + f3(r.ap5095) + "</b><br>" +
+      '<span style="color:var(--muted)">IoU 0.50:0.05:0.95 = 10개 기준. 보간: ' + nm + '</span>';
+    S.map = R;
+  }
+  function renderCut(){ table(); stats(); drawPR(); drawThumbs(); }
+  function all(resetCut){ compute(resetCut); table(); stats(); formula(); mapTable(); drawPR(); drawThumbs(); }
+  $("#apCls").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.cls = +b.dataset.v; segSet($("#apCls"), b.dataset.v); all(true); scrollToCut(); });
+  $("#apInterp").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.method = b.dataset.v; segSet($("#apInterp"), b.dataset.v); all(false); });
+  $("#apIou").addEventListener("input", e => { S.thr = +e.target.value; $("#apIouV").textContent = f2(S.thr); all(false); });
+  cut.addEventListener("input", () => { S.cut = +cut.value; renderCut(); scrollToCut(); });
+  $("#apOne").addEventListener("click", () => { S.cut = 1; cut.value = 1; renderCut(); scrollToCut(); });
+  $("#apAll").addEventListener("click", () => { S.cut = S.E.rows.length; cut.value = S.cut; renderCut(); scrollToCut(); });
+  const pick = e => { const tr = e.target.closest("tr[data-i]"); if (!tr) return; S.cut = +tr.dataset.i; cut.value = S.cut; renderCut(); const nt = $('#apTable tr[data-i="' + S.cut + '"]'); if (nt && e.type === "keydown") nt.focus(); };
+  $("#apTable").addEventListener("click", pick);
+  $("#apTable").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); pick(e); } });
+  return { init(){ all(true); }, draw(){ drawPR(); drawThumbs(); }, S, scrollToCut };
+})();
+
+/* ================================================================
+   5. FROC
+   ================================================================ */
+const FROC = (function(){
+  const S = { cls: 1, thr: 0.5, fp: 2 };
+  const CLS = ["척추뼈", "병변"], PTS = [0.125, 0.25, 0.5, 1, 2, 4, 8];
+  const cv = $("#frocCanvas"), sl = $("#frFp");
+  let curve = null;
+  function compute(){
+    const E = DATA.evalCls(S.cls, S.thr), n = E.nImg;
+    const pts = [{ fpi: 0, sens: 0, conf: null, k: 0 }];
+    E.rows.forEach((r, i) => pts.push({ fpi: r.cfp / n, sens: r.ctp / E.nG, conf: r.p.conf, k: i + 1, ctp: r.ctp, cfp: r.cfp }));
+    const xmax = Math.max(1, Math.ceil(pts[pts.length - 1].fpi));
+    curve = { E, pts, xmax, n };
+    sl.max = xmax; if (S.fp > xmax) S.fp = xmax; sl.value = S.fp;
+  }
+  function at(a){ let best = curve.pts[0]; curve.pts.forEach(p => { if (p.fpi <= a + 1e-9 && (p.sens > best.sens || (p.sens === best.sens && p.k < best.k))) best = p; }); return best; }
+  function draw(){
+    const P = prep(cv); if (!P || !curve) return;
+    const { ctx, w, h } = P, L = 62, R = 14, T = 14, Bm = 40, pw = w - L - R, ph = h - T - Bm, xm = curve.xmax;
+    const X = v => L + v / xm * pw, Y = p => T + (1 - p) * ph;
+    const ink = cssv("--ink"), mut = cssv("--muted"), line = cssv("--line"), acc = cssv("--sk-accent"), mono = cssv("--mono");
+    ctx.font = "12px " + mono; ctx.strokeStyle = line; ctx.fillStyle = mut; ctx.lineWidth = 1;
+    for (let i = 0; i <= 5; i++){ const v = i / 5; ctx.beginPath(); ctx.moveTo(X(0), Y(v)); ctx.lineTo(X(xm), Y(v)); ctx.stroke(); ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(Math.round(v * 100) + "%", L - 6, Y(v)); }
+    const stepX = xm <= 3 ? 0.5 : 1;
+    for (let v = 0; v <= xm + 1e-9; v += stepX){ ctx.beginPath(); ctx.moveTo(X(v), Y(0)); ctx.lineTo(X(v), Y(1)); ctx.stroke(); ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(nf(v), X(v), Y(0) + 5); }
+    ctx.fillStyle = mut; ctx.font = "600 12px " + cssv("--sans"); ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    ctx.fillText("영상 1장당 오탐 수 (FP/영상)", L + pw / 2, h - 2);
+    ctx.save(); ctx.translate(11, T + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "middle"; ctx.fillText("민감도 (Sensitivity)", 0, 0); ctx.restore();
+    // 계단 곡선
+    const pts = curve.pts;
+    ctx.save(); ctx.strokeStyle = acc; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(X(0), Y(0));
+    let prev = pts[0];
+    pts.slice(1).forEach(p => { ctx.lineTo(X(p.fpi), Y(prev.sens)); ctx.lineTo(X(p.fpi), Y(p.sens)); prev = p; });
+    ctx.lineTo(X(xm), Y(prev.sens)); ctx.stroke();
+    ctx.fillStyle = acc; pts.forEach(p => { ctx.beginPath(); ctx.arc(X(p.fpi), Y(p.sens), 2.2, 0, 7); ctx.fill(); });
+    ctx.restore();
+    // 허용선
+    const b = at(S.fp), x = X(S.fp), y = Y(b.sens);
+    ctx.save(); ctx.strokeStyle = cssv("--fp"); ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x, Y(0)); ctx.lineTo(x, Y(1)); ctx.stroke();
+    ctx.strokeStyle = ink; ctx.setLineDash([3, 3]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(0), y); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = ink; ctx.strokeStyle = cssv("--surface"); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X(b.fpi), y, 6.5, 0, 7); ctx.fill(); ctx.stroke();
+    const t = "FP " + nf(S.fp) + "개/장 → " + pct(b.sens); ctx.font = "600 12px " + mono; const tw = ctx.measureText(t).width + 10;
+    const lx = clamp(x + 8, L, w - R - tw), ly = clamp(y + 8, T, T + ph - 22);
+    ctx.fillStyle = cssv("--surface"); ctx.globalAlpha = 0.92; ctx.fillRect(lx, ly, tw, 20); ctx.globalAlpha = 1; ctx.strokeStyle = line; ctx.lineWidth = 1; ctx.strokeRect(lx, ly, tw, 20);
+    ctx.fillStyle = ink; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(t, lx + 5, ly + 10.5);
+    ctx.restore();
+  }
+  function text(){
+    const b = at(S.fp), E = curve.E, name = CLS[S.cls];
+    const found = b.k ? b.ctp : 0, fpc = b.k ? b.cfp : 0;
+    $("#frFpV").textContent = nf(S.fp);
+    $("#frSens").textContent = pct(b.sens);
+    $("#frSensSub").textContent = "민감도 (허용 FP " + nf(S.fp) + "개/영상, IoU " + f2(S.thr) + ")";
+    $("#frSentence").innerHTML = "<b>FP " + nf(S.fp) + "개 허용 시 민감도 " + pct(b.sens) + "</b> — 영상 1장당 오탐을 " + nf(S.fp) + "개까지 감수하면 " + name + " " + E.nG + "개 중 " + found + "개를 찾습니다" +
+      (b.conf != null ? " (신뢰도 ≥ " + f3(b.conf) + ")." : " (아무것도 양성으로 보지 않음).");
+    const a50 = DATA.ap(DATA.evalCls(S.cls, 0.5), "all").ap, a5095 = DATA.apMulti(S.cls, "all").reduce((x, y) => x + y, 0) / 10;
+    $("#frMapSentence").innerHTML = name + " <b>AP50 = " + f2(a50) + "</b>, AP50-95 = " + f2(a5095) + " — 모든 신뢰도 임계값에 걸친 정밀도·재현율 요약입니다. 모형끼리 비교하기엔 좋지만 '한 장에 오탐 몇 개를 봐야 하나'는 바로 읽히지 않습니다.";
+    $("#frFormula").innerHTML = "민감도 = 찾은 정답 / 전체 정답 = " + found + " / " + E.nG + " = <b>" + f3(b.sens) + "</b><br>FP/영상 = 누적 FP / 영상 수 = " + fpc + " / " + curve.n + " = <b>" + f3(fpc / curve.n) + "</b> ≤ " + nf(S.fp);
+    let h = '<tr><th>FP/영상</th>' + PTS.map(p => '<th>' + (p < 1 ? "1/" + Math.round(1 / p) : p) + '</th>').join("") + '<th>평균</th></tr><tr><td>민감도</td>';
+    const vals = PTS.map(p => at(p).sens);
+    h += vals.map(v => '<td class="n">' + pct(v) + '</td>').join("") + '<td class="n"><b>' + pct(vals.reduce((a, c) => a + c, 0) / vals.length) + '</b></td></tr>';
+    $("#frTable").innerHTML = h;
+    S.sens = b.sens; S.found = found;
+  }
+  function all(){ compute(); text(); draw(); }
+  $("#frCls").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.cls = +b.dataset.v; segSet($("#frCls"), b.dataset.v); all(); });
+  $("#frIou").addEventListener("input", e => { S.thr = +e.target.value; $("#frIouV").textContent = f2(S.thr); all(); });
+  sl.addEventListener("input", () => { S.fp = +sl.value; text(); draw(); });
+  return { init: all, draw, S, at: a => at(a) };
+})();
+
+/* ================================================================
+   탭 · 해시 · 키보드 · 테마 다시 그리기
+   ================================================================ */
+const PANES = { iou: IOU, match: MATCH, nms: NMS, ap: AP, froc: FROC };
+const tabs = $$(".sk-tab");
+let current = "iou";
+function selectTab(name, focus){
+  if (!PANES[name]) name = "iou";
+  current = name;
+  tabs.forEach(t => { const on = t.dataset.tab === name; t.setAttribute("aria-selected", String(on)); t.tabIndex = on ? 0 : -1; $("#pane-" + t.dataset.tab).hidden = !on; if (on && focus) t.focus(); });
+  MATCH.player.stop(); NMS.player.stop();
+  if (location.hash.slice(1) !== name) history.replaceState(null, "", "#" + name);
+  PANES[name].draw();
+  if (name === "ap") AP.scrollToCut();
+}
+tabs.forEach(t => {
+  t.addEventListener("click", () => selectTab(t.dataset.tab));
+  t.addEventListener("keydown", e => {
+    const i = tabs.indexOf(t);
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft"){ e.preventDefault(); e.stopPropagation(); const j = (i + (e.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length; selectTab(tabs[j].dataset.tab, true); }
+    else if (e.key === "Home"){ e.preventDefault(); selectTab(tabs[0].dataset.tab, true); }
+    else if (e.key === "End"){ e.preventDefault(); selectTab(tabs[tabs.length - 1].dataset.tab, true); }
+  });
+});
+window.addEventListener("hashchange", () => selectTab(location.hash.slice(1)));
+document.addEventListener("keydown", e => {
+  if (e.key !== "ArrowRight" || e.altKey || e.ctrlKey || e.metaKey) return;
+  const tg = e.target; if (tg && (/INPUT|TEXTAREA|SELECT/.test(tg.tagName) || tg.closest(".sk-tabs") || tg.tagName === "CANVAS")) return;
+  if (current === "match"){ e.preventDefault(); MATCH.player.stop(); MATCH.player.next(); }
+  else if (current === "nms"){ e.preventDefault(); NMS.player.stop(); NMS.player.next(); }
+});
+
+function redrawAll(){ PANES[current].draw(); }
+let raf = 0; const schedule = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(redrawAll); };
+new MutationObserver(schedule).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+if (window.matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener("change", schedule);
+if (window.ResizeObserver){ const ro = new ResizeObserver(schedule); $$("canvas").forEach(c => ro.observe(c)); }
+else window.addEventListener("resize", schedule);
+
+IOU.init(); MATCH.init(); NMS.init(); AP.init(); FROC.init();
+selectTab((location.hash || "").slice(1) || "iou");
+
+/* 검산용 (Playwright 등에서 확인) */
+window.__DM = { iou, IOU, MATCH, NMS, DATA, AP, FROC };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1261 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CNN 합성곱 · 풀링 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 입력 · 패딩 0 · 필터 · 출력 · 풀링, 값 색: 양수 · 음수 */
+:root{
+  --sk-accent: var(--cat-cv);
+  --c-in:#7048E8; --c-pad:#E03131; --c-flt:#2F9E44; --c-out:var(--cat-cv); --c-pool:#D6336C;
+  --pos:#F76707; --neg:#1C7ED6;
+  --q0:#1098AD; --q1:#7048E8; --q2:#0CA678; --q3:#F59F00;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --c-in:#9775FA; --c-pad:#FF8787; --c-flt:#69DB7C; --c-pool:#F783AC;
+  --pos:#FF922B; --neg:#4DABF7;
+  --q0:#3BC9DB; --q1:#9775FA; --q2:#38D9A9; --q3:#FFD43B;
+} }
+:root[data-theme="dark"]{
+  --c-in:#9775FA; --c-pad:#FF8787; --c-flt:#69DB7C; --c-pool:#F783AC;
+  --pos:#FF922B; --neg:#4DABF7;
+  --q0:#3BC9DB; --q1:#9775FA; --q2:#38D9A9; --q3:#FFD43B;
+}
+
+[role="tabpanel"]{display:flex; flex-direction:column; gap:16px; min-width:0}
+/* ---------- 행렬 격자 ---------- */
+.mx{--cs:40px; --g:3px; grid-template-columns:repeat(var(--n), var(--cs)); position:relative; gap:var(--g)}
+.mx .c{width:var(--cs); min-width:0; height:var(--cs); padding:0; font-size:13.5px; font-family:var(--mono); color:var(--ink)}
+.mx.sm{--cs:32px} .mx.sm .c{font-size:12.5px}
+.mx.xs{--cs:30px} .mx.xs .c{font-size:12px}
+.mx .c[data-s="p"]{background:color-mix(in srgb, var(--pos) calc(var(--t) * 1%), var(--surface-2))}
+.mx .c[data-s="n"]{background:color-mix(in srgb, var(--neg) calc(var(--t) * 1%), var(--surface-2))}
+.mx .c.pad{color:var(--c-pad); border:1.5px dashed color-mix(in srgb, var(--c-pad) 65%, transparent);
+  background:repeating-linear-gradient(45deg, color-mix(in srgb, var(--c-pad) 13%, var(--surface)) 0 4px, var(--surface) 4px 8px)}
+.mx .c.pad.flash{animation:padflash 1.1s ease 2}
+@keyframes padflash{50%{box-shadow:0 0 0 3px color-mix(in srgb, var(--c-pad) 45%, transparent)}}
+.mx .c.empty{color:transparent; background:var(--surface); border:1.5px dashed var(--line-strong)}
+.mx .c.cur{border:2px solid var(--c-out); box-shadow:0 0 0 3px color-mix(in srgb, var(--c-out) 30%, transparent)}
+.mx button.c{appearance:none; cursor:pointer; font-weight:600; line-height:1}
+.mx button.c:hover{border-color:var(--line-strong)}
+.mx button.c:focus-visible, .mx input.c:focus-visible{outline:2px solid var(--focus); outline-offset:1px}
+.mx input.c{appearance:textfield; -moz-appearance:textfield; text-align:center; font-weight:600; border:1.5px solid var(--line-strong); border-radius:6px; font-size:13.5px}
+.mx input.c::-webkit-outer-spin-button, .mx input.c::-webkit-inner-spin-button{-webkit-appearance:none; margin:0}
+.mx .c.q{box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--qc) 75%, transparent)}
+.mx .c.pick{background:var(--c-pool); color:var(--on-ink); font-weight:700}
+.mx .c.picked{text-decoration:underline 2px var(--c-pool); text-underline-offset:3px; font-weight:700}
+.mx .c.inw{font-weight:700}
+
+/* 미끄러지는 창 */
+.ov{position:absolute; left:0; top:0; pointer-events:none; --oc:var(--c-in);
+  width:calc(var(--k) * var(--cs) + (var(--k) - 1) * var(--g) + 8px); height:calc(var(--k) * var(--cs) + (var(--k) - 1) * var(--g) + 8px);
+  border:3px solid var(--oc); border-radius:10px; box-shadow:0 0 0 4px color-mix(in srgb, var(--oc) 18%, transparent);
+  transform:translate(calc(var(--x) * (var(--cs) + var(--g)) - 4px), calc(var(--y) * (var(--cs) + var(--g)) - 4px));
+  transition:transform .32s cubic-bezier(.3,.7,.3,1), opacity .2s}
+.ov[hidden]{display:block !important; opacity:0}
+
+/* 역할 틀 */
+.frame{display:inline-flex; flex-direction:column; gap:6px; align-items:flex-start}
+.frame .lb{font-size:12.5px; font-weight:700; color:var(--muted); display:flex; align-items:center; gap:6px; white-space:nowrap}
+.frame .lb::before{content:""; width:10px; height:10px; border-radius:3px; background:var(--rc)}
+.frame .box{padding:6px; border:2px solid var(--rc); border-radius:12px; background:var(--surface)}
+.frame.glow .box{box-shadow:0 0 0 4px color-mix(in srgb, var(--rc) 25%, transparent)}
+.r-in{--rc:var(--c-in)} .r-flt{--rc:var(--c-flt)} .r-out{--rc:var(--c-out)} .r-pool{--rc:var(--c-pool)} .r-pad{--rc:var(--c-pad)}
+.flow{display:flex; flex-wrap:wrap; align-items:center; gap:12px 14px}
+.op{font-size:22px; font-weight:700; color:var(--muted); font-family:var(--mono); line-height:1}
+.op small{display:block; font-size:11px; font-weight:600; color:var(--faint); font-family:var(--sans); text-align:center; margin-top:3px}
+.bigval{min-width:64px; height:48px; display:grid; place-items:center; padding:0 10px; border-radius:10px; font-family:var(--mono); font-size:20px; font-weight:700; border:2px solid var(--c-out); color:var(--ink)}
+.scale{font-family:var(--mono); font-size:13px; font-weight:700; color:var(--c-flt)}
+
+/* 칩 버튼 (여러 줄로 감기는 선택) */
+.chips{display:flex; flex-wrap:wrap; gap:6px}
+.chips button{appearance:none; font:inherit; font-size:13px; font-weight:600; border:1px solid var(--line-strong); background:var(--surface); color:var(--muted); padding:6px 11px; border-radius:999px; cursor:pointer; white-space:nowrap}
+.chips button:hover{color:var(--ink)}
+.chips button[aria-pressed="true"]{background:var(--ink); border-color:var(--ink); color:var(--on-ink)}
+.chips button:focus-visible{outline:2px solid var(--focus); outline-offset:2px}
+.row{display:flex; flex-direction:column; gap:6px}
+.row > .sk-label{margin:0}
+.sk-formula{white-space:normal; overflow-wrap:anywhere}
+.sk-formula .pt{color:var(--c-pad)}
+.sk-formula .hl{color:var(--c-out); font-weight:700}
+.sk-formula .dim{color:var(--muted)}
+.status{font-size:14px; margin:0; min-height:3em; color:var(--text)}
+.status b{color:var(--ink)}
+.play{display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center}
+.play .sk-slider{min-width:150px; flex:0 1 190px}
+details.ed{border:1px solid var(--line); border-radius:10px; padding:8px 12px; background:var(--surface-2)}
+details.ed summary{cursor:pointer; font-weight:700; font-size:14px}
+details.ed[open] summary{margin-bottom:10px}
+.ed-body{display:flex; flex-direction:column; gap:10px; align-items:flex-start}
+.ul{margin:0; padding-left:1.2em; font-size:14px; display:flex; flex-direction:column; gap:4px}
+.ul b{color:var(--ink)}
+.cv-visual{display:flex; flex-direction:column; gap:14px}
+.detail{border-top:1px dashed var(--line-strong); padding-top:14px; display:flex; flex-direction:column; gap:12px}
+.sk-legend i.pad{background:repeating-linear-gradient(45deg, var(--c-pad) 0 2px, transparent 2px 4px); border:1px dashed var(--c-pad)}
+
+/* 풀링 */
+.pool-flow{display:flex; flex-wrap:wrap; align-items:center; gap:12px 16px}
+.cmp{font-size:14.5px; margin:0}
+.cmp b{color:var(--ink)}
+
+/* 실제 이미지 */
+.im-side{grid-template-columns:300px minmax(0,1fr)}
+@media (max-width:900px){ .im-side{grid-template-columns:minmax(0,1fr)} }
+.orig{width:100%; max-width:280px; aspect-ratio:1; display:block; border-radius:10px; border:1px solid var(--line-strong); background:#000}
+.orig.drawing{touch-action:none; cursor:crosshair; border-color:var(--c-in); border-width:2px}
+.maps{display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px}
+@media (max-width:560px){ .maps{grid-template-columns:repeat(2, minmax(0,1fr))} }
+.map{display:flex; flex-direction:column; gap:4px; min-width:0}
+.map canvas{width:100%; aspect-ratio:1; display:block; border-radius:8px; border:1px solid var(--line); cursor:crosshair; touch-action:none}
+.map .t{font-size:12.5px; font-weight:700; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.map .t .sk-mono{font-weight:500; color:var(--faint)}
+.lvl{display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:4px 12px}
+.lvl h3 .sk-mono{color:var(--c-out)}
+.hover-info{font-size:13.5px; min-height:2.8em; margin:0; color:var(--text)}
+.lvl .dv{width:160px}
+.divbar{height:10px; border-radius:5px; background:linear-gradient(90deg, var(--neg), var(--surface) 50%, var(--pos)); border:1px solid var(--line); max-width:220px}
+.divlab{display:flex; justify-content:space-between; max-width:220px; font-size:11.5px; color:var(--faint)}
+
+/* 전체 구조 */
+.arch-svg{display:block; min-width:900px; width:100%; height:auto}
+.arch-svg text{fill:var(--ink); font-family:var(--sans)}
+.arch-svg .nm{font-size:14px; font-weight:700}
+.arch-svg .sh{font-size:13px; font-family:var(--mono); fill:var(--text)}
+.arch-svg .pm{font-size:12px; fill:var(--muted)}
+.arch-svg .opl{font-size:11.5px; fill:var(--muted); font-weight:600}
+.arch-svg .arr{stroke:var(--line-strong); stroke-width:2; fill:none}
+.arch-svg .arrh{fill:var(--line-strong)}
+.b-in  {--bc:var(--c-in)} .b-conv{--bc:var(--c-out)} .b-pool{--bc:var(--c-pool)} .b-flat{--bc:var(--muted)} .b-fc{--bc:var(--c-flt)} .b-out{--bc:var(--c-flt)}
+.arch-svg .f1{fill:color-mix(in srgb, var(--bc) 30%, var(--surface)); stroke:var(--bc); stroke-width:1.5}
+.arch-svg .f2{fill:color-mix(in srgb, var(--bc) 50%, var(--surface)); stroke:var(--bc); stroke-width:1.5}
+.arch-svg .f3{fill:color-mix(in srgb, var(--bc) 16%, var(--surface)); stroke:var(--bc); stroke-width:1.5}
+.arch-ctl{display:flex; flex-wrap:wrap; gap:12px 22px}
+.arch-ctl .row{min-width:0}
+.sk-table td.bad{color:var(--c-pad)}
+.sk-table tr.tot td{font-weight:700; border-top:2px solid var(--line-strong)}
+
+@media (max-width:520px){
+  .mx{--cs:34px} .mx .c{font-size:12.5px}
+  .mx.big{--cs:28px} .mx.big .c{font-size:11px}
+  .mx.sm{--cs:28px} .mx.sm .c{font-size:11.5px}
+  .mx.xs{--cs:26px} .mx.xs .c{font-size:11px}
+  .mx input.c{font-size:12.5px}
+  .op{font-size:18px}
+  .bigval{font-size:17px; min-width:54px; height:42px}
+}
+@media (prefers-reduced-motion: reduce){
+  .ov{transition:none}
+  .mx .c.pad.flash{animation:none}
+}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)" aria-current="page">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">CNN 합성곱 · 풀링 시뮬레이터</h1>
+      <p class="ds-hero__lede">3×3 필터가 입력 위를 한 칸씩 미끄러지며 곱하고 더하는 합성곱(Convolution), 창 안에서 최댓값·평균만 남기는 풀링(Pooling)을 숫자 하나하나까지 따라가 봅니다. 실제 이미지와 전체 CNN 구조에서도 확인합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button class="sk-tab" type="button" role="tab" id="tab-conv" aria-controls="pane-conv" aria-selected="true"><span class="sk-num">1</span>합성곱(Convolution)</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-pool" aria-controls="pane-pool" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>풀링(Pooling)</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-image" aria-controls="pane-image" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>실제 이미지에서</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-arch" aria-controls="pane-arch" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>전체 구조</button>
+  </nav>
+
+  <!-- ========== 1. 합성곱 ========== -->
+  <section id="pane-conv" role="tabpanel" aria-labelledby="tab-conv">
+    <div class="sk-side">
+      <div class="sk-card">
+        <div class="sk-head"><h2>설정</h2><span class="sk-hint">바꾸면 바로 다시 계산</span></div>
+        <div class="row"><span class="sk-label">입력 크기 N</span>
+          <div class="sk-seg" id="cvN"><button type="button" data-v="4" aria-pressed="true">4×4</button><button type="button" data-v="5" aria-pressed="false">5×5</button><button type="button" data-v="6" aria-pressed="false">6×6</button></div></div>
+        <div class="row"><span class="sk-label">제로 패딩 P</span>
+          <div class="sk-seg" id="cvP"><button type="button" data-v="0" aria-pressed="false">0 (없음)</button><button type="button" data-v="1" aria-pressed="true">1겹</button></div></div>
+        <div class="row"><span class="sk-label">보폭 stride S</span>
+          <div class="sk-seg" id="cvS"><button type="button" data-v="1" aria-pressed="true">1</button><button type="button" data-v="2" aria-pressed="false">2</button></div></div>
+        <div class="row"><span class="sk-label">필터 3×3 (F = 3)</span>
+          <div class="chips" id="cvF">
+            <button type="button" data-v="v" aria-pressed="true">세로 경계</button>
+            <button type="button" data-v="h" aria-pressed="false">가로 경계</button>
+            <button type="button" data-v="sh" aria-pressed="false">샤프닝</button>
+            <button type="button" data-v="bl" aria-pressed="false">평균 블러</button>
+            <button type="button" data-v="cu" aria-pressed="false">직접 편집</button>
+          </div></div>
+        <p class="sk-note" id="cvFdesc"></p>
+        <details class="ed" id="cvEd">
+          <summary>입력 값 편집</summary>
+          <div class="ed-body">
+            <div class="sk-mat mx sm" id="cvInEd" aria-label="입력 값 편집 격자"></div>
+            <span class="sk-hint">칸을 눌러 숫자를 바꾸세요 (−9 ~ 9).</span>
+          </div>
+        </details>
+        <button class="sk-btn" type="button" id="cvReset">강의 예제로 되돌리기</button>
+        <div class="sk-legend" aria-label="색 범례">
+          <span><i style="background:var(--c-in)"></i>입력 · 현재 창</span>
+          <span><i class="pad"></i>패딩 0</span>
+          <span><i style="background:var(--c-flt)"></i>필터</span>
+          <span><i style="background:var(--c-out)"></i>출력</span>
+          <span><i style="background:var(--pos)"></i>양수</span>
+          <span><i style="background:var(--neg)"></i>음수</span>
+        </div>
+      </div>
+
+      <div class="sk-card cv-visual">
+        <div class="sk-head"><h2>3×3 창이 한 칸씩 미끄러지며 계산</h2><span class="sk-hint">출력 칸을 누르면 그 위치로 이동 · → 키로 다음</span></div>
+        <ol class="sk-stepper" id="cvStepper" aria-label="진행 단계">
+          <li>① 패딩</li><li>② 필터 준비</li><li>③ 슬라이딩</li><li>④ 완료</li>
+        </ol>
+        <div class="play">
+          <div class="sk-group">
+            <button class="sk-btn sk-btn--sm" type="button" id="cvFirst">처음</button>
+            <button class="sk-btn sk-btn--sm" type="button" id="cvPrev">이전</button>
+            <button class="sk-btn sk-btn--sm" type="button" id="cvNext">다음</button>
+            <button class="sk-btn sk-btn--sm sk-btn--primary" type="button" id="cvPlay" aria-pressed="false">▶ 재생</button>
+          </div>
+          <label class="sk-slider"><span class="sk-sl-head">속도 <b id="cvSpdV">1.0×</b></span><input type="range" id="cvSpd" min="0.5" max="3" step="0.25" value="1"></label>
+        </div>
+        <p class="status" id="cvStatus" aria-live="polite"></p>
+        <div class="flow" id="cvMain">
+          <div class="frame r-in"><span class="lb" id="cvInLb">입력 (패딩 포함)</span><div class="box"><div class="sk-mat mx" id="cvPad"></div></div></div>
+          <div class="op" aria-hidden="true">∗</div>
+          <div class="frame r-flt" id="cvFltFrame"><span class="lb">필터 3×3 <span class="scale" id="cvScale"></span></span><div class="box"><div class="sk-mat mx" id="cvFlt" style="--n:3"></div></div></div>
+          <div class="op" aria-hidden="true">=</div>
+          <div class="frame r-out"><span class="lb" id="cvOutLb">출력</span><div class="box"><div class="sk-mat mx" id="cvOut"></div></div></div>
+        </div>
+        <div class="detail">
+          <h3>현재 위치 계산: 창 ⊙ 필터 (원소별 곱) → 모두 더하기</h3>
+          <div class="flow" id="cvDetail"></div>
+          <div class="sk-formula" id="cvExpand" aria-live="polite"></div>
+        </div>
+        <div class="sk-formula" id="cvSize"></div>
+        <p class="sk-note" id="cvSizeNote"></p>
+        <p class="sk-note"><b>필터 개수 = 출력 채널 개수.</b> 컬러 입력 (H, W, 3)에는 3×3×3 필터를 쓰고, 필터 32개를 쓰면 출력은 (H′, W′, 32)가 됩니다. 필터 값은 사람이 정하는 것이 아니라 <b>역전파로 학습되는 가중치</b>입니다. 여기 프리셋은 이해를 돕는 예시입니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 2. 풀링 ========== -->
+  <section id="pane-pool" role="tabpanel" aria-labelledby="tab-pool" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>같은 입력에 최대 풀링과 평균 풀링을 나란히</h2><span class="sk-hint" id="plSrc"></span></div>
+      <p class="sk-lead">입력은 1번 탭의 합성곱 결과입니다(기본: 강의 예제 4×4). 창 안의 값을 하나로 줄입니다. 곱할 가중치가 없으므로 <b>학습 파라미터가 0개</b>입니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">창 · stride</span>
+          <div class="sk-seg" id="plOpt">
+            <button type="button" data-v="0" aria-pressed="true">2×2 · s2</button>
+            <button type="button" data-v="1" aria-pressed="false">2×2 · s1</button>
+            <button type="button" data-v="2" aria-pressed="false">3×3 · s1</button>
+            <button type="button" data-v="3" aria-pressed="false">3×3 · s2</button>
+          </div></div>
+        <div class="sk-group">
+          <button class="sk-btn sk-btn--sm" type="button" id="plFirst">처음</button>
+          <button class="sk-btn sk-btn--sm" type="button" id="plPrev">이전</button>
+          <button class="sk-btn sk-btn--sm" type="button" id="plNext">다음</button>
+          <button class="sk-btn sk-btn--sm sk-btn--primary" type="button" id="plPlay" aria-pressed="false">▶ 재생</button>
+        </div>
+        <label class="sk-slider"><span class="sk-sl-head">속도 <b id="plSpdV">1.0×</b></span><input type="range" id="plSpd" min="0.5" max="3" step="0.25" value="1"></label>
+        <button class="sk-btn sk-btn--sm" type="button" id="plReset">강의 예제로 되돌리기</button>
+      </div>
+      <div class="sk-stats" id="plStats"></div>
+      <div class="sk-formula" id="plSize"></div>
+      <p class="sk-note sk-note--warn" id="plWarn" hidden></p>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>최대 풀링 (Max Pooling)</h2><span class="sk-hint">창에서 가장 큰 값 하나</span></div>
+        <div class="pool-flow">
+          <div class="frame r-out"><span class="lb">입력</span><div class="box"><div class="sk-mat mx" id="plMaxIn"></div></div></div>
+          <div class="op" aria-hidden="true">→<small>max</small></div>
+          <div class="frame r-pool"><span class="lb" id="plMaxLb">출력</span><div class="box"><div class="sk-mat mx" id="plMaxOut"></div></div></div>
+        </div>
+        <div class="sk-formula" id="plMaxF" aria-live="polite"></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>평균 풀링 (Average Pooling)</h2><span class="sk-hint">창 안 값들의 평균</span></div>
+        <div class="pool-flow">
+          <div class="frame r-out"><span class="lb">입력</span><div class="box"><div class="sk-mat mx" id="plAvgIn"></div></div></div>
+          <div class="op" aria-hidden="true">→<small>avg</small></div>
+          <div class="frame r-pool"><span class="lb" id="plAvgLb">출력</span><div class="box"><div class="sk-mat mx" id="plAvgOut"></div></div></div>
+        </div>
+        <div class="sk-formula" id="plAvgF" aria-live="polite"></div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>비교와 풀링의 목적</h2></div>
+      <p class="cmp" id="plCmp"></p>
+      <ul class="ul">
+        <li><b>연산 · 파라미터 감소</b>: 특성맵 크기가 줄어 다음 층의 계산량과 (Flatten 이후) 가중치 수가 줄어듭니다.</li>
+        <li><b>위치 변화에 강함</b>: 특징이 창 안에서 한두 칸 움직여도 최댓값은 그대로 남습니다.</li>
+        <li><b>넓은 영역을 보는 효과</b>: 줄어든 맵 위의 3×3 필터는 원본에서 더 넓은 범위(수용영역)를 봅니다.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ========== 3. 실제 이미지 ========== -->
+  <section id="pane-image" role="tabpanel" aria-labelledby="tab-image" hidden>
+    <div class="sk-side im-side">
+      <div class="sk-card">
+        <div class="sk-head"><h2>입력 이미지</h2></div>
+        <div class="row"><span class="sk-label">이미지 고르기</span>
+          <div class="chips" id="imSrc">
+            <button type="button" data-v="digit" aria-pressed="true">손글씨 숫자</button>
+            <button type="button" data-v="xray" aria-pressed="false">흉부 X선(모사)</button>
+            <button type="button" data-v="shapes" aria-pressed="false">도형</button>
+            <button type="button" data-v="checker" aria-pressed="false">체커보드</button>
+            <button type="button" data-v="draw" aria-pressed="false">직접 그리기</button>
+            <button type="button" data-v="upload" aria-pressed="false">파일 올리기</button>
+          </div>
+          <input type="file" id="imFile" accept="image/*" hidden>
+        </div>
+        <canvas class="orig" id="imOrig" aria-label="입력 흑백 이미지"></canvas>
+        <div class="sk-group" id="imDrawTools" hidden>
+          <button class="sk-btn sk-btn--sm" type="button" id="imClear">지우기</button>
+          <span class="sk-hint">마우스나 손가락으로 그리세요</span>
+        </div>
+        <div class="row"><span class="sk-label">크기 (흑백)</span>
+          <div class="sk-seg" id="imN"><button type="button" data-v="64" aria-pressed="true">64×64</button><button type="button" data-v="96" aria-pressed="false">96×96</button></div></div>
+        <label class="sk-check"><input type="checkbox" id="imRelu"> ReLU 적용 (음수 → 0)</label>
+        <div class="row"><span class="sk-label">풀링 2×2 · stride 2</span>
+          <div class="sk-seg" id="imPool"><button type="button" data-v="max" aria-pressed="true">최대</button><button type="button" data-v="avg" aria-pressed="false">평균</button><button type="button" data-v="none" aria-pressed="false">없음</button></div></div>
+        <p class="sk-hint">올린 파일은 이 브라우저 안에서만 흑백 변환 · 축소되며 어디로도 전송되지 않습니다.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>필터 4개 → 채널 4개</h2><span class="sk-hint">특성맵의 한 점을 가리키면 원본에서 본 영역 표시</span></div>
+        <div class="sk-formula" id="imShape"></div>
+        <div class="lvl"><h3>합성곱 결과 (특성맵) <span class="sk-mono" id="imConvShape"></span></h3>
+          <div class="dv"><div class="divbar" aria-hidden="true"></div><div class="divlab"><span>음수</span><span>0</span><span>양수</span></div></div></div>
+        <div class="maps" id="imConvMaps"></div>
+        <div class="lvl" id="imPoolHead"><h3>풀링 후 <span class="sk-mono" id="imPoolShape"></span></h3></div>
+        <div class="maps" id="imPoolMaps"></div>
+        <p class="hover-info" id="imInfo" aria-live="polite">특성맵 위에 마우스를 올리거나 눌러 보세요.</p>
+        <p class="sk-note">같은 이미지라도 <b>필터마다 반응하는 곳이 다릅니다</b>. 세로 경계 필터는 세로선에서, 가로 경계 필터는 가로선에서 강하게 반응합니다. 각 특성맵은 자기 값 범위에 맞춰 색을 칠했습니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 4. 전체 구조 ========== -->
+  <section id="pane-arch" role="tabpanel" aria-labelledby="tab-arch" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>입력 → Conv → Pool → Conv → Pool → Flatten → FC → 출력</h2><span class="sk-hint">풀링은 2×2 · stride 2 고정</span></div>
+      <div class="arch-ctl" id="arCtl">
+        <div class="row"><span class="sk-label">입력 크기 H=W</span><div class="sk-seg" data-k="H"><button type="button" data-v="28">28</button><button type="button" data-v="32">32</button><button type="button" data-v="64">64</button><button type="button" data-v="224">224</button></div></div>
+        <div class="row"><span class="sk-label">입력 채널</span><div class="sk-seg" data-k="C"><button type="button" data-v="1">1 흑백</button><button type="button" data-v="3">3 컬러</button></div></div>
+        <div class="row"><span class="sk-label">커널 F</span><div class="sk-seg" data-k="F"><button type="button" data-v="3">3×3</button><button type="button" data-v="5">5×5</button></div></div>
+        <div class="row"><span class="sk-label">stride S</span><div class="sk-seg" data-k="S"><button type="button" data-v="1">1</button><button type="button" data-v="2">2</button></div></div>
+        <div class="row"><span class="sk-label">패딩 P</span><div class="sk-seg" data-k="P"><button type="button" data-v="0">0</button><button type="button" data-v="1">1</button><button type="button" data-v="2">2</button></div></div>
+        <div class="row"><span class="sk-label">Conv1 필터 수</span><div class="sk-seg" data-k="c1"><button type="button" data-v="8">8</button><button type="button" data-v="16">16</button><button type="button" data-v="32">32</button><button type="button" data-v="64">64</button></div></div>
+        <div class="row"><span class="sk-label">Conv2 필터 수</span><div class="sk-seg" data-k="c2"><button type="button" data-v="16">16</button><button type="button" data-v="32">32</button><button type="button" data-v="64">64</button><button type="button" data-v="128">128</button></div></div>
+        <div class="row"><span class="sk-label">FC 뉴런</span><div class="sk-seg" data-k="U"><button type="button" data-v="32">32</button><button type="button" data-v="64">64</button><button type="button" data-v="128">128</button></div></div>
+        <div class="row"><span class="sk-label">출력 클래스</span><div class="sk-seg" data-k="K"><button type="button" data-v="2">2</button><button type="button" data-v="10">10</button></div></div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>텐서 크기 흐름</h2><span class="sk-hint">높이 = 가로·세로 크기, 두께 = 채널 수 (로그 눈금)</span></div>
+      <div class="sk-scroll"><svg class="arch-svg" id="arSvg" role="img" aria-label="CNN 전체 구조와 각 단계 텐서 크기"></svg></div>
+      <div class="sk-legend">
+        <span><i style="background:var(--c-in)"></i>입력</span>
+        <span><i style="background:var(--c-out)"></i>합성곱 특성맵</span>
+        <span><i style="background:var(--c-pool)"></i>풀링</span>
+        <span><i style="background:var(--muted)"></i>펼치기</span>
+        <span><i style="background:var(--c-flt)"></i>완전연결(FC)</span>
+      </div>
+      <p class="sk-note" id="arNote"></p>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>층별 크기와 파라미터 수</h2></div>
+      <div class="sk-stats" id="arStats"></div>
+      <div class="sk-scroll"><table class="sk-table" id="arTable"></table></div>
+      <div class="sk-formula">합성곱 출력 = ⌊(N + 2P − F) / S⌋ + 1 · 합성곱 파라미터 = (F·F·C<sub>in</sub> + 1)·C<sub>out</sub> · 풀링 = 0 · FC = (입력 수 + 1)·뉴런 수</div>
+      <p class="sk-note" id="arCmp"></p>
+    </div>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js"></script>
+<script>
+(function () {
+"use strict";
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const MINUS = "−";
+
+/* ---------- 숫자 표시 ---------- */
+function rnd(v) { const r = Math.round(v * 100) / 100; return Math.abs(r) < 1e-9 ? 0 : r; }
+function fmt(v) { return String(rnd(v)).replace("-", MINUS); }
+function fmtP(v) { return rnd(v) < 0 ? "(" + fmt(v) + ")" : fmt(v); }
+function chain(vals) {
+  if (!vals.length) return "0";
+  return vals.map((v, i) => i === 0 ? fmt(v) : (rnd(v) < 0 ? " " + MINUS + " " + fmt(-v) : " + " + fmt(v))).join("");
+}
+const nf = n => Number(n).toLocaleString("ko-KR");
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+/* 값 → 발산형 옅은 배경 속성 */
+function tintT(v, maxAbs) { const r = rnd(v); return (!r || !maxAbs) ? 0 : Math.round(10 + 34 * Math.min(1, Math.abs(r) / maxAbs)); }
+function tint(v, maxAbs, extra) {
+  const r = rnd(v), t = tintT(v, maxAbs), st = (t ? `--t:${t};` : "") + (extra || "");
+  return (t ? ` data-s="${r > 0 ? "p" : "n"}"` : "") + (st ? ` style="${st}"` : "");
+}
+function setTint(el, v, maxAbs) {
+  const r = rnd(v), t = tintT(v, maxAbs);
+  if (t) { el.dataset.s = r > 0 ? "p" : "n"; el.style.setProperty("--t", t); } else { delete el.dataset.s; el.style.removeProperty("--t"); }
+}
+const maxAbsOf = m => m.flat().reduce((a, v) => Math.max(a, Math.abs(v)), 0);
+const clone = m => m.map(r => r.slice());
+const RM = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- 재생기 ---------- */
+function Player(btn, spdInput, spdOut, stepFn, atEnd, toStart) {
+  let t = null;
+  const P = { playing: false };
+  const delay = () => 1000 / parseFloat(spdInput.value);
+  function upd() { btn.textContent = P.playing ? "❚❚ 멈춤" : "▶ 재생"; btn.setAttribute("aria-pressed", P.playing ? "true" : "false"); }
+  function tick() { t = setTimeout(() => { if (!stepFn()) { P.stop(); return; } if (atEnd()) { P.stop(); return; } tick(); }, delay()); }
+  P.play = () => { if (P.playing) return; if (atEnd()) toStart(); P.playing = true; upd(); if (!stepFn() || atEnd()) { P.stop(); return; } tick(); };
+  P.stop = () => { clearTimeout(t); t = null; P.playing = false; upd(); };
+  P.toggle = () => P.playing ? P.stop() : P.play();
+  btn.addEventListener("click", P.toggle);
+  spdInput.addEventListener("input", () => { spdOut.textContent = parseFloat(spdInput.value).toFixed(1) + "×"; });
+  upd();
+  return P;
+}
+function segSet(el, v) { $$("button", el).forEach(b => b.setAttribute("aria-pressed", b.dataset.v === String(v) ? "true" : "false")); }
+function segOn(el, fn) { el.addEventListener("click", e => { const b = e.target.closest("button"); if (!b || b.disabled) return; fn(b.dataset.v); }); }
+
+/* =====================================================================
+   계산 (순수 함수)
+   ===================================================================== */
+function padMatrix(m, P) {
+  const H = m.length, W = m[0].length, out = [];
+  for (let i = 0; i < H + 2 * P; i++) {
+    const row = [];
+    for (let j = 0; j < W + 2 * P; j++) {
+      const ii = i - P, jj = j - P;
+      const inside = ii >= 0 && ii < H && jj >= 0 && jj < W;
+      row.push({ v: inside ? m[ii][jj] : 0, pad: !inside });
+    }
+    out.push(row);
+  }
+  return out;
+}
+function conv2d(m, k, scale, P, S) {
+  const N = m.length, F = k.length;
+  const padded = padMatrix(m, P);
+  const O = Math.floor((N + 2 * P - F) / S) + 1;
+  const out = [], pos = [];
+  for (let r = 0; r < O; r++) {
+    const row = [];
+    for (let c = 0; c < O; c++) {
+      let s = 0;
+      for (let i = 0; i < F; i++) for (let j = 0; j < F; j++) s += padded[r * S + i][c * S + j].v * k[i][j];
+      row.push(rnd(s * scale));
+      pos.push([r, c]);
+    }
+    out.push(row);
+  }
+  return { padded, out, O, pos };
+}
+function pool2d(m, f, s) {
+  const N = m.length, O = Math.floor((N - f) / s) + 1;
+  const wins = [];
+  if (O < 1) return { O: 0, wins, max: [], avg: [] };
+  const max = [], avg = [];
+  for (let r = 0; r < O; r++) {
+    const mr = [], ar = [];
+    for (let c = 0; c < O; c++) {
+      const cells = []; let best = -Infinity, arg = null, sum = 0;
+      for (let i = 0; i < f; i++) for (let j = 0; j < f; j++) {
+        const y = r * s + i, x = c * s + j, v = m[y][x];
+        cells.push([y, x, v]); sum += v;
+        if (v > best) { best = v; arg = [y, x]; }
+      }
+      const a = rnd(sum / (f * f));
+      wins.push({ r, c, cells, max: best, arg, sum, avg: a });
+      mr.push(best); ar.push(a);
+    }
+    max.push(mr); avg.push(ar);
+  }
+  return { O, wins, max, avg };
+}
+
+/* =====================================================================
+   1. 합성곱
+   ===================================================================== */
+const LECTURE_IN = [[1, 2, 3, 3], [2, 3, 3, 3], [3, 3, 2, 3], [2, 3, 3, 3]];
+const PRESETS = {
+  v: { name: "세로 경계", k: [[1, 0, -1], [1, 0, -1], [1, 0, -1]], s: 1, desc: "<b>세로 경계 검출</b>: 왼쪽 열 +1, 오른쪽 열 −1. 창의 왼쪽이 밝고 오른쪽이 어두우면 양수, 반대면 음수, 고르면 0." },
+  h: { name: "가로 경계", k: [[1, 1, 1], [0, 0, 0], [-1, -1, -1]], s: 1, desc: "<b>가로 경계 검출</b>: 위 행 +1, 아래 행 −1. 위아래 밝기 차이에 반응합니다." },
+  sh: { name: "샤프닝", k: [[0, -1, 0], [-1, 5, -1], [0, -1, 0]], s: 1, desc: "<b>샤프닝</b>: 가운데를 5배로 키우고 상하좌우 이웃을 빼서 차이를 더 또렷하게 만듭니다." },
+  bl: { name: "평균 블러", k: [[1, 1, 1], [1, 1, 1], [1, 1, 1]], s: 1 / 9, desc: "<b>평균 블러</b>: 9칸을 모두 더한 뒤 1/9를 곱해 평균을 냅니다. 값이 고르게 퍼져 흐려집니다." },
+  cu: { name: "직접 편집", desc: "<b>직접 편집</b>: 가운데 그림의 필터 칸을 눌러 숫자를 바꾸세요. 학습에서는 이 값들이 역전파로 정해집니다." }
+};
+const C = { N: 4, inp: clone(LECTURE_IN), P: 1, S: 1, preset: "v", k: clone(PRESETS.v.k), scale: 1, step: 2, res: null };
+
+function cvCompute() { C.res = conv2d(C.inp, C.k, C.scale, C.P, C.S); }
+const cvLast = () => 1 + C.res.O * C.res.O;   // 마지막 단계 번호
+
+function cvBuild() {
+  cvCompute();
+  const { padded, out, O } = C.res;
+  const n = padded.length;
+  // 입력(패딩 포함)
+  const mA = maxAbsOf(C.inp);
+  const padEl = $("#cvPad");
+  padEl.style.setProperty("--n", n);
+  padEl.classList.toggle("big", n >= 8);
+  let h = "";
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    const cell = padded[i][j];
+    h += cell.pad ? `<div class="c pad" data-i="${i}" data-j="${j}">0</div>` : `<div class="c" data-i="${i}" data-j="${j}"${tint(cell.v, mA)}>${fmt(cell.v)}</div>`;
+  }
+  h += `<div class="ov" id="cvOv" style="--k:3;--x:0;--y:0"></div>`;
+  padEl.innerHTML = h;
+  padEl.setAttribute("aria-label", `패딩 포함 입력 ${n}×${n}`);
+  $("#cvInLb").textContent = C.P ? `입력 ${C.N}×${C.N} + 패딩 → ${n}×${n}` : `입력 ${C.N}×${C.N} (패딩 없음)`;
+  // 필터 (직접 수정 가능)
+  const kA = maxAbsOf(C.k), fEl = $("#cvFlt");
+  if (fEl.children.length !== 9) {
+    let fh = "";
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++)
+      fh += `<input class="c" type="number" step="1" inputmode="numeric" data-i="${i}" data-j="${j}" aria-label="필터 ${i + 1}행 ${j + 1}열 (눌러서 값 변경)">`;
+    fEl.innerHTML = fh;
+  }
+  $$("input", fEl).forEach(x => {
+    const v = C.k[+x.dataset.i][+x.dataset.j];
+    if (document.activeElement !== x || +x.value !== v) x.value = rnd(v);
+    setTint(x, v, kA);
+  });
+  $("#cvScale").textContent = C.scale !== 1 ? "× 1/9" : "";
+  // 출력
+  const oEl = $("#cvOut");
+  oEl.style.setProperty("--n", O);
+  const oA = maxAbsOf(out);
+  let oh = "";
+  C.res.pos.forEach(([r, c], idx) => {
+    oh += `<button type="button" class="c" data-idx="${idx}" data-v="${out[r][c]}" aria-label="출력 ${r + 1}행 ${c + 1}열: ${fmt(out[r][c])}"${tint(out[r][c], oA)}>${fmt(out[r][c])}</button>`;
+  });
+  oEl.innerHTML = oh;
+  $("#cvOutLb").textContent = `출력 ${O}×${O}`;
+  // 입력 편집 격자
+  const ed = $("#cvInEd");
+  ed.style.setProperty("--n", C.N);
+  if (ed.children.length !== C.N * C.N) {
+    let eh = "";
+    for (let i = 0; i < C.N; i++) for (let j = 0; j < C.N; j++)
+      eh += `<input class="c" type="number" min="-9" max="9" step="1" data-i="${i}" data-j="${j}" aria-label="입력 ${i + 1}행 ${j + 1}열">`;
+    ed.innerHTML = eh;
+  }
+  $$("input", ed).forEach(x => { if (document.activeElement !== x) x.value = C.inp[+x.dataset.i][+x.dataset.j]; });
+  // 설정 표시
+  segSet($("#cvN"), C.N); segSet($("#cvP"), C.P); segSet($("#cvS"), C.S); segSet($("#cvF"), C.preset);
+  $("#cvFdesc").innerHTML = PRESETS[C.preset].desc;
+  // 출력 크기 공식
+  const num = C.N + 2 * C.P - 3, exact = num / C.S;
+  $("#cvSize").innerHTML = `출력 크기 = ⌊(N + 2P − F) / S⌋ + 1 = ⌊(${C.N} + 2·${C.P} − 3) / ${C.S}⌋ + 1 = ⌊${fmt(exact)}⌋ + 1 = <span class="hl">${O}</span> → 출력 ${O}×${O}`;
+  let note;
+  if (C.P === 1 && C.S === 1) note = `<b>패딩 덕분에 입력(${C.N}×${C.N})과 출력(${O}×${O}) 크기가 같습니다.</b> 가장자리 값도 창의 가운데에 올 수 있습니다.`;
+  else if (C.P === 0 && C.S === 1) note = `<b>패딩이 없으면 출력이 ${C.N}×${C.N} → ${O}×${O}로 줄어듭니다.</b> 가장자리 칸은 창에 덜 들어가 정보가 덜 반영됩니다.`;
+  else note = `<b>stride ${C.S}</b>: 창이 ${C.S}칸씩 건너뛰어 출력이 ${O}×${O}로 작아집니다.` + (Number.isInteger(exact) ? "" : " 나누어떨어지지 않으면 내림하고, 남는 가장자리는 계산에서 빠집니다.");
+  $("#cvSizeNote").innerHTML = note;
+  C.step = Math.max(0, Math.min(C.step, cvLast()));
+  cvRender();
+}
+
+function cvRender() {
+  const { padded, out, O, pos } = C.res;
+  const st = C.step, k = st - 2, last = cvLast();
+  const n = padded.length;
+  // 단계 표시
+  const phase = st === 0 ? 0 : st === 1 ? 1 : (k === O * O - 1 ? 3 : 2);
+  $$("#cvStepper li").forEach((li, i) => {
+    li.classList.toggle("on", i === phase); li.classList.toggle("done", i < phase);
+    if (i === 2) li.textContent = k >= 0 ? `③ 슬라이딩 ${k + 1}/${O * O}` : "③ 슬라이딩";
+  });
+  // 패딩 강조
+  $$("#cvPad .c.pad").forEach(el => el.classList.toggle("flash", st === 0 && !RM()));
+  $("#cvFltFrame").classList.toggle("glow", st === 1);
+  // 창 위치
+  const ov = $("#cvOv");
+  let win = null;
+  if (k >= 0) {
+    const [r, c] = pos[k];
+    ov.hidden = false;
+    ov.style.setProperty("--x", c * C.S); ov.style.setProperty("--y", r * C.S);
+    win = { r, c, y0: r * C.S, x0: c * C.S };
+  } else ov.hidden = true;
+  $$("#cvPad .c").forEach(el => {
+    const i = +el.dataset.i, j = +el.dataset.j;
+    el.classList.toggle("inw", !!win && i >= win.y0 && i < win.y0 + 3 && j >= win.x0 && j < win.x0 + 3);
+  });
+  // 출력 칸 채우기
+  $$("#cvOut .c").forEach(el => {
+    const idx = +el.dataset.idx;
+    el.classList.toggle("empty", idx > k);
+    el.classList.toggle("cur", idx === k);
+  });
+  // 상세 계산
+  const det = $("#cvDetail"), ex = $("#cvExpand");
+  if (win) {
+    const w = [], prod = [];
+    for (let i = 0; i < 3; i++) {
+      const wr = [], pr = [];
+      for (let j = 0; j < 3; j++) { const cell = padded[win.y0 + i][win.x0 + j]; wr.push(cell); pr.push(rnd(cell.v * C.k[i][j])); }
+      w.push(wr); prod.push(pr);
+    }
+    const wA = maxAbsOf(w.map(r => r.map(c => c.v))), kA = maxAbsOf(C.k), pA = maxAbsOf(prod);
+    const grid = (cells, cls) => `<div class="sk-mat mx xs" style="--n:3">${cells}</div>`;
+    let wh = "", kh = "", ph = "";
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+      const cell = w[i][j];
+      wh += cell.pad ? `<div class="c pad">0</div>` : `<div class="c"${tint(cell.v, wA)}>${fmt(cell.v)}</div>`;
+      kh += `<div class="c"${tint(C.k[i][j], kA)}>${fmt(C.k[i][j])}</div>`;
+      ph += `<div class="c"${tint(prod[i][j], pA)}>${fmt(prod[i][j])}</div>`;
+    }
+    const v = out[win.r][win.c];
+    det.innerHTML =
+      `<div class="frame r-in"><span class="lb">현재 창</span><div class="box">${grid(wh)}</div></div>` +
+      `<div class="op" aria-hidden="true">⊙<small>원소별 곱</small></div>` +
+      `<div class="frame r-flt"><span class="lb">필터${C.scale !== 1 ? " (×1/9 전)" : ""}</span><div class="box">${grid(kh)}</div></div>` +
+      `<div class="op" aria-hidden="true">=</div>` +
+      `<div class="frame"><span class="lb" style="--rc:var(--muted)">곱</span><div class="box" style="--rc:var(--line-strong)">${grid(ph)}</div></div>` +
+      `<div class="op" aria-hidden="true">Σ<small>모두 더하기</small></div>` +
+      `<div class="frame r-out"><span class="lb">출력 (${win.r + 1}, ${win.c + 1})</span><div class="bigval" id="cvBig">${fmt(v)}</div></div>`;
+    const terms = [];
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+      const cell = w[i][j], t = `${fmtP(cell.v)}×${fmtP(C.k[i][j])}`;
+      terms.push(cell.pad ? `<span class="pt">${t}</span>` : t);
+    }
+    const nz = prod.flat().filter(x => rnd(x) !== 0);
+    const sum = rnd(prod.flat().reduce((a, b) => a + b, 0));
+    let line2 = `= ${chain(nz)}${nz.length > 1 ? " = " + fmt(sum) : ""}`;
+    if (C.scale !== 1) line2 += ` → ${fmt(sum)} × 1/9 = <span class="hl">${fmt(v)}</span>`;
+    else line2 = line2.replace(/([^ ]+)$/, `<span class="hl">$1</span>`);
+    ex.innerHTML = `${terms.join(" + ")}<br>${line2}` + (terms.some((_, idx) => w[Math.floor(idx / 3)][idx % 3].pad) ? `<br><span class="dim">빨간 항은 패딩 0이라 곱이 0입니다.</span>` : "");
+  } else if (st === 0) {
+    det.innerHTML = `<p class="sk-hint">아직 계산 전입니다. [다음]을 누르세요.</p>`;
+    ex.innerHTML = C.P ? `패딩 P = 1: ${C.N}×${C.N} 입력 둘레에 <span class="pt">0</span>을 한 겹 채워 ${n}×${n}으로 만듭니다.` : `패딩 P = 0: 입력 ${C.N}×${C.N}을 그대로 씁니다.`;
+  } else {
+    det.innerHTML = `<p class="sk-hint">필터를 입력의 왼쪽 위 모서리에 올려놓고 시작합니다.</p>`;
+    ex.innerHTML = `필터 (${PRESETS[C.preset].name}) = [${C.k.map(r => r.map(fmt).join(", ")).join(" | ")}]${C.scale !== 1 ? " × 1/9" : ""}`;
+  }
+  // 설명
+  let s;
+  if (st === 0) s = C.P ? `<b>① 패딩</b>: 입력 ${C.N}×${C.N} 둘레에 0을 1겹 채워 ${n}×${n}이 되었습니다(빨간 칸). 가장자리도 창의 가운데에 올 수 있게 됩니다.` : `<b>① 패딩 없음</b>: 입력 ${C.N}×${C.N}을 그대로 씁니다. 출력은 ${O}×${O}로 줄어듭니다.`;
+  else if (st === 1) s = `<b>② 필터 준비</b>: 3×3 필터(${PRESETS[C.preset].name})를 준비합니다. 이 9개 숫자가 CNN이 학습하는 가중치입니다.`;
+  else {
+    const [r, c] = pos[k];
+    s = `<b>③ 슬라이딩 ${k + 1}/${O * O}</b>: 창을 ${C.S}칸씩 옮겨 (${r + 1}행, ${c + 1}열) 위치. 창과 필터를 원소별로 곱해 모두 더하면 <b>${fmt(out[r][c])}</b> → 출력 (${r + 1}, ${c + 1}) 칸.` + (k === O * O - 1 ? " <b>④ 완료</b>: 출력 " + O + "×" + O + "이 모두 채워졌습니다." : "");
+  }
+  $("#cvStatus").innerHTML = s;
+  $("#cvFirst").disabled = st === 0; $("#cvPrev").disabled = st === 0; $("#cvNext").disabled = st >= last;
+}
+function cvGo(s) { C.step = Math.max(0, Math.min(s, cvLast())); cvRender(); }
+function cvNextStep() { if (C.step >= cvLast()) return false; cvGo(C.step + 1); return true; }
+function cvChanged() { cvPlayer.stop(); cvBuild(); plBuild(); }
+
+const cvPlayer = Player($("#cvPlay"), $("#cvSpd"), $("#cvSpdV"), cvNextStep, () => C.step >= cvLast(), () => cvGo(0));
+$("#cvFirst").onclick = () => { cvPlayer.stop(); cvGo(0); };
+$("#cvPrev").onclick = () => { cvPlayer.stop(); cvGo(C.step - 1); };
+$("#cvNext").onclick = () => { cvPlayer.stop(); cvNextStep(); };
+$("#cvOut").addEventListener("click", e => { const b = e.target.closest("button.c"); if (!b) return; cvPlayer.stop(); cvGo(2 + +b.dataset.idx); });
+segOn($("#cvN"), v => {
+  const N = +v; if (N === C.N) return;
+  const m = [];
+  for (let i = 0; i < N; i++) { const row = []; for (let j = 0; j < N; j++) row.push(i < C.N && j < C.N ? C.inp[i][j] : LECTURE_IN[i % 4][j % 4]); m.push(row); }
+  C.N = N; C.inp = m; $("#cvInEd").innerHTML = ""; cvChanged();
+});
+segOn($("#cvP"), v => { C.P = +v; cvChanged(); });
+segOn($("#cvS"), v => { C.S = +v; cvChanged(); });
+segOn($("#cvF"), v => {
+  C.preset = v;
+  if (v !== "cu") { C.k = clone(PRESETS[v].k); C.scale = PRESETS[v].s; }
+  else { C.k = C.k.map(r => r.map(x => rnd(x * C.scale))); C.scale = 1; }
+  cvChanged();
+  if (v === "cu") { const f = $("#cvFlt input"); if (f) f.focus(); }
+});
+$("#cvFlt").addEventListener("change", e => {
+  const x = e.target.closest("input"); if (!x) return;
+  const val = parseFloat(x.value);
+  if (C.preset !== "cu") { C.k = C.k.map(r => r.map(v => rnd(v * C.scale))); C.scale = 1; C.preset = "cu"; }
+  C.k[+x.dataset.i][+x.dataset.j] = isFinite(val) ? Math.max(-99, Math.min(99, val)) : 0;
+  const keep = C.step; cvPlayer.stop(); cvBuild(); plBuild(); cvGo(keep);
+});
+$("#cvInEd").addEventListener("change", e => {
+  const x = e.target.closest("input"); if (!x) return;
+  const val = parseFloat(x.value);
+  C.inp[+x.dataset.i][+x.dataset.j] = isFinite(val) ? Math.max(-9, Math.min(9, Math.round(val))) : 0;
+  x.value = C.inp[+x.dataset.i][+x.dataset.j];
+  const keep = C.step; cvPlayer.stop(); cvBuild(); plBuild(); cvGo(keep);
+});
+function resetLecture() {
+  C.N = 4; C.inp = clone(LECTURE_IN); C.P = 1; C.S = 1; C.preset = "v"; C.k = clone(PRESETS.v.k); C.scale = 1; C.step = 2;
+  $("#cvInEd").innerHTML = "";
+  PL.opt = 0; PL.k = 0;
+  cvChanged();
+}
+$("#cvReset").onclick = resetLecture;
+
+/* =====================================================================
+   2. 풀링
+   ===================================================================== */
+const POOL_OPTS = [{ f: 2, s: 2 }, { f: 2, s: 1 }, { f: 3, s: 1 }, { f: 3, s: 2 }];
+const PL = { opt: 0, k: 0, res: null };
+const qColor = (r, c) => `var(--q${(r % 2) * 2 + (c % 2)})`;
+
+function plBuild() {
+  const m = C.res.out, N = m.length;
+  // 창이 입력보다 크면 선택 불가
+  $$("#plOpt button").forEach(b => { b.disabled = POOL_OPTS[+b.dataset.v].f > N; });
+  if (POOL_OPTS[PL.opt].f > N) PL.opt = 0;
+  const warn = $("#plWarn");
+  segSet($("#plOpt"), PL.opt);
+  const { f, s } = POOL_OPTS[PL.opt];
+  $("#plSrc").textContent = `입력: 1번 탭 합성곱 결과 ${N}×${N}`;
+  if (f > N) {
+    warn.hidden = false; warn.textContent = `입력이 ${N}×${N}이라 ${f}×${f} 창을 놓을 수 없습니다. 1번 탭에서 패딩을 1로 바꾸거나 [강의 예제로 되돌리기]를 누르세요.`;
+    PL.res = { O: 0, wins: [], max: [], avg: [] };
+  } else { warn.hidden = true; PL.res = pool2d(m, f, s); }
+  const R = PL.res, O = R.O;
+  PL.k = Math.max(0, Math.min(PL.k, Math.max(0, R.wins.length - 1)));
+  // 사분면 색 (창이 겹치지 않을 때)
+  const owner = {};
+  if (s >= f) R.wins.forEach(w => w.cells.forEach(([y, x]) => { owner[y + "," + x] = qColor(w.r, w.c); }));
+  const mA = maxAbsOf(m);
+  const inHTML = id => {
+    let h = "";
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      const q = owner[i + "," + j];
+      h += `<div class="c${q ? " q" : ""}" data-i="${i}" data-j="${j}"${tint(m[i][j], mA, q ? `--qc:${q};` : "")}>${fmt(m[i][j])}</div>`;
+    }
+    return h + `<div class="ov" style="--oc:var(--c-pool);--k:${f};--x:0;--y:0"></div>`;
+  };
+  ["#plMaxIn", "#plAvgIn"].forEach(id => {
+    const el = $(id); el.style.setProperty("--n", N); el.innerHTML = inHTML(id);
+  });
+  const outHTML = (mat, kind) => {
+    const a = maxAbsOf(mat.length ? mat : [[0]]);
+    return R.wins.map((w, idx) => {
+      const v = kind === "max" ? w.max : w.avg;
+      return `<button type="button" class="c${s >= f ? " q" : ""}" data-idx="${idx}" data-v="${v}" aria-label="${kind === "max" ? "최대" : "평균"} 풀링 출력 ${w.r + 1}행 ${w.c + 1}열: ${fmt(v)}"${tint(v, a, `--qc:${qColor(w.r, w.c)};`)}>${fmt(v)}</button>`;
+    }).join("");
+  };
+  [["#plMaxOut", R.max, "max"], ["#plAvgOut", R.avg, "avg"]].forEach(([id, mat, kind]) => {
+    const el = $(id); el.style.setProperty("--n", Math.max(1, O)); el.innerHTML = outHTML(mat, kind);
+  });
+  $("#plMaxLb").textContent = `출력 ${O}×${O}`; $("#plAvgLb").textContent = `출력 ${O}×${O}`;
+  // 통계
+  const ratio = O ? `${O * O}/${N * N}` : "–";
+  const g = (a, b) => b ? g(b, a % b) : a;
+  const simp = O ? (() => { const d = g(O * O, N * N); return `${O * O / d}/${N * N / d}`; })() : "–";
+  $("#plStats").innerHTML =
+    `<div class="sk-stat"><b>${N}×${N}</b><span>입력 (${N * N}개 값)</span></div>` +
+    `<div class="sk-stat"><b>${O}×${O}</b><span>출력 (${O * O}개 값)</span></div>` +
+    `<div class="sk-stat"><b>${simp}</b><span>값 개수 비율 (${ratio})</span></div>` +
+    `<div class="sk-stat" style="border-color:var(--c-pool)"><b>0</b><span>학습 파라미터</span></div>`;
+  $("#plSize").innerHTML = `풀링 출력 크기 = ⌊(N − F) / S⌋ + 1 = ⌊(${N} − ${f}) / ${s}⌋ + 1 = <span class="hl">${O}</span>` + (s < f ? ` · 창이 겹칩니다(stride &lt; 창 크기)` : ` · 창이 겹치지 않아 입력을 ${R.wins.length}조각으로 나눕니다`);
+  // 비교 문장
+  if (O) {
+    const mm = R.max.map(r => "[" + r.map(fmt).join(", ") + "]").join(", ");
+    const aa = R.avg.map(r => "[" + r.map(fmt).join(", ") + "]").join(", ");
+    const topMax = Math.max(...R.max.flat()), topAvg = Math.max(...R.avg.flat());
+    $("#plCmp").innerHTML = `Max 결과 <b class="sk-mono">[${mm}]</b>, Average 결과 <b class="sk-mono">[${aa}]</b>. ` +
+      `Max는 창마다 가장 큰 값만 남겨 강한 반응(최대 <b>${fmt(topMax)}</b>)을 그대로 살리고, Average는 창 안의 작은 값·음수와 섞여 <b>${fmt(topAvg)}</b>까지로 약해집니다. ` +
+      `그래서 CNN에서는 “특징이 있다/없다”를 선명하게 남기는 <b>최대 풀링</b>을 더 많이 씁니다.`;
+  } else $("#plCmp").textContent = "풀링할 수 있는 창이 없습니다.";
+  plRender();
+}
+
+function plRender() {
+  const R = PL.res, k = PL.k;
+  const { f } = POOL_OPTS[PL.opt];
+  const has = R.wins.length > 0;
+  const w = has ? R.wins[k] : null;
+  ["#plMaxIn", "#plAvgIn"].forEach((id, pi) => {
+    const el = $(id), ov = $(".ov", el);
+    if (w) { ov.hidden = false; ov.style.setProperty("--x", w.cells[0][1]); ov.style.setProperty("--y", w.cells[0][0]); }
+    else ov.hidden = true;
+    $$(".c", el).forEach(c => {
+      const i = +c.dataset.i, j = +c.dataset.j;
+      const inW = !!w && w.cells.some(([y, x]) => y === i && x === j);
+      c.classList.toggle("inw", inW);
+      if (pi === 0) {
+        c.classList.toggle("pick", !!w && w.arg[0] === i && w.arg[1] === j);
+        c.classList.toggle("picked", R.wins.some((ww, idx) => idx < k && ww.arg[0] === i && ww.arg[1] === j) && !(w && w.arg[0] === i && w.arg[1] === j));
+      }
+    });
+  });
+  ["#plMaxOut", "#plAvgOut"].forEach(id => $$(".c", $(id)).forEach(b => {
+    const idx = +b.dataset.idx; b.classList.toggle("empty", idx > k); b.classList.toggle("cur", idx === k);
+  }));
+  if (w) {
+    const vals = w.cells.map(c => c[2]);
+    $("#plMaxF").innerHTML = `창 ${k + 1}/${R.wins.length} (${w.r + 1}, ${w.c + 1}): max(${vals.map(fmt).join(", ")}) = <span class="hl">${fmt(w.max)}</span>`;
+    $("#plAvgF").innerHTML = `창 ${k + 1}/${R.wins.length} (${w.r + 1}, ${w.c + 1}): (${chain(vals)}) / ${f * f} = ${fmt(w.sum)} / ${f * f} = <span class="hl">${fmt(w.avg)}</span>`;
+  } else { $("#plMaxF").textContent = ""; $("#plAvgF").textContent = ""; }
+  const last = Math.max(0, R.wins.length - 1);
+  $("#plFirst").disabled = k === 0; $("#plPrev").disabled = k === 0; $("#plNext").disabled = k >= last;
+}
+function plGo(k) { PL.k = Math.max(0, Math.min(k, Math.max(0, PL.res.wins.length - 1))); plRender(); }
+function plNextStep() { if (PL.k >= PL.res.wins.length - 1) return false; plGo(PL.k + 1); return true; }
+const plPlayer = Player($("#plPlay"), $("#plSpd"), $("#plSpdV"), plNextStep, () => PL.k >= PL.res.wins.length - 1, () => plGo(0));
+$("#plFirst").onclick = () => { plPlayer.stop(); plGo(0); };
+$("#plPrev").onclick = () => { plPlayer.stop(); plGo(PL.k - 1); };
+$("#plNext").onclick = () => { plPlayer.stop(); plNextStep(); };
+segOn($("#plOpt"), v => { plPlayer.stop(); PL.opt = +v; PL.k = 0; plBuild(); });
+["#plMaxOut", "#plAvgOut"].forEach(id => $(id).addEventListener("click", e => { const b = e.target.closest("button.c"); if (!b) return; plPlayer.stop(); plGo(+b.dataset.idx); }));
+$("#plReset").onclick = () => { plPlayer.stop(); resetLecture(); };
+
+/* =====================================================================
+   3. 실제 이미지
+   ===================================================================== */
+const IMG_FILTERS = [
+  { name: "세로 경계", k: [[1, 0, -1], [1, 0, -1], [1, 0, -1]], s: 1 },
+  { name: "가로 경계", k: [[1, 1, 1], [0, 0, 0], [-1, -1, -1]], s: 1 },
+  { name: "대각 경계", k: [[0, 1, 1], [-1, 0, 1], [-1, -1, 0]], s: 1 },
+  { name: "평균 블러", k: [[1, 1, 1], [1, 1, 1], [1, 1, 1]], s: 1 / 9 }
+];
+const IM = { src: "digit", N: 64, relu: false, pool: "max", img: null, conv: [], pooled: [], hover: null, uploaded: false, dirty: true };
+const srcCv = document.createElement("canvas"); srcCv.width = srcCv.height = 256;
+const sg = srcCv.getContext("2d", { willReadFrequently: true });
+
+function genImage(kind) {
+  const g = sg;
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.filter = "none"; g.globalAlpha = 1;
+  g.fillStyle = "#000"; g.fillRect(0, 0, 256, 256);
+  if (kind === "digit") {
+    g.filter = "blur(1.2px)"; g.strokeStyle = "#fff"; g.lineWidth = 21; g.lineCap = "round"; g.lineJoin = "round";
+    g.beginPath(); g.moveTo(152, 38); g.quadraticCurveTo(104, 104, 58, 170); g.quadraticCurveTo(130, 166, 210, 162); g.stroke();
+    g.beginPath(); g.moveTo(160, 76); g.quadraticCurveTo(166, 150, 158, 226); g.stroke();
+  } else if (kind === "xray") {
+    g.filter = "blur(7px)";
+    g.fillStyle = "#4a4a4a"; g.beginPath(); g.ellipse(128, 160, 118, 150, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#3c3c3c"; g.beginPath(); g.ellipse(128, 40, 120, 40, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#121212";
+    g.beginPath(); g.ellipse(80, 138, 40, 82, 0.08, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(176, 138, 40, 82, -0.08, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#6e6e6e"; g.beginPath(); g.ellipse(150, 178, 40, 34, -0.3, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#5a5a5a"; g.fillRect(0, 222, 256, 40);
+    g.filter = "blur(2px)"; g.fillStyle = "#b4b4b4"; g.fillRect(118, 0, 20, 256);
+    g.strokeStyle = "rgba(220,220,220,.55)"; g.lineWidth = 6; g.lineCap = "round";
+    for (let i = 0; i < 7; i++) {
+      const y = 62 + i * 23;
+      g.beginPath(); g.moveTo(120, y); g.bezierCurveTo(80, y - 20, 36, y - 6, 42, y + 26); g.stroke();
+      g.beginPath(); g.moveTo(136, y); g.bezierCurveTo(176, y - 20, 220, y - 6, 214, y + 26); g.stroke();
+    }
+    g.strokeStyle = "#c8c8c8"; g.lineWidth = 9;
+    g.beginPath(); g.moveTo(122, 50); g.lineTo(40, 36); g.stroke();
+    g.beginPath(); g.moveTo(134, 50); g.lineTo(216, 36); g.stroke();
+  } else if (kind === "shapes") {
+    g.fillStyle = "#f2f2f2"; g.fillRect(26, 26, 92, 92);
+    g.fillStyle = "#a8a8a8"; g.beginPath(); g.arc(186, 72, 48, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#d4d4d4"; g.beginPath(); g.moveTo(34, 230); g.lineTo(96, 142); g.lineTo(158, 230); g.closePath(); g.fill();
+    g.fillStyle = "#7a7a7a"; g.fillRect(180, 150, 52, 80);
+  } else if (kind === "checker") {
+    for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { g.fillStyle = (i + j) % 2 ? "#161616" : "#ececec"; g.fillRect(j * 32, i * 32, 32, 32); }
+  }
+  g.restore();
+}
+function sampleImage() {
+  const n = IM.N, c = document.createElement("canvas"); c.width = c.height = n;
+  const g = c.getContext("2d", { willReadFrequently: true });
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
+  g.drawImage(srcCv, 0, 0, n, n);
+  const d = g.getImageData(0, 0, n, n).data, img = new Float32Array(n * n);
+  for (let i = 0; i < n * n; i++) img[i] = (0.299 * d[4 * i] + 0.587 * d[4 * i + 1] + 0.114 * d[4 * i + 2]) / 255;
+  IM.img = img;
+}
+function convSame(img, n, k, s) {
+  const out = new Float32Array(n * n);
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+    let sum = 0;
+    for (let i = 0; i < 3; i++) { const rr = r + i - 1; if (rr < 0 || rr >= n) continue;
+      for (let j = 0; j < 3; j++) { const cc = c + j - 1; if (cc < 0 || cc >= n) continue; sum += img[rr * n + cc] * k[i][j]; } }
+    out[r * n + c] = sum * s;
+  }
+  return out;
+}
+function pool2(m, n, mode) {
+  const h = n >> 1, out = new Float32Array(h * h);
+  for (let r = 0; r < h; r++) for (let c = 0; c < h; c++) {
+    const a = m[2 * r * n + 2 * c], b = m[2 * r * n + 2 * c + 1], d = m[(2 * r + 1) * n + 2 * c], e = m[(2 * r + 1) * n + 2 * c + 1];
+    out[r * h + c] = mode === "max" ? Math.max(a, b, d, e) : (a + b + d + e) / 4;
+  }
+  return out;
+}
+function imCompute() {
+  sampleImage();
+  const n = IM.N;
+  IM.conv = IMG_FILTERS.map(f => { const o = convSame(IM.img, n, f.k, f.s); if (IM.relu) for (let i = 0; i < o.length; i++) if (o[i] < 0) o[i] = 0; return o; });
+  IM.pooled = IM.pool === "none" ? [] : IM.conv.map(m => pool2(m, n, IM.pool));
+  IM.offs = null;
+}
+/* 색 읽기 (캔버스용) */
+const probe = document.createElement("span"); probe.style.display = "none"; document.body.appendChild(probe);
+function cssRGB(name) {
+  probe.style.color = getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#888";
+  const m = getComputedStyle(probe).color.match(/[\d.]+/g) || [128, 128, 128];
+  return [+m[0], +m[1], +m[2]];
+}
+function mapToCanvas(data, n, mode, col) {
+  const c = document.createElement("canvas"); c.width = c.height = n;
+  const g = c.getContext("2d"), id = g.createImageData(n, n), d = id.data;
+  if (mode === "gray") {
+    for (let i = 0; i < n * n; i++) { const v = Math.round(Math.max(0, Math.min(1, data[i])) * 255); d[4 * i] = d[4 * i + 1] = d[4 * i + 2] = v; d[4 * i + 3] = 255; }
+  } else {
+    let mA = 0; for (let i = 0; i < data.length; i++) mA = Math.max(mA, Math.abs(data[i]));
+    for (let i = 0; i < n * n; i++) {
+      const t = mA ? data[i] / mA : 0, a = Math.pow(Math.abs(t), 0.75), tc = t >= 0 ? col.pos : col.neg;
+      d[4 * i] = col.mid[0] + (tc[0] - col.mid[0]) * a; d[4 * i + 1] = col.mid[1] + (tc[1] - col.mid[1]) * a; d[4 * i + 2] = col.mid[2] + (tc[2] - col.mid[2]) * a; d[4 * i + 3] = 255;
+    }
+  }
+  g.putImageData(id, 0, 0);
+  return c;
+}
+function fitCanvas(cv) {
+  const w = Math.max(40, Math.round(cv.getBoundingClientRect().width)) || 200;
+  const dpr = Math.min(3, window.devicePixelRatio || 1), W = Math.round(w * dpr);
+  if (cv.width !== W || cv.height !== W) { cv.width = W; cv.height = W; }
+  return W;
+}
+function paint(cv, off, rects) {
+  const W = fitCanvas(cv), g = cv.getContext("2d");
+  g.imageSmoothingEnabled = false;
+  g.clearRect(0, 0, W, W);
+  g.drawImage(off, 0, 0, W, W);
+  const n = off.width, u = W / n;
+  (rects || []).forEach(r => {
+    g.lineWidth = Math.max(2, W / 110);
+    g.strokeStyle = r.color; g.strokeRect(r.x * u, r.y * u, r.w * u, r.h * u);
+    if (r.fill) { g.fillStyle = r.fill; g.fillRect(r.x * u, r.y * u, r.w * u, r.h * u); }
+  });
+}
+function buildMapSlots() {
+  const mk = (id, lvl) => {
+    $(id).innerHTML = IMG_FILTERS.map((f, i) => `<div class="map"><span class="t">${i + 1}. ${f.name}</span><canvas data-lvl="${lvl}" data-ch="${i}" aria-label="${lvl === "conv" ? "합성곱" : "풀링"} 특성맵 ${i + 1}: ${f.name}"></canvas></div>`).join("");
+  };
+  mk("#imConvMaps", "conv"); mk("#imPoolMaps", "pool");
+}
+function imDraw() {
+  if ($("#pane-image").hidden) return;
+  const n = IM.N, h = n >> 1;
+  if (!IM.offs) {
+    const col = { pos: cssRGB("--pos"), neg: cssRGB("--neg"), mid: cssRGB("--surface") };
+    IM.offs = { orig: mapToCanvas(IM.img, n, "gray"), conv: IM.conv.map(m => mapToCanvas(m, n, "div", col)), pool: IM.pooled.map(m => mapToCanvas(m, h, "div", col)) };
+  }
+  const H = IM.hover, cIn = `rgb(${cssRGB("--c-in").join(",")})`, cOut = `rgb(${cssRGB("--ink").join(",")})`;
+  const origRects = [], convRects = [], poolRects = [];
+  if (H) {
+    if (H.lvl === "conv") {
+      origRects.push({ x: H.c - 1, y: H.r - 1, w: 3, h: 3, color: cIn });
+      convRects.push({ x: H.c, y: H.r, w: 1, h: 1, color: cOut });
+    } else {
+      origRects.push({ x: 2 * H.c - 1, y: 2 * H.r - 1, w: 4, h: 4, color: cIn });
+      convRects.push({ x: 2 * H.c, y: 2 * H.r, w: 2, h: 2, color: cOut });
+      poolRects.push({ x: H.c, y: H.r, w: 1, h: 1, color: cOut });
+    }
+  }
+  paint($("#imOrig"), IM.offs.orig, origRects);
+  $$("#imConvMaps canvas").forEach((cv, i) => paint(cv, IM.offs.conv[i], convRects));
+  $$("#imPoolMaps canvas").forEach((cv, i) => { if (IM.offs.pool[i]) paint(cv, IM.offs.pool[i], poolRects); });
+}
+function imUpdateText() {
+  const n = IM.N, h = n >> 1, poolName = IM.pool === "max" ? "최대 풀링" : "평균 풀링";
+  $("#imConvShape").textContent = `${n}×${n}×4`;
+  $("#imPoolShape").textContent = `${h}×${h}×4`;
+  const hasPool = IM.pool !== "none";
+  $("#imPoolHead").hidden = !hasPool; $("#imPoolMaps").hidden = !hasPool;
+  let s = `입력 <span class="hl">${n}×${n}×1</span> → 합성곱 3×3 · 필터 4개 (패딩 1, stride 1) → <span class="hl">${n}×${n}×4</span>`;
+  if (IM.relu) s += ` → ReLU → ${n}×${n}×4`;
+  if (hasPool) s += ` → ${poolName} 2×2 · stride 2 → <span class="hl">${h}×${h}×4</span>`;
+  s += `<br><span class="dim">값 개수: ${nf(n * n)} → ${nf(n * n * 4)}${hasPool ? " → " + nf(h * h * 4) : ""} · 필터 파라미터 (3·3·1 + 1)·4 = 40개${hasPool ? " · 풀링 0개" : ""}</span>`;
+  $("#imShape").innerHTML = s;
+}
+function imRefresh() { imCompute(); imUpdateText(); imDraw(); }
+function imSetSrc(v) {
+  IM.src = v; segSet($("#imSrc"), v);
+  const draw = v === "draw";
+  $("#imDrawTools").hidden = !draw;
+  $("#imOrig").classList.toggle("drawing", draw);
+  $("#imOrig").setAttribute("aria-label", draw ? "그리기 판: 드래그해서 그리세요" : "입력 흑백 이미지");
+  if (draw) { sg.fillStyle = "#000"; sg.fillRect(0, 0, 256, 256); drawStarter(); }
+  else if (v !== "upload") genImage(v);
+  IM.hover = null; imRefresh();
+}
+function drawStarter() { // 빈 판 대신 짧은 획 하나로 시작
+  sg.save(); sg.strokeStyle = "#fff"; sg.lineWidth = 18; sg.lineCap = "round";
+  sg.beginPath(); sg.moveTo(80, 60); sg.lineTo(80, 196); sg.moveTo(80, 196); sg.lineTo(180, 196); sg.stroke(); sg.restore();
+}
+$("#imSrc").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.v === "upload") { $("#imFile").click(); return; }
+  imSetSrc(b.dataset.v);
+});
+$("#imFile").addEventListener("change", e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    const im = new Image();
+    im.onload = () => {
+      sg.save(); sg.fillStyle = "#000"; sg.fillRect(0, 0, 256, 256);
+      const sc = Math.max(256 / im.width, 256 / im.height), w = im.width * sc, h = im.height * sc;
+      sg.drawImage(im, (256 - w) / 2, (256 - h) / 2, w, h); sg.restore();
+      IM.src = "upload"; segSet($("#imSrc"), "upload"); $("#imDrawTools").hidden = true; $("#imOrig").classList.remove("drawing");
+      IM.hover = null; imRefresh();
+    };
+    im.onerror = () => { $("#imInfo").textContent = "이미지를 읽지 못했습니다. PNG·JPG 파일을 골라 주세요."; };
+    im.src = rd.result;
+  };
+  rd.readAsDataURL(f);
+  e.target.value = "";
+});
+segOn($("#imN"), v => { IM.N = +v; segSet($("#imN"), v); IM.hover = null; imRefresh(); });
+segOn($("#imPool"), v => { IM.pool = v; segSet($("#imPool"), v); IM.hover = null; imRefresh(); });
+$("#imRelu").addEventListener("change", e => { IM.relu = e.target.checked; imRefresh(); });
+$("#imClear").onclick = () => { sg.fillStyle = "#000"; sg.fillRect(0, 0, 256, 256); imRefresh(); };
+/* 그리기 */
+(function () {
+  const cv = $("#imOrig"); let drawing = false, last = null, raf = 0;
+  const pt = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * 256, (e.clientY - r.top) / r.height * 256]; };
+  const line = (a, b) => { sg.save(); sg.strokeStyle = "#fff"; sg.lineWidth = 18; sg.lineCap = "round"; sg.beginPath(); sg.moveTo(a[0], a[1]); sg.lineTo(b[0], b[1]); sg.stroke(); sg.restore(); };
+  const sched = () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; imRefresh(); }); };
+  cv.addEventListener("pointerdown", e => { if (IM.src !== "draw") return; drawing = true; last = pt(e); cv.setPointerCapture(e.pointerId); line(last, last); sched(); e.preventDefault(); });
+  cv.addEventListener("pointermove", e => { if (!drawing) return; const p = pt(e); line(last, p); last = p; sched(); });
+  const end = () => { drawing = false; };
+  cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+})();
+/* 특성맵 가리키기 */
+function onMapHover(e) {
+  const cv = e.target.closest("canvas"); if (!cv) return;
+  const lvl = cv.dataset.lvl, ch = +cv.dataset.ch, n = lvl === "conv" ? IM.N : IM.N >> 1;
+  const r0 = cv.getBoundingClientRect();
+  const c = Math.max(0, Math.min(n - 1, Math.floor((e.clientX - r0.left) / r0.width * n)));
+  const r = Math.max(0, Math.min(n - 1, Math.floor((e.clientY - r0.top) / r0.height * n)));
+  if (IM.hover && IM.hover.lvl === lvl && IM.hover.r === r && IM.hover.c === c && IM.hover.ch === ch) return;
+  IM.hover = { lvl, ch, r, c };
+  const v = (lvl === "conv" ? IM.conv[ch] : IM.pooled[ch])[r * n + c];
+  $("#imInfo").innerHTML = lvl === "conv"
+    ? `<b>${IMG_FILTERS[ch].name}</b> 특성맵 (${r + 1}, ${c + 1}) = <b class="sk-mono">${fmt(v)}</b> ← 원본의 <b>3×3</b> 영역(보라 테두리)과 필터를 곱해 더한 값. 같은 위치라도 필터마다 값이 다릅니다.`
+    : `<b>${IMG_FILTERS[ch].name}</b> 풀링 맵 (${r + 1}, ${c + 1}) = <b class="sk-mono">${fmt(v)}</b> ← 합성곱 맵의 <b>2×2</b> 창 ← 원본의 <b>4×4</b> 영역. 풀링을 거치면 한 칸이 원본의 더 넓은 범위를 대표합니다.`;
+  imDraw();
+}
+["#imConvMaps", "#imPoolMaps"].forEach(id => {
+  const el = $(id);
+  el.addEventListener("pointermove", onMapHover);
+  el.addEventListener("pointerdown", onMapHover);
+  el.addEventListener("pointerleave", () => { if (IM.hover) { IM.hover = null; imDraw(); } });
+});
+
+/* =====================================================================
+   4. 전체 구조
+   ===================================================================== */
+const AR = { H: 32, C: 3, F: 3, S: 1, P: 1, c1: 32, c2: 64, U: 64, K: 10 };
+function arCompute(p) {
+  const L = []; let h = p.H, c = p.C, ok = true;
+  L.push({ k: "in", name: "입력", h, c, params: 0, op: "", shape: `${h}×${h}×${c}`, calc: "–" });
+  for (const i of [1, 2]) {
+    const f = p["c" + i];
+    const num = h + 2 * p.P - p.F, oh = Math.floor(num / p.S) + 1;
+    if (num < 0 || oh < 1) { ok = false; L.push({ k: "conv", name: "Conv" + i, bad: true, shape: "불가", params: 0, op: `${p.F}×${p.F} ×${f}`, calc: `⌊(${h} + 2·${p.P} − ${p.F}) / ${p.S}⌋ + 1 < 1` }); break; }
+    const params = (p.F * p.F * c + 1) * f;
+    L.push({ k: "conv", name: "Conv" + i, h: oh, c: f, params, op: `합성곱 ${p.F}×${p.F} ×${f}`, opLines: [`합성곱 ${p.F}×${p.F}`, `필터 ${f}개`], shape: `${oh}×${oh}×${f}`, calc: `(${p.F}·${p.F}·${c} + 1)·${f}`, size: `⌊(${h} + 2·${p.P} − ${p.F}) / ${p.S}⌋ + 1 = ${oh}` });
+    h = oh; c = f;
+    const ph = Math.floor((h - 2) / 2) + 1;
+    if (h < 2) { ok = false; L.push({ k: "pool", name: "Pool" + i, bad: true, shape: "불가", params: 0, op: "풀링 2×2", calc: "입력이 2보다 작음" }); break; }
+    L.push({ k: "pool", name: "Pool" + i, h: ph, c, params: 0, op: "최대 풀링 2×2", opLines: ["최대 풀링", "2×2"], shape: `${ph}×${ph}×${c}`, calc: "0 (가중치 없음)", size: `⌊(${h} − 2) / 2⌋ + 1 = ${ph}` });
+    h = ph;
+  }
+  if (ok) {
+    const flat = h * h * c;
+    L.push({ k: "flat", name: "Flatten", len: flat, params: 0, op: "펼치기", shape: `${nf(flat)}`, calc: `${h}·${h}·${c} = ${nf(flat)} (파라미터 0)` });
+    L.push({ k: "fc", name: "FC", len: p.U, params: (flat + 1) * p.U, op: "완전연결", shape: `${p.U}`, calc: `(${nf(flat)} + 1)·${p.U}` });
+    L.push({ k: "out", name: "출력", len: p.K, params: (p.U + 1) * p.K, op: "FC + softmax", opLines: ["FC", "+ softmax"], shape: `${p.K}`, calc: `(${p.U} + 1)·${p.K}` });
+  }
+  return { L, ok };
+}
+function arRender() {
+  $$("#arCtl .sk-seg").forEach(el => segSet(el, AR[el.dataset.k]));
+  const { L, ok } = arCompute(AR);
+  // SVG
+  const maxH = Math.max(AR.H, 4), lg = Math.log2;
+  const hp = h => 26 + 128 * lg(Math.max(1, h)) / lg(maxH);
+  const dp = c => 8 + 6 * lg(Math.max(1, c));
+  const vp = len => Math.min(170, 30 + 11 * lg(Math.max(1, len)));
+  const GAP = 118, TOP = 34;
+  const geo = L.map(l => {
+    if (l.bad) return { w: 60, h: 60, ox: 0 };
+    if (l.k === "flat" || l.k === "fc" || l.k === "out") return { w: 16, h: vp(l.len), ox: 0 };
+    const H = hp(l.h), ox = H * 0.42;
+    return { w: dp(l.c) + ox, d: dp(l.c), h: H, ox };
+  });
+  const bodyH = Math.max(...geo.map(g => g.h + g.ox * 0.7)) + 10;
+  const cy = TOP + bodyH / 2 + 10;
+  let x = 24, s = "";
+  const defs = `<defs><marker id="arH" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="arrh" d="M0,0L10,5L0,10z"/></marker></defs>`;
+  L.forEach((l, i) => {
+    const g = geo[i], cls = { in: "b-in", conv: "b-conv", pool: "b-pool", flat: "b-flat", fc: "b-fc", out: "b-out" }[l.k];
+    if (i > 0) {
+      const x0 = x - GAP + 10, x1 = x - 10;
+      s += `<path class="arr" d="M${x0},${cy} L${x1},${cy}" marker-end="url(#arH)"/>`;
+      const ol = l.opLines || [l.op];
+      ol.forEach((t, li) => { s += `<text class="opl" x="${(x0 + x1) / 2}" y="${cy - 12 - (ol.length - 1 - li) * 15}" text-anchor="middle">${esc(t)}</text>`; });
+    }
+    if (l.bad) {
+      s += `<g class="b-pool"><rect class="f3" x="${x}" y="${cy - 30}" width="60" height="60" rx="8" stroke-dasharray="5 4"/></g>`;
+      s += `<text class="nm" x="${x + 30}" y="${cy + 5}" text-anchor="middle">불가</text>`;
+    } else if (g.d !== undefined) {
+      const fx = x, fy = cy - g.h / 2 + g.ox * 0.35, ox = g.ox, oy = g.ox * 0.7;
+      s += `<g class="${cls}">` +
+        `<path class="f3" d="M${fx},${fy} L${fx + ox},${fy - oy} L${fx + g.d + ox},${fy - oy} L${fx + g.d},${fy} Z"/>` +
+        `<path class="f2" d="M${fx + g.d},${fy} L${fx + g.d + ox},${fy - oy} L${fx + g.d + ox},${fy + g.h - oy} L${fx + g.d},${fy + g.h} Z"/>` +
+        `<rect class="f1" x="${fx}" y="${fy}" width="${g.d}" height="${g.h}"/></g>`;
+    } else {
+      s += `<g class="${cls}"><rect class="f1" x="${x}" y="${cy - g.h / 2}" width="${g.w}" height="${g.h}" rx="4"/></g>`;
+    }
+    const lx = x + g.w / 2, ly = TOP + bodyH + 34;
+    s += `<text class="nm" x="${lx}" y="${ly}" text-anchor="middle">${esc(l.name)}</text>`;
+    s += `<text class="sh" x="${lx}" y="${ly + 19}" text-anchor="middle">${esc(l.shape)}</text>`;
+    s += `<text class="pm" x="${lx}" y="${ly + 37}" text-anchor="middle">${l.k === "in" ? "" : "파라미터 " + nf(l.params)}</text>`;
+    x += g.w + GAP;
+  });
+  const W = x - GAP + 40, Hh = TOP + bodyH + 84;
+  const svg = $("#arSvg");
+  svg.setAttribute("viewBox", `0 0 ${Math.round(W)} ${Math.round(Hh)}`);
+  svg.style.minWidth = Math.min(1100, Math.round(W * 0.82)) + "px";
+  svg.innerHTML = defs + s;
+  // 표
+  const total = L.reduce((a, l) => a + (l.params || 0), 0);
+  let t = `<thead><tr><th>층</th><th>연산</th><th>출력 크기</th><th>크기 계산</th><th>파라미터</th><th>파라미터 계산</th></tr></thead><tbody>`;
+  L.forEach(l => {
+    t += `<tr><td>${esc(l.name)}</td><td>${esc(l.op || "–")}</td><td class="n${l.bad ? " bad" : ""}">${esc(l.shape)}</td><td class="n">${esc(l.size || "–")}</td><td class="n">${nf(l.params || 0)}</td><td class="n">${esc(l.calc)}</td></tr>`;
+  });
+  t += `<tr class="tot"><td>합계</td><td></td><td></td><td></td><td class="n">${nf(total)}</td><td></td></tr></tbody>`;
+  $("#arTable").innerHTML = t;
+  const conv = L.filter(l => l.k === "conv" && !l.bad).reduce((a, l) => a + l.params, 0);
+  const fc = L.filter(l => l.k === "fc" || l.k === "out").reduce((a, l) => a + l.params, 0);
+  $("#arStats").innerHTML =
+    `<div class="sk-stat"><b>${nf(total)}</b><span>전체 파라미터</span></div>` +
+    `<div class="sk-stat"><b>${nf(conv)}</b><span>합성곱 층</span></div>` +
+    `<div class="sk-stat"><b>0</b><span>풀링 층</span></div>` +
+    `<div class="sk-stat"><b>${nf(fc)}</b><span>FC · 출력 층</span></div>`;
+  if (!ok) {
+    $("#arNote").innerHTML = `<b>이 설정으로는 특성맵이 1×1보다 작아집니다.</b> 입력을 키우거나 패딩을 늘리거나 stride를 1로 바꾸세요.`;
+    $("#arCmp").textContent = "";
+    return;
+  }
+  const c1 = L[1], p2 = L[4];
+  $("#arNote").innerHTML = `특성맵이 <b>작아지고(${AR.H} → ${c1.h} → ${L[2].h} → ${L[3].h} → ${p2.h})</b> <b>두꺼워집니다(채널 ${AR.C} → ${AR.c1} → ${AR.c2})</b>. 필터 개수 = 출력 채널 수: 입력 (${AR.H}, ${AR.H}, ${AR.C}) + 필터 ${AR.c1}개 → (${c1.h}, ${c1.h}, ${AR.c1}).`;
+  const inN = AR.H * AR.H * AR.C, outN = c1.h * c1.h * AR.c1, dense = (inN + 1) * outN;
+  $("#arCmp").innerHTML = `<b>완전연결 대비 합성곱 파라미터가 훨씬 적습니다.</b> 입력 ${AR.H}×${AR.H}×${AR.C} (${nf(inN)}개)을 Conv1 출력 크기 ${c1.shape} (${nf(outN)}개)로 완전연결하면 (${nf(inN)} + 1)·${nf(outN)} = <b>${nf(dense)}</b>개, 합성곱은 같은 필터를 모든 위치에서 공유해 <b>${nf(c1.params)}</b>개 → 약 <b>${nf(Math.round(dense / c1.params))}배</b> 적습니다.`;
+}
+$$("#arCtl .sk-seg").forEach(el => segOn(el, v => { AR[el.dataset.k] = +v; arRender(); }));
+
+/* =====================================================================
+   탭 · 키보드 · 테마
+   ===================================================================== */
+const TABS = ["conv", "pool", "image", "arch"];
+let cur = "conv";
+function showTab(name, focus, userAct) {
+  if (!TABS.includes(name)) name = "conv";
+  cur = name;
+  TABS.forEach(t => {
+    const tab = $("#tab-" + t), on = t === name;
+    tab.setAttribute("aria-selected", on ? "true" : "false"); tab.tabIndex = on ? 0 : -1;
+    $("#pane-" + t).hidden = !on;
+  });
+  if (name !== "conv") cvPlayer.stop();
+  if (name !== "pool") plPlayer.stop();
+  try { history.replaceState(null, "", "#" + name); } catch (e) { }
+  if (name === "image") imDraw();
+  if (name === "arch") arRender();
+  if (focus) $("#tab-" + name).focus();
+  if (userAct) { try { $("#tab-" + name).scrollIntoView({ block: "nearest", inline: "nearest" }); } catch (e) { } }
+}
+$(".sk-tabs").addEventListener("click", e => { const b = e.target.closest(".sk-tab"); if (b) showTab(b.id.slice(4), false, true); });
+$(".sk-tabs").addEventListener("keydown", e => {
+  if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+  e.preventDefault(); e.stopPropagation();
+  const i = TABS.indexOf(cur), d = e.key === "ArrowRight" ? 1 : -1;
+  showTab(TABS[(i + d + TABS.length) % TABS.length], true, true);
+});
+window.addEventListener("hashchange", () => showTab((location.hash || "").slice(1)));
+document.addEventListener("keydown", e => {
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  const t = e.target;
+  if (t && (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.closest(".sk-tabs") || t.isContentEditable)) return;
+  if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+  const fwd = e.key === "ArrowRight";
+  if (cur === "conv") { e.preventDefault(); cvPlayer.stop(); fwd ? cvNextStep() : cvGo(C.step - 1); }
+  else if (cur === "pool") { e.preventDefault(); plPlayer.stop(); fwd ? plNextStep() : plGo(PL.k - 1); }
+});
+function rethem() { IM.offs = null; imDraw(); }
+new MutationObserver(rethem).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", rethem); } catch (e) { }
+let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(imDraw, 120); });
+
+/* ---------- 시작 ---------- */
+buildMapSlots();
+genImage("digit");
+imCompute(); imUpdateText();
+cvBuild();
+plBuild();
+arRender();
+showTab((location.hash || "").slice(1) || "conv");
+})();
+</script>
+</body>
+</html>
