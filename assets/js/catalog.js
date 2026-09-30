@@ -73,6 +73,15 @@ window.DS_SIMULATORS = [
 
   /* ---------- 자연어처리 ---------- */
   {
+    id: "word2vec",
+    category: "nlp",
+    href: "simulators/nlp/word2vec.html",
+    title: "Word2Vec (Skip-gram · CBOW)",
+    summary: "윈도를 밀며 학습 샘플을 만들고, 한 샘플의 순전파·역전파를 숫자로 따라간 뒤, 단어 벡터가 지도 위에서 비슷한 단어끼리 모이는 과정을 봅니다. Skip-gram과 CBOW를 골라 비교합니다.",
+    tags: ["단어 임베딩", "Skip-gram", "CBOW", "네거티브 샘플링"],
+    glyph: "w2v"
+  },
+  {
     id: "lda-gibbs-sampling",
     category: "nlp",
     href: "simulators/nlp/lda-gibbs-sampling.html",
@@ -80,6 +89,15 @@ window.DS_SIMULATORS = [
     summary: "문서 3개·주제 2개로 단어의 주제 딱지를 떼고, 두 확률을 곱해 주사위로 새 주제를 뽑는 과정을 한 단계씩 따라갑니다.",
     tags: ["토픽 모델링", "LDA", "깁스 샘플링"],
     glyph: "lda"
+  },
+  {
+    id: "rnn-family",
+    category: "nlp",
+    href: "simulators/nlp/rnn-family.html",
+    title: "RNN 계열 모형",
+    summary: "SimpleRNN · LSTM · GRU · 양방향 · Stacked RNN을 골라 의료 문장을 한 시점씩 읽으며 게이트와 은닉 상태를 실제 숫자로 따라가고, 기억 감쇠·파라미터 수·출력 shape을 비교합니다.",
+    tags: ["RNN", "LSTM · GRU", "양방향 · Stacked", "게이트"],
+    glyph: "rnn"
   },
   {
     id: "seq2seq-attention",
