@@ -1,0 +1,1222 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Word2Vec 시뮬레이터 (Skip-gram · CBOW) | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20260930c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20260930c">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: Skip-gram 파랑 · CBOW 주황 · 주변 단어 주황 · 정답 초록 · 오답 빨강 · 히트맵(양수 주황 / 음수 파랑) · 단어 범주 6색 */
+:root{ --sk-accent: var(--cat-nlp);
+  --sg:#2F6FDB; --cb:#D9622B; --ctx:#C2410C; --ok:#15803D; --bad:#DC2626; --hpos:#D9480F; --hneg:#1C7ED6;
+  --c-sym:#D6336C; --c-drug:#0D9488; --c-person:#7C3AED; --c-meas:#B45309; --c-act:#2563EB; --c-other:#0E7490; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --sg:#6C9BF2; --cb:#F0874A; --ctx:#FF914D; --ok:#4ADE80; --bad:#F87171; --hpos:#FF8A5B; --hneg:#5AA9F5;
+  --c-sym:#F2678F; --c-drug:#33D1BD; --c-person:#B294FF; --c-meas:#F0A860; --c-act:#6AA5FF; --c-other:#4FC3D9; } }
+:root[data-theme="dark"]{
+  --sg:#6C9BF2; --cb:#F0874A; --ctx:#FF914D; --ok:#4ADE80; --bad:#F87171; --hpos:#FF8A5B; --hneg:#5AA9F5;
+  --c-sym:#F2678F; --c-drug:#33D1BD; --c-person:#B294FF; --c-meas:#F0A860; --c-act:#6AA5FF; --c-other:#4FC3D9; }
+
+/* 모드 선택 (탭 위 공통) */
+.wv-modebar{flex-direction:row;flex-wrap:wrap;align-items:center;gap:12px 22px;padding:14px 18px}
+.wv-bigseg button{font-size:16px;font-weight:700;padding:10px 20px;display:inline-flex;align-items:baseline;gap:8px}
+.wv-bigseg button small{font-size:12.5px;font-weight:600;opacity:.8}
+.wv-bigseg button[data-v="skipgram"][aria-pressed="true"]{background:var(--sg);color:var(--on-ink)}
+.wv-bigseg button[data-v="cbow"][aria-pressed="true"]{background:var(--cb);color:var(--on-ink)}
+.wv-modedesc{margin:0;font-size:14.5px;color:var(--text);flex:1 1 320px;min-width:0}
+.wv-modedesc b{color:var(--ink)}
+.wv-sg{color:var(--sg)} .wv-cb{color:var(--cb)} .wv-ok{color:var(--ok)} .wv-bad{color:var(--bad)} .wv-ctxc{color:var(--ctx)}
+.wv-dot{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+
+/* 1. 코퍼스 · 윈도 슬라이딩 */
+.wv-side{grid-template-columns:340px minmax(0,1fr)}
+@media (max-width:900px){.wv-side{grid-template-columns:minmax(0,1fr)}}
+.wv-corpus{width:100%;font-family:var(--mono);font-size:13px;line-height:1.6;resize:vertical;min-height:200px}
+.wv-msg{font-size:13px;margin:0;color:var(--muted);min-height:1.3em}
+.wv-msg.err{color:var(--bad)}
+.wv-sentnav{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.wv-sentnav .sk-select{max-width:100%;flex:1 1 220px}
+.wv-sent{display:flex;flex-wrap:wrap;gap:8px 6px;padding:14px 12px 10px;background:var(--surface-2);border-radius:12px;border:1px solid var(--line);min-height:74px;align-items:flex-end}
+.wv-tok{position:relative;display:inline-flex;flex-direction:column;align-items:center;gap:2px;font-size:16px;font-weight:600;color:var(--muted);padding:6px 10px 5px;border-radius:9px;border:2px solid transparent;background:var(--surface);transition:background .25s,border-color .25s,color .25s,transform .25s}
+.wv-tok sub{font-family:var(--mono);font-size:10.5px;color:var(--faint);font-weight:500;line-height:1}
+.wv-tok.in{color:var(--ink)}
+.wv-tok.ctx{border-color:var(--ctx);color:var(--ink);background:color-mix(in srgb,var(--ctx) 12%,var(--surface))}
+.wv-tok.cen{border-color:var(--sk-accent);background:var(--sk-accent);color:var(--on-ink);transform:translateY(-3px)}
+.wv-tok.cen sub{color:var(--on-ink);opacity:.8}
+.wv-tok.out{opacity:.55}
+button.wv-tok{font:inherit;font-size:16px;font-weight:600;cursor:pointer}
+button.wv-tok:hover{border-color:var(--line-strong)}
+button.wv-tok:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.wv-tok.blank{border-style:dashed;border-color:var(--sk-accent);color:var(--sk-accent);background:var(--surface);min-width:64px}
+.wv-tok.off{text-decoration:line-through;opacity:.6}
+.wv-samp{display:flex;flex-wrap:wrap;gap:6px;min-height:34px}
+.wv-pair{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600;padding:5px 10px;border-radius:8px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink);white-space:nowrap}
+.wv-pair .ar{color:var(--faint);font-weight:500}
+.wv-pair .c{color:var(--sk-accent)} .wv-pair .x{color:var(--ctx)}
+.wv-pair.new{border-color:var(--sk-accent);background:color-mix(in srgb,var(--sk-accent) 10%,var(--surface))}
+.wv-pair.pop{animation:wv-pop .45s ease}
+@keyframes wv-pop{0%{transform:scale(.85);opacity:.2}100%{transform:scale(1);opacity:1}}
+.wv-samplist{display:flex;flex-wrap:wrap;gap:6px;max-height:190px;overflow:auto;padding:2px}
+.wv-samplist .wv-pair{font-size:13px;padding:3px 8px}
+.wv-side .sk-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.wv-side .sk-stat{min-width:0}
+#pPredF{white-space:pre-wrap}
+.wv-bigstat{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.wv-bigstat .sk-stat{min-width:0}
+.wv-bigstat .sk-stat.on{border-color:var(--mc);box-shadow:inset 0 0 0 1px var(--mc);background:color-mix(in srgb,var(--mc) 9%,var(--surface))}
+.wv-bigstat .sk-stat b.m{color:var(--mc)}
+@media (max-width:620px){.wv-bigstat{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.wv-card-h3{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.wv-card-h3 .sk-hint{font-weight:500}
+
+/* 2. 한 샘플 */
+.wv-stepgrid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:1000px){.wv-stepgrid{grid-template-columns:minmax(0,1fr)}}
+.sk-stepper li{cursor:pointer}
+.wv-onehot{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 10px;align-items:center;font-size:13px}
+.wv-onehot .lab{font-weight:700;color:var(--ink);white-space:nowrap}
+.wv-oh{display:flex;gap:2px}
+.wv-oh i{flex:1 1 0;min-width:5px;max-width:14px;height:18px;border-radius:3px;background:var(--surface-2);border:1px solid var(--line)}
+.wv-oh i.one{background:var(--sk-accent);border-color:var(--sk-accent)}
+.wv-vec{display:flex;flex-wrap:wrap;gap:3px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.wv-vec span{min-width:50px;padding:4px 4px;text-align:center;border-radius:6px;font-size:12.5px;font-weight:600;color:var(--ink);background:var(--surface-2)}
+.wv-vecrow{display:grid;grid-template-columns:92px minmax(0,1fr);gap:6px 10px;align-items:center;font-size:13px}
+.wv-vecrow .lab{font-weight:700;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wv-bars{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:5px 10px;align-items:center;font-size:13.5px}
+.wv-bars .w{font-weight:600;color:var(--ink);white-space:nowrap;max-width:9em;overflow:hidden;text-overflow:ellipsis}
+.wv-bars .tr{position:relative;height:18px;background:var(--surface-2);border-radius:5px;overflow:hidden}
+.wv-bars .tr .fl{position:absolute;top:0;bottom:0;left:0;border-radius:5px;background:var(--faint);transition:width .3s}
+.wv-bars .tr.div .mid{position:absolute;top:0;bottom:0;left:50%;width:1px;background:var(--line-strong)}
+.wv-bars .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--muted);text-align:right;min-width:4.5em}
+.wv-bars .ok .fl,.wv-bars .fl.ok{background:var(--ok)} .wv-bars .w.ok{color:var(--ok)}
+.wv-bars .fl.bad{background:var(--bad)} .wv-bars .w.bad{color:var(--bad)}
+.wv-bars .fl.acc{background:var(--sk-accent)}
+.wv-bars .fl.ctx{background:var(--ctx)}
+.wv-bars .gap{grid-column:1/-1;height:1px;background:var(--line);margin:2px 0}
+.wv-heats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.wv-heats figure{margin:0;display:flex;flex-direction:column;gap:6px;min-width:0}
+.wv-heats figcaption{font-size:13px;font-weight:700;color:var(--ink)}
+.wv-heats figcaption span{font-weight:500;color:var(--muted);font-size:12px}
+.wv-heats canvas{width:100%;display:block}
+.wv-scale{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.wv-scale .bar{width:140px;max-width:36vw;height:10px;border-radius:5px;border:1px solid var(--line)}
+.wv-steptitle{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.wv-steptitle .tag{font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;background:var(--surface-2);color:var(--muted)}
+.wv-steptitle .tag.fw{background:color-mix(in srgb,var(--sk-accent) 14%,var(--surface));color:var(--sk-accent)}
+.wv-steptitle .tag.bw{background:color-mix(in srgb,var(--bad) 12%,var(--surface));color:var(--bad)}
+.wv-vis{display:flex;flex-direction:column;gap:12px;min-height:120px}
+.wv-formula{white-space:pre;font-size:12.5px}
+.wv-check{font-size:13.5px}
+details.wv-more{font-size:13.5px;color:var(--muted)}
+details.wv-more summary{cursor:pointer;font-weight:600;color:var(--ink)}
+details.wv-more summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+details.wv-more[open] summary{margin-bottom:8px}
+
+/* 3. 학습 */
+.wv-trainlay{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:1000px){.wv-trainlay{grid-template-columns:minmax(0,1fr)}}
+.wv-trainside{display:flex;flex-direction:column;gap:16px;min-width:0}
+.wv-trainlay.both{grid-template-columns:minmax(0,1fr)}
+.wv-trainlay.both .wv-trainside{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+@media (max-width:900px){.wv-trainlay.both .wv-trainside{grid-template-columns:minmax(0,1fr)}}
+.wv-maps{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+.wv-maps.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:640px){.wv-maps.two{grid-template-columns:minmax(0,1fr)}}
+.wv-map{display:flex;flex-direction:column;gap:6px;min-width:0}
+.wv-map h3{font-size:14px;margin:0;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.wv-map h3 .sub{font-size:12px;font-weight:500;color:var(--muted);font-family:var(--mono)}
+.wv-map canvas{width:100%;aspect-ratio:4/3;display:block;border-radius:10px;border:1px solid var(--line);background:var(--surface)}
+.wv-chart svg{display:block;width:100%;height:auto}
+.wv-chart .gl{stroke:var(--line);stroke-width:1}
+.wv-chart .ax{fill:var(--muted);font-size:11px;font-family:var(--mono)}
+.wv-chart .axl{fill:var(--muted);font-size:11.5px;font-family:var(--sans);font-weight:600}
+.wv-chart .ref{stroke:var(--faint);stroke-dasharray:4 4;stroke-width:1.2}
+.wv-chart .reft{fill:var(--faint);font-size:11px;font-family:var(--sans)}
+.wv-chart .sr{fill:none;stroke-width:2.4;stroke-linejoin:round;stroke-linecap:round}
+.wv-chart .sr.sg{stroke:var(--sg)} .wv-chart .sr.cb{stroke:var(--cb)}
+.wv-chart .el{font-size:11.5px;font-weight:700;font-family:var(--sans)}
+.wv-chart .el.sg{fill:var(--sg)} .wv-chart .el.cb{fill:var(--cb)}
+.wv-chart .empty{fill:var(--faint);font-size:13px;font-family:var(--sans)}
+.wv-probe td .nb{display:inline-block;margin-right:8px}
+.wv-probe td .nb small{color:var(--muted);font-family:var(--mono);margin-left:2px}
+.wv-probe td.ok-row{color:var(--ink)}
+
+/* 4. 예측 · 유사도 */
+.wv-chips{display:flex;flex-wrap:wrap;gap:6px}
+.wv-chip{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600;padding:4px 6px 4px 10px;border-radius:999px;border:1.5px solid var(--ctx);background:color-mix(in srgb,var(--ctx) 10%,var(--surface));color:var(--ink)}
+.wv-chip button{appearance:none;border:0;background:none;color:var(--muted);font:inherit;font-size:13px;cursor:pointer;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;padding:0}
+.wv-chip button:hover{background:var(--surface-2);color:var(--ink)}
+.wv-chip button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.wv-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.wv-row .sk-select{max-width:100%}
+.wv-big{font-family:var(--mono);font-size:24px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.wv-cmp2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.wv-cmp2 .sk-stat.on{border-color:var(--sk-accent);box-shadow:inset 0 0 0 1px var(--sk-accent)}
+.wv-srcbar{flex-direction:row;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:14px 18px}
+.wv-srcbar p{margin:0;font-size:14px;color:var(--muted);flex:1 1 260px}
+.wv-srcbar p b{color:var(--ink)}
+.wv-op{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--muted)}
+
+/* 5. 비교 */
+.wv-arch{transition:border-color .2s,box-shadow .2s}
+.wv-arch.on{border-color:var(--mc);box-shadow:inset 0 0 0 1px var(--mc)}
+.wv-arch h2{color:var(--mc)}
+.wv-arch svg{display:block;width:100%;height:auto;min-width:430px}
+#archCBsvg,#archSGsvg{overflow-x:auto;max-width:100%}
+.wv-arch .bx{fill:var(--surface);stroke:var(--line-strong);stroke-width:1.5}
+.wv-arch .bx.io{fill:var(--surface-2)}
+.wv-arch .bx.h{stroke:var(--mc);stroke-width:2.2;fill:color-mix(in srgb,var(--mc) 10%,var(--surface))}
+.wv-arch .t{font-size:13px;font-weight:700;fill:var(--ink);font-family:var(--sans)}
+.wv-arch .s{font-size:11px;fill:var(--muted);font-family:var(--sans)}
+.wv-arch .m{font-size:11.5px;font-weight:700;fill:var(--mc);font-family:var(--mono)}
+.wv-arch .ln{fill:none;stroke:var(--mc);stroke-width:1.6;opacity:.85}
+.wv-arch .ah{fill:var(--mc)}
+.wv-arch .ly{font-size:11.5px;font-weight:700;fill:var(--faint);font-family:var(--sans)}
+.wv-cmp td.cur,.wv-cmp th.cur{background:color-mix(in srgb,var(--sk-accent) 10%,var(--surface))}
+.wv-cmp td{white-space:normal;min-width:110px}
+.wv-cmp td:first-child{white-space:nowrap;color:var(--muted);font-weight:600}
+.wv-cmp .win{font-weight:700;color:var(--ink)}
+.wv-code{position:relative}
+.wv-code pre{margin:0;font-family:var(--mono);font-size:12.5px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow:auto;color:var(--ink)}
+.wv-code pre .cm{color:var(--muted)}
+.wv-code pre .kw{color:var(--sk-accent);font-weight:600}
+.wv-code pre .st{color:var(--c-drug)}
+.wv-code .sk-btn{position:absolute;top:8px;right:8px}
+
+@media (max-width:520px){
+  .sk-slider{min-width:0;width:100%}
+  .wv-bigseg{width:100%} .wv-bigseg button{flex:1 1 0;flex-direction:column;align-items:center;gap:1px;padding:8px 6px;font-size:15px}
+  .wv-tok,button.wv-tok{font-size:14.5px;padding:5px 7px 4px}
+  .wv-heats{gap:8px}
+  .wv-vec span{min-width:44px;font-size:12px}
+  .wv-vecrow{grid-template-columns:70px minmax(0,1fr)}
+}
+@media (prefers-reduced-motion: reduce){
+  .wv-tok,.wv-bars .tr .fl,.wv-arch{transition:none}
+  .wv-pair.pop{animation:none}
+}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)" aria-current="page">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">Word2Vec 시뮬레이터 (Skip-gram · CBOW)</h1>
+      <p class="ds-hero__lede">원-핫 벡터는 차원이 크고 의미를 담지 못합니다. “비슷한 문맥에 나오는 단어는 뜻이 비슷하다”는 분포 가설로, 작은 의료 문장 모음에서 Skip-gram(중심 → 주변)과 CBOW(주변 → 중심)를 직접 학습시킵니다. 윈도 슬라이딩으로 샘플 만들기, 한 샘플의 순전파·역전파, 단어 벡터 지도가 모이는 과정, 코사인 유사도까지 따라가 봅니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <div class="sk-card wv-modebar">
+    <div class="sk-seg wv-bigseg" id="modeSeg" role="group" aria-label="학습 방식 선택">
+      <button type="button" data-v="skipgram" aria-pressed="true">Skip-gram <small>중심 → 주변</small></button>
+      <button type="button" data-v="cbow" aria-pressed="false">CBOW <small>주변 → 중심</small></button>
+    </div>
+    <p class="wv-modedesc" id="modeDesc"></p>
+  </div>
+
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button type="button" class="sk-tab" role="tab" id="tab-data" aria-controls="pane-data" aria-selected="true"><span class="sk-num">1</span>학습 데이터 만들기</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-step" aria-controls="pane-step" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>한 번의 예측과 학습</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-train" aria-controls="pane-train" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>학습 진행</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-predict" aria-controls="pane-predict" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>단어 예측 · 유사도</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-compare" aria-controls="pane-compare" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>Skip-gram vs CBOW</button>
+  </nav>
+
+  <!-- ================= 1. 학습 데이터 만들기 ================= -->
+  <section id="pane-data" role="tabpanel" aria-labelledby="tab-data">
+    <div class="sk-side wv-side">
+      <div class="sk-card">
+        <div class="sk-head"><h2>학습 코퍼스</h2><span class="sk-hint">한 줄 = 한 문장 · 띄어쓰기 = 토큰</span></div>
+        <textarea id="corpus" class="sk-input wv-corpus" rows="14" spellcheck="false" aria-label="학습 코퍼스 (한 줄에 한 문장)"></textarea>
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--primary" id="corpApply">적용</button>
+          <button type="button" class="sk-btn" id="corpReset">기본 코퍼스</button>
+        </div>
+        <p class="wv-msg" id="corpMsg" aria-live="polite"></p>
+        <div class="sk-stats">
+          <div class="sk-stat"><b id="stSent">0</b><span>문장</span></div>
+          <div class="sk-stat"><b id="stTok">0</b><span>토큰</span></div>
+          <div class="sk-stat"><b id="stV">0</b><span>어휘 수 V</span></div>
+        </div>
+        <p class="sk-note">분포 가설: <b>비슷한 문맥에 나오는 단어는 뜻이 비슷하다.</b> 두통·발열·기침, 해열제·진통제·항생제, 의사·간호사처럼 같은 자리에 들어가는 단어를 일부러 넣었습니다.</p>
+      </div>
+
+      <div class="sk-card">
+        <div class="sk-head"><h2>윈도 슬라이딩으로 학습 샘플 만들기</h2><span class="sk-hint">중심 단어가 한 칸씩 움직입니다 · 키보드 → 다음</span></div>
+        <div class="sk-controls">
+          <div class="sk-slider" style="min-width:170px">
+            <div class="sk-sl-head"><label for="dW">윈도 크기 w (좌우 몇 칸)</label><b data-out="w">2</b></div>
+            <input type="range" id="dW" data-bind="w" min="1" max="3" step="1" value="2">
+          </div>
+          <div class="sk-group">
+            <button type="button" class="sk-btn sk-btn--sm" id="dFirst">처음</button>
+            <button type="button" class="sk-btn sk-btn--sm" id="dPrev">이전</button>
+            <button type="button" class="sk-btn sk-btn--sm" id="dNext">다음</button>
+            <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="dPlay">재생</button>
+          </div>
+          <div class="sk-slider" style="min-width:130px">
+            <div class="sk-sl-head"><label for="dSpeed">속도</label><b id="dSpeedV">1×</b></div>
+            <input type="range" id="dSpeed" min="0.5" max="4" step="0.5" value="1">
+          </div>
+        </div>
+        <div class="wv-sentnav">
+          <label class="sk-label" for="dSent">문장</label>
+          <select class="sk-select" id="dSent"></select>
+        </div>
+        <div class="wv-sent" id="dSentView" aria-live="polite"></div>
+        <div class="sk-formula" id="dNow"></div>
+        <div class="wv-card-h3"><h3>방금 만든 학습 샘플</h3><span class="sk-hint" id="dNewHint"></span></div>
+        <div class="wv-samp" id="dNew"></div>
+        <div class="wv-card-h3"><h3>이 문장에서 지금까지 만든 샘플</h3><span class="sk-hint" id="dListHint"></span></div>
+        <div class="wv-samplist" id="dList"></div>
+        <div class="wv-bigstat">
+          <div class="sk-stat" id="dStSG" style="--mc:var(--sg)"><b class="m" id="dCntSG">0</b><span>Skip-gram 샘플 (중심, 주변) 쌍</span></div>
+          <div class="sk-stat" id="dStCB" style="--mc:var(--cb)"><b class="m" id="dCntCB">0</b><span>CBOW 샘플 ([주변들], 중심)</span></div>
+          <div class="sk-stat"><b id="dRatio">0</b><span>Skip-gram ÷ CBOW</span></div>
+          <div class="sk-stat"><b id="dProg">0</b><span>지금까지 생성 (현재 모드)</span></div>
+        </div>
+        <p class="sk-note" id="dNote"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 2. 한 번의 예측과 학습 ================= -->
+  <section id="pane-step" role="tabpanel" aria-labelledby="tab-step" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>샘플 하나로 순전파 → 손실 → 역전파</h2><span class="sk-hint">단계를 누르거나 키보드 → 로 진행 · 6단계 뒤 [다음]은 가중치를 반영하고 다음 샘플로</span></div>
+      <div class="sk-controls">
+        <div class="sk-group" style="flex:1 1 320px;min-width:0">
+          <label class="sk-label" for="sSel">학습 샘플</label>
+          <select class="sk-select" id="sSel" style="flex:1 1 220px;min-width:0"></select>
+          <button type="button" class="sk-btn sk-btn--sm" id="sRand">무작위 샘플</button>
+        </div>
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--sm" id="sFirst">처음</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="sPrev">이전</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="sNext">다음</button>
+          <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="sPlay">재생</button>
+        </div>
+        <div class="sk-slider" style="min-width:120px">
+          <div class="sk-sl-head"><label for="sSpeed">속도</label><b id="sSpeedV">1×</b></div>
+          <input type="range" id="sSpeed" min="0.5" max="4" step="0.5" value="1">
+        </div>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-slider" style="min-width:190px">
+          <div class="sk-sl-head"><label for="sLr">학습률 η</label><b data-out="lr">0.050</b></div>
+          <input type="range" id="sLr" data-bind="lr" min="0.005" max="0.3" step="0.005" value="0.05">
+        </div>
+        <div class="sk-group"><span class="sk-label">출력층</span>
+          <div class="sk-seg" data-bind-seg="loss" role="group" aria-label="출력층 방식">
+            <button type="button" data-v="softmax" aria-pressed="true">전체 softmax</button>
+            <button type="button" data-v="ns" aria-pressed="false">네거티브 샘플링</button>
+          </div>
+        </div>
+        <div class="sk-slider wv-kbox" style="min-width:150px">
+          <div class="sk-sl-head"><label for="sK">오답 개수 k</label><b data-out="k">3</b></div>
+          <input type="range" id="sK" data-bind="k" min="2" max="5" step="1" value="3">
+        </div>
+        <button type="button" class="sk-btn sk-btn--sm wv-kbox" id="sRedraw">오답 다시 뽑기</button>
+      </div>
+      <ol class="sk-stepper" id="sStepper" aria-label="계산 단계"></ol>
+    </div>
+
+    <div class="wv-stepgrid" style="margin-top:16px">
+      <div class="sk-card">
+        <div class="wv-steptitle"><h2 id="sTitle"></h2><span class="tag" id="sTag"></span></div>
+        <div class="wv-vis" id="sVis"></div>
+        <div class="sk-formula wv-formula" id="sFormula"></div>
+        <p class="sk-note" id="sNote"></p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>가중치 행렬 (V×N)</h2>
+          <div class="sk-seg" id="hView" role="group" aria-label="히트맵 표시">
+            <button type="button" data-v="val" aria-pressed="true">값</button>
+            <button type="button" data-v="delta" aria-pressed="false">이번 변화량 Δ</button>
+          </div>
+        </div>
+        <div class="wv-heats">
+          <figure><figcaption>W<sub>in</sub> <span>입력 임베딩 · 행 = 단어 벡터</span></figcaption><canvas id="hIn" aria-label="입력 가중치 행렬 W_in 히트맵"></canvas></figure>
+          <figure><figcaption>W<sub>out</sub>ᵀ <span>출력 가중치 (전치해서 표시)</span></figcaption><canvas id="hOut" aria-label="출력 가중치 행렬 W_out 전치 히트맵"></canvas></figure>
+        </div>
+        <div class="wv-scale"><span id="hScaleLo">−</span><span class="bar" id="hScaleBar"></span><span id="hScaleHi">+</span>
+          <span><i class="wv-dot" style="background:var(--ink)"></i>입력 행</span><span><i class="wv-dot" style="background:var(--ok)"></i>정답</span><span class="wv-kbox"><i class="wv-dot" style="background:var(--bad)"></i>오답(네거티브)</span></div>
+        <p class="sk-hint" id="hHint" style="margin:0"></p>
+        <details class="wv-more">
+          <summary>역전파 기울기 검산 (수치 미분과 비교)</summary>
+          <p style="margin:0 0 8px">가중치 하나를 ±ε(=10⁻⁵)만큼 흔들어 손실 변화로 구한 기울기와, 위에서 손으로 유도한 기울기를 모든 원소에서 비교합니다.</p>
+          <button type="button" class="sk-btn sk-btn--sm" id="gcBtn">이 샘플로 검산</button>
+          <p class="sk-note wv-check" id="gcOut" style="margin-top:8px" hidden></p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 3. 학습 진행 ================= -->
+  <section id="pane-train" role="tabpanel" aria-labelledby="tab-train" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>코퍼스 전체로 에폭 반복 학습</h2><span class="sk-hint">같은 seed면 언제나 같은 결과</span></div>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--primary" id="tStart">학습 시작</button>
+          <button type="button" class="sk-btn" id="tStop" disabled>멈춤</button>
+          <button type="button" class="sk-btn" id="tReset">초기화</button>
+        </div>
+        <div class="sk-slider" style="min-width:170px">
+          <div class="sk-sl-head"><label for="tEp">목표 에폭</label><b data-out="epochs">100</b></div>
+          <input type="range" id="tEp" data-bind="epochs" min="10" max="400" step="10" value="100">
+        </div>
+        <div class="sk-group"><span class="sk-label">속도</span>
+          <div class="sk-seg" id="tSpeed" role="group" aria-label="학습 속도">
+            <button type="button" data-v="0.1" aria-pressed="false">천천히</button>
+            <button type="button" data-v="1" aria-pressed="true">보통</button>
+            <button type="button" data-v="4" aria-pressed="false">빠르게</button>
+          </div>
+        </div>
+        <label class="sk-check"><input type="checkbox" id="tBoth">두 모드 동시 학습 · 지도 나란히</label>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-slider" style="min-width:170px">
+          <div class="sk-sl-head"><label for="tLr">학습률 η</label><b data-out="lr">0.050</b></div>
+          <input type="range" id="tLr" data-bind="lr" min="0.005" max="0.3" step="0.005" value="0.05">
+        </div>
+        <div class="sk-slider" style="min-width:150px">
+          <div class="sk-sl-head"><label for="tW">윈도 크기 w</label><b data-out="w">2</b></div>
+          <input type="range" id="tW" data-bind="w" min="1" max="3" step="1" value="2">
+        </div>
+        <div class="sk-group"><span class="sk-label">출력층</span>
+          <div class="sk-seg" data-bind-seg="loss" role="group" aria-label="출력층 방식">
+            <button type="button" data-v="softmax" aria-pressed="true">softmax</button>
+            <button type="button" data-v="ns" aria-pressed="false">네거티브 샘플링</button>
+          </div>
+        </div>
+        <div class="sk-slider wv-kbox" style="min-width:130px">
+          <div class="sk-sl-head"><label for="tK">오답 k</label><b data-out="k">3</b></div>
+          <input type="range" id="tK" data-bind="k" min="2" max="5" step="1" value="3">
+        </div>
+        <div class="sk-group">
+          <label class="sk-label" for="tN">벡터 차원 N</label>
+          <select class="sk-select" id="tN"></select>
+        </div>
+        <div class="sk-group">
+          <label class="sk-label" for="tSeed">seed</label>
+          <input class="sk-input" id="tSeed" type="number" min="1" max="99999" step="1" value="160" style="width:90px">
+        </div>
+      </div>
+      <div class="sk-stats" id="tStats"></div>
+    </div>
+
+    <div class="wv-trainlay" id="tLay" style="margin-top:16px">
+      <div class="sk-card">
+        <div class="sk-head"><h2>단어 벡터 지도 (N차원 → PCA 2D)</h2>
+          <label class="sk-check"><input type="checkbox" id="tHide">조사·어미 숨기기</label>
+        </div>
+        <div class="sk-legend" id="catLegend"></div>
+        <div class="wv-maps" id="maps"></div>
+        <p class="sk-hint" style="margin:0">각 단어 벡터를 길이 1로 맞춘 뒤(코사인 기준) 주성분 두 개 축에 투영했습니다. 가까이 모인 점일수록 벡터 방향이 비슷합니다.</p>
+      </div>
+      <div class="wv-trainside">
+        <div class="sk-card">
+          <div class="sk-head"><h2>손실 곡선</h2><span class="sk-hint">에폭마다 샘플 평균 손실</span></div>
+          <div class="wv-chart" id="lossChart" role="img" aria-label="에폭별 평균 손실 그래프"></div>
+        </div>
+        <div class="sk-card">
+          <div class="sk-head"><h2>가장 가까운 단어 (코사인)</h2></div>
+          <div class="sk-scroll"><table class="sk-table wv-probe" id="probe"></table></div>
+          <p class="sk-note" id="tNote">학습 결과는 데이터에 좌우됩니다. 코퍼스(1번 탭)를 바꾸거나 문장을 줄이면 지도와 이웃 단어가 달라집니다. 의료 코퍼스로 학습하면 ‘두통’ 옆에 증상 단어가, 일반 코퍼스라면 전혀 다른 단어가 옵니다(도메인 임베딩).</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 4. 단어 예측 · 유사도 ================= -->
+  <section id="pane-predict" role="tabpanel" aria-labelledby="tab-predict" hidden>
+    <div class="sk-card wv-srcbar">
+      <div class="sk-group"><span class="sk-label">가중치</span>
+        <div class="sk-seg" id="pSrc" role="group" aria-label="사용할 가중치">
+          <button type="button" data-v="after" aria-pressed="true">지금 가중치 (학습 후)</button>
+          <button type="button" data-v="before" aria-pressed="false">학습 전 (무작위 초기값)</button>
+        </div>
+      </div>
+      <p id="pStatus"></p>
+      <button type="button" class="sk-btn" id="pTrain">바로 학습</button>
+    </div>
+
+    <div class="sk-grid2" style="margin-top:16px">
+      <div class="sk-card" id="pPredCard">
+        <div class="sk-head"><h2 id="pPredTitle">단어 예측</h2><span class="sk-hint" id="pPredHint"></span></div>
+        <div id="pSG">
+          <div class="wv-row">
+            <label class="sk-label" for="pCenter">중심 단어</label>
+            <select class="sk-select" id="pCenter"></select>
+            <div class="sk-slider" style="min-width:140px">
+              <div class="sk-sl-head"><label for="pK1">상위 k</label><b id="pK1v">8</b></div>
+              <input type="range" id="pK1" min="3" max="12" step="1" value="8">
+            </div>
+          </div>
+        </div>
+        <div id="pCB" hidden>
+          <div class="wv-row">
+            <label class="sk-label" for="pSent">문장</label>
+            <select class="sk-select" id="pSent" style="flex:1 1 200px;min-width:0"></select>
+          </div>
+          <p class="sk-hint" style="margin:0">빈칸으로 만들 단어를 누르세요. 창 안의 주변 단어가 입력 칩이 됩니다.</p>
+          <div class="wv-sent" id="pSentView"></div>
+          <div class="wv-row">
+            <span class="sk-label">주변 단어 (입력)</span>
+            <div class="wv-chips" id="pCtx"></div>
+          </div>
+          <div class="wv-row">
+            <label class="sk-label" for="pAdd">단어 추가</label>
+            <select class="sk-select" id="pAdd"></select>
+            <button type="button" class="sk-btn sk-btn--sm" id="pAddBtn">추가</button>
+            <div class="sk-slider" style="min-width:140px">
+              <div class="sk-sl-head"><label for="pK2">상위 k</label><b id="pK2v">8</b></div>
+              <input type="range" id="pK2" min="3" max="12" step="1" value="8">
+            </div>
+          </div>
+        </div>
+        <div class="sk-formula" id="pPredF"></div>
+        <div class="wv-bars" id="pBars"></div>
+        <p class="sk-note" id="pPredNote"></p>
+      </div>
+
+      <div class="sk-card">
+        <div class="sk-head"><h2>코사인 유사도</h2><span class="sk-hint">학습 후 W<sub>in</sub>의 행 = 단어 벡터</span></div>
+        <div class="wv-row">
+          <label class="sk-label" for="pA">단어 A</label><select class="sk-select" id="pA"></select>
+          <label class="sk-label" for="pB">단어 B</label><select class="sk-select" id="pB"></select>
+        </div>
+        <div class="wv-cmp2">
+          <div class="sk-stat" id="pCosBefore"><b>0</b><span>학습 전 (무작위)</span></div>
+          <div class="sk-stat" id="pCosAfter"><b>0</b><span>지금 가중치</span></div>
+        </div>
+        <div class="sk-formula wv-formula" id="pCosF"></div>
+        <p class="sk-note" id="pCosNote"></p>
+        <div class="sk-head"><h3>A와 가장 가까운 단어</h3><span class="sk-hint">자기 자신 제외</span></div>
+        <div class="wv-bars" id="pNb"></div>
+      </div>
+    </div>
+
+    <div class="sk-card" style="margin-top:16px">
+      <div class="sk-head"><h2>벡터 연산으로 유사어 찾기</h2><span class="sk-hint">결과 벡터와 코사인이 큰 단어 (입력 단어 제외)</span></div>
+      <div class="wv-row">
+        <select class="sk-select" id="pX" aria-label="첫 단어"></select><span class="wv-op">−</span>
+        <select class="sk-select" id="pY" aria-label="빼는 단어"></select><span class="wv-op">+</span>
+        <select class="sk-select" id="pZ" aria-label="더하는 단어"></select><span class="wv-op">≈ ?</span>
+        <label class="sk-check" style="margin-left:8px"><input type="checkbox" id="pNoFunc" checked>조사·어미 빼고 찾기</label>
+      </div>
+      <div class="sk-grid2">
+        <div class="sk-formula wv-formula" id="pArF"></div>
+        <div class="wv-bars" id="pAr"></div>
+      </div>
+      <p class="sk-note">문장 17개짜리 작은 코퍼스라 벡터 연산은 쉽게 흔들립니다. ‘진통제 − 두통 + 발열’은 “두통에 쓰는 약에서 두통을 빼고 발열을 더하면 → 발열에 쓰는 약(해열제)?”을 묻는 식입니다. ‘의사 − 처방 + 조제’(→ 약사)도 해 보세요. 큰 코퍼스로 학습한 모델에서 이런 관계가 더 뚜렷해집니다.</p>
+    </div>
+  </section>
+
+  <!-- ================= 5. 비교 ================= -->
+  <section id="pane-compare" role="tabpanel" aria-labelledby="tab-compare" hidden>
+    <div class="sk-grid2">
+      <div class="sk-card wv-arch" id="archCB" style="--mc:var(--cb)"><div class="sk-head"><h2>CBOW: 주변 → 중심</h2><span class="sk-hint">여러 입력을 평균해 하나를 예측</span></div><div id="archCBsvg" role="img" aria-label="CBOW 구조: 주변 단어 원-핫 입력들이 같은 W_in을 거쳐 평균된 투사층 h가 되고, W_out과 softmax로 중심 단어 하나를 예측"></div></div>
+      <div class="sk-card wv-arch" id="archSG" style="--mc:var(--sg)"><div class="sk-head"><h2>Skip-gram: 중심 → 주변</h2><span class="sk-hint">입력 하나로 여러 위치를 예측</span></div><div id="archSGsvg" role="img" aria-label="Skip-gram 구조: 중심 단어 원-핫 입력이 W_in을 거쳐 투사층 h가 되고, 같은 W_out과 softmax로 주변 단어 각각을 예측"></div></div>
+    </div>
+
+    <div class="sk-card" style="margin-top:16px">
+      <div class="sk-head"><h2>같은 코퍼스 · 같은 창에서 비교</h2>
+        <button type="button" class="sk-btn sk-btn--sm" id="cTime">한 에폭 시간 재기</button></div>
+      <div class="sk-scroll"><table class="sk-table wv-cmp" id="cTable"></table></div>
+      <p class="sk-hint" style="margin:0" id="cHint"></p>
+    </div>
+
+    <div class="sk-grid2" style="margin-top:16px">
+      <div class="sk-card">
+        <div class="sk-head"><h2>파라미터 수</h2><span class="sk-hint">두 모드 모두 같음</span></div>
+        <div class="sk-formula wv-formula" id="cParam"></div>
+        <p class="sk-note">학습이 끝나면 <b>W<sub>in</sub>의 각 행을 단어 벡터</b>로 씁니다 (Gensim의 <span class="sk-mono">model.wv</span>). W<sub>out</sub>은 학습용이라 보통 버립니다.</p>
+        <div class="sk-formula wv-formula" id="cNs"></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>Gensim 코드 (현재 설정)</h2><span class="sk-hint">설정을 바꾸면 바로 바뀝니다</span></div>
+        <div class="wv-code"><pre id="cCode"></pre><button type="button" class="sk-btn sk-btn--sm" id="cCopy">복사</button></div>
+        <p class="sk-hint" style="margin:0">Gensim은 창 크기를 1~w 사이에서 무작위로 줄이고 학습률을 점점 낮추는 등 세부 방식이 달라, 숫자는 이 시뮬레이터와 똑같이 나오지 않습니다.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20260930c"></script>
+<script>
+(function(){
+"use strict";
+/* ================= Word2Vec 엔진 (순수 JS · 수동 역전파) ================= */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+function tokenize(text){return text.split(/\n+/).map(l=>l.trim().split(/\s+/).filter(Boolean)).filter(s=>s.length>0);}
+function buildVocab(sents){const words=[],index=new Map(),counts=[];sents.forEach(s=>s.forEach(w=>{if(!index.has(w)){index.set(w,words.length);words.push(w);counts.push(0);}counts[index.get(w)]++;}));return{words,index,counts};}
+function makeSamples(sents,vocab,w,mode){
+  const out=[];
+  sents.forEach((s,si)=>{const ids=s.map(x=>vocab.index.get(x));
+    for(let i=0;i<ids.length;i++){const ctx=[];
+      for(let j=Math.max(0,i-w);j<=Math.min(ids.length-1,i+w);j++) if(j!==i) ctx.push(j);
+      if(!ctx.length) continue;
+      if(mode==="skipgram") ctx.forEach(j=>out.push({s:si,i,cpos:[j],inp:[ids[i]],t:ids[j]}));
+      else out.push({s:si,i,cpos:ctx,inp:ctx.map(j=>ids[j]),t:ids[i]});
+    }});
+  return out;
+}
+function newModel(V,N,seed){
+  const r=mulberry32(seed),Win=new Float64Array(V*N),Wo=new Float64Array(V*N);
+  for(let i=0;i<V*N;i++)Win[i]=(r()-0.5);
+  for(let i=0;i<V*N;i++)Wo[i]=(r()-0.5);
+  return{V,N,seed,Win,Wo,Win0:Float64Array.from(Win),Wo0:Float64Array.from(Wo),rng:mulberry32(seed^0x9E3779B9),epoch:0,steps:0,hist:[]};
+}
+function negTable(counts){const p=counts.map(c=>Math.pow(c,0.75));const z=p.reduce((a,b)=>a+b,0);let acc=0;return p.map(v=>(acc+=v/z));}
+function drawNegs(cdf,k,t,rng){const out=[];let guard=0;while(out.length<k&&guard++<1000){const r=rng();let lo=0,hi=cdf.length-1;while(lo<hi){const m=(lo+hi)>>1;if(cdf[m]<r)lo=m+1;else hi=m;}if(lo!==t&&!out.includes(lo))out.push(lo);}return out;}
+const sigm=x=>x>=0?1/(1+Math.exp(-x)):Math.exp(x)/(1+Math.exp(x));
+/* 한 샘플: 순전파 + 기울기 (가중치는 건드리지 않음) */
+function computeStep(m,inp,t,loss,negs){
+  const V=m.V,N=m.N,h=new Float64Array(N);
+  inp.forEach(a=>{for(let d=0;d<N;d++)h[d]+=m.Win[a*N+d]/inp.length;});
+  const u=new Float64Array(V);for(let v=0;v<V;v++){let s=0;for(let d=0;d<N;d++)s+=m.Wo[v*N+d]*h[d];u[v]=s;}
+  const res={inp,t,h,u,loss};
+  const dh=new Float64Array(N);const gOut=new Map(); // v -> coefficient e_v  (dWo[v] = e_v * h)
+  if(loss.type==="softmax"){
+    let mx=-Infinity;for(let v=0;v<V;v++)mx=Math.max(mx,u[v]);
+    const p=new Float64Array(V);let z=0;for(let v=0;v<V;v++){p[v]=Math.exp(u[v]-mx);z+=p[v];}for(let v=0;v<V;v++)p[v]/=z;
+    res.p=p;res.L=-Math.log(Math.max(p[t],1e-300));
+    for(let v=0;v<V;v++){const e=p[v]-(v===t?1:0);gOut.set(v,e);for(let d=0;d<N;d++)dh[d]+=e*m.Wo[v*N+d];}
+  }else{
+    const ids=[t,...negs],lab=ids.map((_,j)=>j===0?1:0);let L=0;const sg=[];
+    ids.forEach((v,j)=>{const s=sigm(u[v]);sg.push(s);L+=lab[j]?-Math.log(Math.max(s,1e-300)):-Math.log(Math.max(1-s,1e-300));
+      const e=s-lab[j];gOut.set(v,(gOut.get(v)||0)+e);for(let d=0;d<N;d++)dh[d]+=e*m.Wo[v*N+d];});
+    res.negs=negs;res.ids=ids;res.sig=sg;res.L=L;
+  }
+  res.gOut=gOut;res.dh=dh;
+  const gIn=new Map();inp.forEach(a=>{const g=gIn.get(a)||new Float64Array(N);for(let d=0;d<N;d++)g[d]+=dh[d]/inp.length;gIn.set(a,g);});
+  res.gIn=gIn;return res;
+}
+function applyStep(m,res,lr){
+  const N=m.N;
+  res.gOut.forEach((e,v)=>{for(let d=0;d<N;d++)m.Wo[v*N+d]-=lr*e*res.h[d];});
+  res.gIn.forEach((g,a)=>{for(let d=0;d<N;d++)m.Win[a*N+d]-=lr*g[d];});
+}
+function lossOnly(m,inp,t,loss,negs){return computeStep(m,inp,t,loss,negs).L;}
+function trainSample(m,smp,loss,lr,cdf){
+  const negs=loss.type==="ns"?drawNegs(cdf,loss.k,smp.t,m.rng):null;
+  const r=computeStep(m,smp.inp,smp.t,loss,negs);applyStep(m,r,lr);m.steps++;return r.L;
+}
+function shuffle(a,rng){for(let i=a.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function vec(W,N,i){return Array.from(W.subarray(i*N,i*N+N));}
+function cosine(a,b){let s=0,na=0,nb=0;for(let i=0;i<a.length;i++){s+=a[i]*b[i];na+=a[i]*a[i];nb+=b[i]*b[i];}return s/(Math.sqrt(na*nb)||1);}
+function neighbors(W,N,V,q,exclude,k){const out=[];for(let v=0;v<V;v++){if(exclude&&exclude.includes(v))continue;out.push({v,c:cosine(q,vec(W,N,v))});}out.sort((a,b)=>b.c-a.c);return out.slice(0,k);}
+/* PCA 2D (단위 길이로 정규화 후) */
+function pca2(W,N,V,prev){
+  const X=[];for(let v=0;v<V;v++){const a=vec(W,N,v);const n=Math.hypot(...a)||1;X.push(a.map(x=>x/n));}
+  const mu=new Array(N).fill(0);X.forEach(r=>r.forEach((x,d)=>mu[d]+=x/V));X.forEach(r=>r.forEach((x,d)=>r[d]=x-mu[d]));
+  const C=[];for(let i=0;i<N;i++){C.push(new Array(N).fill(0));for(let j=0;j<N;j++){let s=0;for(let v=0;v<V;v++)s+=X[v][i]*X[v][j];C[i][j]=s/V;}}
+  let tot=0;for(let i=0;i<N;i++)tot+=C[i][i];
+  const comps=[],vals=[];
+  for(let c=0;c<2;c++){let b=(prev&&prev[c])?prev[c].slice():Array.from({length:N},(_,i)=>Math.sin(i*1.7+c*0.9+1));
+    for(let it=0;it<200;it++){const nb=C.map(row=>row.reduce((s,x,j)=>s+x*b[j],0));const n=Math.hypot(...nb)||1;b=nb.map(x=>x/n);}
+    const lam=b.reduce((s,x,i)=>s+x*C[i].reduce((ss,y,j)=>ss+y*b[j],0),0);
+    if(prev&&prev[c]&&b.reduce((s,x,i)=>s+x*prev[c][i],0)<0)b=b.map(x=>-x);
+    comps.push(b);vals.push(lam);for(let i=0;i<N;i++)for(let j=0;j<N;j++)C[i][j]-=lam*b[i]*b[j];}
+  const pts=X.map(r=>[r.reduce((s,x,d)=>s+x*comps[0][d],0),r.reduce((s,x,d)=>s+x*comps[1][d],0)]);
+  return{pts,comps,vals,tot};
+}
+/* ================= 표시 도우미 ================= */
+const $=id=>document.getElementById(id);
+const reduceMotion=!!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches);
+const MINUS="−";
+function f(v,d=3){if(!isFinite(v))return"∞";const s=Math.abs(v).toFixed(d);if(+s===0)return(0).toFixed(d);return(v<0?MINUS:"")+s;}
+const fp=(v,d=3)=>v<0?"("+f(v,d)+")":f(v,d);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const vecStr=(a,d=2)=>"["+Array.from(a).map(x=>f(x,d)).join(", ")+"]";
+function sci(v){if(v===0)return"0";const e=Math.floor(Math.log10(Math.abs(v)));const m=v/Math.pow(10,e);const SUP={"-":"⁻","0":"⁰","1":"¹","2":"²","3":"³","4":"⁴","5":"⁵","6":"⁶","7":"⁷","8":"⁸","9":"⁹"};return m.toFixed(1)+"×10"+String(e).split("").map(c=>SUP[c]).join("");}
+const comma=n=>Math.round(n).toLocaleString("en-US");
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+function hexRgb(h){h=(h||"#888").replace("#","");if(h.length===3)h=h.split("").map(c=>c+c).join("");const n=parseInt(h,16);return[(n>>16)&255,(n>>8)&255,n&255];}
+function mixc(a,b,t){return[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
+const rgb=c=>`rgb(${c[0]|0},${c[1]|0},${c[2]|0})`;
+function fitCanvas(cv){const dpr=window.devicePixelRatio||1;const w=Math.max(40,cv.clientWidth),h=Math.max(40,cv.clientHeight||w);cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);const ctx=cv.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);return{ctx,w,h};}
+function segInit(el,onChange){el.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{segSet(el,b.dataset.v);onChange(b.dataset.v);}));}
+function segSet(el,v){el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x.dataset.v===String(v)?"true":"false"));}
+
+/* ================= 코퍼스 · 범주 ================= */
+const DEFAULT_CORPUS=[
+"환자 는 두통 과 발열 을 호소 했다","환자 는 기침 과 발열 을 호소 했다","환자 는 복통 과 두통 을 호소 했다",
+"의사 는 환자 에게 해열제 를 처방 했다","의사 는 환자 에게 진통제 를 처방 했다","의사 는 환자 에게 항생제 를 처방 했다",
+"간호사 는 환자 의 체온 을 측정 했다","간호사 는 환자 의 혈압 을 측정 했다","의사 는 환자 의 맥박 을 측정 했다",
+"간호사 는 환자 에게 해열제 를 투여 했다","간호사 는 환자 에게 진통제 를 투여 했다",
+"약사 는 환자 에게 소화제 를 조제 했다","약사 는 환자 에게 항생제 를 조제 했다",
+"발열 이 심하면 해열제 를 복용 한다","두통 이 심하면 진통제 를 복용 한다","복통 이 심하면 소화제 를 복용 한다","기침 이 심하면 항생제 를 복용 한다"].join("\n");
+const CATS=[
+ {id:"sym",name:"증상",v:"--c-sym",words:["두통","발열","기침","복통","설사","구토","감염","통증","오한","어지럼증","염증"]},
+ {id:"drug",name:"약",v:"--c-drug",words:["해열제","진통제","항생제","소화제","수액","주사","기침약","연고","소염제"]},
+ {id:"person",name:"사람",v:"--c-person",words:["환자","의사","간호사","약사","보호자"]},
+ {id:"meas",name:"측정값",v:"--c-meas",words:["체온","혈압","맥박","혈당","체중","산소포화도"]},
+ {id:"act",name:"행위",v:"--c-act",words:["호소","처방","측정","투여","조제","복용","진찰","검사","치료"]},
+ {id:"other",name:"기타",v:"--c-other",words:[]},
+ {id:"func",name:"조사·어미",v:"--faint",words:["는","은","이","가","을","를","과","와","의","에게","에","에는","에서","했다","한다","하다","했고","도","로","으로","및"]}
+];
+const catOf=w=>CATS.find(c=>c.words.includes(w))||CATS.find(c=>c.id==="other");
+const MODES={skipgram:{name:"Skip-gram",cls:"sg",v:"--sg"},cbow:{name:"CBOW",cls:"cb",v:"--cb"}};
+const TABS=["data","step","train","predict","compare"];
+
+/* ================= 상태 ================= */
+const ST={mode:"skipgram",tab:"data",w:2,N:8,lr:0.05,loss:"softmax",k:3,seed:160,epochs:100,both:false,hide:false,src:"after",epf:1};
+let C=null,ver=0;const M={};
+const lossCfg=()=>({type:ST.loss,k:ST.k});
+const WD=i=>C.voc.words[i];
+const IDX=w=>C.voc.index.get(w);
+function setCorpus(text){const sents=tokenize(text);const voc=buildVocab(sents);C={text,sents,voc,V:voc.words.length,cdf:negTable(voc.counts),tokens:sents.reduce((a,s)=>a+s.length,0)};rebuildSamples();}
+function rebuildSamples(){C.samples={skipgram:makeSamples(C.sents,C.voc,ST.w,"skipgram"),cbow:makeSamples(C.sents,C.voc,ST.w,"cbow")};ver++;}
+function freshModel(){const m=newModel(C.V,ST.N,ST.seed);Object.assign(m,{goal:0,pos:0,sum:0,ord:null,ordVer:-1,pc:null,sc:0});return m;}
+function resetModels(){M.skipgram=freshModel();M.cbow=freshModel();}
+function avgLoss(m,k){const S=C.samples[k];if(!S.length)return 0;const r=mulberry32(1),lc=lossCfg();let s=0;S.forEach(x=>{s+=computeStep(m,x.inp,x.t,lc,lc.type==="ns"?drawNegs(C.cdf,lc.k,x.t,r):null).L;});return s/S.length;}
+function trainChunk(m,k,n){const S=C.samples[k];if(!S.length)return;
+  if(!m.hist.length)m.hist.push({e:0,L:avgLoss(m,k)});
+  if(m.ordVer!==ver||!m.ord){m.ord=S.slice();shuffle(m.ord,m.rng);m.ordVer=ver;m.pos=0;m.sum=0;}
+  const lc=lossCfg();
+  for(let c=0;c<n&&m.epoch<m.goal;c++){m.sum+=trainSample(m,m.ord[m.pos++],lc,ST.lr,C.cdf);
+    if(m.pos>=m.ord.length){m.epoch++;m.hist.push({e:m.epoch,L:m.sum/m.ord.length});shuffle(m.ord,m.rng);m.pos=0;m.sum=0;}}
+}
+function sampleLabel(k,x,full){const w=x.inp.map(WD);return k==="skipgram"?`${w[0]} → ${WD(x.t)}`:`[${w.join(" · ")}] → ${WD(x.t)}`;}
+function pairHTML(k,x,cls){const w=x.inp.map(WD);
+  return k==="skipgram"?`<span class="wv-pair ${cls||""}"><span class="c">${esc(w[0])}</span><span class="ar">→</span><span class="x">${esc(WD(x.t))}</span></span>`
+  :`<span class="wv-pair ${cls||""}"><span class="x">[${w.map(esc).join(" · ")}]</span><span class="ar">→</span><span class="c">${esc(WD(x.t))}</span></span>`;}
+function barsHTML(rows,signed){return rows.map(r=>{if(r.gap)return'<div class="gap"></div>';
+  const t=Math.min(1,Math.abs(r.val)/(r.max||1));
+  const fl=signed?`<div class="fl ${r.cls||""}" style="left:${r.val<0?50-50*t:50}%;width:${50*t}%"></div><div class="mid"></div>`:`<div class="fl ${r.cls||""}" style="width:${100*t}%"></div>`;
+  return`<div class="w ${r.wcls||""}" title="${esc(r.w)}">${esc(r.w)}</div><div class="tr${signed?" div":""}">${fl}</div><div class="v">${r.txt}</div>`;}).join("");}
+function vecHTML(a,mx){return'<div class="wv-vec">'+Array.from(a).map(x=>{const t=Math.min(1,Math.abs(x)/(mx||1));return`<span style="background:color-mix(in srgb,var(${x<0?"--hneg":"--hpos"}) ${Math.round(t*55)}%,var(--surface-2))">${f(x,2)}</span>`;}).join("")+"</div>";}
+const vmax=(...arrs)=>arrs.reduce((m,a)=>Math.max(m,...Array.from(a).map(Math.abs)),1e-9);
+
+/* ================= 모드 · 탭 · 해시 ================= */
+const tabBtns=TABS.map(t=>$("tab-"+t));
+function setHash(){try{history.replaceState(null,"","#"+ST.mode+(ST.tab!=="data"?"/"+ST.tab:""));}catch(e){}}
+function parseHash(){const out={};(location.hash||"").slice(1).split(/[\/&,]/).forEach(p=>{p=p.toLowerCase();if(p==="skipgram"||p==="sg")out.m="skipgram";else if(p==="cbow")out.m="cbow";else if(TABS.includes(p))out.t=p;});return out;}
+function showTab(t,focus){ST.tab=t;tabBtns.forEach(b=>{const on=b.id==="tab-"+t;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;$(b.getAttribute("aria-controls")).hidden=!on;if(on&&focus)b.focus();});
+  if(t!=="data")dStop();if(t!=="step")sStop();setHash();render();}
+tabBtns.forEach((b,i)=>{b.addEventListener("click",()=>showTab(TABS[i]));
+  b.addEventListener("keydown",e=>{const d=e.key==="ArrowRight"?1:e.key==="ArrowLeft"?-1:0;if(!d)return;e.preventDefault();showTab(TABS[(i+d+TABS.length)%TABS.length],true);});});
+function setMode(m){ST.mode=m;segSet($("modeSeg"),m);
+  $("modeDesc").innerHTML=m==="skipgram"
+    ?'<b class="wv-sg">Skip-gram</b>: 중심 단어 하나로 창 안의 주변 단어를 <b>하나씩</b> 예측합니다. (중심, 주변) 쌍 하나가 학습 샘플 하나입니다.'
+    :'<b class="wv-cb">CBOW</b>(Continuous Bag of Words): 창 안의 주변 단어 벡터를 <b>평균</b> 내어 가운데 빈칸(중심 단어)을 예측합니다. 중심 위치 하나가 학습 샘플 하나입니다.';
+  dStop();sStop();setHash();render();}
+segInit($("modeSeg"),v=>setMode(v));
+window.addEventListener("hashchange",()=>{const h=parseHash();if(h.m&&h.m!==ST.mode)setMode(h.m);if(h.t&&h.t!==ST.tab)showTab(h.t);});
+function render(){({data:dRender,step:sRender,train:tRender,predict:pRender,compare:cRender})[ST.tab]();}
+
+/* ================= 공유 조작 (여러 탭에 같은 값) ================= */
+const OUTF={w:v=>String(v),lr:v=>v.toFixed(3),k:v=>String(v),epochs:v=>String(v)};
+function syncOut(key){document.querySelectorAll(`[data-out="${key}"]`).forEach(e=>e.textContent=OUTF[key](ST[key]));
+  document.querySelectorAll(`input[data-bind="${key}"]`).forEach(i=>{if(+i.value!==ST[key])i.value=ST[key];});}
+function syncSeg(key){document.querySelectorAll(`[data-bind-seg="${key}"]`).forEach(s=>segSet(s,ST[key]));}
+function syncK(){document.querySelectorAll(".wv-kbox").forEach(e=>e.hidden=ST.loss!=="ns");}
+document.querySelectorAll("input[data-bind]").forEach(inp=>inp.addEventListener("input",()=>{const key=inp.dataset.bind;ST[key]=+inp.value;syncOut(key);onParam(key);}));
+document.querySelectorAll("[data-bind-seg]").forEach(seg=>seg.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{const key=seg.dataset.bindSeg;ST[key]=b.dataset.v;syncSeg(key);onParam(key);})));
+function onParam(key){
+  if(key==="w"){rebuildSamples();dClamp();}
+  if(key==="loss"||key==="k"){syncK();S.negs=null;}
+  render();
+}
+
+/* ================= 1. 학습 데이터 만들기 ================= */
+const D={si:0,i:2,timer:null,ver:-1,anim:false};
+function dClamp(){D.si=Math.min(D.si,C.sents.length-1);D.i=Math.min(D.i,C.sents[D.si].length-1);}
+function ctxPos(len,i){const a=[];for(let j=Math.max(0,i-ST.w);j<=Math.min(len-1,i+ST.w);j++)if(j!==i)a.push(j);return a;}
+function dMove(d){let si=D.si,i=D.i+d;
+  if(i>=C.sents[si].length){si++;i=0;if(si>=C.sents.length)return false;}
+  else if(i<0){si--;if(si<0)return false;i=C.sents[si].length-1;}
+  D.si=si;D.i=i;return true;}
+function dNext(){dMove(1);D.anim=true;dRender();}
+function dPrev(){dMove(-1);D.anim=false;dRender();}
+function dStop(){if(D.timer){clearInterval(D.timer);D.timer=null;}$("dPlay").textContent="재생";}
+function dPlay(){if(D.timer){dStop();return;}
+  if(D.si===C.sents.length-1&&D.i===C.sents[D.si].length-1){D.si=0;D.i=0;}
+  $("dPlay").textContent="멈춤";
+  D.timer=setInterval(()=>{if(!dMove(1)){dStop();return;}D.anim=true;dRender();},Math.round(1000/(+$("dSpeed").value)));}
+function dRender(){
+  $("stSent").textContent=C.sents.length;$("stTok").textContent=C.tokens;$("stV").textContent=C.V;
+  if(D.ver!==ver){D.ver=ver;$("dSent").innerHTML=C.sents.map((s,k)=>`<option value="${k}">${k+1}. ${esc(s.join(" "))}</option>`).join("");}
+  $("dSent").value=D.si;
+  const s=C.sents[D.si],cp=ctxPos(s.length,D.i),win=new Set(cp);
+  $("dSentView").innerHTML=s.map((w,j)=>`<span class="wv-tok ${j===D.i?"cen":win.has(j)?"ctx":"out"}"><sub>${j}</sub>${esc(w)}</span>`).join("");
+  $("dNow").innerHTML=`중심 w<sub>t</sub> = “${esc(s[D.i])}” (위치 ${D.i}) · 창 ±${ST.w} → 주변 위치 ${cp.length?cp.join(", "):"없음"} = [${cp.map(j=>esc(s[j])).join(", ")}]`;
+  const k=ST.mode,arr=C.samples[k];
+  const now=arr.filter(x=>x.s===D.si&&x.i===D.i);
+  $("dNew").innerHTML=now.length?now.map(x=>pairHTML(k,x,"new"+(D.anim&&!reduceMotion?" pop":""))).join(""):'<span class="sk-hint">주변 단어가 없어 샘플이 생기지 않습니다.</span>';
+  $("dNewHint").textContent=k==="skipgram"?`(중심, 주변) 쌍 ${now.length}개`:`([주변 ${now.length?now[0].inp.length:0}개], 중심) 1개`;
+  const inSent=arr.filter(x=>x.s===D.si&&x.i<=D.i);const tot=arr.filter(x=>x.s===D.si).length;
+  $("dList").innerHTML=inSent.map(x=>pairHTML(k,x,x.i===D.i?"new":"")).join("");
+  $("dListHint").textContent=`${inSent.length} / ${tot}개`;
+  const nSG=C.samples.skipgram.length,nCB=C.samples.cbow.length;
+  $("dCntSG").textContent=nSG;$("dCntCB").textContent=nCB;$("dRatio").textContent=(nSG/Math.max(1,nCB)).toFixed(2)+"배";
+  const done=arr.filter(x=>x.s<D.si||(x.s===D.si&&x.i<=D.i)).length;
+  $("dProg").textContent=`${done} / ${arr.length}`;
+  $("dStSG").classList.toggle("on",k==="skipgram");$("dStCB").classList.toggle("on",k==="cbow");
+  $("dNote").innerHTML=k==="skipgram"
+    ?`<b>Skip-gram</b>은 중심 위치 하나에서 주변 단어 수만큼(최대 2w = ${2*ST.w}개) 샘플이 생깁니다. 그래서 같은 코퍼스에서 샘플이 CBOW의 <b>${(nSG/Math.max(1,nCB)).toFixed(2)}배</b>입니다. 학습은 느리지만 단어마다 업데이트 기회가 많아 드문 단어·작은 데이터에 강합니다.`
+    :`<b>CBOW</b>는 중심 위치 하나에 샘플 하나입니다. 샘플 수가 Skip-gram의 <b>${(nCB/Math.max(1,nSG)).toFixed(2)}배</b>뿐이라 빠르고, 주변 벡터를 평균하므로 자주 나오는 단어를 안정적으로 배웁니다. 대신 드문 단어의 신호는 평균 속에 묻히기 쉽습니다.`;
+  D.anim=false;
+}
+$("dSent").addEventListener("change",()=>{D.si=+$("dSent").value;D.i=0;dRender();});
+$("dFirst").onclick=()=>{dStop();D.si=0;D.i=0;dRender();};
+$("dPrev").onclick=()=>{dStop();dPrev();};
+$("dNext").onclick=()=>{dStop();dNext();};
+$("dPlay").onclick=dPlay;
+$("dSpeed").addEventListener("input",()=>{$("dSpeedV").textContent=$("dSpeed").value+"×";if(D.timer){dStop();dPlay();}});
+function applyCorpus(text){
+  const sents=tokenize(text);const V=new Set(sents.flat()).size;
+  const msg=$("corpMsg");msg.classList.remove("err");
+  if(sents.length<2||!sents.some(s=>s.length>1)){msg.textContent="두 문장 이상, 단어 두 개 이상인 문장이 필요합니다.";msg.classList.add("err");return;}
+  if(V>150||sents.flat().length>2500){msg.textContent="너무 큽니다. 어휘 150개, 토큰 2,500개 이하로 줄여 주세요.";msg.classList.add("err");return;}
+  tStopRun();setCorpus(text);resetModels();D.si=0;D.i=Math.min(2,C.sents[0].length-1);S.negs=null;
+  msg.textContent=`적용했습니다: 문장 ${C.sents.length}개 · 어휘 ${C.V}개. 두 모델을 새로 초기화했습니다.`;render();
+}
+$("corpApply").onclick=()=>applyCorpus($("corpus").value);
+$("corpReset").onclick=()=>{$("corpus").value=DEFAULT_CORPUS;applyCorpus(DEFAULT_CORPUS);};
+
+/* ================= 2. 한 번의 예측과 학습 ================= */
+const S={idx:-1,step:0,res:null,after:null,Lafter:0,negs:null,timer:null,view:"val",rng:mulberry32(2024),mode:null,ver:-1};
+const STEPS=["원-핫 입력","임베딩 조회 h","점수 u","확률 · 손실","출력층 기울기","입력층 기울기"];
+function sDefaultIdx(){const a=C.samples[ST.mode];const k=a.findIndex(x=>x.s===0&&x.i===2&&(ST.mode==="cbow"||WD(x.t)==="발열"));return k>=0?k:0;}
+function sEnsure(){const a=C.samples[ST.mode];
+  if(S.mode!==ST.mode||S.ver!==ver||S.idx<0||S.idx>=a.length){
+    if(S.mode!==ST.mode||S.idx<0||S.idx>=a.length)S.idx=sDefaultIdx();
+    S.mode=ST.mode;S.ver=ver;S.negs=null;
+    $("sSel").innerHTML=a.map((x,i)=>`<option value="${i}">#${i+1} · 문장 ${x.s+1} · ${esc(sampleLabel(ST.mode,x))}</option>`).join("");}
+  $("sSel").value=S.idx;}
+function sCompute(){const m=M[ST.mode];const smp=C.samples[ST.mode][S.idx];S.smp=smp;
+  if(ST.loss==="ns"){if(!S.negs||S.negs.length!==ST.k||S.negs.includes(smp.t))S.negs=drawNegs(C.cdf,ST.k,smp.t,S.rng);}
+  const lc=lossCfg(),negs=ST.loss==="ns"?S.negs:null;
+  S.res=computeStep(m,smp.inp,smp.t,lc,negs);
+  const m2={V:m.V,N:m.N,Win:Float64Array.from(m.Win),Wo:Float64Array.from(m.Wo)};applyStep(m2,S.res,ST.lr);
+  S.after=m2;S.Lafter=computeStep(m2,smp.inp,smp.t,lc,negs).L;}
+function sStop(){if(S.timer){clearInterval(S.timer);S.timer=null;}$("sPlay").textContent="재생";}
+function sNext(){if(S.step<5){S.step++;}else{applyStep(M[ST.mode],S.res,ST.lr);M[ST.mode].steps++;S.idx=(S.idx+1)%C.samples[ST.mode].length;S.negs=null;S.step=0;}sRender();}
+function sPrev(){if(S.step>0){S.step--;sRender();}}
+$("sFirst").onclick=()=>{sStop();S.step=0;sRender();};
+$("sPrev").onclick=()=>{sStop();sPrev();};
+$("sNext").onclick=()=>{sStop();sNext();};
+$("sPlay").onclick=()=>{if(S.timer){sStop();return;}$("sPlay").textContent="멈춤";S.timer=setInterval(sNext,Math.round(1500/(+$("sSpeed").value)));};
+$("sSpeed").addEventListener("input",()=>{$("sSpeedV").textContent=$("sSpeed").value+"×";if(S.timer){sStop();$("sPlay").click();}});
+$("sSel").addEventListener("change",()=>{S.idx=+$("sSel").value;S.step=0;S.negs=null;sRender();});
+$("sRand").onclick=()=>{S.idx=Math.floor(Math.random()*C.samples[ST.mode].length);S.step=0;S.negs=null;sRender();};
+$("sRedraw").onclick=()=>{S.negs=drawNegs(C.cdf,ST.k,S.smp.t,S.rng);sRender();};
+segInit($("hView"),v=>{S.view=v;sDrawHeats();});
+function sRender(){
+  sEnsure();sCompute();
+  const r=S.res,smp=S.smp,k=ST.mode,N=ST.N,V=C.V,ns=ST.loss==="ns",m=M[k];
+  const tw=WD(smp.t),inW=smp.inp.map(WD),Cn=smp.inp.length;
+  $("sStepper").innerHTML=STEPS.map((t,i)=>`<li class="${i===S.step?"on":i<S.step?"done":""}" data-i="${i}">${i+1}. ${i===3&&ns?"시그모이드 · 손실":t}</li>`).join("");
+  $("sTitle").textContent=`${S.step+1}. ${S.step===3&&ns?"시그모이드 · 손실":STEPS[S.step]}`;
+  const tag=$("sTag");tag.textContent=S.step<4?"순전파":"역전파";tag.className="tag "+(S.step<4?"fw":"bw");
+  const sampleLine=`<div class="wv-row"><span class="sk-label">샘플</span>${pairHTML(k,smp)}<span class="sk-hint">${k==="skipgram"?"입력 = 중심, 정답 = 주변 단어":"입력 = 주변 "+Cn+"개, 정답 = 중심 단어"}</span></div>`;
+  let vis="",fo="",note="";
+  const hm=vmax(r.h);
+  if(S.step===0){
+    vis=sampleLine+'<div class="wv-onehot">'+smp.inp.map(a=>`<span class="lab">x(${esc(WD(a))})</span><div class="wv-oh" aria-hidden="true">${Array.from({length:V},(_,v)=>`<i class="${v===a?"one":""}"></i>`).join("")}</div>`).join("")+"</div>";
+    fo=smp.inp.map(a=>`x(${WD(a)}) = [${Array.from({length:V},(_,v)=>v===a?"1":"0").slice(0,Math.min(V,a+3)).join(", ")}${a+3<V?", …":""}]   ← ${a+1}번째 칸만 1`).join("\n")+`\n벡터 길이 = 어휘 수 V = ${V}`;
+    note=`원-핫 벡터는 어휘 수만큼 차원이 커지고(여기선 ${V}, 실제로는 수만), 서로 다른 두 단어의 내적은 항상 0이라 ‘두통’과 ‘발열’이 비슷하다는 정보를 담지 못합니다. Word2Vec은 이것을 N=${N}차원 밀집 벡터로 바꿉니다.`;
+  }else if(S.step===1){
+    const rows=smp.inp.map(a=>`<span class="lab">W_in[${esc(WD(a))}]</span>${vecHTML(m.Win.subarray(a*N,a*N+N),hm)}`).join("");
+    vis=sampleLine+`<div class="wv-vecrow">${rows}${Cn>1?`<span class="lab">평균 h</span>${vecHTML(r.h,hm)}`:`<span class="lab">= h</span>${vecHTML(r.h,hm)}`}</div>`;
+    if(Cn===1)fo=`h = W_inᵀ · x = W_in[${inW[0]}]   (원-핫 곱셈 = 행 하나 꺼내기)\nh = ${vecStr(r.h,3)}`;
+    else fo=`h = ( ${inW.map(w=>"W_in["+w+"]").join(" + ")} ) / ${Cn}\nh₁ = ( ${smp.inp.map(a=>fp(m.Win[a*N],3)).join(" + ")} ) / ${Cn} = ${f(r.h[0],3)}\nh = ${vecStr(r.h,3)}`;
+    note=`은닉층 h는 N = ${N}차원이고 <b>활성 함수가 없습니다</b>. 원-핫 벡터와 W<sub>in</sub>(V×N)을 곱하면 결국 그 단어의 행을 꺼내는 것과 같아서, 이것을 임베딩 조회(Embedding lookup)라고 부릅니다.${Cn>1?" CBOW는 주변 단어들의 행을 평균합니다.":""}`;
+  }else if(S.step===2){
+    const ids=ns?[smp.t,...S.negs]:Array.from({length:V},(_,v)=>v).sort((a,b)=>r.u[b]-r.u[a]).slice(0,10);
+    if(!ns&&!ids.includes(smp.t))ids.push(smp.t);
+    const um=vmax(ids.map(v=>r.u[v]));
+    vis=sampleLine+'<div class="wv-bars">'+barsHTML(ids.map(v=>({w:WD(v)+(v===smp.t?" (정답)":ns?" (오답)":""),val:r.u[v],max:um,cls:v===smp.t?"ok":ns?"bad":"acc",wcls:v===smp.t?"ok":ns?"bad":"",txt:f(r.u[v],3)})),true)+"</div>";
+    const vt=m.Wo.subarray(smp.t*N,smp.t*N+N);
+    fo=`u_j = h · v′_j        (v′_j = W_out의 j번째 열 = 오른쪽 히트맵의 j번째 행)\nu_${tw} = ${Array.from(r.h).map((x,d)=>fp(x,2)+"×"+fp(vt[d],2)).join(" + ")}\n     = ${f(r.u[smp.t],3)}`
+      +(ns?`\n→ 정답 1개 + 오답 k = ${ST.k}개만 계산 (곱셈 N×(k+1) = ${N*(ST.k+1)}번)`:`\n→ V = ${V}개 단어 모두 계산 (곱셈 N×V = ${N*V}번)`);
+    note=ns?`네거티브 샘플링은 V개 전체 대신 <b>정답 1개</b>와 빈도<sup>0.75</sup>에 비례해 무작위로 뽑은 <b>오답 ${ST.k}개</b>(${S.negs.map(v=>"‘"+esc(WD(v))+"’").join(", ")})의 점수만 계산합니다.`
+      :`점수 u가 클수록 그 단어가 ${k==="skipgram"?"주변에":"가운데에"} 올 것이라고 모델이 보는 것입니다. 아직 학습 전이면 정답 점수가 특별히 높지 않습니다.`;
+  }else if(S.step===3){
+    if(!ns){const ord=Array.from({length:V},(_,v)=>v).sort((a,b)=>r.p[b]-r.p[a]);const top=ord.slice(0,10);const rows=top.map(v=>({w:WD(v)+(v===smp.t?" (정답)":""),val:r.p[v],max:r.p[ord[0]],cls:v===smp.t?"ok":"acc",wcls:v===smp.t?"ok":"",txt:f(r.p[v],4)}));
+      if(!top.includes(smp.t)){rows.push({gap:1});rows.push({w:tw+" (정답) · "+(ord.indexOf(smp.t)+1)+"위",val:r.p[smp.t],max:r.p[ord[0]],cls:"ok",wcls:"ok",txt:f(r.p[smp.t],4)});}
+      let Z=0;for(let v=0;v<V;v++)Z+=Math.exp(r.u[v]);const sum=Array.from(r.p).reduce((a,b)=>a+b,0);
+      vis=sampleLine+'<div class="wv-bars">'+barsHTML(rows)+`</div><div class="sk-stats"><div class="sk-stat"><b>${sum.toFixed(4)}</b><span>Σ p (확률의 합)</span></div><div class="sk-stat"><b class="wv-ok">${f(r.p[smp.t],4)}</b><span>p(정답 ‘${esc(tw)}’)</span></div><div class="sk-stat"><b>${f(r.L,3)}</b><span>손실 L</span></div></div>`;
+      fo=`p_j = exp(u_j) / Σ_k exp(u_k)\np_${tw} = exp(${f(r.u[smp.t],3)}) / ${f(Z,3)} = ${f(Math.exp(r.u[smp.t]),3)} / ${f(Z,3)} = ${f(r.p[smp.t],4)}\nΣ_j p_j = ${sum.toFixed(4)}   (V = ${V}개 확률의 합)\nL = −log p_${tw} = −log ${f(r.p[smp.t],4)} = ${f(r.L,3)}\n(모두 같은 확률 1/V이면 L = log ${V} = ${f(Math.log(V),3)})`;
+      note=`softmax는 V개 점수를 합이 1인 확률로 바꿉니다. 교차 엔트로피 손실은 <b>정답 단어 확률의 −log</b>입니다. 정답 확률이 1에 가까울수록 손실은 0에 가까워집니다.`;
+    }else{const ids=r.ids;
+      vis=sampleLine+'<div class="wv-bars">'+barsHTML(ids.map((v,j)=>({w:WD(v)+(j===0?" (정답 → 1)":" (오답 → 0)"),val:r.sig[j],max:1,cls:j===0?"ok":"bad",wcls:j===0?"ok":"bad",txt:f(r.sig[j],4)})))+`</div><div class="sk-stats"><div class="sk-stat"><b>${f(r.L,3)}</b><span>손실 L</span></div></div>`;
+      fo=`σ(x) = 1 / (1 + e^(−x))\n`+ids.map((v,j)=>`${j===0?"정답":"오답"}  σ(u_${WD(v)}) = σ(${f(r.u[v],3)}) = ${f(r.sig[j],4)}   → ${j===0?"1":"0"}이 되도록`).join("\n")
+        +`\nL = −log σ(u_${tw}) − Σ log(1 − σ(u_오답))\n  = −log ${f(r.sig[0],4)} ${r.sig.slice(1).map(s=>"− log "+f(1-s,4)).join(" ")}\n  = ${f(r.L,3)}`;
+      note=`네거티브 샘플링은 “이 단어가 진짜 ${k==="skipgram"?"주변":"중심"} 단어인가?”를 단어마다 <b>시그모이드로 예/아니오</b> 판별합니다. 정답은 σ→1, 오답은 σ→0이 되도록 학습합니다. 확률 합이 1일 필요가 없습니다.`;}
+  }else if(S.step===4){
+    const e=new Float64Array(V);r.gOut.forEach((x,v)=>e[v]=x);
+    const ids=ns?r.ids:Array.from({length:V},(_,v)=>v).sort((a,b)=>Math.abs(e[b])-Math.abs(e[a])).slice(0,8);
+    const em=vmax(ids.map(v=>e[v]));
+    vis=sampleLine+'<div class="wv-bars">'+barsHTML(ids.map(v=>({w:WD(v)+(v===smp.t?" (정답)":""),val:e[v],max:em,cls:v===smp.t?"ok":"bad",wcls:v===smp.t?"ok":"",txt:f(e[v],4)})),true)+"</div>";
+    const vt0=m.Wo.subarray(smp.t*N,smp.t*N+N),vt1=S.after.Wo.subarray(smp.t*N,smp.t*N+N);
+    const wr=ns?S.negs[0]:ids.find(v=>v!==smp.t);
+    fo=(ns?`e_j = σ(u_j) − 정답표시_j   (정답 1, 오답 0)\ne_${tw} = ${f(r.sig[0],4)} − 1 = ${f(e[smp.t],4)}\ne_${WD(wr)} = ${f(r.sig[1],4)} − 0 = ${f(e[wr],4)}`
+         :`e_j = p_j − y_j   (정답이면 y = 1, 나머지 0)\ne_${tw} = ${f(r.p[smp.t],4)} − 1 = ${f(e[smp.t],4)}\ne_${WD(wr)} = ${f(r.p[wr],4)} − 0 = ${f(e[wr],4)}   (가장 큰 오답)`)
+      +`\n∂L/∂v′_j = e_j · h\nv′_${tw} ← v′_${tw} − η · e_${tw} · h\n     = ${vecStr(vt0,2)}\n       − ${f(ST.lr,3)} × ${fp(e[smp.t],4)} × ${vecStr(r.h,2)}\n     = ${vecStr(vt1,2)}\n→ W_out에서 바뀌는 열: ${ns?`정답 1 + 오답 ${ST.k} = ${ST.k+1}개`:`V = ${V}개 전부`}`;
+    note=`정답 단어의 출력 벡터 v′는 h 쪽으로 당겨져 다음엔 점수가 커지고, 확률을 높게 줬던 오답은 h 반대쪽으로 밀립니다. ${ns?"네거티브 샘플링은 "+(ST.k+1)+"개 열만 고치므로 V가 커도 계산이 가볍습니다.":"softmax는 모든 단어의 열을 고치므로 V가 크면 무겁습니다."}`;
+  }else{
+    const dh=r.dh;const g=Array.from(dh).map(x=>x/Cn);
+    const a0=smp.inp[0];const w0=m.Win.subarray(a0*N,a0*N+N),w1=S.after.Win.subarray(a0*N,a0*N+N);
+    const dm=vmax(dh,w0,w1);
+    vis=sampleLine+`<div class="wv-vecrow"><span class="lab">∂L/∂h</span>${vecHTML(dh,dm)}<span class="lab">W_in[${esc(WD(a0))}] 전</span>${vecHTML(w0,dm)}<span class="lab">W_in[${esc(WD(a0))}] 후</span>${vecHTML(w1,dm)}</div>`
+      +`<div class="sk-stats"><div class="sk-stat"><b>${f(r.L,3)}</b><span>갱신 전 손실</span></div><div class="sk-stat"><b class="wv-ok">${f(S.Lafter,3)}</b><span>갱신 후 같은 샘플 손실</span></div></div>`;
+    fo=`∂L/∂h = Σ_j e_j · v′_j     (갱신 전 v′ 사용)\n      = ${vecStr(dh,3)}\n`
+      +(Cn===1?`W_in[${WD(a0)}] ← W_in[${WD(a0)}] − η · ∂L/∂h\n     = ${vecStr(w0,2)}\n       − ${f(ST.lr,3)} × ${vecStr(dh,2)}\n     = ${vecStr(w1,2)}`
+        :`h가 ${Cn}개 행의 평균이므로 각 행의 기울기 = (∂L/∂h) / ${Cn}\n각 주변 단어 행 ← 행 − η · (∂L/∂h) / ${Cn}\nW_in[${WD(a0)}] = ${vecStr(w0,2)}\n       − ${f(ST.lr,3)} × ${vecStr(g,2)}\n     = ${vecStr(w1,2)}`)
+      +`\n같은 샘플 손실: ${f(r.L,3)} → ${f(S.Lafter,3)}`;
+    note=`입력층에서는 입력 단어의 행(${Cn===1?"1개":Cn+"개"})만 바뀝니다. 비슷한 문맥을 예측하도록 학습되면서 비슷한 단어의 행이 점점 닮아 갑니다. <b>[다음]</b>을 누르면 이 변화를 반영하고 다음 샘플로 넘어갑니다.`;
+  }
+  $("sVis").innerHTML=vis;$("sFormula").textContent=fo;$("sNote").innerHTML=note;
+  $("sStepper").querySelectorAll("li").forEach(li=>li.onclick=()=>{sStop();S.step=+li.dataset.i;sRender();});
+  $("gcOut").hidden=true;
+  sDrawHeats();
+}
+function drawHeat(cv,Wd,V,N,o){
+  const rowH=V>60?9:13,headH=14;
+  const cw0=cv.clientWidth||200;const labW=Math.round(Math.min(64,Math.max(36,cw0*0.27)));const dW=o.dnorm?20:0;
+  cv.style.height=(headH+V*rowH+4)+"px";
+  const{ctx,w,h}=fitCanvas(cv);ctx.clearRect(0,0,w,h);
+  const cw=(w-labW-dW-4)/N;
+  const base=hexRgb(css("--surface-2")),pos=hexRgb(css("--hpos")),neg=hexRgb(css("--hneg"));
+  const sans=css("--sans"),mono=css("--mono");
+  ctx.textBaseline="middle";
+  if(cw>=13){ctx.font=`500 9.5px ${mono}`;ctx.fillStyle=css("--faint");ctx.textAlign="center";for(let d=0;d<N;d++)ctx.fillText(String(d+1),labW+d*cw+cw/2,headH/2);}
+  const nmax=o.dnorm?Math.max(1e-12,...o.dnorm):1;
+  for(let v=0;v<V;v++){const y=headH+v*rowH;const hl=o.hl.get(v);
+    ctx.font=`${hl?700:500} ${rowH>10?11:9}px ${sans}`;ctx.textAlign="right";ctx.fillStyle=hl?css(hl):css("--muted");
+    let lab=WD(v);while(lab.length>1&&ctx.measureText(lab).width>labW-6)lab=lab.slice(0,-1);
+    ctx.fillText(lab,labW-5,y+rowH/2+0.5);
+    for(let d=0;d<N;d++){const x=Wd[v*N+d];const t=Math.min(1,Math.abs(x)/o.scale);ctx.fillStyle=rgb(mixc(base,x<0?neg:pos,t));ctx.fillRect(labW+d*cw+0.5,y+0.5,Math.max(1,cw-1),rowH-1);}
+    if(o.dnorm&&o.dnorm[v]>0){ctx.fillStyle=css("--ink");ctx.fillRect(labW+N*cw+4,y+3,Math.max(1,(dW-4)*o.dnorm[v]/nmax),rowH-6);}
+  }
+  o.hl.forEach((c,v)=>{const y=headH+v*rowH;ctx.strokeStyle=css(c);ctx.lineWidth=2;ctx.strokeRect(labW+1,y+1,N*cw-2,rowH-2);});
+}
+function sDrawHeats(){
+  if(!S.res||ST.tab!=="step")return;
+  const m=M[ST.mode],V=C.V,N=ST.N,st=S.step,smp=S.smp;
+  const inNew=st>=5,outNew=st>=4;
+  const dIn=new Float64Array(V*N),dOut=new Float64Array(V*N);
+  if(inNew)for(let i=0;i<V*N;i++)dIn[i]=S.after.Win[i]-m.Win[i];
+  if(outNew)for(let i=0;i<V*N;i++)dOut[i]=S.after.Wo[i]-m.Wo[i];
+  const rn=(D0)=>{const a=new Float64Array(V);for(let v=0;v<V;v++){let s=0;for(let d=0;d<N;d++)s+=D0[v*N+d]**2;a[v]=Math.sqrt(s);}return a;};
+  const hin=new Map(),hout=new Map();smp.inp.forEach(a=>hin.set(a,"--ink"));
+  if(st>=2){if(ST.loss==="ns")S.negs.forEach(v=>hout.set(v,"--bad"));hout.set(smp.t,"--ok");}
+  const delta=S.view==="delta";
+  let sc;
+  if(delta){sc=vmax(dIn,dOut);if(!inNew&&!outNew)sc=1;}else sc=vmax(m.Win,m.Wo,S.after.Win,S.after.Wo);
+  drawHeat($("hIn"),delta?dIn:(inNew?S.after.Win:m.Win),V,N,{hl:hin,scale:sc,dnorm:inNew?rn(dIn):null});
+  drawHeat($("hOut"),delta?dOut:(outNew?S.after.Wo:m.Wo),V,N,{hl:hout,scale:sc,dnorm:outNew?rn(dOut):null});
+  $("hScaleLo").textContent=MINUS+(delta?sci(sc):f(sc,2));$("hScaleHi").textContent="+"+(delta?sci(sc):f(sc,2));
+  $("hScaleBar").style.background=`linear-gradient(90deg,${css("--hneg")},${css("--surface-2")} 50%,${css("--hpos")})`;
+  $("hHint").textContent=st<4?(delta?"아직 가중치가 바뀌지 않았습니다 (5단계부터 변화).":"순전파 단계: 가중치는 그대로입니다. 테두리 = 이번 샘플이 쓰는 행.")
+    :st===4?`W_out: ${ST.loss==="ns"?(ST.k+1)+"개":"모든"} 행이 바뀐 뒤의 값 (오른쪽 막대 = 행별 변화 크기). W_in은 아직 그대로.`
+    :`W_in: 입력 단어 ${smp.inp.length===1?"1개":new Set(smp.inp).size+"개"} 행만 바뀌었습니다 (오른쪽 막대). 나머지 행은 그대로.`;
+}
+function gradCheck(){
+  const m=M[ST.mode],smp=S.smp,lc=lossCfg(),negs=ST.loss==="ns"?S.negs:null;const r=computeStep(m,smp.inp,smp.t,lc,negs);const N=m.N,V=m.V,eps=1e-5;
+  const gIn=new Float64Array(V*N),gOut=new Float64Array(V*N);r.gIn.forEach((g,a)=>{for(let d=0;d<N;d++)gIn[a*N+d]=g[d];});r.gOut.forEach((e,v)=>{for(let d=0;d<N;d++)gOut[v*N+d]=e*r.h[d];});
+  let maxAbs=0,maxRel=0,n=0;
+  [[m.Win,gIn],[m.Wo,gOut]].forEach(([W,G])=>{for(let i=0;i<V*N;i++){const o=W[i];W[i]=o+eps;const Lp=computeStep(m,smp.inp,smp.t,lc,negs).L;W[i]=o-eps;const Lm=computeStep(m,smp.inp,smp.t,lc,negs).L;W[i]=o;
+    const num=(Lp-Lm)/(2*eps),ab=Math.abs(num-G[i]);maxAbs=Math.max(maxAbs,ab);if(Math.abs(num)+Math.abs(G[i])>1e-7)maxRel=Math.max(maxRel,ab/(Math.abs(num)+Math.abs(G[i])));n++;}});
+  return{maxAbs,maxRel,n};
+}
+$("gcBtn").onclick=()=>{const g=gradCheck();const o=$("gcOut");o.hidden=false;
+  o.innerHTML=`W<sub>in</sub>·W<sub>out</sub> 원소 <b>${g.n}개</b> 전부 비교 → 최대 절대 오차 <b>${sci(g.maxAbs)}</b>, 최대 상대 오차 <b>${sci(g.maxRel)}</b>. ${g.maxRel<1e-5?"손으로 유도한 기울기가 수치 미분과 일치합니다.":"차이가 큽니다."}`;};
+
+/* ================= 3. 학습 진행 ================= */
+const T={running:false,raf:0,timing:null};
+const activeModes=()=>ST.both?["skipgram","cbow"]:[ST.mode];
+function tSetGoals(){activeModes().forEach(k=>{const m=M[k];if(m.epoch>=m.goal)m.goal=m.epoch+ST.epochs;});}
+function tStart(){if(T.running)return;tSetGoals();T.running=true;tButtons();T.raf=requestAnimationFrame(tFrame);}
+function tStopRun(){T.running=false;cancelAnimationFrame(T.raf);tButtons();}
+function tFrame(){if(!T.running)return;let done=true;
+  activeModes().forEach(k=>{const m=M[k];if(m.epoch>=m.goal)return;trainChunk(m,k,Math.max(1,Math.round(ST.epf*C.samples[k].length)));if(m.epoch<m.goal)done=false;});
+  if(ST.tab==="train")tDraw(true);
+  if(done){tStopRun();if(ST.tab==="train")tDraw(false);return;}
+  T.raf=requestAnimationFrame(tFrame);}
+function tButtons(){const ms=activeModes().map(k=>M[k]);const b=$("tStart");
+  b.disabled=T.running;$("tStop").disabled=!T.running;
+  b.textContent=ms.every(m=>m.epoch===0&&m.goal===0)?"학습 시작":ms.some(m=>m.epoch<m.goal)?"이어서 학습":`+${ST.epochs} 에폭 더`;
+  $("pTrain").disabled=T.running;}
+function tEnsureMaps(){const ks=activeModes();const host=$("maps");const key=ks.join(",");$("tLay").classList.toggle("both",ks.length>1);
+  if(host.dataset.key!==key){host.dataset.key=key;host.classList.toggle("two",ks.length>1);
+    host.innerHTML=ks.map(k=>`<div class="wv-map"><h3><span class="wv-${MODES[k].cls}">${MODES[k].name}</span><span class="sub" id="mapSub-${k}"></span></h3><canvas id="map-${k}" role="img" aria-label="${MODES[k].name} 단어 벡터 2차원 지도"></canvas></div>`).join("");}}
+function drawMap(k,smooth){const cv=$("map-"+k);if(!cv)return;const m=M[k];const{ctx,w,h}=fitCanvas(cv);ctx.clearRect(0,0,w,h);
+  const P=pca2(m.Win,m.N,C.V,m.pc);m.pc=P.comps;
+  const vis=[];for(let v=0;v<C.V;v++){if(ST.hide&&catOf(WD(v)).id==="func")continue;vis.push(v);}
+  let mx=1e-6;vis.forEach(v=>{mx=Math.max(mx,Math.abs(P.pts[v][0]),Math.abs(P.pts[v][1]));});
+  m.sc=smooth&&m.sc?m.sc+(mx-m.sc)*0.25:mx;
+  const padX=Math.min(40,w*0.08),padY=18;const X=x=>w/2+x/m.sc*(w/2-padX),Y=y=>h/2-y/m.sc*(h/2-padY);
+  ctx.strokeStyle=css("--line");ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,h/2);ctx.lineTo(w,h/2);ctx.moveTo(w/2,0);ctx.lineTo(w/2,h);ctx.stroke();
+  ctx.font=`500 10.5px ${css("--mono")}`;ctx.fillStyle=css("--faint");ctx.textAlign="right";ctx.textBaseline="bottom";ctx.fillText("PC1",w-4,h/2-2);ctx.textAlign="left";ctx.textBaseline="top";ctx.fillText("PC2",w/2+4,3);
+  const fs=w<340?11:12.5;const ink=css("--ink"),muted=css("--muted"),sans=css("--sans");
+  /* 점 먼저, 이름표는 겹치지 않게 위아래로 비켜 배치 (옮겨진 이름표는 가는 선으로 연결) */
+  const items=vis.map(v=>{const c=catOf(WD(v));return{v,c,fn:c.id==="func",x:X(P.pts[v][0]),y:Y(P.pts[v][1])};});
+  items.forEach(it=>{ctx.fillStyle=css(it.c.v);ctx.beginPath();ctx.arc(it.x,it.y,it.fn?3.2:5,0,Math.PI*2);ctx.fill();});
+  const placed=[];const lh=fs+3;
+  items.sort((a,b)=>(a.fn-b.fn)||(a.y-b.y)).forEach(it=>{
+    ctx.font=`${it.fn?500:700} ${it.fn?fs-1.5:fs}px ${sans}`;const tw=ctx.measureText(WD(it.v)).width;
+    const right=it.x+8+tw<=w-2;const bx=right?it.x+7:it.x-7-tw;
+    let best=null;
+    for(let t=0;t<14&&!best;t++){const off=(t%2?1:-1)*Math.ceil(t/2)*lh;const by=it.y+off;if(by<lh/2||by>h-lh/2)continue;
+      const box={x:bx-1,y:by-lh/2,w:tw+2,h:lh};
+      if(!placed.some(q=>box.x<q.x+q.w&&q.x<box.x+box.w&&box.y<q.y+q.h&&q.y<box.y+box.h))best={box,by,off};}
+    if(!best)best={box:{x:bx,y:it.y-lh/2,w:tw,h:lh},by:it.y,off:0};
+    placed.push(best.box);
+    if(best.off){ctx.strokeStyle=css("--line-strong");ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(it.x,it.y);ctx.lineTo(right?bx-1:bx+tw+1,best.by);ctx.stroke();}
+    ctx.fillStyle=it.fn?muted:ink;ctx.textBaseline="middle";ctx.textAlign="left";ctx.fillText(WD(it.v),bx,best.by);});
+  const sub=$("mapSub-"+k);if(sub)sub.textContent=`에폭 ${m.epoch} · PC1+PC2 설명 ${P.tot>0?Math.round(100*(P.vals[0]+P.vals[1])/P.tot):0}%`;}
+function drawLoss(){const host=$("lossChart");const ks=activeModes();
+  const Wd=Math.max(260,Math.round(host.clientWidth||400)),H=230,mL=40,mR=14,mT=12,mB=34,pw=Wd-mL-mR,ph=H-mT-mB;
+  const hs=ks.map(k=>M[k].hist);const has=hs.some(x=>x.length>1);
+  let xMax=Math.max(10,...ks.map(k=>Math.max(M[k].goal,M[k].epoch)));let yMax=0;hs.forEach(hh=>hh.forEach(p=>yMax=Math.max(yMax,p.L)));
+  if(ST.loss==="softmax")yMax=Math.max(yMax,Math.log(C.V));yMax=Math.max(0.5,yMax);const yStep=yMax<=2?0.5:yMax<=5?1:2;yMax=Math.ceil(yMax/yStep-1e-9)*yStep;
+  const X=e=>mL+pw*e/xMax,Y=L=>mT+ph*(1-L/yMax);
+  let s=`<svg viewBox="0 0 ${Wd} ${H}" width="${Wd}" height="${H}">`;
+  for(let L=0;L<=yMax+1e-9;L+=yStep){s+=`<line class="gl" x1="${mL}" x2="${mL+pw}" y1="${Y(L)}" y2="${Y(L)}"/><text class="ax" x="${mL-6}" y="${Y(L)+4}" text-anchor="end">${L.toFixed(1)}</text>`;}
+  for(let i=0;i<=4;i++){const e=Math.round(xMax*i/4);s+=`<text class="ax" x="${X(e)}" y="${H-mB+16}" text-anchor="middle">${e}</text>`;}
+  s+=`<text class="axl" x="${mL+pw/2}" y="${H-4}" text-anchor="middle">에폭</text>`;
+  if(ST.loss==="softmax"){const L=Math.log(C.V);s+=`<line class="ref" x1="${mL}" x2="${mL+pw}" y1="${Y(L)}" y2="${Y(L)}"/><text class="reft" x="${mL+6}" y="${Y(L)-5}">무작위 추측 log V = ${L.toFixed(2)}</text>`;}
+  if(!has)s+=`<text class="empty" x="${mL+pw/2}" y="${mT+ph/2}" text-anchor="middle">[학습 시작]을 누르면 손실이 그려집니다</text>`;
+  ks.forEach((k,j)=>{const hh=M[k].hist;if(hh.length<2)return;const c=MODES[k].cls;
+    s+=`<path class="sr ${c}" d="${hh.map((p,i)=>(i?"L":"M")+X(p.e).toFixed(1)+" "+Y(p.L).toFixed(1)).join("")}"/>`;
+    const last=hh[hh.length-1];s+=`<text class="el ${c}" x="${Math.min(X(last.e),mL+pw)}" y="${Math.min(mT+ph-4,Math.max(mT+10,Y(last.L)+(j?16:-7)))}" text-anchor="end">${MODES[k].name} ${last.L.toFixed(2)}</text>`;});
+  host.innerHTML=s+"</svg>";
+  host.setAttribute("aria-label",ks.map(k=>{const hh=M[k].hist;return`${MODES[k].name} 손실 ${hh.length?hh[0].L.toFixed(2)+" → "+hh[hh.length-1].L.toFixed(2):"기록 없음"}`;}).join(", "));}
+function probeWords(){const want=["두통","해열제","의사","체온","처방"].filter(w=>C.voc.index.has(w));
+  if(want.length>=3)return want;return C.voc.words.filter(w=>catOf(w).id!=="func").slice(0,5);}
+function nbCell(m,w){const i=IDX(w),c=catOf(w).id;return neighbors(m.Win,m.N,C.V,vec(m.Win,m.N,i),[i],3).map(o=>{const ww=WD(o.v),same=catOf(ww).id===c&&c!=="other";return`<span class="nb" style="${same?"color:var("+catOf(ww).v+");font-weight:700":""}">${esc(ww)}<small>${f(o.c,2)}</small></span>`;}).join("");}
+function tDraw(smooth){
+  const ks=activeModes();
+  $("tStats").innerHTML=ks.map(k=>{const m=M[k],h=m.hist;const nm=ks.length>1?MODES[k].name+" ":"";return`<div class="sk-stat"><b class="wv-${MODES[k].cls}">${m.epoch} / ${Math.max(m.goal,m.epoch)||ST.epochs}</b><span>${nm}에폭</span></div><div class="sk-stat"><b>${h.length?h[h.length-1].L.toFixed(3):"—"}</b><span>${nm}최근 평균 손실</span></div>`;}).join("")
+    +(ks.length===1?`<div class="sk-stat"><b>${comma(M[ks[0]].steps)}</b><span>누적 업데이트</span></div><div class="sk-stat"><b>${C.samples[ks[0]].length}</b><span>샘플 / 에폭</span></div>`:"");
+  tEnsureMaps();ks.forEach(k=>drawMap(k,smooth));drawLoss();
+  $("probe").innerHTML=`<thead><tr><th>단어</th>${ks.map(k=>`<th>${MODES[k].name} 이웃 3개 (코사인)</th>`).join("")}</tr></thead><tbody>`
+    +probeWords().map(w=>`<tr><td style="color:var(${catOf(w).v});font-weight:700">${esc(w)}</td>${ks.map(k=>`<td>${nbCell(M[k],w)}</td>`).join("")}</tr>`).join("")+"</tbody>";
+  tButtons();}
+function tRender(){
+  $("catLegend").innerHTML=CATS.filter(c=>C.voc.words.some(w=>catOf(w)===c)).map(c=>`<span><i style="background:var(${c.v})"></i>${c.name}</span>`).join("");
+  tDraw(false);}
+$("tStart").onclick=tStart;$("tStop").onclick=()=>{tStopRun();tDraw(false);};
+$("tReset").onclick=()=>{tStopRun();resetModels();S.negs=null;tRender();};
+segInit($("tSpeed"),v=>{ST.epf=+v;});
+$("tBoth").addEventListener("change",()=>{ST.both=$("tBoth").checked;if(T.running)tSetGoals();tRender();});
+$("tHide").addEventListener("change",()=>{ST.hide=$("tHide").checked;tDraw(false);});
+$("tN").innerHTML=[2,3,4,5,6,8,10,12,16].map(n=>`<option value="${n}">${n}</option>`).join("");$("tN").value=ST.N;
+$("tN").addEventListener("change",()=>{ST.N=+$("tN").value;tStopRun();resetModels();S.negs=null;render();});
+$("tSeed").addEventListener("change",()=>{const v=Math.max(1,Math.min(99999,Math.round(+$("tSeed").value)||1));$("tSeed").value=v;ST.seed=v;tStopRun();resetModels();S.negs=null;render();});
+
+/* ================= 4. 단어 예측 · 유사도 ================= */
+const P={center:"두통",sent:0,blank:2,ctx:null,a:"두통",b:"발열",x:"진통제",y:"두통",z:"발열",ver:-1,noFunc:true};
+function curW(k){const m=M[k||ST.mode];return ST.src==="before"?{Win:m.Win0,Wo:m.Wo0,N:m.N}:{Win:m.Win,Wo:m.Wo,N:m.N};}
+function predictDist(Wt,inp){const N=Wt.N,V=C.V,h=new Float64Array(N);inp.forEach(a=>{for(let d=0;d<N;d++)h[d]+=Wt.Win[a*N+d]/inp.length;});
+  const u=new Float64Array(V);let mx=-Infinity;for(let v=0;v<V;v++){let s=0;for(let d=0;d<N;d++)s+=Wt.Wo[v*N+d]*h[d];u[v]=s;mx=Math.max(mx,s);}
+  const p=new Float64Array(V);let z=0;for(let v=0;v<V;v++){p[v]=Math.exp(u[v]-mx);z+=p[v];}for(let v=0;v<V;v++)p[v]/=z;return{h,u,p};}
+function pickW(w,fb){return C.voc.index.has(w)?w:fb;}
+function pEnsure(){if(P.ver===ver)return;P.ver=ver;
+  const opts=C.voc.words.map(w=>`<option value="${esc(w)}">${esc(w)}</option>`).join("");
+  ["pCenter","pAdd","pA","pB","pX","pY","pZ"].forEach(id=>$(id).innerHTML=opts);
+  const nf=C.voc.words.filter(w=>catOf(w).id!=="func");const fb=i=>nf[i%Math.max(1,nf.length)]||C.voc.words[0];
+  P.center=pickW(P.center,fb(0));P.a=pickW(P.a,fb(0));P.b=pickW(P.b,fb(1));P.x=pickW(P.x,fb(0));P.y=pickW(P.y,fb(1));P.z=pickW(P.z,fb(2));
+  $("pSent").innerHTML=C.sents.map((s,k)=>`<option value="${k}">${k+1}. ${esc(s.join(" "))}</option>`).join("");
+  P.sent=Math.min(P.sent,C.sents.length-1);P.blank=Math.min(P.blank,C.sents[P.sent].length-1);P.ctx=null;}
+function pResetCtx(){const s=C.sents[P.sent];P.ctx=ctxPos(s.length,P.blank).map(j=>({w:IDX(s[j]),j}));}
+function pRender(){
+  pEnsure();const k=ST.mode,m=M[k],Wt=curW(k);
+  segSet($("pSrc"),ST.src);
+  $("pStatus").innerHTML=`<b class="wv-${MODES[k].cls}">${MODES[k].name}</b> 모델: ${m.epoch>0?`<b>${m.epoch} 에폭</b> 학습됨 (3번 탭과 같은 가중치)`:"<b>아직 학습 전</b>입니다. [바로 학습]을 누르거나 3번 탭에서 학습하세요."}${ST.src==="before"?" · 지금은 학습 전 무작위 초기값으로 계산합니다.":""}`;
+  $("pTrain").textContent=`바로 학습 (+${ST.epochs} 에폭)`;
+  $("pSG").hidden=k!=="skipgram";$("pCB").hidden=k!=="cbow";
+  if(k==="skipgram"){
+    $("pPredTitle").textContent="Skip-gram: 중심 단어 → 주변에 올 단어";$("pPredHint").textContent="p(주변 | 중심)";
+    $("pCenter").value=P.center;const c=IDX(P.center),kk=+$("pK1").value;
+    const d=predictDist(Wt,[c]);const cnt=new Map();
+    C.sents.forEach(s=>s.forEach((w,i)=>{if(w!==P.center)return;ctxPos(s.length,i).forEach(j=>{const o=IDX(s[j]);cnt.set(o,(cnt.get(o)||0)+1);});}));
+    const ord=Array.from({length:C.V},(_,v)=>v).sort((a,b)=>d.p[b]-d.p[a]).slice(0,kk);
+    $("pBars").innerHTML=barsHTML(ord.map(v=>({w:WD(v),val:d.p[v],max:d.p[ord[0]],cls:cnt.has(v)?"ctx":"",txt:f(d.p[v],3)})));
+    const real=[...cnt.entries()].sort((a,b)=>b[1]-a[1]);
+    $("pPredF").textContent=`p(o | “${P.center}”) = softmax( W_outᵀ · W_in[${P.center}] )\n코퍼스에서 실제로 ‘${P.center}’ 주변(±${ST.w})에 나온 단어: ${real.map(([v,n])=>WD(v)+"×"+n).join(", ")}`;
+    const hit=ord.filter(v=>cnt.has(v)).length;
+    $("pPredNote").innerHTML=`<span class="wv-ctxc">주황 막대</span> = 코퍼스에서 실제로 ‘${esc(P.center)}’ 주변에 나왔던 단어 (상위 ${kk}개 중 ${hit}개). Skip-gram은 창 안의 모든 위치에 이 분포 하나를 같이 씁니다.${ST.src==="before"||m.epoch===0?" 학습 전에는 확률이 거의 균등(1/V ≈ "+f(1/C.V,3)+")합니다.":""}`;
+  }else{
+    $("pPredTitle").textContent="CBOW: 주변 단어들 → 빈칸(중심) 채우기";$("pPredHint").textContent="p(중심 | 주변)";
+    $("pSent").value=P.sent;if(!P.ctx)pResetCtx();
+    const s=C.sents[P.sent],inCtx=new Set(P.ctx.filter(c=>c.j!=null).map(c=>c.j));
+    $("pSentView").innerHTML=s.map((w,j)=>`<button type="button" class="wv-tok ${j===P.blank?"blank":inCtx.has(j)?"ctx":"out"}" data-j="${j}" aria-label="${esc(w)}${j===P.blank?" (빈칸)":" 을(를) 빈칸으로"}"><sub>${j}</sub>${j===P.blank?"___":esc(w)}</button>`).join("");
+    $("pSentView").querySelectorAll("button").forEach(b=>b.onclick=()=>{P.blank=+b.dataset.j;pResetCtx();pRender();});
+    $("pCtx").innerHTML=P.ctx.length?P.ctx.map((c,i)=>`<span class="wv-chip">${esc(WD(c.w))}<button type="button" data-i="${i}" aria-label="${esc(WD(c.w))} 빼기">×</button></span>`).join(""):'<span class="sk-hint">주변 단어가 없습니다. 단어를 추가하세요.</span>';
+    $("pCtx").querySelectorAll("button").forEach(b=>b.onclick=()=>{P.ctx.splice(+b.dataset.i,1);pRender();});
+    const kk=+$("pK2").value,ans=IDX(s[P.blank]);
+    if(!P.ctx.length){$("pBars").innerHTML="";$("pPredF").textContent="입력할 주변 단어가 없습니다.";$("pPredNote").textContent="";}
+    else{const inp=P.ctx.map(c=>c.w);const d=predictDist(Wt,inp);const ordAll=Array.from({length:C.V},(_,v)=>v).sort((a,b)=>d.p[b]-d.p[a]);const ord=ordAll.slice(0,kk);
+      const rows=ord.map(v=>({w:WD(v)+(v===ans?" (원래 단어)":""),val:d.p[v],max:d.p[ord[0]],cls:v===ans?"ok":"acc",wcls:v===ans?"ok":"",txt:f(d.p[v],3)}));
+      const rank=ordAll.indexOf(ans)+1;if(rank>kk){rows.push({gap:1});rows.push({w:WD(ans)+" (원래 단어)",val:d.p[ans],max:d.p[ord[0]],cls:"ok",wcls:"ok",txt:f(d.p[ans],3)});}
+      $("pBars").innerHTML=barsHTML(rows);
+      $("pPredF").textContent=`빈칸 문장: ${s.map((w,j)=>j===P.blank?"___":w).join(" ")}\nh = 평균( ${inp.map(a=>"W_in["+WD(a)+"]").join(", ")} )\np(중심 | 주변) = softmax( W_outᵀ · h )\n가장 높은 단어: ‘${WD(ord[0])}’ (p = ${f(d.p[ord[0]],3)}) · 원래 단어 ‘${WD(ans)}’: ${rank}위 (p = ${f(d.p[ans],3)})`;
+      $("pPredNote").innerHTML=`빈칸에 ‘${esc(WD(ans))}’ 대신 같은 범주의 단어가 높게 나오면, 모델이 “이 자리에는 이런 종류의 단어가 온다”를 배운 것입니다.${ST.src==="before"||m.epoch===0?" 학습 전에는 확률이 거의 균등합니다.":""}`;}
+  }
+  /* 유사도 */
+  $("pA").value=P.a;$("pB").value=P.b;const N=Wt.N,a=IDX(P.a),b=IDX(P.b);
+  const va=vec(Wt.Win,N,a),vb=vec(Wt.Win,N,b);
+  const cb=cosine(vec(m.Win0,N,a),vec(m.Win0,N,b)),ca=cosine(vec(m.Win,N,a),vec(m.Win,N,b));
+  $("pCosBefore").querySelector("b").textContent=f(cb,3);$("pCosAfter").querySelector("b").textContent=f(ca,3);
+  $("pCosAfter").querySelector("span").textContent=m.epoch>0?`학습 후 (${m.epoch} 에폭)`:"지금 가중치 (학습 전)";
+  $("pCosBefore").classList.toggle("on",ST.src==="before");$("pCosAfter").classList.toggle("on",ST.src!=="before");
+  const dot=va.reduce((s,x,i)=>s+x*vb[i],0),na=Math.hypot(...va),nb=Math.hypot(...vb);
+  $("pCosF").textContent=`a = W_in[${P.a}] = ${vecStr(va,2)}\nb = W_in[${P.b}] = ${vecStr(vb,2)}\na·b = ${va.map((x,i)=>fp(x,2)+"×"+fp(vb[i],2)).join(" + ")}\n    = ${f(dot,3)}\n‖a‖ = √(${va.map(x=>fp(x,2)+"²").join(" + ")}) = ${f(na,3)}\n‖b‖ = ${f(nb,3)}\ncos(a, b) = a·b / (‖a‖ ‖b‖) = ${f(dot,3)} / (${f(na,3)} × ${f(nb,3)}) = ${f(dot/(na*nb),3)}`;
+  $("pCosNote").innerHTML=(ST.src==="before"||m.epoch===0)
+    ?`학습 전 무작위 벡터끼리의 코사인(<b>${f(cb,3)}</b>)은 우연히 나온 값이라 아무 의미가 없습니다. 실습에서 similarity 0.064가 나온 것처럼, <b>데이터가 부족하거나 학습이 안 되면</b> 비슷한 단어도 이런 0 근처 값이 나옵니다.`
+    :`학습 전 <b>${f(cb,3)}</b> → 학습 후 <b>${f(ca,3)}</b>. 비슷한 문맥에 나온 단어일수록 벡터 방향이 비슷해져 코사인이 1에 가까워집니다. 원-핫이었다면 서로 다른 두 단어의 코사인은 항상 0입니다.`;
+  const nbs=neighbors(Wt.Win,N,C.V,va,[a],6);
+  $("pNb").innerHTML=barsHTML(nbs.map(o=>({w:WD(o.v),val:o.c,max:1,cls:"acc",wcls:"",txt:f(o.c,3)})),true);
+  /* 벡터 연산 */
+  $("pX").value=P.x;$("pY").value=P.y;$("pZ").value=P.z;const x=IDX(P.x),y=IDX(P.y),z=IDX(P.z);
+  const vx=vec(Wt.Win,N,x),vy=vec(Wt.Win,N,y),vz=vec(Wt.Win,N,z),q=vx.map((t,i)=>t-vy[i]+vz[i]);
+  const res=neighbors(Wt.Win,N,C.V,q,[x,y,z],C.V).filter(o=>!P.noFunc||catOf(WD(o.v)).id!=="func").slice(0,5);
+  $("pAr").innerHTML=barsHTML(res.map((o,i)=>({w:WD(o.v),val:o.c,max:1,cls:i===0?"ok":"acc",wcls:i===0?"ok":"",txt:f(o.c,3)})),true);
+  $("pArF").textContent=`q = W_in[${P.x}] − W_in[${P.y}] + W_in[${P.z}]\n  = ${vecStr(vx,2)}\n  − ${vecStr(vy,2)}\n  + ${vecStr(vz,2)}\n  = ${vecStr(q,2)}\n가장 가까운 단어: ‘${WD(res[0].v)}’ (cos = ${f(res[0].c,3)})`;
+}
+segInit($("pSrc"),v=>{ST.src=v;pRender();});
+$("pTrain").onclick=()=>{if(T.running)return;const k=ST.mode,m=M[k];m.goal=m.epoch+ST.epochs;trainChunk(m,k,Infinity);S.negs=null;pRender();};
+[["pCenter","center"],["pA","a"],["pB","b"],["pX","x"],["pY","y"],["pZ","z"]].forEach(([id,key])=>$(id).addEventListener("change",()=>{P[key]=$(id).value;pRender();}));
+$("pSent").addEventListener("change",()=>{P.sent=+$("pSent").value;P.blank=Math.min(2,C.sents[P.sent].length-1);pResetCtx();pRender();});
+$("pAddBtn").onclick=()=>{if(!P.ctx)pResetCtx();if(P.ctx.length>=10)return;P.ctx.push({w:IDX($("pAdd").value),j:null});pRender();};
+$("pNoFunc").addEventListener("change",()=>{P.noFunc=$("pNoFunc").checked;pRender();});
+$("pK1").addEventListener("input",()=>{$("pK1v").textContent=$("pK1").value;pRender();});
+$("pK2").addEventListener("input",()=>{$("pK2v").textContent=$("pK2").value;pRender();});
+
+/* ================= 5. 비교 ================= */
+function archSVG(k){
+  const s=C.sents[0];const i=Math.min(s.length-1,Math.max(Math.min(2,s.length-1),Math.min(ST.w,s.length-1)));
+  const cp=ctxPos(s.length,i),ctxW=cp.map(j=>s[j]),cen=s[i],n=Math.max(1,ctxW.length);
+  const W=560,rowH=40,top=40,H=top+n*rowH+14,midY=top+n*rowH/2;const id="ah"+k;
+  const box=(x,y,w,h,cls,t,sub)=>`<rect class="bx ${cls}" x="${x}" y="${y}" width="${w}" height="${h}" rx="8"/><text class="t" x="${x+w/2}" y="${y+(sub?h/2-3:h/2+4)}" text-anchor="middle">${esc(t)}</text>${sub?`<text class="s" x="${x+w/2}" y="${y+h/2+11}" text-anchor="middle">${esc(sub)}</text>`:""}`;
+  const arrow=(x1,y1,x2,y2)=>`<path class="ln" d="M${x1} ${y1} C${(x1+x2)/2} ${y1} ${(x1+x2)/2} ${y2} ${x2-6} ${y2}" marker-end="url(#${id})"/>`;
+  const ys=ctxW.map((_,j)=>top+j*rowH+rowH/2);
+  let g=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"><defs><marker id="${id}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0 0L10 5L0 10z"/></marker></defs>`;
+  g+=`<text class="ly" x="70" y="16" text-anchor="middle">입력층 (원-핫 V=${C.V})</text><text class="ly" x="280" y="16" text-anchor="middle">투사층 h (N=${ST.N})</text><text class="ly" x="485" y="16" text-anchor="middle">출력층 (${ST.loss==="ns"?"시그모이드":"softmax"})</text>`;
+  const hx=225,hw=110,hh=58;
+  if(k==="cbow"){
+    ctxW.forEach((w,j)=>{g+=box(10,ys[j]-15,120,30,"io","x: "+w);g+=arrow(132,ys[j],hx,midY);});
+    g+=box(hx,midY-hh/2,hw,hh,"h","h = 평균",`주변 ${ctxW.length}개 행`);
+    g+=arrow(hx+hw+2,midY,420,midY);g+=box(420,midY-17,130,34,"io","→ "+cen,"중심 1개 예측");
+    g+=`<text class="m" x="${(132+hx)/2}" y="${top-6}" text-anchor="middle">W_in 공유</text><text class="m" x="${(hx+hw+420)/2}" y="${midY-12}" text-anchor="middle">W_out</text>`;
+  }else{
+    g+=box(10,midY-15,120,30,"io","x: "+cen);g+=arrow(132,midY,hx,midY);
+    g+=box(hx,midY-hh/2,hw,hh,"h","h = W_in[행]","중심 1개 행");
+    ctxW.forEach((w,j)=>{g+=arrow(hx+hw+2,midY,420,ys[j]);g+=box(420,ys[j]-15,130,30,"io","→ "+w);});
+    g+=`<text class="m" x="${(132+hx)/2}" y="${midY-12}" text-anchor="middle">W_in</text><text class="m" x="${(hx+hw+420)/2}" y="${top-6}" text-anchor="middle">W_out 공유</text>`;
+  }
+  return g+"</svg>";
+}
+function cRender(){
+  $("archCBsvg").innerHTML=archSVG("cbow");$("archSGsvg").innerHTML=archSVG("skipgram");
+  $("archCB").classList.toggle("on",ST.mode==="cbow");$("archSG").classList.toggle("on",ST.mode==="skipgram");
+  const V=C.V,N=ST.N,nSG=C.samples.skipgram.length,nCB=C.samples.cbow.length,Cb=nSG/Math.max(1,nCB),ns=ST.loss==="ns",O=ns?ST.k+1:V,On=ns?"(k+1)":"V";
+  const perSG=3*N*O+N,perCB=3*N*O+2*Cb*N;
+  const cur=k=>ST.mode===k?' class="cur"':"";
+  const tm=T.timing;
+  const rows=[
+    ["예측 방향","주변 단어들 → 중심 단어","중심 단어 → 주변 단어 각각"],
+    ["학습 샘플 수 (w = "+ST.w+")",`<b class="win">${comma(nCB)}</b>개`,`${comma(nSG)}개 (CBOW의 ${Cb.toFixed(2)}배)`],
+    ["샘플 하나의 곱셈 (대략)",`3·N·${On} + 2·C̄·N = ${comma(perCB)}<br><span class="sk-hint">C̄ = 평균 주변 수 ${Cb.toFixed(2)}</span>`,`3·N·${On} + N = ${comma(perSG)}`],
+    ["한 에폭 곱셈 (대략)",`<b class="win">${comma(perCB*nCB)}</b>`,`${comma(perSG*nSG)}`],
+    ["실제 한 에폭 시간",tm?`<b class="win">${tm.cbow.toFixed(2)} ms</b>`:"—",tm?`${tm.skipgram.toFixed(2)} ms`:"—"],
+    ["속도",'<b class="win">빠름</b>',"느림 (샘플이 많음)"],
+    ["자주 나오는 단어",'<b class="win">강함</b> (평균으로 안정적)',"보통"],
+    ["드문 단어","약함 (평균 속에 묻힘)",'<b class="win">강함</b> (쌍마다 따로 업데이트)'],
+    ["작은 데이터","불리",'<b class="win">유리</b>'],
+    ["Gensim 옵션","sg=0 (기본값)","sg=1"]];
+  $("cTable").innerHTML=`<thead><tr><th>항목</th><th${cur("cbow")}>CBOW</th><th${cur("skipgram")}>Skip-gram</th></tr></thead><tbody>`+rows.map(r=>`<tr><td>${r[0]}</td><td${cur("cbow")}>${r[1]}</td><td${cur("skipgram")}>${r[2]}</td></tr>`).join("")+"</tbody>";
+  $("cHint").textContent=`곱셈 수: 점수 계산 N·${On} + 출력층 갱신 N·${On} + ∂L/∂h 계산 N·${On}, 그리고 입력층 조회·갱신. 속도 차이의 대부분은 샘플 수 차이(${Cb.toFixed(2)}배)에서 옵니다.`+(tm?` 시간은 이 브라우저에서 잰 값입니다.`:"");
+  $("cParam").textContent=`W_in  : V × N = ${V} × ${N} = ${comma(V*N)}\nW_out : N × V = ${N} × ${V} = ${comma(V*N)}\n합계  : 2 × V × N = ${comma(2*V*N)}\n예) 어휘 V = 10,000, N = 100 → 2 × 10,000 × 100 = 2,000,000`;
+  $("cNs").textContent=`출력층 계산 (샘플 하나)\nsoftmax        : V = ${V}개 점수 모두 → 곱셈 N×V = ${N*V}\n네거티브 샘플링 : 정답 1 + 오답 k = ${ST.k}개 → 곱셈 N×(k+1) = ${N*(ST.k+1)}\nV = 10,000이면  : ${comma(100*10000)} vs ${comma(100*(ST.k+1))}  (N = 100)`;
+  const sg=ST.mode==="skipgram"?1:0;const ex=C.sents.slice(0,2).map(s=>"    ["+s.map(w=>JSON.stringify(w)).join(", ")+"],");
+  const pairs=[["from gensim.models import Word2Vec",""],["",""],["sentences = [",""],...ex.map(l=>[l,""]),[`    # ... 총 ${C.sents.length}문장 (띄어쓰기로 자른 토큰 목록)`,"c"],["]",""],["",""],
+    ["model = Word2Vec(",""],["    sentences,",""],[`    vector_size=${N},`,`# N: 단어 벡터 차원`],[`    window=${ST.w},`,"# 윈도 크기"],["    min_count=1,","# 한 번 나온 단어도 사용"],
+    [`    sg=${sg},`,`# 1 = Skip-gram, 0 = CBOW (지금: ${MODES[ST.mode].name})`],
+    ...(ns?[[`    negative=${ST.k},`,"# 네거티브 샘플 k개"],["    hs=0,",""]]:[["    negative=0,","# 네거티브 샘플링 끔"],["    hs=1,","# 전체 softmax 대신 계층적 softmax"]]),
+    [`    alpha=${ST.lr},`,"# 학습률 η"],[`    epochs=${ST.epochs},`,""],[`    seed=${ST.seed},`,""],["    workers=1,","# 결과 재현용"],[")",""],["",""],
+    [`print(model.wv.most_similar(${JSON.stringify(P.a)}, topn=5))`,""],[`print(model.wv.similarity(${JSON.stringify(P.a)}, ${JSON.stringify(P.b)}))`,""],
+    [`print(model.wv.most_similar(positive=[${JSON.stringify(P.x)}, ${JSON.stringify(P.z)}], negative=[${JSON.stringify(P.y)}], topn=3))`,""]];
+  C.code=pairs.map(([a,b])=>b==="c"?a:(b?a.padEnd(18)+" "+b:a)).join("\n");
+  $("cCode").innerHTML=pairs.map(([a,b])=>b==="c"?`<span class="cm">${esc(a)}</span>`:esc(b?a.padEnd(18):a)+(b?` <span class="cm">${esc(b)}</span>`:"")).join("\n");
+}
+$("cTime").onclick=()=>{const out={};["skipgram","cbow"].forEach(k=>{const m=freshModel();m.goal=1e9;let ep=0;const t0=performance.now();while(performance.now()-t0<120||ep<3){const e0=m.epoch;trainChunk(m,k,C.samples[k].length);ep+=m.epoch-e0;}out[k]=(performance.now()-t0)/ep;});T.timing=out;cRender();};
+$("cCopy").onclick=async()=>{try{await navigator.clipboard.writeText(C.code);$("cCopy").textContent="복사됨";}catch(e){const r=document.createRange();r.selectNodeContents($("cCode"));const sel=getSelection();sel.removeAllRanges();sel.addRange(r);$("cCopy").textContent="선택됨";}setTimeout(()=>$("cCopy").textContent="복사",1400);};
+
+/* ================= 키보드 · 테마 · 시작 ================= */
+document.addEventListener("keydown",e=>{if(e.altKey||e.ctrlKey||e.metaKey||e.shiftKey)return;if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;
+  const t=e.target;if(t&&t.closest&&t.closest("input,textarea,select,.sk-tab,[contenteditable='true']"))return;
+  const d=e.key==="ArrowRight"?1:-1;
+  if(ST.tab==="data"){dStop();d>0?dNext():dPrev();e.preventDefault();}
+  else if(ST.tab==="step"){sStop();d>0?sNext():sPrev();e.preventDefault();}});
+function redraw(){if(ST.tab==="step")sDrawHeats();else if(ST.tab==="train")tDraw(false);}
+new MutationObserver(redraw).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",redraw);}catch(e){}
+let rzT;window.addEventListener("resize",()=>{clearTimeout(rzT);rzT=setTimeout(()=>{if(ST.tab==="train")drawLoss();redraw();},150);});
+
+$("corpus").value=DEFAULT_CORPUS;setCorpus(DEFAULT_CORPUS);resetModels();syncK();
+["w","lr","k","epochs"].forEach(syncOut);
+const h0=parseHash();ST.mode=h0.m||"skipgram";ST.tab=h0.t||"data";
+setMode(ST.mode);showTab(ST.tab);
+})();
+</script>
+</body>
+</html>
