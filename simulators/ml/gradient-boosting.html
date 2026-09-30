@@ -1,0 +1,1264 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>그래디언트 부스팅 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20260930c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20260930c">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 파랑 = 데이터·학습 / 청록 = 검증 / 보라 = 새 트리(학습) / 주황 = 평가·조기 종료 / 빨강 = 잔차·과적합 / 초록 = 활용
+   클래스 색: 파랑(0) · 주황(1) */
+:root{ --sk-accent: var(--cat-ml);
+  --c-data:#2563EB; --c-val:#0D9488; --c-learn:#7C3AED; --c-eval:#EA580C; --c-risk:#DC2626; --c-use:#16A34A;
+  --c0:#2563EB; --c1:#EA580C; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --c-data:#6AA5FF; --c-val:#33D1BD; --c-learn:#B294FF; --c-eval:#FF914D; --c-risk:#F87171; --c-use:#4ADE80;
+  --c0:#6AA5FF; --c1:#FF914D; } }
+:root[data-theme="dark"]{
+  --c-data:#6AA5FF; --c-val:#33D1BD; --c-learn:#B294FF; --c-eval:#FF914D; --c-risk:#F87171; --c-use:#4ADE80;
+  --c0:#6AA5FF; --c1:#FF914D; }
+
+.gb-dot{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.gb-ring{display:inline-block;width:11px;height:11px;border-radius:50%;border:2px solid currentColor;margin-right:5px;vertical-align:-1px}
+.gb-line{display:inline-block;width:18px;height:0;border-top:3px solid currentColor;margin-right:5px;vertical-align:3px}
+.gb-line.dash{border-top-style:dashed;border-top-width:2px}
+.t-data{color:var(--c-data)} .t-val{color:var(--c-val)} .t-learn{color:var(--c-learn)} .t-eval{color:var(--c-eval)} .t-risk{color:var(--c-risk)} .t-use{color:var(--c-use)} .t-ink{color:var(--ink)} .t-muted{color:var(--muted)}
+
+.gb-panels{align-items:stretch}
+.gb-fig{display:flex;flex-direction:column;gap:6px;min-width:0}
+.gb-fig h3{font-size:14px;margin:0;min-height:30px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:space-between}
+.gb-fig h3 small{font-size:12px;font-weight:600;color:var(--faint)}
+.gb-fig canvas{display:block;width:100%;aspect-ratio:4/3;border:1px solid var(--line);border-radius:10px;background:var(--surface);touch-action:manipulation}
+.gb-fig canvas.click{cursor:crosshair}
+.gb-fig .sk-legend{font-size:12px;gap:4px 12px}
+.gb-sq canvas{aspect-ratio:1/1}
+.gb-wide canvas{aspect-ratio:16/10}
+
+.gb-formula{white-space:pre-wrap;overflow-wrap:anywhere}
+.gb-formula .hl{font-weight:600}
+.gb-caption{margin:0;font-size:14px;line-height:1.6;min-height:3.2em}
+.gb-caption b{color:var(--ink)}
+
+.gb-table td.cur,.gb-table tr.cur td{background:color-mix(in srgb,var(--sk-accent) 10%,var(--surface))}
+.gb-table td.best{font-weight:700;color:var(--ink)}
+.gb-table td.off{color:var(--faint)}
+.gb-table input.sk-input{width:74px;text-align:right;font-family:var(--mono);padding:3px 6px}
+.gb-table td.wrap,.gb-table th.wrap{white-space:normal;min-width:160px}
+.gb-cmp th:first-child{min-width:112px}
+
+.gb-kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--ink)}
+.gb-sep{width:1px;align-self:stretch;background:var(--line);min-height:26px}
+.gb-code{margin:0;font-family:var(--mono);font-size:13px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;white-space:pre;color:var(--ink);tab-size:4}
+.gb-code .cm{color:var(--muted)}
+.gb-code .kw{color:var(--c-learn);font-weight:600}
+.gb-code .st{color:var(--c-val)}
+.gb-code .nu{color:var(--c-eval)}
+.gb-lib{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.gb-lib .sk-card{gap:6px;padding:14px 16px}
+.gb-lib p{margin:0;font-size:14px;color:var(--text)}
+.gb-lib h3 small{font-weight:600;color:var(--faint);font-size:12px;margin-left:6px}
+@media (max-width:900px){.gb-lib{grid-template-columns:minmax(0,1fr)}}
+.gb-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.gb-two .sk-card{gap:8px}
+.gb-two ul{margin:0;padding-left:18px;font-size:14px;display:grid;gap:3px}
+@media (max-width:760px){.gb-two{grid-template-columns:minmax(0,1fr)}}
+.gb-cls{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.gb-cls{grid-template-columns:minmax(0,1fr)}}
+.gb-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.gb-presets .sk-btn{font-size:13px}
+.gb-fig h3 .sk-seg button{padding:3px 9px;font-size:12px}
+.gb-presets .sk-btn[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.sk-stepper li{cursor:default}
+@media (max-width:520px){
+  .sk-slider{min-width:0;width:100%}
+  .sk-controls{gap:10px 12px}
+  .gb-sep{display:none}
+  .gb-code{font-size:12px;padding:12px}
+}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)" aria-current="page">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">그래디언트 부스팅 시뮬레이터</h1>
+      <p class="ds-hero__lede">얕은 트리를 한 그루씩 더하면서, 앞의 모델이 틀린 만큼(잔차)을 다음 트리가 이어서 맞추는 앙상블입니다. 트리를 하나씩 추가하며 예측선과 손실이 어떻게 바뀌는지, 왜 '그래디언트'라고 부르는지, 트리가 너무 많아지면 어디서 과적합이 시작되는지 직접 확인합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button type="button" class="sk-tab" role="tab" id="tab-residual" aria-controls="pane-residual" aria-selected="true"><span class="sk-num">1</span>잔차를 이어서 맞추기</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-gradient" aria-controls="pane-gradient" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>왜 '그래디언트'인가</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-classify" aria-controls="pane-classify" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>분류 부스팅</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-compare" aria-controls="pane-compare" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>배깅 vs 부스팅</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>코드</button>
+  </nav>
+
+  <!-- ================= 1. 잔차 이어 맞추기 (회귀) ================= -->
+  <section id="pane-residual" role="tabpanel" aria-labelledby="tab-residual">
+    <div class="sk-card">
+      <div class="sk-head"><h2>나이로 연간 의료비 예측하기: 트리를 한 그루씩 더하기</h2><span class="sk-hint">키보드 <span class="gb-kbd">→</span> 다음 트리 · <span class="gb-kbd">←</span> 이전 · 그래프를 누르면 그 점의 계산을 따라갑니다</span></div>
+      <p class="sk-lead">평균 하나(F₀)로 시작해, 매 라운드 <b>잔차 r = y − F</b>를 계산하고 얕은 회귀 트리 h가 그 잔차를 맞춥니다. 예측은 트리 전체가 아니라 <b>학습률 η만큼만</b> 옮깁니다: F ← F + η·h.</p>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--sm" id="r1First">초기화</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="r1Prev">이전</button>
+          <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="r1Next">다음 트리</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="r1Play">재생</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="r1Last">끝으로</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="r1Best">검증 최저로</button>
+        </div>
+        <div class="sk-slider" style="min-width:150px">
+          <div class="sk-sl-head"><label for="r1Speed">재생 속도</label><b id="r1SpeedV">1×</b></div>
+          <input type="range" id="r1Speed" min="0" max="4" step="1" value="1">
+        </div>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-slider">
+          <div class="sk-sl-head"><label for="r1Eta">학습률 η (learning_rate)</label><b id="r1EtaV">0.10</b></div>
+          <input type="range" id="r1Eta" min="0.01" max="1" step="0.01" value="0.1">
+        </div>
+        <div class="sk-slider">
+          <div class="sk-sl-head"><label for="r1N">트리 수 (n_estimators)</label><b id="r1NV">150</b></div>
+          <input type="range" id="r1N" min="1" max="300" step="1" value="150">
+        </div>
+        <div class="sk-group"><span class="sk-label">트리 깊이 (max_depth)</span>
+          <div class="sk-seg" id="r1Depth" role="group" aria-label="트리 깊이">
+            <button type="button" data-v="1" aria-pressed="false">1</button>
+            <button type="button" data-v="2" aria-pressed="true">2</button>
+            <button type="button" data-v="3" aria-pressed="false">3</button>
+          </div>
+        </div>
+        <div class="sk-slider">
+          <div class="sk-sl-head"><label for="r1Sub">표본 비율 (subsample)</label><b id="r1SubV">1.0</b></div>
+          <input type="range" id="r1Sub" min="0.3" max="1" step="0.1" value="1">
+        </div>
+      </div>
+      <div class="sk-controls gb-presets">
+        <span class="sk-label">비교 설정</span>
+        <button type="button" class="sk-btn" data-preset="A" aria-pressed="false">A: η 작게 + 트리 많이</button>
+        <button type="button" class="sk-btn" data-preset="B" aria-pressed="false">B: η 크게 + 트리 적게</button>
+        <button type="button" class="sk-btn" data-preset="C" aria-pressed="false">C: 깊은 트리로 과적합</button>
+        <span class="gb-sep" aria-hidden="true"></span>
+        <button type="button" class="sk-btn sk-btn--sm" id="r1Data">새 데이터 뽑기</button>
+        <label class="sk-check"><input type="checkbox" id="r1ShowVal" checked>검증 데이터 보기</label>
+      </div>
+
+      <div class="sk-grid3 gb-panels">
+        <div class="gb-fig">
+          <h3><span>① 현재 예측 F<sub>m</sub>(x)</span><small id="r1T1"></small></h3>
+          <canvas id="r1C1" class="click" aria-label="나이에 따른 의료비 산점도와 현재까지 더한 부스팅 예측선, 점마다 남은 잔차를 세로 선분으로 표시"></canvas>
+          <div class="sk-legend"><span class="t-data"><i class="gb-dot" style="background:var(--c-data)"></i>학습</span><span class="t-val"><i class="gb-ring"></i>검증</span><span class="t-ink"><i class="gb-line"></i>F<sub>m</sub></span><span class="t-muted"><i class="gb-line dash"></i>F<sub>m−1</sub></span><span class="t-risk"><i class="gb-line" style="border-top-width:2px"></i>남은 잔차 y − F<sub>m</sub></span></div>
+        </div>
+        <div class="gb-fig">
+          <h3><span>② 이번 라운드: 잔차와 새 트리 h<sub>m</sub></span><small>세로축 자동 확대</small></h3>
+          <canvas id="r1C2" class="click" aria-label="이번 라운드에 트리가 맞춘 잔차 점들과 새 트리의 계단 모양 예측"></canvas>
+          <div class="sk-legend"><span class="t-risk"><i class="gb-dot" style="background:var(--c-risk)"></i>잔차 r = y − F<sub>m−1</sub></span><span class="t-learn"><i class="gb-line"></i>h<sub>m</sub>(x)</span><span class="t-learn"><i class="gb-line dash"></i>η·h<sub>m</sub>(x)</span></div>
+        </div>
+        <div class="gb-fig">
+          <h3><span>③ 누적 손실 (MSE)</span>
+            <span class="sk-seg" id="r1Scale" role="group" aria-label="세로축 눈금"><button type="button" data-v="lin" aria-pressed="false">선형</button><button type="button" data-v="log" aria-pressed="true">로그</button></span></h3>
+          <canvas id="r1C3" aria-label="라운드별 학습 MSE와 검증 MSE 곡선, 검증 MSE가 가장 낮은 조기 종료 지점 표시"></canvas>
+          <div class="sk-legend"><span class="t-data"><i class="gb-line"></i>학습 MSE</span><span class="t-val"><i class="gb-line"></i>검증 MSE</span><span class="t-eval"><i class="gb-line dash"></i>검증 최저 (조기 종료)</span><span class="t-risk"><i class="gb-dot" style="background:color-mix(in srgb,var(--c-risk) 25%,var(--surface))"></i>과적합 구간</span></div>
+        </div>
+      </div>
+
+      <div class="sk-grid2">
+        <div class="gb-col">
+          <div class="sk-formula gb-formula" id="r1Formula" aria-live="polite"></div>
+          <p class="sk-note gb-caption" id="r1Caption"></p>
+        </div>
+        <div class="gb-col">
+          <div class="sk-stats" id="r1Stats"></div>
+          <div class="sk-scroll"><table class="sk-table gb-table gb-cmp" id="r1Cmp"></table></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 2. 왜 그래디언트인가 ================= -->
+  <section id="pane-gradient" role="tabpanel" aria-labelledby="tab-gradient" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>MSE 손실에서 음의 기울기 = 잔차</h2></div>
+      <div class="sk-formula gb-formula">손실      L(y, F) = ½ (y − F)²
+미분      ∂L/∂F  = −(y − F)
+음의 기울기 −∂L/∂F = y − F  = <span class="t-risk hl">잔차 r</span>
+
+그러므로 "잔차에 트리를 맞춘다" = "손실이 가장 빨리 줄어드는 방향(음의 기울기)을 트리로 근사한다"
+F<sub>m</sub>(x) = F<sub>m−1</sub>(x) + η · h<sub>m</sub>(x),   h<sub>m</sub> ≈ −∂L/∂F  (점마다의 기울기를 흉내 낸 트리)</div>
+      <div class="gb-two">
+        <div class="sk-card sk-card--sunk">
+          <h3>경사하강법: 파라미터 공간에서 한 걸음</h3>
+          <div class="sk-formula">θ ← θ − η · ∂L/∂θ</div>
+          <ul>
+            <li>움직이는 것: <b>가중치 θ</b> (숫자 몇 개)</li>
+            <li>기울기: 손실을 θ로 미분</li>
+            <li>예: 선형회귀·로지스틱 회귀·신경망 학습</li>
+          </ul>
+        </div>
+        <div class="sk-card sk-card--sunk">
+          <h3>그래디언트 부스팅: 함수 공간에서 한 걸음</h3>
+          <div class="sk-formula">F ← F − η · ∂L/∂F  ≈  F + η · h</div>
+          <ul>
+            <li>움직이는 것: <b>예측 함수 F 자체</b> (점마다의 예측값)</li>
+            <li>기울기: 각 점의 예측 F(xᵢ)로 미분 → 점 n개면 n개짜리 벡터</li>
+            <li>트리 h가 이 벡터를 흉내 내므로 <b>처음 보는 x에도</b> 같은 방향으로 움직일 수 있음</li>
+          </ul>
+        </div>
+      </div>
+      <div class="sk-scroll"><table class="sk-table gb-table">
+        <thead><tr><th>손실 함수</th><th>L(y, F)</th><th>음의 기울기 −∂L/∂F (트리가 맞출 값)</th><th>scikit-learn loss</th></tr></thead>
+        <tbody>
+          <tr><td>제곱 오차 (회귀)</td><td class="sk-mono">½(y − F)²</td><td class="sk-mono">y − F  (잔차)</td><td class="sk-mono">"squared_error"</td></tr>
+          <tr><td>절대 오차 (회귀)</td><td class="sk-mono">|y − F|</td><td class="sk-mono">sign(y − F)  (부호만)</td><td class="sk-mono">"absolute_error"</td></tr>
+          <tr><td>Huber (회귀)</td><td class="sk-mono">작으면 제곱, 크면 절대</td><td class="sk-mono">작으면 y − F, 크면 δ·sign(y − F)</td><td class="sk-mono">"huber"</td></tr>
+          <tr><td>로그 손실 (이진 분류)</td><td class="sk-mono">−[y log p + (1−y) log(1−p)]</td><td class="sk-mono">y − p,  p = σ(F)  (유사 잔차)</td><td class="sk-mono">"log_loss"</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="sk-card" style="margin-top:16px">
+      <div class="sk-head"><h2>점 5개로 한 라운드 따라가기</h2><span class="sk-hint">의료비 값은 직접 바꿔 볼 수 있습니다 · 키보드 <span class="gb-kbd">→</span> 다음 단계</span></div>
+      <ol class="sk-stepper" id="g2Stepper" aria-label="계산 단계"></ol>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--sm" id="g2First">처음</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="g2Prev">이전</button>
+          <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="g2Next">다음</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="g2Play">재생</button>
+        </div>
+        <div class="sk-group"><span class="sk-label">학습률 η</span>
+          <div class="sk-seg" id="g2Eta" role="group" aria-label="학습률">
+            <button type="button" data-v="0.1" aria-pressed="false">0.1</button>
+            <button type="button" data-v="0.5" aria-pressed="true">0.5</button>
+            <button type="button" data-v="1" aria-pressed="false">1.0</button>
+          </div>
+        </div>
+        <button type="button" class="sk-btn sk-btn--sm" id="g2Reset">값 되돌리기</button>
+      </div>
+      <p class="sk-note gb-caption" id="g2Caption" aria-live="polite"></p>
+      <div class="sk-grid2">
+        <div class="gb-col">
+          <div class="sk-scroll"><table class="sk-table gb-table" id="g2Table"></table></div>
+          <div class="sk-scroll"><table class="sk-table gb-table" id="g2Split"></table></div>
+        </div>
+        <div class="gb-col">
+          <div class="gb-fig gb-wide">
+            <canvas id="g2C" aria-label="점 5개와 F0 평균선, 잔차, 분할 기준, 새 예측 F1을 단계별로 표시"></canvas>
+            <div class="sk-legend"><span class="t-data"><i class="gb-dot" style="background:var(--c-data)"></i>데이터</span><span class="t-muted"><i class="gb-line dash"></i>F₀ = 평균</span><span class="t-risk"><i class="gb-line" style="border-top-width:2px"></i>잔차</span><span class="t-learn"><i class="gb-line dash"></i>F₀ + h₁ (η = 1이면)</span><span class="t-ink"><i class="gb-line"></i>F₁ = F₀ + η·h₁</span></div>
+          </div>
+          <div class="sk-formula gb-formula" id="g2Formula"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 3. 분류 부스팅 ================= -->
+  <section id="pane-classify" role="tabpanel" aria-labelledby="tab-classify" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>나이·공복혈당으로 질환 여부 분류하기</h2><span class="sk-hint">키보드 <span class="gb-kbd">→</span> 다음 트리 · 점을 누르면 그 점의 계산을 따라갑니다</span></div>
+      <p class="sk-lead">분류에서는 확률 대신 <b>로그 오즈 F</b>를 더해 갑니다. 확률은 p = σ(F), 트리가 맞추는 값은 <b>유사 잔차 r = y − p</b> (로그 손실의 음의 기울기)입니다. 틀린 점일수록 r이 커서 다음 트리가 그 점을 더 신경 씁니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--sm" id="c3First">초기화</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="c3Prev">이전</button>
+          <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="c3Next">다음 트리</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="c3Play">재생</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="c3Last">끝으로</button>
+        </div>
+        <div class="sk-slider" style="min-width:150px">
+          <div class="sk-sl-head"><label for="c3Speed">재생 속도</label><b id="c3SpeedV">1×</b></div>
+          <input type="range" id="c3Speed" min="0" max="4" step="1" value="1">
+        </div>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-slider">
+          <div class="sk-sl-head"><label for="c3Eta">학습률 η</label><b id="c3EtaV">0.30</b></div>
+          <input type="range" id="c3Eta" min="0.01" max="1" step="0.01" value="0.3">
+        </div>
+        <div class="sk-slider">
+          <div class="sk-sl-head"><label for="c3N">트리 수</label><b id="c3NV">100</b></div>
+          <input type="range" id="c3N" min="1" max="300" step="1" value="100">
+        </div>
+        <div class="sk-group"><span class="sk-label">트리 깊이</span>
+          <div class="sk-seg" id="c3Depth" role="group" aria-label="트리 깊이">
+            <button type="button" data-v="1" aria-pressed="false">1</button>
+            <button type="button" data-v="2" aria-pressed="true">2</button>
+            <button type="button" data-v="3" aria-pressed="false">3</button>
+          </div>
+        </div>
+        <div class="sk-group"><span class="sk-label">잎 값</span>
+          <div class="sk-seg" id="c3Leaf" role="group" aria-label="잎 값 계산 방식">
+            <button type="button" data-v="newton" aria-pressed="true">뉴턴 스텝 Σr / Σp(1−p)</button>
+            <button type="button" data-v="mean" aria-pressed="false">잔차 평균</button>
+          </div>
+        </div>
+        <label class="sk-check"><input type="checkbox" id="c3ShowVal">검증 데이터 보기</label>
+        <button type="button" class="sk-btn sk-btn--sm" id="c3Data">새 데이터 뽑기</button>
+      </div>
+      <div class="gb-cls">
+        <div class="gb-fig gb-sq">
+          <h3><span>결정 경계와 확률 p = σ(F<sub>m</sub>)</span><small id="c3T1"></small></h3>
+          <canvas id="c3C1" class="click" aria-label="나이와 공복혈당 평면 위의 파랑·주황 점과 부스팅 모델의 확률 배경, p = 0.5 결정 경계"></canvas>
+          <div class="sk-legend"><span class="t-data"><i class="gb-dot" style="background:var(--c0)"></i>질환 없음 (y = 0)</span><span class="t-eval"><i class="gb-dot" style="background:var(--c1)"></i>질환 있음 (y = 1)</span><span class="t-ink"><i class="gb-line"></i>p = 0.5 경계</span><span class="t-muted">점 크기 = |y − p| (다음 트리가 맞출 크기)</span></div>
+        </div>
+        <div class="gb-col">
+          <div class="gb-fig gb-wide">
+            <h3><span>로그 손실 곡선</span></h3>
+            <canvas id="c3C2" aria-label="라운드별 학습·검증 로그 손실 곡선"></canvas>
+            <div class="sk-legend"><span class="t-data"><i class="gb-line"></i>학습</span><span class="t-val"><i class="gb-line"></i>검증</span><span class="t-eval"><i class="gb-line dash"></i>검증 최저</span></div>
+          </div>
+          <div class="sk-stats" id="c3Stats"></div>
+          <div class="sk-formula gb-formula" id="c3Formula" aria-live="polite"></div>
+        </div>
+      </div>
+      <p class="sk-note" id="c3Note"></p>
+    </div>
+  </section>
+
+  <!-- ================= 4. 배깅 vs 부스팅 ================= -->
+  <section id="pane-compare" role="tabpanel" aria-labelledby="tab-compare" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>배깅(랜덤포레스트)과 부스팅, 무엇이 다른가</h2></div>
+      <div class="sk-scroll"><table class="sk-table gb-table">
+        <thead><tr><th>항목</th><th class="wrap">배깅 · 랜덤포레스트</th><th class="wrap">부스팅 · 그래디언트 부스팅</th></tr></thead>
+        <tbody>
+          <tr><td>트리를 만드는 순서</td><td class="wrap"><b>병렬</b> · 서로 독립</td><td class="wrap"><b>순차</b> · 앞 모델의 잔차를 보정</td></tr>
+          <tr><td>각 트리가 보는 데이터</td><td class="wrap">부트스트랩 표본 + 무작위 특성 (max_features)</td><td class="wrap">전체 또는 subsample 표본 + <b>현재 잔차</b></td></tr>
+          <tr><td>기본 트리</td><td class="wrap">깊은 트리 (편향 작고 분산 큼)</td><td class="wrap">얕은 트리, 깊이 1~5 (약한 학습기)</td></tr>
+          <tr><td>합치는 방법</td><td class="wrap">평균(회귀) · 다수결/확률 평균(분류)</td><td class="wrap">F = F₀ + η·(h₁ + h₂ + … + h<sub>M</sub>)</td></tr>
+          <tr><td>주로 줄이는 것</td><td class="wrap"><b>분산</b> (흔들림을 평균으로 상쇄)</td><td class="wrap"><b>편향</b> (못 맞춘 부분을 계속 보정)</td></tr>
+          <tr><td>트리를 늘리면</td><td class="wrap">성능이 수렴, 과적합이 거의 늘지 않음</td><td class="wrap">학습 데이터에 계속 맞춰 <span class="t-risk">과적합 가능</span> → 조기 종료</td></tr>
+          <tr><td>주요 하이퍼파라미터</td><td class="wrap sk-mono">n_estimators, max_features, max_depth, min_samples_leaf</td><td class="wrap sk-mono">n_estimators, learning_rate, max_depth, subsample</td></tr>
+          <tr><td>병렬 처리 · 튜닝</td><td class="wrap">쉬움 (n_jobs) · 기본값으로도 잘 됨</td><td class="wrap">라운드는 순차 · η와 트리 수를 함께 조정</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="sk-card" style="margin-top:16px">
+      <div class="sk-head"><h2>같은 데이터에서 나란히 보기</h2><span class="sk-hint">1번 화면과 같은 나이–의료비 데이터</span></div>
+      <div class="sk-controls">
+        <div class="sk-slider" style="min-width:240px">
+          <div class="sk-sl-head"><label for="b4K">트리 수</label><b id="b4KV">30</b></div>
+          <input type="range" id="b4K" min="1" max="300" step="1" value="30">
+        </div>
+        <label class="sk-check"><input type="checkbox" id="b4Ind" checked>개별 트리 흐리게 보기</label>
+        <span class="sk-hint">RF: 부트스트랩, 깊이 제한 없음 · GB: η = 0.1, max_depth = 3</span>
+      </div>
+      <div class="sk-grid3 gb-panels">
+        <div class="gb-fig">
+          <h3><span>랜덤포레스트 (평균)</span><small id="b4T1"></small></h3>
+          <canvas id="b4C1" aria-label="랜덤포레스트: 부트스트랩 트리 여러 개와 그 평균 예측선"></canvas>
+          <div class="sk-legend"><span class="t-use"><i class="gb-line"></i>평균 예측</span><span class="t-muted"><i class="gb-line" style="border-top-width:1px"></i>개별 트리</span></div>
+        </div>
+        <div class="gb-fig">
+          <h3><span>그래디언트 부스팅 (누적 합)</span><small id="b4T2"></small></h3>
+          <canvas id="b4C2" aria-label="그래디언트 부스팅: 트리를 더해 가는 중간 예측선들과 최종 예측선"></canvas>
+          <div class="sk-legend"><span class="t-learn"><i class="gb-line"></i>F<sub>M</sub></span><span class="t-muted"><i class="gb-line" style="border-top-width:1px"></i>중간 단계 F<sub>m</sub></span></div>
+        </div>
+        <div class="gb-fig">
+          <h3><span>트리 수에 따른 검증 MSE</span></h3>
+          <canvas id="b4C3" aria-label="트리 수에 따른 랜덤포레스트와 그래디언트 부스팅의 검증 MSE"></canvas>
+          <div class="sk-legend"><span class="t-use"><i class="gb-line"></i>RF 검증</span><span class="t-learn"><i class="gb-line"></i>GB 검증</span><span class="t-learn"><i class="gb-line dash"></i>GB 학습</span></div>
+        </div>
+      </div>
+      <div class="sk-stats" id="b4Stats"></div>
+      <p class="sk-note" id="b4Note"></p>
+    </div>
+
+    <div class="gb-lib" style="margin-top:16px">
+      <div class="sk-card"><h3>XGBoost<small>규제</small></h3><p>2차 미분(뉴턴 스텝)으로 잎 값을 정하고, 잎 가중치에 L1·L2 규제(α, λ)와 분할 최소 이득 γ를 걸어 과적합을 누릅니다. 결측값이 갈 방향도 학습합니다.</p></div>
+      <div class="sk-card"><h3>LightGBM<small>히스토그램 분할</small></h3><p>연속값을 구간(bin)으로 묶은 히스토그램으로 분할점을 빠르게 찾고, 손실이 가장 큰 잎부터 키우는(leaf-wise) 방식이라 대용량에서 빠릅니다.</p></div>
+      <div class="sk-card"><h3>CatBoost<small>범주형 처리</small></h3><p>범주형 변수를 순서형 타깃 통계로 바로 인코딩하고, 순서 부스팅(ordered boosting)으로 타깃 누수를 줄입니다. 좌우 대칭(oblivious) 트리를 씁니다.</p></div>
+    </div>
+  </section>
+
+  <!-- ================= 5. 코드 ================= -->
+  <section id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>scikit-learn 코드</h2><span class="sk-hint">설정을 바꾸면 코드가 바로 바뀝니다</span></div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">모델</span>
+          <div class="sk-seg" id="k5Kind" role="group" aria-label="모델 종류">
+            <button type="button" data-v="reg" aria-pressed="true">회귀 (Regressor)</button>
+            <button type="button" data-v="cls" aria-pressed="false">분류 (Classifier)</button>
+          </div>
+        </div>
+        <button type="button" class="sk-btn sk-btn--sm" id="k5Pull">1·3번 화면 설정 가져오기</button>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-slider">
+          <div class="sk-sl-head"><label for="k5N">n_estimators</label><b id="k5NV">150</b></div>
+          <input type="range" id="k5N" min="1" max="500" step="1" value="150">
+        </div>
+        <div class="sk-slider">
+          <div class="sk-sl-head"><label for="k5Eta">learning_rate</label><b id="k5EtaV">0.30</b></div>
+          <input type="range" id="k5Eta" min="0.01" max="1" step="0.01" value="0.3">
+        </div>
+        <div class="sk-slider">
+          <div class="sk-sl-head"><label for="k5Depth">max_depth</label><b id="k5DepthV">2</b></div>
+          <input type="range" id="k5Depth" min="1" max="8" step="1" value="2">
+        </div>
+        <div class="sk-slider">
+          <div class="sk-sl-head"><label for="k5Sub">subsample</label><b id="k5SubV">1.0</b></div>
+          <input type="range" id="k5Sub" min="0.3" max="1" step="0.1" value="1">
+        </div>
+      </div>
+      <div class="sk-controls">
+        <label class="sk-check"><input type="checkbox" id="k5Stoch">확률적 부스팅 (subsample = 0.8)</label>
+        <label class="sk-check"><input type="checkbox" id="k5Early">조기 종료 (n_iter_no_change)</label>
+        <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="k5Copy">복사</button>
+      </div>
+      <pre class="gb-code" id="k5Code" tabindex="0" aria-label="파이썬 코드"></pre>
+      <p class="sk-note" id="k5Note"></p>
+    </div>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20260930c"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------------- 공통 수학 ---------------- */
+  function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+  function gauss(R){let u=0;while(u===0)u=R();const v=R();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+  const sigmoid = z => 1/(1+Math.exp(-z));
+  const mean = a => { let s=0; for (const v of a) s+=v; return s/a.length; };
+  function mse(y, F){ let s=0; for (let i=0;i<y.length;i++){ const d=y[i]-F[i]; s+=d*d; } return s/y.length; }
+  function logloss(y, F){ let s=0; for (let i=0;i<y.length;i++){ let p=sigmoid(F[i]); p=Math.min(1-1e-15,Math.max(1e-15,p)); s+= y[i]?-Math.log(p):-Math.log(1-p); } return s/y.length; }
+  function accuracy(y, F){ let c=0; for (let i=0;i<y.length;i++) if ((F[i]>0?1:0)===y[i]) c++; return c/y.length; }
+  function argmin(a){ let b=0; for (let i=1;i<a.length;i++) if (a[i]<a[b]-1e-15) b=i; return b; }
+
+  /* 회귀 트리: 제곱오차(MSE) 감소가 가장 큰 분할을 깊이 우선으로.
+     X: 행 배열(특성 배열), r: 맞출 값, idx: 사용할 행 번호, leafFn(idx) → 잎 값 */
+  function buildTree(X, r, idx, maxDepth, minLeaf, leafFn, depth){
+    depth = depth || 0;
+    const n = idx.length; let s = 0; for (const i of idx) s += r[i];
+    const leaf = () => ({ leaf:true, value: leafFn(idx), n, idx });
+    if (depth >= maxDepth || n < 2*minLeaf) return leaf();
+    const D = X[idx[0]].length, base = s*s/n; let best = null;
+    for (let f=0; f<D; f++){
+      const o = idx.slice().sort((a,b)=>X[a][f]-X[b][f]); let sl = 0;
+      for (let k=0; k<n-1; k++){
+        sl += r[o[k]];
+        if (X[o[k]][f] === X[o[k+1]][f]) continue;
+        const nl=k+1, nr=n-nl; if (nl<minLeaf || nr<minLeaf) continue;
+        const sr = s-sl, g = sl*sl/nl + sr*sr/nr - base;
+        if (!best || g > best.g + 1e-12) best = { g, f, thr:(X[o[k]][f]+X[o[k+1]][f])/2, k, o };
+      }
+    }
+    if (!best || best.g <= 1e-12) return leaf();
+    return { leaf:false, f:best.f, thr:best.thr, gain:best.g, n,
+      left: buildTree(X, r, best.o.slice(0,best.k+1), maxDepth, minLeaf, leafFn, depth+1),
+      right: buildTree(X, r, best.o.slice(best.k+1), maxDepth, minLeaf, leafFn, depth+1) };
+  }
+  function leafOf(t, x){ while (!t.leaf) t = x[t.f] <= t.thr ? t.left : t.right; return t; }
+  const predict = (t, x) => leafOf(t, x).value;
+
+  /* ---------------- 그리기 도구 ---------------- */
+  let C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement), g = n => s.getPropertyValue(n).trim();
+    C = { surface:g("--surface"), surface2:g("--surface-2"), ink:g("--ink"), text:g("--text"), muted:g("--muted"), faint:g("--faint"),
+      line:g("--line"), lineStrong:g("--line-strong"), data:g("--c-data"), val:g("--c-val"), learn:g("--c-learn"), evalc:g("--c-eval"),
+      risk:g("--c-risk"), use:g("--c-use"), c0:g("--c0"), c1:g("--c1"), mono:g("--mono")||"monospace", sans:g("--sans")||"sans-serif" };
+  }
+  function hexRgb(h){ h=(h||"#888").replace("#",""); if (h.length===3) h=h.split("").map(c=>c+c).join(""); const n=parseInt(h.slice(0,6),16); return [n>>16&255, n>>8&255, n&255]; }
+  function alpha(hex, a){ const [r,g,b]=hexRgb(hex); return `rgba(${r},${g},${b},${a})`; }
+  function prep(cv){
+    const dpr = Math.max(1, window.devicePixelRatio||1), w = cv.clientWidth, h = cv.clientHeight;
+    if (!w || !h) return null;
+    const W = Math.round(w*dpr), H = Math.round(h*dpr);
+    if (cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; }
+    const ctx = cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
+    return { ctx, w, h };
+  }
+  function niceTicks(a, b, n){
+    const span = b-a; if (!(span>0)) return [a];
+    const s0 = span/Math.max(1,n), mag = Math.pow(10, Math.floor(Math.log10(s0))), e = s0/mag;
+    const st = (e<1.5?1:e<3?2:e<7?5:10)*mag, t = [];
+    for (let v=Math.ceil(a/st-1e-9)*st; v<=b+1e-9; v+=st) t.push(+v.toFixed(10));
+    return t;
+  }
+  function fmtTick(v){ const a=Math.abs(v); if (a===0) return "0"; if (a>=100) return v.toFixed(0); if (a>=1) return (+v.toFixed(2)).toString(); if (a>=0.01) return (+v.toFixed(3)).toString(); return v.toExponential(0); }
+  /* 좌표축: o = {x0,x1,y0,y1,xl,yl,log,xt,yt} */
+  function axes(P, o){
+    const { ctx, w, h } = P, small = w < 360;
+    const m = { l: small?40:48, r: 10, t: 10, b: 34 };
+    const pw = w-m.l-m.r, ph = h-m.t-m.b;
+    const ty = o.log ? v => Math.log10(Math.max(v,1e-9)) : v => v;
+    const Y0 = ty(o.y0), Y1 = ty(o.y1);
+    const sx = v => m.l + (v-o.x0)/(o.x1-o.x0)*pw;
+    const sy = v => m.t + (1-(ty(v)-Y0)/(Y1-Y0))*ph;
+    ctx.save(); ctx.lineWidth = 1; ctx.font = `${small?10:11}px ${C.mono}`;
+    const xt = o.xt || niceTicks(o.x0, o.x1, small?4:6);
+    let yt;
+    if (o.log){ yt=[]; for (let e=Math.floor(Y0); e<=Math.ceil(Y1); e++) for (const k of [1,2,5]){ const v=k*Math.pow(10,e); if (v>=o.y0*0.999 && v<=o.y1*1.001) yt.push(v); } }
+    else yt = o.yt || niceTicks(o.y0, o.y1, small?4:5);
+    ctx.strokeStyle = C.line; ctx.fillStyle = C.muted;
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (const v of yt){ const y=Math.round(sy(v))+.5; ctx.beginPath(); ctx.moveTo(m.l,y); ctx.lineTo(w-m.r,y); ctx.stroke(); ctx.fillText(fmtTick(v), m.l-5, y); }
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (const v of xt){ const x=Math.round(sx(v))+.5; ctx.beginPath(); ctx.moveTo(x,m.t); ctx.lineTo(x,h-m.b); ctx.stroke(); ctx.fillText(o.xfmt?o.xfmt(v):fmtTick(v), x, h-m.b+4); }
+    ctx.strokeStyle = C.lineStrong; ctx.strokeRect(m.l+.5, m.t+.5, pw-1, ph-1);
+    ctx.font = `600 ${small?10.5:11.5}px ${C.sans}`; ctx.fillStyle = C.muted;
+    if (o.xl){ ctx.textAlign="right"; ctx.textBaseline="bottom"; ctx.fillText(o.xl, w-m.r, h-1); }
+    ctx.restore();
+    return { yl:o.yl, sx, sy, m, pw, ph, ix: px => o.x0 + (px-m.l)/pw*(o.x1-o.x0), iy: py => o.y0 + (1-(py-m.t)/ph)*(o.y1-o.y0) };
+  }
+  /* 세로축 이름: 데이터를 다 그린 뒤 맨 위에 */
+  function ylab(P, A){ if (A.yl) label(P.ctx, A.yl, A.m.l+7, A.m.t+5, C.muted, "left", "top"); }
+  function clip(P, A){ P.ctx.save(); P.ctx.beginPath(); P.ctx.rect(A.m.l, A.m.t, A.pw, A.ph); P.ctx.clip(); }
+  function polyline(ctx, xs, ys, sx, sy){ ctx.beginPath(); for (let i=0;i<xs.length;i++){ const X=sx(xs[i]), Y=sy(ys[i]); i?ctx.lineTo(X,Y):ctx.moveTo(X,Y); } ctx.stroke(); }
+  function dot(ctx, x, y, r, fill, stroke, lw){ ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); if (fill){ ctx.fillStyle=fill; ctx.fill(); } if (stroke){ ctx.strokeStyle=stroke; ctx.lineWidth=lw||1; ctx.stroke(); } }
+  function label(ctx, text, x, y, color, align, base){ ctx.save(); ctx.font=`600 11px ${C.sans}`; ctx.textAlign=align||"left"; ctx.textBaseline=base||"top";
+    const tw = ctx.measureText(text).width, bx = align==="right"?x-tw-4:align==="center"?x-tw/2-4:x-4;
+    ctx.fillStyle = alpha(C.surface.startsWith("#")?C.surface:"#ffffff", .88); ctx.fillRect(bx, (base==="bottom"?y-15:y-1), tw+8, 16);
+    ctx.fillStyle = color; ctx.fillText(text, x, y); ctx.restore(); }
+  const SUB = "₀₁₂₃₄₅₆₇₈₉";
+  const sub = n => String(n).replace(/\d/g, d => SUB[+d]);
+  const f3 = v => (Math.abs(v)<5e-4?0:v).toFixed(3);
+  const f2 = v => v.toFixed(2);
+  const sgn = v => v < 0 ? "− " + f3(-v) : "+ " + f3(v);
+  const par = v => v < 0 ? "(" + f3(v) + ")" : f3(v);
+  function setSeg(el, v){ el.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === String(v)))); }
+  function onSeg(el, fn){ el.querySelectorAll("button").forEach(b => b.addEventListener("click", () => { setSeg(el, b.dataset.v); fn(b.dataset.v); })); }
+  const SPEEDS = [0.5, 1, 2, 4, 8];
+  function statHTML(items){ return items.map(([v,l,cls]) => `<div class="sk-stat"><b${cls?` class="${cls}"`:""}>${v}</b><span>${l}</span></div>`).join(""); }
+
+  /* 손실 곡선 (1·3번 화면 공용) */
+  function drawLoss(cv, tr, va, m, opt){
+    const P = prep(cv); if (!P) return;
+    const N = tr.length-1, all = tr.concat(va);
+    let y1 = Math.max(...all)*1.05, y0 = opt.log ? Math.max(1e-4, Math.min(...all)*0.8) : 0;
+    const A = axes(P, { x0:0, x1:Math.max(1,N), y0, y1, log:opt.log, xl:"라운드 (트리 수)", yl:opt.yl });
+    const { ctx } = P, xs = [...Array(N+1).keys()];
+    const b = argmin(va);
+    clip(P, A);
+    if (va[N] > va[b]*1.02 && b < N){ ctx.fillStyle = alpha(C.risk, .09); ctx.fillRect(A.sx(b), A.m.t, A.sx(N)-A.sx(b), A.ph); }
+    ctx.lineWidth = 1.6; ctx.setLineDash([]);
+    ctx.strokeStyle = alpha(C.data, .28); polyline(ctx, xs, tr, A.sx, A.sy);
+    ctx.strokeStyle = alpha(C.val, .28); polyline(ctx, xs, va, A.sx, A.sy);
+    ctx.lineWidth = 2.6;
+    ctx.strokeStyle = C.data; polyline(ctx, xs.slice(0,m+1), tr.slice(0,m+1), A.sx, A.sy);
+    ctx.strokeStyle = C.val; polyline(ctx, xs.slice(0,m+1), va.slice(0,m+1), A.sx, A.sy);
+    ctx.setLineDash([5,4]); ctx.lineWidth = 1.6; ctx.strokeStyle = C.evalc;
+    ctx.beginPath(); ctx.moveTo(A.sx(b)+.5, A.m.t); ctx.lineTo(A.sx(b)+.5, A.m.t+A.ph); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = alpha(C.ink.startsWith("#")?C.ink:"#000000", .45); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(A.sx(m)+.5, A.m.t); ctx.lineTo(A.sx(m)+.5, A.m.t+A.ph); ctx.stroke();
+    dot(ctx, A.sx(m), A.sy(tr[m]), 4.5, C.data, C.surface, 1.5);
+    dot(ctx, A.sx(m), A.sy(va[m]), 4.5, C.val, C.surface, 1.5);
+    dot(ctx, A.sx(b), A.sy(va[b]), 5, C.evalc, C.surface, 1.5);
+    ctx.restore();
+    ylab(P, A);
+    const lx = A.sx(b), right = lx > A.m.l + A.pw*0.6;
+    label(ctx, `검증 최저 ${b}라운드`, right ? lx-6 : lx+6, A.m.t+24, C.evalc, right ? "right" : "left");
+  }
+
+  /* ======================================================================
+     1. 잔차 이어 맞추기 (회귀)
+     ====================================================================== */
+  const X0 = 20, X1 = 80;
+  const S1 = { eta:0.1, n:150, depth:2, sub:1.0, seed:3, m:0, sel:null, log:true, showVal:true, speed:1, timer:null, preset:null };
+  let D1, R1, dirty4 = true;
+  function genReg(seed){
+    const R = mulberry32(seed*7919+11), pts = [];
+    for (let i=0;i<100;i++){
+      const a = X0 + (X1-X0)*R();
+      const y = 1 + 2.5/(1+Math.exp(-(a-55)/6)) + 0.4*Math.sin(a/5) + 0.35*gauss(R);
+      pts.push([Math.fround(a), +y.toFixed(3)]);   /* float32로 맞춰 두면 scikit-learn과 분할 기준이 완전히 같음 */
+    }
+    const tr = pts.slice(0,60), va = pts.slice(60);
+    return { tx:tr.map(p=>p[0]), ty:tr.map(p=>p[1]), vx:va.map(p=>p[0]), vy:va.map(p=>p[1]) };
+  }
+  const GRID = Array.from({length:241}, (_,i) => X0 + (X1-X0)*i/240);
+  /* 회귀 부스팅 전체 학습 (라운드별 상태 저장) */
+  function boostReg(D, eta, N, depth, sub, seed){
+    const X = D.tx.map(v=>[v]), y = D.ty, n = y.length, Xv = D.vx.map(v=>[v]);
+    const F0 = mean(y);
+    let F = new Float64Array(n).fill(F0), Fv = new Float64Array(D.vy.length).fill(F0), G = new Float64Array(GRID.length).fill(F0);
+    const rounds = [{ F, Fv, G }], trainL = [mse(y,F)], valL = [mse(D.vy,Fv)];
+    const R = mulberry32(seed*31+5);
+    for (let m=1; m<=N; m++){
+      const r = y.map((v,i) => v - F[i]);
+      let idx = [...Array(n).keys()];
+      if (sub < 1){ const k = Math.max(2, Math.round(sub*n));
+        for (let i=0;i<k;i++){ const j=i+Math.floor(R()*(n-i)); [idx[i],idx[j]]=[idx[j],idx[i]]; }
+        idx = idx.slice(0,k).sort((a,b)=>a-b); }
+      const tree = buildTree(X, r, idx, depth, 1, ids => { let s=0; for (const i of ids) s+=r[i]; return s/ids.length; });
+      const h = X.map(x => predict(tree, x));
+      F = F.map((v,i) => v + eta*h[i]);
+      Fv = Fv.map((v,i) => v + eta*predict(tree, Xv[i]));
+      G = G.map((v,i) => v + eta*predict(tree, [GRID[i]]));
+      rounds.push({ tree, idx, inS:new Set(idx), r, h, F, Fv, G });
+      trainL.push(mse(y,F)); valL.push(mse(D.vy,Fv));
+    }
+    return { F0, rounds, trainL, valL, best: argmin(valL), N, eta, depth, sub };
+  }
+  const PRESETS = { A:{eta:0.05,n:300,depth:2,label:"A: η 0.05 · 300그루"}, B:{eta:1.0,n:15,depth:2,label:"B: η 1.0 · 15그루"}, C:{eta:0.5,n:300,depth:3,label:"C: η 0.5 · 깊이 3"} };
+  function retrain1(keepM){
+    R1 = boostReg(D1, S1.eta, S1.n, S1.depth, S1.sub, S1.seed);
+    S1.m = keepM ? Math.min(S1.m, S1.n) : 0;
+    if (S1.sel == null || S1.sel >= D1.ty.length){ let b=0; D1.tx.forEach((v,i)=>{ if (Math.abs(v-60)<Math.abs(D1.tx[b]-60)) b=i; }); S1.sel=b; }
+    renderCmp1(); render1();
+    syncCodeFromTabs(false);
+  }
+  function renderCmp1(){
+    const rows = [];
+    for (const k of ["A","B","C"]){ const p = PRESETS[k]; const R = boostReg(D1, p.eta, p.n, p.depth, S1.sub, S1.seed); rows.push([p.label, R, S1.preset===k]); }
+    rows.push([`현재: η ${f2(S1.eta)} · ${S1.n}그루 · 깊이 ${S1.depth}`, R1, true && !S1.preset]);
+    $("r1Cmp").innerHTML = `<thead><tr><th>설정</th><th>학습 MSE (끝)</th><th>검증 MSE 최저 (라운드)</th><th>검증 MSE (끝)</th></tr></thead><tbody>` +
+      rows.map(([l,R,cur]) => `<tr class="${cur?"cur":""}"><td>${l}</td><td class="n">${R.trainL[R.N].toFixed(4)}</td><td class="n">${R.valL[R.best].toFixed(4)} (${R.best})</td><td class="n">${R.valL[R.N].toFixed(4)}</td></tr>`).join("") + `</tbody>`;
+  }
+  function yRange1(){ const all = D1.ty.concat(D1.vy); return [Math.floor(Math.min(...all)*2)/2 - 0.25, Math.ceil(Math.max(...all)*2)/2 + 0.25]; }
+  function render1(){
+    const m = S1.m, R = R1, cur = R.rounds[m], prev = m ? R.rounds[m-1] : null, i = S1.sel;
+    $("r1T1").textContent = `m = ${m} / ${S1.n}`;
+    /* ① 현재 예측 */
+    let P = prep($("r1C1"));
+    if (P){
+      const [y0,y1] = yRange1();
+      const A = axes(P, { x0:X0, x1:X1, y0, y1, xl:"나이 (세)", yl:"연간 의료비 (백만 원)" }); const { ctx } = P;
+      clip(P, A);
+      if (S1.showVal) D1.vx.forEach((x,k) => dot(ctx, A.sx(x), A.sy(D1.vy[k]), 3.4, null, alpha(C.val,.9), 1.5));
+      ctx.strokeStyle = alpha(C.risk, .6); ctx.lineWidth = 1.4;
+      D1.tx.forEach((x,k) => { ctx.beginPath(); ctx.moveTo(A.sx(x), A.sy(cur.F[k])); ctx.lineTo(A.sx(x), A.sy(D1.ty[k])); ctx.stroke(); });
+      if (prev){ ctx.setLineDash([5,4]); ctx.strokeStyle = C.muted; ctx.lineWidth = 1.5; polyline(ctx, GRID, prev.G, A.sx, A.sy); ctx.setLineDash([]); }
+      ctx.strokeStyle = C.ink; ctx.lineWidth = 2.6; polyline(ctx, GRID, cur.G, A.sx, A.sy);
+      D1.tx.forEach((x,k) => dot(ctx, A.sx(x), A.sy(D1.ty[k]), 3.6, C.data, C.surface, 1));
+      if (i != null){ dot(ctx, A.sx(D1.tx[i]), A.sy(D1.ty[i]), 8, null, C.ink, 2); }
+      ctx.restore(); ylab(P, A);
+      $("r1C1")._A = A;
+    }
+    /* ② 잔차와 새 트리 */
+    P = prep($("r1C2"));
+    if (P){
+      const r = m ? cur.r : D1.ty.map((v,k)=>v-R.F0);
+      let mx = Math.max(0.1, ...r.map(Math.abs)); if (m) mx = Math.max(mx, ...GRID.map(g=>Math.abs(predict(cur.tree,[g]))));
+      mx *= 1.12;
+      const A = axes(P, { x0:X0, x1:X1, y0:-mx, y1:mx, xl:"나이 (세)", yl: m ? `잔차 r = y − F${sub(m-1)}` : "잔차 r = y − F₀" }); const { ctx } = P;
+      clip(P, A);
+      ctx.strokeStyle = C.lineStrong; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(A.m.l, A.sy(0)); ctx.lineTo(A.m.l+A.pw, A.sy(0)); ctx.stroke();
+      D1.tx.forEach((x,k) => { const inS = !m || cur.inS.has(k);
+        dot(ctx, A.sx(x), A.sy(r[k]), 3.6, inS ? C.risk : null, inS ? C.surface : alpha(C.risk,.55), inS?1:1.4); });
+      if (m){
+        const hg = GRID.map(g => predict(cur.tree,[g]));
+        ctx.strokeStyle = C.learn; ctx.lineWidth = 2.8; polyline(ctx, GRID, hg, A.sx, A.sy);
+        ctx.setLineDash([5,4]); ctx.lineWidth = 1.6; polyline(ctx, GRID, hg.map(v=>v*S1.eta), A.sx, A.sy); ctx.setLineDash([]);
+        /* 분할선 */
+        ctx.strokeStyle = alpha(C.learn,.45); ctx.lineWidth = 1; ctx.setLineDash([2,3]);
+        (function walk(t){ if (t.leaf) return; ctx.beginPath(); ctx.moveTo(A.sx(t.thr), A.m.t); ctx.lineTo(A.sx(t.thr), A.m.t+A.ph); ctx.stroke(); walk(t.left); walk(t.right); })(cur.tree);
+        ctx.setLineDash([]);
+      }
+      if (i != null) dot(ctx, A.sx(D1.tx[i]), A.sy(r[i]), 8, null, C.ink, 2);
+      ctx.restore(); ylab(P, A);
+      if (!m) label(ctx, "다음 트리 h₁이 이 잔차를 맞춥니다", A.m.l+8, A.m.t+26, C.learn);
+      $("r1C2")._A = A;
+    }
+    /* ③ 손실 */
+    drawLoss($("r1C3"), R.trainL, R.valL, m, { log:S1.log, yl:"MSE" });
+
+    /* 수식 대입 */
+    const x = D1.tx[i], y = D1.ty[i];
+    let s;
+    if (!m){
+      s = `라운드 0 · 선택한 점: 나이 ${x.toFixed(1)}세, 실제 의료비 y = ${f3(y)}\n` +
+          `F₀(x) = 학습 데이터 ${D1.ty.length}개의 평균 = ${f3(R.F0)}   (모든 x에서 같은 값)\n` +
+          `잔차   r = y − F₀(x) = ${f3(y)} − ${par(R.F0)} = <span class="t-risk hl">${f3(y-R.F0)}</span>\n` +
+          `→ [다음 트리]를 누르면 얕은 트리 h₁이 이 잔차들을 맞춥니다.`;
+    } else {
+      const Fp = prev.F[i], r = cur.r[i], h = cur.h[i], Fn = cur.F[i], lf = leafOf(cur.tree, [x]);
+      const inS = cur.inS.has(i);
+      const leafN = lf.idx.length;
+      s = `라운드 ${m} · 선택한 점: 나이 ${x.toFixed(1)}세, 실제 의료비 y = ${f3(y)}\n` +
+          `잔차     r = y − F${sub(m-1)}(x) = ${f3(y)} − ${par(Fp)} = <span class="t-risk hl">${f3(r)}</span>${inS?"":"   (이번 표본에서 빠진 점)"}\n` +
+          `새 트리  h${sub(m)}(x) = <span class="t-learn hl">${f3(h)}</span>   (이 점이 속한 잎: 표본 ${leafN}개의 잔차 평균)\n` +
+          `갱신     F${sub(m)}(x) = F${sub(m-1)}(x) + η·h${sub(m)}(x) = ${f3(Fp)} + ${f2(S1.eta)} × ${par(h)} = <b class="hl">${f3(Fn)}</b>\n` +
+          `남은 잔차 y − F${sub(m)}(x) = ${f3(y-Fn)}`;
+    }
+    $("r1Formula").innerHTML = s;
+    const b = R.best, over = R.valL[R.N] > R.valL[b]*1.02;
+    let cap;
+    if (m === 0) cap = `<b>출발점</b>: 모든 사람의 의료비를 평균 ${f3(R.F0)}로 예측합니다. 빨간 세로 선분이 각 점의 잔차입니다.`;
+    else if (m < b) cap = `트리를 더할수록 잔차(빨간 선분)가 짧아지고 학습·검증 MSE가 함께 내려갑니다. 검증 MSE는 <b>${b}라운드</b>에서 가장 낮습니다.`;
+    else if (m === b) cap = `<b>여기가 조기 종료 지점</b>입니다. 검증 MSE ${R.valL[b].toFixed(4)}가 가장 낮은 라운드입니다.`;
+    else cap = over ? `검증 최저(${b}라운드)를 지났습니다. 학습 MSE는 계속 줄지만 검증 MSE는 <b>다시 오릅니다</b> → 잡음까지 외우는 과적합. 실무에서는 여기서 멈춥니다(early stopping).`
+                    : `검증 최저(${b}라운드) 이후에도 검증 MSE가 거의 그대로입니다. η가 작거나 트리가 얕으면 과적합이 느리게 옵니다.`;
+    if (S1.sub < 1 && m) cap += ` 표본 비율 ${S1.sub.toFixed(1)}: 이번 트리는 학습점 중 ${cur.idx.length}개(속이 찬 점)만 보고 만들었습니다. 그래서 학습 MSE가 가끔 조금 오를 수 있습니다(확률적 부스팅).`;
+    $("r1Caption").innerHTML = cap;
+    $("r1Stats").innerHTML = statHTML([
+      [`${m}`, "더한 트리 수 m"],
+      [R.trainL[m].toFixed(4), "학습 MSE", "t-data"],
+      [R.valL[m].toFixed(4), "검증 MSE", "t-val"],
+      [`${b}`, "검증 최저 라운드", "t-eval"],
+    ]);
+    ["r1First","r1Prev"].forEach(id => $(id).disabled = m===0);
+    ["r1Next","r1Last"].forEach(id => $(id).disabled = m>=S1.n);
+  }
+  function step1(d){ S1.m = Math.max(0, Math.min(S1.n, S1.m + d)); render1(); }
+  function stop1(){ if (S1.timer){ clearInterval(S1.timer); S1.timer=null; } $("r1Play").textContent = "재생"; }
+  function play1(){
+    if (S1.timer){ stop1(); return; }
+    if (S1.m >= S1.n) S1.m = 0;
+    $("r1Play").textContent = "멈춤";
+    const tick = () => { if (S1.m >= S1.n){ stop1(); return; } step1(S1.n > 60 ? Math.ceil(S1.n/120) : 1); };
+    S1.timer = setInterval(tick, (reduce?900:520)/SPEEDS[S1.speed]);
+  }
+  $("r1First").onclick = () => { stop1(); S1.m = 0; render1(); };
+  $("r1Prev").onclick = () => { stop1(); step1(-1); };
+  $("r1Next").onclick = () => { stop1(); step1(1); };
+  $("r1Last").onclick = () => { stop1(); S1.m = S1.n; render1(); };
+  $("r1Best").onclick = () => { stop1(); S1.m = R1.best; render1(); };
+  $("r1Play").onclick = play1;
+  $("r1Speed").oninput = e => { S1.speed = +e.target.value; $("r1SpeedV").textContent = SPEEDS[S1.speed]+"×"; if (S1.timer){ stop1(); play1(); } };
+  function clearPreset(){ S1.preset = null; document.querySelectorAll("[data-preset]").forEach(b=>b.setAttribute("aria-pressed","false")); }
+  $("r1Eta").oninput = e => { S1.eta = +e.target.value; $("r1EtaV").textContent = f2(S1.eta); clearPreset(); stop1(); retrain1(true); };
+  $("r1N").oninput = e => { S1.n = +e.target.value; $("r1NV").textContent = S1.n; clearPreset(); stop1(); retrain1(true); };
+  $("r1Sub").oninput = e => { S1.sub = +e.target.value; $("r1SubV").textContent = S1.sub.toFixed(1); stop1(); retrain1(true); };
+  onSeg($("r1Depth"), v => { S1.depth = +v; clearPreset(); stop1(); retrain1(true); });
+  onSeg($("r1Scale"), v => { S1.log = v === "log"; render1(); });
+  $("r1ShowVal").onchange = e => { S1.showVal = e.target.checked; render1(); };
+  $("r1Data").onclick = () => { stop1(); S1.seed++; D1 = genReg(S1.seed); S1.sel = null; dirty4 = true; retrain1(false); };
+  document.querySelectorAll("[data-preset]").forEach(b => b.addEventListener("click", () => {
+    const p = PRESETS[b.dataset.preset]; stop1();
+    S1.eta = p.eta; S1.n = p.n; S1.depth = p.depth;
+    $("r1Eta").value = p.eta; $("r1EtaV").textContent = f2(p.eta); $("r1N").value = p.n; $("r1NV").textContent = p.n; setSeg($("r1Depth"), p.depth);
+    retrain1(false); S1.preset = b.dataset.preset;
+    document.querySelectorAll("[data-preset]").forEach(x=>x.setAttribute("aria-pressed", String(x===b)));
+    renderCmp1();
+  }));
+  function pickReg(ev, cv){
+    const A = cv._A; if (!A) return; const rc = cv.getBoundingClientRect(); const xv = A.ix(ev.clientX - rc.left);
+    let b = 0; D1.tx.forEach((x,k) => { if (Math.abs(x-xv) < Math.abs(D1.tx[b]-xv)) b = k; });
+    S1.sel = b; render1();
+  }
+  $("r1C1").addEventListener("click", e => pickReg(e, $("r1C1")));
+  $("r1C2").addEventListener("click", e => pickReg(e, $("r1C2")));
+
+  /* ======================================================================
+     2. 왜 그래디언트인가 (점 5개)
+     ====================================================================== */
+  const G2X = [25, 35, 45, 55, 65], G2Y0 = [1.2, 1.5, 2.1, 3.6, 4.1];
+  const S2 = { y:G2Y0.slice(), eta:0.5, step:0, timer:null };
+  const STEPS2 = ["F₀ = 평균", "잔차 = 음의 기울기", "분할 찾기", "잎 값 = 잔차 평균", "F₁ = F₀ + η·h₁", "손실 비교"];
+  $("g2Stepper").innerHTML = STEPS2.map((t,k) => `<li>${k+1}. ${t}</li>`).join("");
+  function calc2(){
+    const y = S2.y, n = y.length, F0 = mean(y), r = y.map(v => v-F0);
+    const splits = [];
+    for (let k=1;k<n;k++){
+      const L = r.slice(0,k), R = r.slice(k), mL = mean(L), mR = mean(R);
+      const sse = L.reduce((s,v)=>s+(v-mL)**2,0) + R.reduce((s,v)=>s+(v-mR)**2,0);
+      splits.push({ thr:(G2X[k-1]+G2X[k])/2, k, mL, mR, sse });
+    }
+    let bi = 0; splits.forEach((s,j) => { if (s.sse < splits[bi].sse - 1e-12) bi = j; });
+    const bs = splits[bi], h = G2X.map((_,j) => j < bs.k ? bs.mL : bs.mR);
+    const F1 = h.map(v => F0 + S2.eta*v), r1 = y.map((v,j) => v - F1[j]);
+    const L0 = mean(r.map(v=>v*v)), L1 = mean(r1.map(v=>v*v));
+    return { F0, r, splits, bi, bs, h, F1, r1, L0, L1, sseAll: r.reduce((s,v)=>s+v*v,0) };
+  }
+  function render2(){
+    const K = calc2(), st = S2.step;
+    $("g2Stepper").querySelectorAll("li").forEach((li,k) => { li.className = k===st ? "on" : k<st ? "done" : ""; });
+    const rev = (k, v) => st >= k ? v : `<span class="t-muted">·</span>`;
+    const cc = k => st === k ? " cur" : "";
+    const head = `<thead><tr><th>i</th><th>나이 x</th><th>의료비 y</th><th class="${cc(0).trim()}">F₀</th><th class="${cc(1).trim()}">r = y − F₀</th><th class="${cc(3).trim()}">h₁(x)</th><th class="${cc(4).trim()}">F₁ = F₀ + η·h₁</th><th class="${cc(5).trim()}">y − F₁</th></tr></thead>`;
+    const focusIdx = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.g2 : null;
+    const body = G2X.map((x,j) => `<tr><td class="n">${j+1}</td><td class="n">${x}</td>` +
+      `<td class="n"><input class="sk-input" type="number" step="0.1" min="-50" max="50" value="${S2.y[j]}" data-g2="${j}" aria-label="${j+1}번 점 의료비"></td>` +
+      `<td class="n${cc(0)}">${rev(0, f3(K.F0))}</td><td class="n${cc(1)} t-risk">${rev(1, f3(K.r[j]))}</td>` +
+      `<td class="n${cc(3)} t-learn">${rev(3, f3(K.h[j]))}</td><td class="n${cc(4)}">${rev(4, f3(K.F1[j]))}</td><td class="n${cc(5)}">${rev(5, f3(K.r1[j]))}</td></tr>`).join("");
+    const foot = `<tfoot><tr><td colspan="4" class="t-muted">평균 제곱 오차 (MSE)</td><td class="n${cc(5)}">${st>=5?f3(K.L0):""}</td><td></td><td></td><td class="n${cc(5)}">${st>=5?`<b>${f3(K.L1)}</b>`:""}</td></tr></tfoot>`;
+    $("g2Table").innerHTML = head + `<tbody>${body}</tbody>` + foot;
+    $("g2Table").querySelectorAll("input[data-g2]").forEach(inp => {
+      inp.addEventListener("change", () => { const v = parseFloat(inp.value); if (isFinite(v)){ S2.y[+inp.dataset.g2] = Math.max(-50, Math.min(50, v)); } render2(); });
+    });
+    if (focusIdx != null){ const el = $("g2Table").querySelector(`input[data-g2="${focusIdx}"]`); if (el) el.focus(); }
+    $("g2Split").innerHTML = st >= 2 ? `<thead><tr><th>분할 기준 (나이)</th><th>왼쪽 잔차 평균</th><th>오른쪽 잔차 평균</th><th>제곱오차 합 SSE</th></tr></thead><tbody>` +
+      K.splits.map((s,j) => `<tr class="${j===K.bi?"cur":""}"><td class="n">x ≤ ${s.thr}</td><td class="n">${f3(s.mL)}</td><td class="n">${f3(s.mR)}</td><td class="n ${j===K.bi?"best":""}">${f3(s.sse)}${j===K.bi?"  ← 최소":""}</td></tr>`).join("") + `</tbody>`
+      : `<tbody><tr><td class="t-muted">3단계에서 가능한 분할 4개를 비교합니다.</td></tr></tbody>`;
+    const j0 = 0, eta = S2.eta, bs = K.bs;
+    const cap = [
+      `모든 점을 상수 하나로 예측합니다. 제곱오차를 가장 작게 만드는 상수는 평균: F₀ = (${S2.y.map(f2).join(" + ")}) / 5 = <b>${f3(K.F0)}</b>`,
+      `각 점의 잔차 r = y − F₀ 는 손실 ½(y − F)² 를 F로 미분한 값에 − 를 붙인 것과 같습니다. 1번 점: −∂L/∂F = y − F = ${f2(S2.y[j0])} − ${f3(K.F0)} = <b>${f3(K.r[j0])}</b>`,
+      `깊이 1 트리(그루터기)는 잔차를 두 묶음으로 나눴을 때 제곱오차 합 SSE가 가장 작은 기준을 고릅니다. 나누기 전 SSE = ${f3(K.sseAll)} → <b>x ≤ ${bs.thr}</b>에서 ${f3(bs.sse)}`,
+      `각 잎의 값은 그 잎에 든 잔차의 평균입니다. 왼쪽 ${bs.k}개 평균 <b>${f3(bs.mL)}</b>, 오른쪽 ${5-bs.k}개 평균 <b>${f3(bs.mR)}</b>`,
+      `트리를 그대로 더하지 않고 η = ${eta}만큼만 더합니다. 1번 점: F₁ = ${f3(K.F0)} + ${eta} × ${par(K.h[0])} = <b>${f3(K.F1[0])}</b>`,
+      `한 라운드 만에 MSE가 <b>${f3(K.L0)} → ${f3(K.L1)}</b>로 줄었습니다. 다음 라운드는 새 잔차 y − F₁ 에 두 번째 트리를 맞춥니다.`
+    ][st];
+    $("g2Caption").innerHTML = `<b>${st+1}단계</b> · ` + cap;
+    $("g2Formula").innerHTML = st < 4
+      ? `F₁(x) = F₀ + η · h₁(x)\nh₁(x) = { ${st>=3?f3(bs.mL):"?"}  (x ≤ ${st>=2?bs.thr:"?"}),  ${st>=3?f3(bs.mR):"?"}  (그 외) }`
+      : `F₁(x) = ${f3(K.F0)} + ${eta} × h₁(x)\n      = ${f3(K.F0 + eta*bs.mL)}  (x ≤ ${bs.thr}),  ${f3(K.F0 + eta*bs.mR)}  (x > ${bs.thr})\nMSE: ${f3(K.L0)} → ${st>=5?f3(K.L1):"?"}`;
+    ["g2First","g2Prev"].forEach(id => $(id).disabled = st===0);
+    $("g2Next").disabled = st >= STEPS2.length-1;
+    draw2(K);
+  }
+  function draw2(K){
+    K = K || calc2();
+    const P = prep($("g2C")); if (!P) return;
+    const st = S2.step, all = S2.y.concat([K.F0, ...K.F1, K.F0+K.bs.mL, K.F0+K.bs.mR]);
+    const y0 = Math.floor(Math.min(...all)) - 0.3, y1 = Math.ceil(Math.max(...all)) + 0.3;
+    const A = axes(P, { x0:20, x1:70, y0, y1, xl:"나이 (세)", yl:"의료비 (백만 원)", xt:G2X }); const { ctx } = P;
+    clip(P, A);
+    const xl = A.sx(20), xr = A.sx(70), xs = A.sx(K.bs.thr);
+    ctx.setLineDash([5,4]); ctx.strokeStyle = C.muted; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(xl, A.sy(K.F0)); ctx.lineTo(xr, A.sy(K.F0)); ctx.stroke(); ctx.setLineDash([]);
+    if (st >= 2){ ctx.strokeStyle = alpha(C.learn,.6); ctx.setLineDash([2,3]); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(xs, A.m.t); ctx.lineTo(xs, A.m.t+A.ph); ctx.stroke(); ctx.setLineDash([]); }
+    if (st >= 3){ ctx.setLineDash([6,4]); ctx.strokeStyle = C.learn; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(xl, A.sy(K.F0+K.bs.mL)); ctx.lineTo(xs, A.sy(K.F0+K.bs.mL)); ctx.lineTo(xs, A.sy(K.F0+K.bs.mR)); ctx.lineTo(xr, A.sy(K.F0+K.bs.mR)); ctx.stroke(); ctx.setLineDash([]); }
+    if (st >= 4){ ctx.strokeStyle = C.ink; ctx.lineWidth = 2.8;
+      const a = K.F0+S2.eta*K.bs.mL, b = K.F0+S2.eta*K.bs.mR;
+      ctx.beginPath(); ctx.moveTo(xl, A.sy(a)); ctx.lineTo(xs, A.sy(a)); ctx.lineTo(xs, A.sy(b)); ctx.lineTo(xr, A.sy(b)); ctx.stroke(); }
+    if (st >= 1){ const base = st >= 5 ? K.F1 : G2X.map(()=>K.F0);
+      ctx.strokeStyle = alpha(C.risk,.85); ctx.lineWidth = 2.2;
+      G2X.forEach((x,j) => { const off = st>=5 ? 0 : 0; ctx.beginPath(); ctx.moveTo(A.sx(x)+off, A.sy(base[j])); ctx.lineTo(A.sx(x)+off, A.sy(S2.y[j])); ctx.stroke(); }); }
+    G2X.forEach((x,j) => dot(ctx, A.sx(x), A.sy(S2.y[j]), 5.5, C.data, C.surface, 1.5));
+    ctx.restore(); ylab(P, A);
+    label(ctx, `F₀ = ${f3(K.F0)}`, A.m.l+6, A.sy(K.F0)-4, C.muted, "left", "bottom");
+  }
+  function stop2(){ if (S2.timer){ clearInterval(S2.timer); S2.timer=null; } $("g2Play").textContent = "재생"; }
+  function step2(d){ S2.step = Math.max(0, Math.min(STEPS2.length-1, S2.step+d)); render2(); }
+  $("g2First").onclick = () => { stop2(); S2.step = 0; render2(); };
+  $("g2Prev").onclick = () => { stop2(); step2(-1); };
+  $("g2Next").onclick = () => { stop2(); step2(1); };
+  $("g2Play").onclick = () => { if (S2.timer){ stop2(); return; } if (S2.step >= STEPS2.length-1) S2.step = 0; render2();
+    $("g2Play").textContent = "멈춤"; S2.timer = setInterval(() => { if (S2.step >= STEPS2.length-1){ stop2(); return; } step2(1); }, reduce?2200:1600); };
+  onSeg($("g2Eta"), v => { S2.eta = +v; render2(); });
+  $("g2Reset").onclick = () => { S2.y = G2Y0.slice(); render2(); };
+
+  /* ======================================================================
+     3. 분류 부스팅
+     ====================================================================== */
+  const S3 = { eta:0.3, n:100, depth:2, leaf:"newton", seed:2, m:0, sel:null, showVal:false, speed:1, timer:null };
+  let D3, R3, gridCache = null;
+  const GN = 72; /* 확률 배경 격자 */
+  const age = u => 20 + 60*u, glu = v => 70 + 130*v;
+  function genCls(seed){
+    const R = mulberry32(seed*104729+7), X = [], y = [];
+    for (let i=0;i<200;i++){
+      const u = R(), v = R();
+      const b = 0.78 - 0.5*u + 0.13*Math.sin(3*Math.PI*u);
+      const p = sigmoid(20*(v - b));
+      X.push([Math.fround(u), Math.fround(v)]); y.push(R() < p ? 1 : 0);
+    }
+    return { X:X.slice(0,120), y:y.slice(0,120), Xv:X.slice(120), yv:y.slice(120) };
+  }
+  function boostCls(D, eta, N, depth, leafMode){
+    const { X, y, Xv, yv } = D, n = y.length;
+    const pbar = mean(y), F0 = Math.log(pbar/(1-pbar));
+    let F = new Float64Array(n).fill(F0), Fv = new Float64Array(yv.length).fill(F0);
+    const rounds = [{ F, Fv }], trainL = [logloss(y,F)], valL = [logloss(yv,Fv)], acc = [accuracy(y,F)], vacc = [accuracy(yv,Fv)];
+    const all = [...Array(n).keys()];
+    for (let m=1;m<=N;m++){
+      const p = Array.from(F, sigmoid), r = y.map((v,i) => v - p[i]);
+      const leafFn = leafMode === "newton"
+        ? ids => { let a=0, b=0; for (const i of ids){ a+=r[i]; b+=p[i]*(1-p[i]); } return Math.abs(b) < 1e-150 ? 0 : a/b; }
+        : ids => { let a=0; for (const i of ids) a+=r[i]; return a/ids.length; };
+      const tree = buildTree(X, r, all, depth, 1, leafFn);
+      const h = X.map(x => predict(tree, x));
+      F = F.map((v,i) => v + eta*h[i]); Fv = Fv.map((v,i) => v + eta*predict(tree, Xv[i]));
+      rounds.push({ tree, p, r, h, F, Fv });
+      trainL.push(logloss(y,F)); valL.push(logloss(yv,Fv)); acc.push(accuracy(y,F)); vacc.push(accuracy(yv,Fv));
+    }
+    return { F0, pbar, rounds, trainL, valL, acc, vacc, best: argmin(valL), N };
+  }
+  function retrain3(keepM){
+    R3 = boostCls(D3, S3.eta, S3.n, S3.depth, S3.leaf); gridCache = null;
+    S3.m = keepM ? Math.min(S3.m, S3.n) : 0;
+    if (S3.sel == null){ /* 기본 선택: 경계 근처의 주황 점 */
+      let b = -1, bd = 1e9; D3.X.forEach((x,k) => { const d = Math.hypot(x[0]-0.62, x[1]-0.55); if (D3.y[k]===1 && d < bd){ bd=d; b=k; } }); S3.sel = b < 0 ? 0 : b; }
+    render3(); syncCodeFromTabs(false);
+  }
+  function gridF(m){
+    if (gridCache && gridCache.m === m) return gridCache.G;
+    let G, from;
+    if (gridCache && gridCache.m < m){ G = gridCache.G.slice(); from = gridCache.m+1; }
+    else { G = new Float64Array(GN*GN).fill(R3.F0); from = 1; }
+    for (let k=from;k<=m;k++){ const t = R3.rounds[k].tree;
+      for (let a=0;a<GN;a++) for (let b=0;b<GN;b++) G[a*GN+b] += S3.eta*predict(t, [(b+.5)/GN, (a+.5)/GN]); }
+    gridCache = { m, G }; return G;
+  }
+  function render3(){
+    const m = S3.m, R = R3, cur = R.rounds[m], i = S3.sel;
+    $("c3T1").textContent = `m = ${m} / ${S3.n}`;
+    const P = prep($("c3C1"));
+    if (P){
+      const GT = [80,100,120,140,160,180,200], gv2 = g => (g-70)/130;
+      const A = axes(P, { x0:0, x1:1, y0:0, y1:1, xt:[0,1/6,2/6,3/6,4/6,5/6,1], yt:GT.map(gv2), xfmt:u=>Math.round(age(u)), xl:"나이 (세)", yl:"공복혈당 (mg/dL)" });
+      const { ctx } = P;
+      /* y축 눈금을 혈당값으로 다시 쓰기 */
+      ctx.save(); ctx.fillStyle = C.surface; ctx.fillRect(0, A.m.t-8, A.m.l-2, A.ph+16);
+      ctx.font = `${P.w<360?10:11}px ${C.mono}`; ctx.fillStyle = C.muted; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      GT.forEach(g => ctx.fillText(g, A.m.l-5, A.sy(gv2(g)))); ctx.restore();
+      const G = gridF(m), c0 = hexRgb(C.c0), c1 = hexRgb(C.c1), sf = hexRgb(C.surface);
+      const cw = A.pw/GN, ch = A.ph/GN;
+      clip(P, A);
+      for (let a=0;a<GN;a++) for (let b=0;b<GN;b++){
+        const p = sigmoid(G[a*GN+b]), c = p >= .5 ? c1 : c0, t = Math.min(1, Math.abs(p-.5)*2)*0.42 + 0.06;
+        ctx.fillStyle = `rgb(${Math.round(sf[0]+(c[0]-sf[0])*t)},${Math.round(sf[1]+(c[1]-sf[1])*t)},${Math.round(sf[2]+(c[2]-sf[2])*t)})`;
+        ctx.fillRect(A.m.l + b*cw, A.m.t + (GN-1-a)*ch, cw+.6, ch+.6);
+      }
+      /* p = 0.5 경계 (격자 가장자리를 따라) */
+      ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.beginPath();
+      for (let a=0;a<GN;a++) for (let b=0;b<GN;b++){
+        const s = G[a*GN+b] >= 0;
+        if (b+1 < GN && (G[a*GN+b+1] >= 0) !== s){ const x = A.m.l+(b+1)*cw, yT = A.m.t+(GN-1-a)*ch; ctx.moveTo(x, yT); ctx.lineTo(x, yT+ch); }
+        if (a+1 < GN && (G[(a+1)*GN+b] >= 0) !== s){ const yy = A.m.t+(GN-1-a)*ch, x = A.m.l+b*cw; ctx.moveTo(x, yy); ctx.lineTo(x+cw, yy); }
+      }
+      ctx.stroke();
+      ctx.strokeStyle = C.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(A.m.l+.5, A.m.t+.5, A.pw-1, A.ph-1);
+      if (S3.showVal) D3.Xv.forEach((x,k) => dot(ctx, A.sx(x[0]), A.sy(x[1]), 4, null, D3.yv[k] ? C.c1 : C.c0, 1.8));
+      D3.X.forEach((x,k) => { const p = sigmoid(cur.F[k]), rr = Math.abs(D3.y[k]-p);
+        dot(ctx, A.sx(x[0]), A.sy(x[1]), 2.4 + 8.5*rr, D3.y[k] ? C.c1 : C.c0, C.surface, 1.2); });
+      if (i != null){ const x = D3.X[i], p = sigmoid(cur.F[i]); dot(ctx, A.sx(x[0]), A.sy(x[1]), 2.4+8.5*Math.abs(D3.y[i]-p)+4, null, C.ink, 2.2); }
+      ctx.restore(); ylab(P, A);
+      $("c3C1")._A = A;
+    }
+    drawLoss($("c3C2"), R.trainL, R.valL, m, { log:false, yl:"로그 손실" });
+    $("c3Stats").innerHTML = statHTML([
+      [`${m}`, "트리 수 m"],
+      [R.trainL[m].toFixed(4), "학습 로그 손실", "t-data"],
+      [R.valL[m].toFixed(4), "검증 로그 손실", "t-val"],
+      [(R.acc[m]*100).toFixed(1)+"%", "학습 정확도"],
+      [(R.vacc[m]*100).toFixed(1)+"%", "검증 정확도"],
+    ]);
+    const x = D3.X[i], y = D3.y[i];
+    let s = `선택한 점: 나이 ${Math.round(age(x[0]))}세, 혈당 ${Math.round(glu(x[1]))} mg/dL, 실제 y = ${y}\n`;
+    if (!m){
+      const n1 = D3.y.reduce((a,b)=>a+b,0);
+      s += `F₀ = log(p̄ / (1 − p̄)),  p̄ = ${n1}/${D3.y.length} = ${f3(R.pbar)}\n   = log(${f3(R.pbar)} / ${f3(1-R.pbar)}) = <b class="hl">${f3(R.F0)}</b>\n` +
+           `p = σ(F₀) = ${f3(sigmoid(R.F0))}   유사 잔차 r = y − p = <span class="t-risk hl">${f3(y - sigmoid(R.F0))}</span>`;
+    } else {
+      const rd = cur, Fp = R.rounds[m-1].F[i], p = rd.p[i], r = rd.r[i], lf = leafOf(rd.tree, x);
+      let sr = 0, sh = 0; for (const k of lf.idx){ sr += rd.r[k]; sh += rd.p[k]*(1-rd.p[k]); }
+      const g = lf.value, Fn = rd.F[i];
+      s += `F${sub(m-1)}(x) = ${f3(Fp)}  →  p = σ(F${sub(m-1)}) = 1 / (1 + e^${Fp>=0?"−":""}${f3(Math.abs(Fp))}) = ${f3(p)}\n` +
+           `유사 잔차 r = y − p = ${y} − ${f3(p)} = <span class="t-risk hl">${f3(r)}</span>   (= −∂L/∂F)\n` +
+           (S3.leaf === "newton"
+             ? `잎 값  γ = Σr / Σp(1−p) = ${f3(sr)} / ${f3(sh)} = <span class="t-learn hl">${f3(g)}</span>   (잎의 점 ${lf.idx.length}개)\n`
+             : `잎 값  γ = 잔차 평균 = ${f3(sr)} / ${lf.idx.length} = <span class="t-learn hl">${f3(g)}</span>\n`) +
+           `F${sub(m)}(x) = F${sub(m-1)}(x) + η·γ = ${f3(Fp)} + ${f2(S3.eta)} × ${par(g)} = <b class="hl">${f3(Fn)}</b>  →  p = ${f3(sigmoid(Fn))}`;
+    }
+    $("c3Formula").innerHTML = s;
+    const b = R.best;
+    $("c3Note").innerHTML = (S3.leaf === "newton"
+      ? `<b>뉴턴 스텝</b>은 잔차 합을 곡률 Σp(1−p)로 나눠 로그 오즈 단위로 알맞은 크기만큼 움직입니다 (scikit-learn 방식). `
+      : `<b>잔차 평균</b>은 확률 단위(−1~1)의 값을 로그 오즈에 그대로 더하므로 걸음이 작아 더 많은 트리가 필요합니다. `) +
+      `검증 로그 손실은 <b>${b}라운드</b>에서 가장 낮습니다(${R.valL[b].toFixed(4)}). 큰 점일수록 현재 모델이 많이 틀린 점이고, 다음 트리의 목표값 |y − p|가 큽니다.`;
+    ["c3First","c3Prev"].forEach(id => $(id).disabled = m===0);
+    ["c3Next","c3Last"].forEach(id => $(id).disabled = m>=S3.n);
+  }
+  function step3(d){ S3.m = Math.max(0, Math.min(S3.n, S3.m+d)); render3(); }
+  function stop3(){ if (S3.timer){ clearInterval(S3.timer); S3.timer=null; } $("c3Play").textContent = "재생"; }
+  function play3(){
+    if (S3.timer){ stop3(); return; }
+    if (S3.m >= S3.n) S3.m = 0;
+    $("c3Play").textContent = "멈춤";
+    S3.timer = setInterval(() => { if (S3.m >= S3.n){ stop3(); return; } step3(S3.n > 60 ? Math.ceil(S3.n/100) : 1); }, (reduce?900:520)/SPEEDS[S3.speed]);
+  }
+  $("c3First").onclick = () => { stop3(); S3.m = 0; render3(); };
+  $("c3Prev").onclick = () => { stop3(); step3(-1); };
+  $("c3Next").onclick = () => { stop3(); step3(1); };
+  $("c3Last").onclick = () => { stop3(); S3.m = S3.n; render3(); };
+  $("c3Play").onclick = play3;
+  $("c3Speed").oninput = e => { S3.speed = +e.target.value; $("c3SpeedV").textContent = SPEEDS[S3.speed]+"×"; if (S3.timer){ stop3(); play3(); } };
+  $("c3Eta").oninput = e => { S3.eta = +e.target.value; $("c3EtaV").textContent = f2(S3.eta); stop3(); retrain3(true); };
+  $("c3N").oninput = e => { S3.n = +e.target.value; $("c3NV").textContent = S3.n; stop3(); retrain3(true); };
+  onSeg($("c3Depth"), v => { S3.depth = +v; stop3(); retrain3(true); });
+  onSeg($("c3Leaf"), v => { S3.leaf = v; stop3(); retrain3(true); });
+  $("c3ShowVal").onchange = e => { S3.showVal = e.target.checked; render3(); };
+  $("c3Data").onclick = () => { stop3(); S3.seed++; D3 = genCls(S3.seed); S3.sel = null; retrain3(false); };
+  $("c3C1").addEventListener("click", ev => {
+    const A = $("c3C1")._A; if (!A) return; const rc = $("c3C1").getBoundingClientRect();
+    const u = A.ix(ev.clientX-rc.left), v = A.iy(ev.clientY-rc.top);
+    let b = 0; D3.X.forEach((x,k) => { if (Math.hypot(x[0]-u,x[1]-v) < Math.hypot(D3.X[b][0]-u, D3.X[b][1]-v)) b = k; });
+    S3.sel = b; render3();
+  });
+
+  /* ======================================================================
+     4. 배깅 vs 부스팅
+     ====================================================================== */
+  const S4 = { k:30, ind:true, K:300 };
+  let R4 = null;
+  function train4(){
+    const X = D1.tx.map(v=>[v]), y = D1.ty, n = y.length, Xv = D1.vx.map(v=>[v]);
+    const R = mulberry32(S1.seed*977+3);
+    const rfG = [], rfV = [], rfT = [];
+    for (let t=0;t<S4.K;t++){
+      const bs = Array.from({length:n}, () => Math.floor(R()*n));
+      const tree = buildTree(X, y, bs, 30, 1, ids => { let s=0; for (const i of ids) s+=y[i]; return s/ids.length; });
+      rfG.push(GRID.map(g => predict(tree,[g]))); rfV.push(Xv.map(x => predict(tree,x))); rfT.push(X.map(x => predict(tree,x)));
+    }
+    const rfVal = [], rfTr = [], sv = new Float64Array(Xv.length), stt = new Float64Array(n);
+    for (let t=0;t<S4.K;t++){ for (let j=0;j<Xv.length;j++) sv[j]+=rfV[t][j]; for (let j=0;j<n;j++) stt[j]+=rfT[t][j];
+      rfVal.push(mse(D1.vy, Array.from(sv, v=>v/(t+1)))); rfTr.push(mse(y, Array.from(stt, v=>v/(t+1)))); }
+    const gb = boostReg(D1, 0.1, S4.K, 3, 1, S1.seed);
+    R4 = { rfG, rfVal, rfTr, gb }; dirty4 = false;
+  }
+  function render4(){
+    if (dirty4 || !R4) train4();
+    const k = S4.k, R = R4, [y0,y1] = yRange1();
+    $("b4T1").textContent = `트리 ${k}그루`; $("b4T2").textContent = `트리 ${k}그루`;
+    let P = prep($("b4C1"));
+    if (P){
+      const A = axes(P, { x0:X0, x1:X1, y0, y1, xl:"나이 (세)", yl:"의료비" }); const { ctx } = P; clip(P, A);
+      if (S4.ind){ ctx.strokeStyle = alpha(C.muted.startsWith("#")?C.muted:"#888888", .22); ctx.lineWidth = 1; for (let t=0;t<Math.min(k,25);t++) polyline(ctx, GRID, R.rfG[t], A.sx, A.sy); }
+      D1.tx.forEach((x,j) => dot(ctx, A.sx(x), A.sy(D1.ty[j]), 3, C.data, C.surface, 1));
+      const avg = GRID.map((_,g) => { let s=0; for (let t=0;t<k;t++) s+=R.rfG[t][g]; return s/k; });
+      ctx.strokeStyle = C.use; ctx.lineWidth = 2.8; polyline(ctx, GRID, avg, A.sx, A.sy); ctx.restore(); ylab(P, A);
+    }
+    P = prep($("b4C2"));
+    if (P){
+      const A = axes(P, { x0:X0, x1:X1, y0, y1, xl:"나이 (세)", yl:"의료비" }); const { ctx } = P; clip(P, A);
+      if (S4.ind){ ctx.strokeStyle = alpha(C.muted.startsWith("#")?C.muted:"#888888", .3); ctx.lineWidth = 1;
+        const marks = [1,2,4,8,16,32,64,128,256].filter(v => v < k); for (const v of marks) polyline(ctx, GRID, R.gb.rounds[v].G, A.sx, A.sy); }
+      D1.tx.forEach((x,j) => dot(ctx, A.sx(x), A.sy(D1.ty[j]), 3, C.data, C.surface, 1));
+      ctx.strokeStyle = C.learn; ctx.lineWidth = 2.8; polyline(ctx, GRID, R.gb.rounds[k].G, A.sx, A.sy); ctx.restore(); ylab(P, A);
+    }
+    P = prep($("b4C3"));
+    if (P){
+      const K = S4.K, xs = Array.from({length:K}, (_,t)=>t+1), gv = R.gb.valL.slice(1), gt = R.gb.trainL.slice(1);
+      /* 처음 몇 그루의 큰 값은 잘라 내고, 수렴·과적합 구간이 잘 보이게 */
+      const top = Math.max(...R.rfVal.slice(4), ...gv.slice(9)) * 1.3;
+      const A = axes(P, { x0:1, x1:K, y0:0, y1:top, xl:"트리 수", yl:"검증·학습 MSE (위쪽 잘림)" }); const { ctx } = P; clip(P, A);
+      ctx.lineWidth = 1.6; ctx.setLineDash([5,4]); ctx.strokeStyle = alpha(C.learn,.7); polyline(ctx, xs, gt, A.sx, A.sy); ctx.setLineDash([]);
+      ctx.lineWidth = 2.4; ctx.strokeStyle = C.use; polyline(ctx, xs, R.rfVal, A.sx, A.sy);
+      ctx.strokeStyle = C.learn; polyline(ctx, xs, gv, A.sx, A.sy);
+      ctx.strokeStyle = alpha(C.ink.startsWith("#")?C.ink:"#000000",.45); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(A.sx(k)+.5, A.m.t); ctx.lineTo(A.sx(k)+.5, A.m.t+A.ph); ctx.stroke();
+      dot(ctx, A.sx(k), A.sy(R.rfVal[k-1]), 4.5, C.use, C.surface, 1.5); dot(ctx, A.sx(k), A.sy(gv[k-1]), 4.5, C.learn, C.surface, 1.5);
+      ctx.restore(); ylab(P, A);
+    }
+    const gb = argmin(R.gb.valL);
+    $("b4Stats").innerHTML = statHTML([
+      [R.rfTr[k-1].toFixed(4), "RF 학습 MSE", "t-use"], [R.rfVal[k-1].toFixed(4), "RF 검증 MSE", "t-use"],
+      [R.gb.trainL[k].toFixed(4), "GB 학습 MSE", "t-learn"], [R.gb.valL[k].toFixed(4), "GB 검증 MSE", "t-learn"],
+    ]);
+    $("b4Note").innerHTML = `랜덤포레스트는 깊은 트리 여러 개의 <b>평균</b>이라 트리를 늘려도 검증 MSE가 한 값으로 수렴합니다 (트리 수는 많을수록 안정). ` +
+      `부스팅은 얕은 트리를 <b>누적</b>해 곡선을 조금씩 구부려 가며, 검증 MSE가 ${gb}그루에서 가장 낮고 그 뒤로는 ${R.gb.valL[S4.K] > R.gb.valL[gb]*1.02 ? "다시 오릅니다 (트리 수 = 조정해야 할 하이퍼파라미터)" : "거의 변하지 않습니다"}.`;
+  }
+  $("b4K").oninput = e => { S4.k = +e.target.value; $("b4KV").textContent = S4.k; render4(); };
+  $("b4Ind").onchange = e => { S4.ind = e.target.checked; render4(); };
+
+  /* ======================================================================
+     5. 코드
+     ====================================================================== */
+  const S5 = { kind:"reg", n:150, eta:0.3, depth:2, sub:1.0, early:false };
+  function syncCodeFromTabs(force){
+    if (!force && S5.touched) return;
+    const src = S5.kind === "reg" ? { n:S1.n, eta:S1.eta, depth:S1.depth, sub:S1.sub } : { n:S3.n, eta:S3.eta, depth:S3.depth, sub:1.0 };
+    Object.assign(S5, src);
+    $("k5N").value = S5.n; $("k5Eta").value = S5.eta; $("k5Depth").value = S5.depth; $("k5Sub").value = S5.sub;
+    render5();
+  }
+  const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  function hilite(code){
+    return code.split("\n").map(line => {
+      const h = line.indexOf("#"); let a = h >= 0 ? line.slice(0,h) : line, c = h >= 0 ? line.slice(h) : "";
+      a = esc(a).replace(/("[^"]*")/g, '<span class="st">$1</span>')
+        .replace(/\b(import|from|as|for|in|print|def|return|if|else|True|False|None)\b/g, '<span class="kw">$1</span>')
+        .replace(/(^|[^\w.])(\d+\.?\d*)(?![\w])/g, '$1<span class="nu">$2</span>');
+      return a + (c ? `<span class="cm">${esc(c)}</span>` : "");
+    }).join("\n");
+  }
+  function code5(){
+    const n = S5.n, eta = +S5.eta.toFixed(2), d = S5.depth, sub = +S5.sub.toFixed(1);
+    const early = S5.early ? `\n    n_iter_no_change=10,      # 검증 손실이 10라운드 동안 안 좋아지면 멈춤\n    validation_fraction=0.2,  # 학습 데이터의 20%를 조기 종료 판단용으로 떼어 둠\n    tol=1e-4,` : "";
+    const subC = sub < 1 ? "   # < 1.0 이면 확률적 부스팅 (라운드마다 일부 표본만 사용)" : "   # 1.0 = 매 라운드 학습 데이터 전체 사용";
+    if (S5.kind === "reg") return `import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.metrics import mean_squared_error
+
+# 예시 데이터: 나이 → 연간 의료비(백만 원), 비선형 + 잡음
+rng = np.random.default_rng(7)
+age = rng.uniform(20, 80, 100)
+cost = 1 + 2.5 / (1 + np.exp(-(age - 55) / 6)) + 0.4 * np.sin(age / 5) + rng.normal(0, 0.35, 100)
+X, y = age.reshape(-1, 1), cost
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.4, random_state=42)
+
+model = GradientBoostingRegressor(
+    loss="squared_error",     # 음의 기울기 = 잔차 y - F
+    n_estimators=${n},
+    learning_rate=${eta},        # η: 트리 하나를 얼마나 반영할지
+    max_depth=${d},
+    subsample=${sub.toFixed(1)},${subC}${early}
+    random_state=42,
+)
+model.fit(X_train, y_train)
+print("사용한 트리 수:", model.n_estimators_)
+print("학습 MSE:", mean_squared_error(y_train, model.predict(X_train)))
+
+# 라운드별 검증 MSE → 조기 종료 지점 찾기
+val_mse = [mean_squared_error(y_val, p) for p in model.staged_predict(X_val)]
+best = int(np.argmin(val_mse)) + 1
+print("검증 MSE 최저:", round(min(val_mse), 4), "/ 라운드", best)
+${sub < 1 ? "\n# 확률적 부스팅이면 표본에서 빠진 데이터로 계산한 손실 개선량(OOB)도 볼 수 있음\nprint(model.oob_improvement_[:5])\n" : ""}`;
+    return `import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.metrics import log_loss, accuracy_score
+
+# 예시 데이터: 나이, 공복혈당 → 질환 여부(0/1)
+rng = np.random.default_rng(3)
+u, v = rng.uniform(0, 1, 200), rng.uniform(0, 1, 200)
+boundary = 0.78 - 0.5 * u + 0.13 * np.sin(3 * np.pi * u)
+y = (rng.uniform(0, 1, 200) < 1 / (1 + np.exp(-20 * (v - boundary)))).astype(int)
+X = np.column_stack([20 + 60 * u, 70 + 130 * v])      # 나이(세), 공복혈당(mg/dL)
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.4, random_state=42, stratify=y)
+
+model = GradientBoostingClassifier(
+    loss="log_loss",          # F0 = log(p/(1-p)), 유사 잔차 = y - p, 잎 값 = 뉴턴 스텝
+    n_estimators=${n},
+    learning_rate=${eta},
+    max_depth=${d},
+    subsample=${sub.toFixed(1)},${subC}${early}
+    random_state=42,
+)
+model.fit(X_train, y_train)
+print("사용한 트리 수:", model.n_estimators_)
+print("검증 정확도:", accuracy_score(y_val, model.predict(X_val)))
+
+# 라운드별 검증 로그 손실 → 조기 종료 지점 찾기
+val_loss = [log_loss(y_val, p) for p in model.staged_predict_proba(X_val)]
+best = int(np.argmin(val_loss)) + 1
+print("검증 로그 손실 최저:", round(min(val_loss), 4), "/ 라운드", best)
+`;
+  }
+  function render5(){
+    $("k5NV").textContent = S5.n; $("k5EtaV").textContent = f2(S5.eta); $("k5DepthV").textContent = S5.depth; $("k5SubV").textContent = S5.sub.toFixed(1);
+    $("k5Stoch").checked = S5.sub < 1;
+    $("k5Early").checked = S5.early;
+    S5.code = code5(); $("k5Code").innerHTML = hilite(S5.code);
+    $("k5Note").innerHTML = S5.kind === "reg"
+      ? `scikit-learn 기본값은 n_estimators=100, learning_rate=0.1, max_depth=3, subsample=1.0입니다. 학습률을 낮추면 같은 성능에 더 많은 트리가 필요합니다. 데이터가 수만 행 이상이면 <b>HistGradientBoostingRegressor</b>(히스토그램 분할, 조기 종료 기본 지원)가 훨씬 빠릅니다.`
+      : `GradientBoostingClassifier는 3번 화면의 <b>뉴턴 스텝</b> 잎 값을 씁니다. predict_proba가 σ(F)입니다. 대용량이면 <b>HistGradientBoostingClassifier</b>를 권합니다.`;
+  }
+  onSeg($("k5Kind"), v => { S5.kind = v; S5.touched = false; syncCodeFromTabs(true); });
+  $("k5Pull").onclick = () => { S5.touched = false; syncCodeFromTabs(true); };
+  $("k5N").oninput = e => { S5.n = +e.target.value; S5.touched = true; render5(); };
+  $("k5Eta").oninput = e => { S5.eta = +e.target.value; S5.touched = true; render5(); };
+  $("k5Depth").oninput = e => { S5.depth = +e.target.value; S5.touched = true; render5(); };
+  $("k5Sub").oninput = e => { S5.sub = +e.target.value; S5.touched = true; render5(); };
+  $("k5Stoch").onchange = e => { S5.sub = e.target.checked ? 0.8 : 1.0; $("k5Sub").value = S5.sub; S5.touched = true; render5(); };
+  $("k5Early").onchange = e => { S5.early = e.target.checked; render5(); };
+  $("k5Copy").onclick = async () => {
+    try { await navigator.clipboard.writeText(S5.code); $("k5Copy").textContent = "복사됨"; }
+    catch (e) { const r = document.createRange(); r.selectNodeContents($("k5Code")); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); $("k5Copy").textContent = "선택됨 (Ctrl+C)"; }
+    setTimeout(() => $("k5Copy").textContent = "복사", 1500);
+  };
+
+  /* ---------------- 안쪽 탭 (URL 해시 연동, ←/→ 키 이동) ---------------- */
+  const tabs = [...document.querySelectorAll(".sk-tab")];
+  let active = "residual";
+  function show(t) {
+    tabs.forEach(b => { const on = b === t; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1;
+      document.getElementById(b.getAttribute("aria-controls")).hidden = !on; });
+    active = t.id.replace("tab-", "");
+    history.replaceState(null, "", "#" + active);
+    stop1(); stop2(); stop3();
+    redraw();
+  }
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => show(b));
+    b.addEventListener("keydown", e => {
+      const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return;
+      const n = tabs[(i + d + tabs.length) % tabs.length]; show(n); n.focus(); e.preventDefault();
+    });
+  });
+  /* 화면 안 단계 이동: → / ← (입력칸·탭·버튼 묶음에 포커스가 있을 때는 제외) */
+  document.addEventListener("keydown", e => {
+    if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    const t = e.target; if (t && t.closest && t.closest("input,select,textarea,[role=tab],.sk-seg,pre")) return;
+    const d = e.key === "ArrowRight" ? 1 : -1;
+    if (active === "residual"){ stop1(); step1(d); }
+    else if (active === "gradient"){ stop2(); step2(d); }
+    else if (active === "classify"){ stop3(); step3(d); }
+    else return;
+    e.preventDefault();
+  });
+
+  function redraw(){
+    readColors();
+    if (active === "residual") render1();
+    else if (active === "gradient") render2();
+    else if (active === "classify") render3();
+    else if (active === "compare") render4();
+    else if (active === "code") render5();
+  }
+  new MutationObserver(redraw).observe(document.documentElement, { attributes:true, attributeFilter:["data-theme"] });
+  try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", redraw); } catch (e) {}
+  let rz = null;
+  const ro = new ResizeObserver(() => { cancelAnimationFrame(rz); rz = requestAnimationFrame(redraw); });
+  document.querySelectorAll("canvas").forEach(c => ro.observe(c));
+
+  /* ---------------- 시작 ---------------- */
+  readColors();
+  D1 = genReg(S1.seed); D3 = genCls(S3.seed);
+  R1 = boostReg(D1, S1.eta, S1.n, S1.depth, S1.sub, S1.seed);
+  R3 = boostCls(D3, S3.eta, S3.n, S3.depth, S3.leaf);
+  S3.sel = null;
+  (function(){ let b=0; D1.tx.forEach((v,i)=>{ if (Math.abs(v-60)<Math.abs(D1.tx[b]-60)) b=i; }); S1.sel=b;
+    let c=-1, bd=1e9; D3.X.forEach((x,k)=>{ const d=Math.hypot(x[0]-0.62,x[1]-0.55); if (D3.y[k]===1 && d<bd){ bd=d; c=k; } }); S3.sel = c<0?0:c; })();
+  renderCmp1(); syncCodeFromTabs(true);
+  const start = document.getElementById("tab-" + location.hash.slice(1));
+  show(start || tabs[0]);
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1096 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>퍼셉트론 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20260930c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20260930c">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 양수 가중치·ŷ=1 파랑 · 음수 가중치·ŷ=0 주황 · 순전파 화살표 파랑 · 틀림 빨강 · 은닉 노드 h₁ 청록 / h₂ 자홍 · 출력 노드 보라 */
+:root{ --sk-accent: var(--cat-nn);
+  --pos:#2563EB; --neg:#EA580C; --fwd:#2563EB; --err:#DC2626; --ok:#15803D; --h1:#0D9488; --h2:#C026D3; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --pos:#6AA5FF; --neg:#FF914D; --fwd:#6AA5FF; --err:#FF6B6B; --ok:#4ADE80; --h1:#33D1BD; --h2:#EB7BF5; } }
+:root[data-theme="dark"]{ --pos:#6AA5FF; --neg:#FF914D; --fwd:#6AA5FF; --err:#FF6B6B; --ok:#4ADE80; --h1:#33D1BD; --h2:#EB7BF5; }
+
+.pc-pos{color:var(--pos)} .pc-neg{color:var(--neg)} .pc-err{color:var(--err)} .pc-ok{color:var(--ok)}
+.pc-h1{color:var(--h1)} .pc-h2{color:var(--h2)}
+.pc-dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.pc-sq{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.pc-line{display:inline-block;width:18px;height:0;border-top:3px solid currentColor;margin-right:5px;vertical-align:3px}
+
+.pc-side{grid-template-columns:330px minmax(0,1fr)}
+@media (max-width:900px){.pc-side{grid-template-columns:minmax(0,1fr)}}
+.pc-segg{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line-strong)}
+.pc-segg button+button{border-left:0}
+.pc-inrow{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px solid var(--line)}
+.pc-inrow:first-child{border-top:0;padding-top:0}
+.pc-inhead{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:14px}
+.pc-inhead b{color:var(--ink)}
+.pc-tog{min-width:92px;font-family:var(--mono)}
+.pc-tog[aria-pressed="true"]{background:var(--ink);color:var(--on-ink);border-color:var(--ink)}
+.sk-slider{min-width:0}
+.pc-wsl input[type="range"]{accent-color:var(--sk-accent)}
+
+.pc-svg{width:100%;min-width:0}
+#nSvg,#xSvg{max-width:760px;margin:0 auto}
+@media (max-width:620px){ #nSvg svg,#xSvg svg{min-width:480px} #cKv{grid-template-columns:minmax(0,1fr)} #cKv dd{text-align:left;margin-bottom:6px} .sk-formula{font-size:12px} }
+.pc-svg svg{display:block;width:100%;height:auto}
+.pc-svg text{font-family:var(--sans)}
+.pc-svg .mono{font-family:var(--mono)}
+.pc-flow{fill:none;stroke-linecap:round;stroke-dasharray:3 11;animation:pc-flow 1s linear infinite;stroke:var(--surface);opacity:.85}
+@keyframes pc-flow{to{stroke-dashoffset:-14}}
+
+.pc-plane{width:100%;max-width:560px;aspect-ratio:1/1;display:block;margin:0 auto;border-radius:10px;touch-action:manipulation}
+.pc-plane.click{cursor:crosshair}
+.pc-verdict{font-size:17px;font-weight:700;margin:0}
+.pc-table td.cur,.pc-table tr.cur td{background:color-mix(in srgb,var(--sk-accent) 12%,var(--surface))}
+.pc-table td.c,.pc-table th.c{text-align:center}
+.pc-pre{white-space:pre;overflow-x:auto}
+.pc-formula-big{font-size:14px}
+.pc-code{white-space:pre;overflow:auto;max-height:620px;font-size:12.5px;line-height:1.6;margin:0;tab-size:4}
+.pc-kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--ink)}
+.pc-wgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.pc-wgrid .sk-card{gap:8px;padding:12px 14px}
+.pc-wgrid h3{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+@media (max-width:900px){.pc-wgrid{grid-template-columns:minmax(0,1fr)}}
+.pc-big{font-family:var(--mono);font-size:24px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.pc-mt{margin-top:16px}
+.pc-log{max-height:260px;overflow:auto}
+.sk-controls .sk-slider{min-width:170px}
+@media (max-width:520px){
+  .sk-controls .sk-slider{min-width:0;width:100%}
+  .pc-hide-sm{display:none}
+  .pc-wide-seg{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line-strong)}
+  .pc-wide-seg button+button{border-left:0}
+}
+@media (prefers-reduced-motion: reduce){ .pc-flow{animation:none;display:none} }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)" aria-current="page">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">퍼셉트론 시뮬레이터</h1>
+      <p class="ds-hero__lede">노드 하나는 입력에 가중치를 곱해 더하고(Σ) 활성 함수를 거쳐 출력합니다. 가중치로 논리 게이트를 만들고, 틀린 점을 만날 때마다 경계선이 움직이는 학습 규칙을 따라가 본 뒤, 직선 하나로는 안 되는 XOR을 은닉층으로 푸는 과정과 활성 함수가 비선형이어야 하는 이유를 확인합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button type="button" class="sk-tab" role="tab" id="tab-node" aria-controls="pane-node" aria-selected="true"><span class="sk-num">1</span>노드 하나의 계산</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-gate" aria-controls="pane-gate" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>논리 게이트</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-learn" aria-controls="pane-learn" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>학습 규칙</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-xor" aria-controls="pane-xor" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>XOR과 다층 퍼셉트론</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-linear" aria-controls="pane-linear" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>선형 붕괴</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>코드</button>
+  </nav>
+
+  <!-- ================= 1. 노드 하나 ================= -->
+  <section id="pane-node" role="tabpanel" aria-labelledby="tab-node">
+    <div class="sk-side pc-side">
+      <div class="sk-card">
+        <div class="sk-head"><h2>입력 · 가중치 · bias</h2></div>
+        <p class="sk-lead">예시: 발열 · 기침 · 호흡곤란 증상으로 <b>검사 필요 여부</b>를 정하는 노드</p>
+        <div class="sk-group"><span class="sk-label">입력</span>
+          <div class="sk-seg" id="nMode" role="group" aria-label="입력 방식"><button type="button" data-v="bin" aria-pressed="true">0/1 (있음/없음)</button><button type="button" data-v="cont" aria-pressed="false">정도 0~1</button></div>
+        </div>
+        <div id="nInputs"></div>
+        <div class="sk-slider pc-wsl"><div class="sk-sl-head"><label for="nB">bias b (문턱을 옮김)</label><b id="nBv"></b></div><input type="range" id="nB" min="-3" max="3" step="0.1" value="-1"></div>
+        <div class="sk-group"><span class="sk-label">활성 함수</span>
+          <div class="sk-seg pc-segg" id="nAct" role="group" aria-label="활성 함수"><button type="button" data-v="step" aria-pressed="true">계단 (원 퍼셉트론)</button><button type="button" data-v="sigmoid" aria-pressed="false">시그모이드</button><button type="button" data-v="tanh" aria-pressed="false">tanh</button><button type="button" data-v="relu" aria-pressed="false">ReLU</button></div>
+        </div>
+        <div class="sk-group"><button type="button" class="sk-btn sk-btn--sm" id="nReset">처음 값으로</button></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>노드 하나: 가중합 Σ → 활성 함수 → 출력 y</h2>
+          <div class="sk-legend"><span><i style="background:var(--pos)"></i>양수 가중치</span><span><i style="background:var(--neg)"></i>음수 가중치</span><span>선 굵기 = |w|</span><span class="pc-pos"><span class="pc-line"></span>순전파</span></div>
+        </div>
+        <div class="sk-scroll"><div class="pc-svg" id="nSvg" role="img" aria-label="입력 세 개가 가중치를 곱해 Σ 노드로 모이고, bias를 더한 z가 활성 함수를 거쳐 출력 y가 되는 노드 도식"></div></div>
+        <div class="sk-formula pc-pre pc-formula-big" id="nFormula"></div>
+        <p class="pc-verdict" id="nVerdict" aria-live="polite"></p>
+        <div class="sk-grid2">
+          <div>
+            <div class="sk-head"><h3 id="nActTitle">활성 함수 그래프</h3><span class="sk-hint">점 = 지금의 z</span></div>
+            <div class="pc-svg" id="nActSvg" role="img" aria-label="선택한 활성 함수의 그래프와 현재 z 위치"></div>
+          </div>
+          <div>
+            <div class="sk-head"><h3>모든 증상 조합 8가지</h3><span class="sk-hint">같은 w · b · 활성 함수</span></div>
+            <div class="sk-scroll"><table class="sk-table pc-table" id="nTable"></table></div>
+          </div>
+        </div>
+        <p class="sk-note">네 활성 함수 모두 <b>z &gt; 0</b> 이면 "필요" 쪽입니다 (계단 1, 시그모이드 0.5 초과, tanh 0 초과, ReLU 0 초과). 다른 것은 <b>출력의 모양</b>입니다: 0/1 결정, 0~1 확률, −1~1, 0 이상 크기.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 2. 논리 게이트 ================= -->
+  <section id="pane-gate" role="tabpanel" aria-labelledby="tab-gate" hidden>
+    <div class="sk-side pc-side">
+      <div class="sk-card">
+        <div class="sk-head"><h2>게이트 맞히기</h2><span class="sk-hint">입력 2개, 계단 함수</span></div>
+        <div class="sk-seg" id="gGate" role="group" aria-label="게이트"><button type="button" data-v="AND" aria-pressed="true">AND</button><button type="button" data-v="OR" aria-pressed="false">OR</button><button type="button" data-v="NAND" aria-pressed="false">NAND</button><button type="button" data-v="XOR" aria-pressed="false">XOR</button></div>
+        <div class="sk-slider pc-wsl"><div class="sk-sl-head"><label for="gW1">가중치 w₁</label><b id="gW1v"></b></div><input type="range" id="gW1" min="-2" max="2" step="0.1" value="1"></div>
+        <div class="sk-slider pc-wsl"><div class="sk-sl-head"><label for="gW2">가중치 w₂</label><b id="gW2v"></b></div><input type="range" id="gW2" min="-2" max="2" step="0.1" value="1"></div>
+        <div class="sk-slider pc-wsl"><div class="sk-sl-head"><label for="gB">bias b</label><b id="gBv"></b></div><input type="range" id="gB" min="-3" max="3" step="0.1" value="-0.5"></div>
+        <div class="sk-group"><button type="button" class="sk-btn sk-btn--sm" id="gSol">정답 예시 넣기</button><button type="button" class="sk-btn sk-btn--sm" id="gReset">처음 값</button></div>
+        <div class="sk-stats" id="gStats"></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>입력 평면과 결정 경계 w₁x₁ + w₂x₂ + b = 0</h2>
+          <div class="sk-legend"><span><i class="pc-dot" style="background:var(--pos)"></i>정답 1</span><span><i class="pc-sq" style="background:var(--neg)"></i>정답 0</span><span><i style="background:color-mix(in srgb,var(--pos) 25%,var(--surface))"></i>ŷ = 1 영역</span><span><i style="background:color-mix(in srgb,var(--neg) 25%,var(--surface))"></i>ŷ = 0 영역</span><span class="pc-err">빨간 고리 = 틀림</span></div>
+        </div>
+        <canvas class="pc-plane" id="gCv" aria-label="입력 평면의 점 네 개와 현재 가중치로 그린 결정 경계 직선"></canvas>
+        <div class="sk-formula pc-pre" id="gFormula"></div>
+        <div class="sk-scroll"><table class="sk-table pc-table" id="gTable"></table></div>
+        <div id="gNote"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 3. 학습 규칙 ================= -->
+  <section id="pane-learn" role="tabpanel" aria-labelledby="tab-learn" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>퍼셉트론 학습 규칙: 틀린 점을 만날 때만 고친다</h2><span class="sk-hint">키보드 <span class="pc-kbd">→</span> 한 샘플 · <span class="pc-kbd">←</span> 이전</span></div>
+      <div class="sk-formula pc-pre">ŷ = step(w₁x₁ + w₂x₂ + b)      (z &gt; 0 이면 1, 아니면 0)
+w ← w + η(y − ŷ)x        b ← b + η(y − ŷ)
+맞히면 y − ŷ = 0 → 그대로 · 1인데 0이라 하면 +ηx 쪽으로 · 0인데 1이라 하면 −ηx 쪽으로</div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">데이터</span>
+          <div class="sk-seg pc-wide-seg" id="lData" role="group" aria-label="데이터 종류"><button type="button" data-v="sep" aria-pressed="true">분리 가능</button><button type="button" data-v="narrow" aria-pressed="false">여백 좁음</button><button type="button" data-v="overlap" aria-pressed="false">분리 불가</button><button type="button" data-v="empty" aria-pressed="false">빈 평면</button></div>
+          <button type="button" class="sk-btn sk-btn--sm" id="lSeed">다른 seed</button><span class="sk-hint sk-mono" id="lSeedV"></span>
+        </div>
+        <div class="sk-group"><span class="sk-label">평면 클릭</span>
+          <div class="sk-seg" id="lClick" role="group" aria-label="평면을 클릭하면"><button type="button" data-v="1" aria-pressed="true">1 추가</button><button type="button" data-v="0" aria-pressed="false">0 추가</button><button type="button" data-v="del" aria-pressed="false">지우기</button></div>
+        </div>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">학습률 η</span>
+          <div class="sk-seg" id="lEta" role="group" aria-label="학습률"><button type="button" data-v="0.01" aria-pressed="false">0.01</button><button type="button" data-v="0.05" aria-pressed="false">0.05</button><button type="button" data-v="0.1" aria-pressed="true">0.1</button><button type="button" data-v="0.5" aria-pressed="false">0.5</button><button type="button" data-v="1" aria-pressed="false">1</button></div></div>
+        <div class="sk-group"><span class="sk-label">초기값</span>
+          <div class="sk-seg" id="lInit" role="group" aria-label="초기값"><button type="button" data-v="zero" aria-pressed="true">모두 0</button><button type="button" data-v="rand" aria-pressed="false">무작위</button></div></div>
+        <div class="sk-group"><span class="sk-label">최대 에폭</span>
+          <div class="sk-seg" id="lMax" role="group" aria-label="최대 에폭"><button type="button" data-v="20" aria-pressed="false">20</button><button type="button" data-v="50" aria-pressed="true">50</button><button type="button" data-v="100" aria-pressed="false">100</button></div></div>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--sm" id="lFirst">처음</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="lPrev">이전</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="lNext">한 샘플 →</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="lEpoch">한 에폭</button>
+          <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="lPlay">재생</button>
+        </div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="lSpeed">속도</label><b id="lSpeedv"></b></div><input type="range" id="lSpeed" min="0.5" max="8" step="0.5" value="2"></div>
+      </div>
+    </div>
+    <div class="sk-grid2 pc-mt">
+      <div class="sk-card">
+        <div class="sk-head"><h3>x₁ 수축기 혈압 · x₂ 공복 혈당 (표준화)</h3>
+          <div class="sk-legend"><span><i class="pc-dot" style="background:var(--pos)"></i>1 고위험</span><span><i class="pc-sq" style="background:var(--neg)"></i>0 저위험</span><span class="pc-err">빨간 고리 = 지금 경계로 틀림</span></div></div>
+        <canvas class="pc-plane click" id="lCv" aria-label="2차원 데이터 점과 퍼셉트론 결정 경계. 클릭하면 점을 추가하거나 지웁니다"></canvas>
+        <p class="sk-hint" style="margin:0">두꺼운 테두리 = 지금 보는 샘플 · 점선 = 갱신 직전 경계 · 화살표 w 쪽이 ŷ = 1</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-stats" id="lStats"></div>
+        <div class="sk-formula pc-pre" id="lFormula" aria-live="polite"></div>
+        <div id="lNote"></div>
+        <div class="sk-head"><h3>에폭별 갱신(틀린) 횟수</h3><span class="sk-hint">0이 되는 에폭 = 수렴</span></div>
+        <div class="pc-svg" id="lChart" role="img" aria-label="에폭별 오분류 수 막대 차트"></div>
+        <p class="sk-hint" style="margin:0"><b>퍼셉트론 수렴 정리</b>(Novikoff, 1962): 데이터가 직선으로 나뉘면(선형 분리 가능) 갱신은 유한 번, 최대 (R/γ)²번 뒤 반드시 멈춘다. R = 가장 먼 점까지 거리, γ = 경계와 가장 가까운 점 사이 여백.</p>
+      </div>
+    </div>
+    <div class="sk-card pc-mt">
+      <div class="sk-head"><h3>갱신 기록 (틀린 샘플만, 최근 순)</h3><span class="sk-hint" id="lLogHint"></span></div>
+      <div class="sk-scroll pc-log"><table class="sk-table pc-table" id="lLog"></table></div>
+    </div>
+  </section>
+
+  <!-- ================= 4. XOR과 MLP ================= -->
+  <section id="pane-xor" role="tabpanel" aria-labelledby="tab-xor" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>은닉층 2노드로 XOR 만들기: XOR = AND(OR, NAND)</h2>
+        <div class="sk-legend"><span><i style="background:var(--pos)"></i>양수 가중치</span><span><i style="background:var(--neg)"></i>음수 가중치</span><span class="pc-h1"><span class="pc-line"></span>h₁ 경계</span><span class="pc-h2"><span class="pc-line"></span>h₂ 경계</span></div></div>
+      <div class="sk-scroll"><div class="pc-svg" id="xSvg" role="img" aria-label="입력 두 개, 은닉 노드 두 개, 출력 노드 하나로 이루어진 다층 퍼셉트론 도식"></div></div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">예시</span>
+          <button type="button" class="sk-btn sk-btn--sm" id="xP1">OR · NAND → AND</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="xP2">다른 해: 한쪽만 1 두 개 → OR</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="xP3">무작위</button></div>
+        <div class="sk-group"><span class="sk-label">활성 함수</span>
+          <div class="sk-seg" id="xAct" role="group" aria-label="활성 함수"><button type="button" data-v="step" aria-pressed="true">계단</button><button type="button" data-v="sig" aria-pressed="false">시그모이드</button></div></div>
+        <div class="sk-slider" id="xKWrap" hidden><div class="sk-sl-head"><label for="xK">가중치 배율 k (모든 w·b에 곱함)</label><b id="xKv"></b></div><input type="range" id="xK" min="1" max="20" step="1" value="10"></div>
+      </div>
+      <div class="pc-wgrid" id="xW"></div>
+    </div>
+    <div class="sk-grid2 pc-mt">
+      <div class="sk-card">
+        <div class="sk-head"><h3>입력 공간 (x₁, x₂)</h3><div class="sk-legend"><span><i class="pc-dot" style="background:var(--pos)"></i>XOR 1</span><span><i class="pc-sq" style="background:var(--neg)"></i>XOR 0</span></div></div>
+        <canvas class="pc-plane" id="xCvIn" aria-label="입력 공간에서 은닉 노드 두 개의 경계 직선과 망 전체의 판정 영역"></canvas>
+        <p class="sk-hint" style="margin:0" id="xInHint">직선 두 개(h₁, h₂)가 만든 띠 안쪽만 1. 직선 하나로는 못 만드는 모양입니다.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h3 id="xHidTitle">은닉 공간 (h₁, h₂)</h3><span class="sk-hint">점이 은닉 노드 값 위치로 옮겨감</span></div>
+        <canvas class="pc-plane" id="xCvHid" aria-label="입력 공간의 점이 은닉 공간으로 옮겨지는 변환과 출력 노드의 경계 직선"></canvas>
+        <div class="sk-controls">
+          <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="xPlay">변환 재생</button>
+          <div class="sk-slider" style="flex:1"><div class="sk-sl-head"><label for="xT">입력 공간 → 은닉 공간</label><b id="xTv"></b></div><input type="range" id="xT" min="0" max="1" step="0.01" value="1"></div>
+        </div>
+      </div>
+    </div>
+    <div class="sk-card pc-mt">
+      <div class="sk-head"><h2>진리표로 확인</h2><span class="sk-hint" id="xTHint"></span></div>
+      <div class="sk-scroll"><table class="sk-table pc-table" id="xTable"></table></div>
+      <div id="xNote"></div>
+    </div>
+  </section>
+
+  <!-- ================= 5. 선형 붕괴 ================= -->
+  <section id="pane-linear" role="tabpanel" aria-labelledby="tab-linear" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>활성 함수가 없으면 100층도 1층: 선형 붕괴</h2><span class="sk-hint">입력 x 1개 → 은닉층들 → 출력 y 1개, 가중치는 seed로 고정한 무작위 값</span></div>
+      <div class="sk-controls">
+        <div class="sk-slider"><div class="sk-sl-head"><label for="zL">층 수 L (가중치 층)</label><b id="zLv"></b></div><input type="range" id="zL" min="1" max="10" step="1" value="4"></div>
+        <div class="sk-group"><span class="sk-label">활성 함수</span>
+          <div class="sk-seg" id="zAct" role="group" aria-label="활성 함수"><button type="button" data-v="none" aria-pressed="false">없음 (항등)</button><button type="button" data-v="relu" aria-pressed="true">ReLU</button><button type="button" data-v="tanh" aria-pressed="false">tanh</button></div></div>
+        <div class="sk-group"><span class="sk-label">층 폭</span>
+          <div class="sk-seg" id="zH" role="group" aria-label="은닉층 폭"><button type="button" data-v="1" aria-pressed="false">1</button><button type="button" data-v="8" aria-pressed="true">8</button><button type="button" data-v="16" aria-pressed="false">16</button></div></div>
+        <div class="sk-group"><button type="button" class="sk-btn sk-btn--sm" id="zSeed">다른 seed</button><span class="sk-hint sk-mono" id="zSeedV"></span></div>
+        <label class="sk-check"><input type="checkbox" id="zGhost" checked>같은 가중치로 "활성 없음"도 겹쳐 보기</label>
+      </div>
+    </div>
+    <div class="sk-grid2 pc-mt">
+      <div class="sk-card">
+        <div class="sk-head"><h3 id="zChartTitle">출력 함수 y = f(x)</h3>
+          <div class="sk-legend"><span style="color:var(--sk-accent)"><span class="pc-line"></span>선택한 활성 함수</span><span style="color:var(--muted)"><span class="pc-line" style="border-top-style:dashed"></span>활성 없음 (같은 가중치)</span></div></div>
+        <div class="pc-svg" id="zChart" role="img" aria-label="다층망의 출력 함수 그래프"></div>
+        <div class="sk-stats" id="zStats"></div>
+      </div>
+      <div class="sk-card">
+        <h2>두 층 선형 합성을 숫자로 전개</h2>
+        <div class="sk-formula pc-pre">f₁(x) = a₁x + b₁,   f₂(u) = a₂u + b₂
+f₂(f₁(x)) = a₂(a₁x + b₁) + b₂ = <b>(a₂a₁)</b>x + <b>(a₂b₁ + b₂)</b>   → 여전히 1차식</div>
+        <div class="sk-formula pc-pre" id="zExpand"></div>
+        <div id="zNote"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 6. 코드 ================= -->
+  <section id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>코드로 옮기기</h2><span class="sk-hint">다른 화면의 현재 설정이 그대로 들어갑니다</span></div>
+      <div class="sk-controls">
+        <div class="sk-seg" id="cLang" role="group" aria-label="코드 종류"><button type="button" data-v="np" aria-pressed="true">numpy 퍼셉트론</button><button type="button" data-v="sk" aria-pressed="false">scikit-learn</button><button type="button" data-v="keras" aria-pressed="false">Keras</button></div>
+        <button type="button" class="sk-btn sk-btn--sm" id="cCopy">코드 복사</button><span class="sk-hint" id="cCopied" aria-live="polite"></span>
+      </div>
+      <dl class="sk-kv" id="cKv"></dl>
+      <pre class="sk-formula pc-code" id="cCode" tabindex="0" aria-label="파이썬 코드"></pre>
+      <p class="sk-note" id="cNote"></p>
+    </div>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20260930c"></script>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const reduceMotion=!!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches);
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function gauss(r){let u=0;while(!u)u=r();const v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const r2=v=>Math.round(v*100)/100;
+const clean=v=>Math.abs(v)<5e-10?0:v;
+const snap=v=>Math.round(v*1e9)/1e9;
+function fx(v,d=2){v=clean(v);const s=Math.abs(v).toFixed(d);return (v<0&&Number(s)!==0?"−":"")+s;}
+function fp(v,d=2){return clean(v)<0?"("+fx(v,d)+")":fx(v,d);}
+function fplus(v,d=2){return clean(v)<0?" − "+fx(-v,d):" + "+fx(v,d);}
+const py=v=>String(v);
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+function rgba(c,a){c=(c||"").trim();if(c[0]==="#"){let h=c.slice(1);if(h.length===3)h=h.split("").map(x=>x+x).join("");const n=parseInt(h,16);return`rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;}return c;}
+function C(){return{pos:css("--pos"),neg:css("--neg"),err:css("--err"),ink:css("--ink"),text:css("--text"),muted:css("--muted"),faint:css("--faint"),line:css("--line"),lineS:css("--line-strong"),surf:css("--surface"),surf2:css("--surface-2"),acc:css("--cat-nn"),h1:css("--h1"),h2:css("--h2"),fwd:css("--fwd"),sans:css("--sans")||"sans-serif",mono:css("--mono")||"monospace",dark:isDark()};}
+function isDark(){const t=document.documentElement.getAttribute("data-theme");if(t==="dark")return true;if(t==="light")return false;return !!(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches);}
+function fitCanvas(cv){const dpr=window.devicePixelRatio||1;const w=Math.max(60,cv.clientWidth),h=Math.max(60,cv.clientHeight||w);cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);const ctx=cv.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);return{ctx,w,h};}
+function segInit(el,cb){el.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{segSet(el,b.dataset.v);cb(b.dataset.v);}));}
+function segVal(el){const b=el.querySelector('button[aria-pressed="true"]');return b?b.dataset.v:null;}
+function segSet(el,v){el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x.dataset.v===String(v)?"true":"false"));}
+function bindSlider(id,fmt,cb){const el=$(id),out=$(id+"v");const up=()=>{out.textContent=fmt(+el.value);};el.addEventListener("input",()=>{up();if(cb)cb(+el.value);});up();return el;}
+function setSlider(id,v,fmt){$(id).value=v;$(id+"v").textContent=fmt(+$(id).value);}
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+
+/* ---------- 좌표 평면(캔버스) 공통 ---------- */
+function makePlane(cv,lo,hi){
+  const {ctx,w,h}=fitCanvas(cv);
+  const padL=44,padB=40,padT=10,padR=12;
+  const s=Math.max(40,Math.min(w-padL-padR,h-padT-padB));
+  const ox=padL+Math.max(0,(w-padL-padR-s)/2),oy=padT;
+  const X=x=>ox+(x-lo)/(hi-lo)*s, Y=y=>oy+(1-(y-lo)/(hi-lo))*s;
+  const IX=px=>lo+(px-ox)/s*(hi-lo), IY=py=>lo+(1-(py-oy)/s)*(hi-lo);
+  return{ctx,w,h,X,Y,IX,IY,lo,hi,s,ox,oy};
+}
+function planeAxes(P,ticks,xl,yl,c){
+  const{ctx,X,Y,lo,hi}=P;ctx.save();ctx.lineWidth=1;
+  ticks.forEach(t=>{ctx.strokeStyle=t===0?c.lineS:c.line;ctx.beginPath();ctx.moveTo(X(t),Y(lo));ctx.lineTo(X(t),Y(hi));ctx.stroke();ctx.beginPath();ctx.moveTo(X(lo),Y(t));ctx.lineTo(X(hi),Y(t));ctx.stroke();});
+  ctx.strokeStyle=c.lineS;ctx.strokeRect(X(lo),Y(hi),P.s,P.s);
+  ctx.fillStyle=c.muted;ctx.font="11px "+c.mono;ctx.textAlign="center";ctx.textBaseline="top";
+  const tl=t=>(t<0?"−":"")+String(Math.abs(t));
+  ticks.forEach(t=>ctx.fillText(tl(t),X(t),Y(lo)+4));
+  ctx.textAlign="right";ctx.textBaseline="middle";ticks.forEach(t=>ctx.fillText(tl(t),X(lo)-5,Y(t)));
+  ctx.font="600 12px "+c.sans;ctx.fillStyle=c.muted;ctx.textAlign="center";ctx.textBaseline="bottom";ctx.fillText(xl,X((lo+hi)/2),P.oy+P.s+38);
+  ctx.save();ctx.translate(12,Y((lo+hi)/2));ctx.rotate(-Math.PI/2);ctx.textBaseline="middle";ctx.fillText(yl,0,0);ctx.restore();
+  ctx.restore();
+}
+function clipPoly(poly,f){const out=[];for(let i=0;i<poly.length;i++){const a=poly[i],b=poly[(i+1)%poly.length];const fa=f(a),fb=f(b);if(fa>=0)out.push(a);if((fa>=0)!==(fb>=0)){const t=fa/(fa-fb);out.push([a[0]+t*(b[0]-a[0]),a[1]+t*(b[1]-a[1])]);}}return out;}
+function fillPoly(P,poly,col){if(poly.length<3)return;const{ctx,X,Y}=P;ctx.beginPath();poly.forEach((p,i)=>i?ctx.lineTo(X(p[0]),Y(p[1])):ctx.moveTo(X(p[0]),Y(p[1])));ctx.closePath();ctx.fillStyle=col;ctx.fill();}
+function rectPoly(P){const{lo,hi}=P;return[[lo,lo],[hi,lo],[hi,hi],[lo,hi]];}
+function halfPlanes(P,w1,w2,b,c,alpha){
+  const a=alpha??(c.dark?0.2:0.14);
+  const f=p=>w1*p[0]+w2*p[1]+b;
+  fillPoly(P,clipPoly(rectPoly(P),p=>-f(p)),rgba(c.neg,a));
+  fillPoly(P,clipPoly(rectPoly(P),p=>f(p)-1e-12),rgba(c.pos,a));
+}
+function lineEnds(P,w1,w2,b){
+  if(Math.abs(w1)<1e-12&&Math.abs(w2)<1e-12)return null;
+  const R=rectPoly(P),pts=[];const f=p=>w1*p[0]+w2*p[1]+b;
+  for(let i=0;i<4;i++){const a=R[i],q=R[(i+1)%4];const fa=f(a),fb=f(q);if(fa===0)pts.push(a);if(fa*fb<0){const t=fa/(fa-fb);pts.push([a[0]+t*(q[0]-a[0]),a[1]+t*(q[1]-a[1])]);}}
+  if(pts.length<2)return null;return[pts[0],pts[pts.length-1]];
+}
+function drawLine(P,w1,w2,b,col,lw,dash){const e=lineEnds(P,w1,w2,b);if(!e)return;const{ctx,X,Y}=P;ctx.save();ctx.strokeStyle=col;ctx.lineWidth=lw;if(dash)ctx.setLineDash(dash);ctx.lineCap="round";ctx.beginPath();ctx.moveTo(X(e[0][0]),Y(e[0][1]));ctx.lineTo(X(e[1][0]),Y(e[1][1]));ctx.stroke();ctx.restore();}
+function drawNormal(P,w1,w2,b,col,label){
+  const n2=w1*w1+w2*w2;if(n2<1e-12)return;const n=Math.sqrt(n2);
+  const cx=(P.lo+P.hi)/2,cy=cx;const z=w1*cx+w2*cy+b;
+  let fx0=cx-z*w1/n2,fy0=cy-z*w2/n2;const span=P.hi-P.lo;
+  if(fx0<P.lo+span*0.08||fx0>P.hi-span*0.08||fy0<P.lo+span*0.08||fy0>P.hi-span*0.08){const e=lineEnds(P,w1,w2,b);if(!e)return;fx0=(e[0][0]+e[1][0])/2;fy0=(e[0][1]+e[1][1])/2;}
+  const L=span*0.11,tx=fx0+w1/n*L,ty=fy0+w2/n*L;const{ctx,X,Y}=P;
+  ctx.save();ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=2.2;ctx.beginPath();ctx.moveTo(X(fx0),Y(fy0));ctx.lineTo(X(tx),Y(ty));ctx.stroke();
+  const ang=Math.atan2(Y(ty)-Y(fy0),X(tx)-X(fx0));ctx.beginPath();ctx.moveTo(X(tx),Y(ty));ctx.lineTo(X(tx)-9*Math.cos(ang-0.45),Y(ty)-9*Math.sin(ang-0.45));ctx.lineTo(X(tx)-9*Math.cos(ang+0.45),Y(ty)-9*Math.sin(ang+0.45));ctx.closePath();ctx.fill();
+  if(label){ctx.font="700 12px "+css("--mono");ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(label,X(tx)+12*Math.cos(ang),Y(ty)+12*Math.sin(ang));}
+  ctx.restore();
+}
+function drawPt(P,x,y,cls,c,o={}){
+  const{ctx,X,Y}=P;const r=o.r||7;const px=X(x),pyy=Y(y);ctx.save();
+  ctx.fillStyle=cls?c.pos:c.neg;ctx.strokeStyle=c.surf;ctx.lineWidth=1.6;
+  ctx.beginPath();if(cls)ctx.arc(px,pyy,r,0,Math.PI*2);else ctx.rect(px-r*0.88,pyy-r*0.88,r*1.76,r*1.76);ctx.fill();ctx.stroke();
+  if(o.wrong){ctx.strokeStyle=c.err;ctx.lineWidth=2.4;ctx.beginPath();ctx.arc(px,pyy,r+5,0,Math.PI*2);ctx.stroke();}
+  if(o.cur){ctx.strokeStyle=c.ink;ctx.lineWidth=3;ctx.beginPath();ctx.arc(px,pyy,r+(o.wrong?9:5),0,Math.PI*2);ctx.stroke();}
+  ctx.restore();
+}
+
+/* ---------- 탭 ---------- */
+const TABS=["node","gate","learn","xor","linear","code"];
+let curTab="node";
+function showTab(k,focus){
+  curTab=k;
+  TABS.forEach(t=>{const b=$("tab-"+t),on=t===k;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;$("pane-"+t).hidden=!on;});
+  if(focus)$("tab-"+k).focus();
+  try{history.replaceState(null,"","#"+k);}catch(e){}
+  if(k!=="learn")LR.pause();
+  if(k!=="xor")XR.stop();
+  render(k);
+}
+TABS.forEach(t=>$("tab-"+t).addEventListener("click",()=>showTab(t)));
+document.querySelector(".sk-tabs").addEventListener("keydown",e=>{
+  if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;
+  const i=TABS.indexOf(curTab),n=(i+(e.key==="ArrowRight"?1:-1)+TABS.length)%TABS.length;showTab(TABS[n],true);e.preventDefault();
+});
+window.addEventListener("hashchange",()=>{const k=location.hash.slice(1);if(TABS.includes(k)&&k!==curTab)showTab(k);});
+function render(k){({node:ND.render,gate:GT.render,learn:LR.render,xor:XR.render,linear:LN.render,code:CD.render})[k]();}
+
+/* ================= 1. 노드 하나 ================= */
+const ACT={
+  step:{name:"계단",f:z=>z>0?1:0,lo:-0.3,hi:1.3,ticks:[0,0.5,1]},
+  sigmoid:{name:"시그모이드",f:z=>1/(1+Math.exp(-z)),lo:-0.3,hi:1.3,ticks:[0,0.5,1]},
+  tanh:{name:"tanh",f:z=>Math.tanh(z),lo:-1.3,hi:1.3,ticks:[-1,0,1]},
+  relu:{name:"ReLU",f:z=>Math.max(0,z),lo:-0.8,hi:6.3,ticks:[0,2,4,6]}
+};
+const ND=(function(){
+  const FEAT=[["x₁","발열"],["x₂","기침"],["x₃","호흡곤란"]];
+  const DEF={x:[1,0,1],w:[0.6,0.4,0.9],b:-1,mode:"bin",act:"step"};
+  const st=JSON.parse(JSON.stringify(DEF));
+  const fmt1=v=>fx(v,1),fmt2=v=>fx(v,2);
+  function build(){
+    let h="";
+    FEAT.forEach((f,i)=>{
+      h+=`<div class="pc-inrow"><div class="pc-inhead"><b>${f[0]} ${f[1]}</b>`+
+        `<button type="button" class="sk-btn sk-btn--sm pc-tog" id="nTog${i}" aria-pressed="false" aria-label="${f[1]} 있음/없음 전환"></button></div>`+
+        `<div class="sk-slider" id="nXs${i}" hidden><div class="sk-sl-head"><label for="nX${i}">${f[1]} 정도 ${f[0]}</label><b id="nX${i}v"></b></div><input type="range" id="nX${i}" min="0" max="1" step="0.1" value="${st.x[i]}"></div>`+
+        `<div class="sk-slider pc-wsl"><div class="sk-sl-head"><label for="nW${i}">가중치 w${"₁₂₃"[i]}</label><b id="nW${i}v"></b></div><input type="range" id="nW${i}" min="-2" max="2" step="0.1" value="${st.w[i]}"></div></div>`;
+    });
+    $("nInputs").innerHTML=h;
+    FEAT.forEach((f,i)=>{
+      $("nTog"+i).addEventListener("click",()=>{st.x[i]=st.x[i]>0.5?0:1;$("nX"+i).value=st.x[i];$("nX"+i+"v").textContent=fmt1(st.x[i]);render();});
+      bindSlider("nX"+i,fmt1,v=>{st.x[i]=v;render();});
+      bindSlider("nW"+i,fmt1,v=>{st.w[i]=v;render();});
+    });
+    bindSlider("nB",fmt1,v=>{st.b=v;render();});
+    segInit($("nMode"),v=>{st.mode=v;if(v==="bin")st.x=st.x.map(x=>x>=0.5?1:0);syncUI();render();});
+    segInit($("nAct"),v=>{st.act=v;render();});
+    $("nReset").addEventListener("click",()=>{Object.assign(st,JSON.parse(JSON.stringify(DEF)));syncUI();render();});
+    syncUI();
+  }
+  function syncUI(){
+    segSet($("nMode"),st.mode);segSet($("nAct"),st.act);
+    FEAT.forEach((f,i)=>{setSlider("nX"+i,st.x[i],fmt1);setSlider("nW"+i,st.w[i],fmt1);
+      $("nXs"+i).hidden=st.mode!=="cont";$("nTog"+i).hidden=st.mode!=="bin";});
+    setSlider("nB",st.b,fmt1);
+  }
+  function calc(x){const z=snap(st.w[0]*x[0]+st.w[1]*x[1]+st.w[2]*x[2]+st.b);return{z,y:ACT[st.act].f(z)};}
+  function yStr(y){return st.act==="step"?String(y):fx(y,3);}
+  function verdict(z,y){
+    const need=z>0;
+    const extra=st.act==="sigmoid"?` (확률처럼 읽으면 ${fx(y,3)})`:st.act==="relu"?(need?` (강도 ${fx(y,2)})`:" (0으로 잘림)"):st.act==="tanh"?` (−1~1 중 ${fx(y,3)})`:"";
+    return{need,text:(need?"검사 필요":"검사 불필요")+extra};
+  }
+  function svg(z,y){
+    const W=620,H=318,inX=62,inY=[62,158,254],S={x:350,y:158,r:40},F={x:430,w:86,h:72},Yc={x:572,r:30};
+    let s=`<svg viewBox="0 0 ${W} ${H}" aria-hidden="true"><defs><marker id="nArr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--fwd)"/></marker></defs>`;
+    const edge=(x0,y0,r0,x1,y1,r1)=>{const dx=x1-x0,dy=y1-y0,L=Math.hypot(dx,dy);return[x0+dx/L*r0,y0+dy/L*r0,x1-dx/L*r1,y1-dy/L*r1];};
+    const wcol=w=>w>0?"var(--pos)":w<0?"var(--neg)":"var(--faint)";
+    // 입력 → Σ
+    st.w.forEach((w,i)=>{
+      const e=edge(inX,inY[i],24,S.x,S.y,S.r);const sw=1.2+3.6*Math.abs(w);
+      s+=`<line x1="${e[0]}" y1="${e[1]}" x2="${e[2]}" y2="${e[3]}" stroke="${wcol(w)}" stroke-width="${sw}" stroke-linecap="round"${w===0?' stroke-dasharray="4 5"':""}/>`;
+    });
+    // bias
+    const B={x:262,y:292};{const e=edge(B.x,B.y,15,S.x,S.y,S.r);s+=`<line x1="${e[0]}" y1="${e[1]}" x2="${e[2]}" y2="${e[3]}" stroke="${wcol(st.b)}" stroke-width="${1.2+3.6*Math.min(2,Math.abs(st.b))/1}" stroke-linecap="round"${st.b===0?' stroke-dasharray="4 5"':""}/>`;}
+    // 가중치 라벨
+    st.w.forEach((w,i)=>{const t=0.46;const lx=inX+(S.x-inX)*t,ly=inY[i]+(S.y-inY[i])*t;
+      s+=`<rect x="${lx-40}" y="${ly-12}" width="80" height="24" rx="6" fill="var(--surface)" stroke="var(--line)"/><text x="${lx}" y="${ly+5}" text-anchor="middle" font-size="14" font-weight="700" class="mono" fill="${wcol(w)}">w${"₁₂₃"[i]}=${fx(w,1)}</text>`;});
+    {const lx=B.x+(S.x-B.x)*0.55,ly=B.y+(S.y-B.y)*0.55;s+=`<rect x="${lx-6}" y="${ly-12}" width="82" height="24" rx="6" fill="var(--surface)" stroke="var(--line)"/><text x="${lx+35}" y="${ly+5}" text-anchor="middle" font-size="14" font-weight="700" class="mono" fill="${wcol(st.b)}">b=${fx(st.b,1)}</text>`;}
+    // 입력 노드
+    FEAT.forEach((f,i)=>{const on=st.x[i]>0;
+      s+=`<circle cx="${inX}" cy="${inY[i]}" r="24" fill="${on?"color-mix(in srgb,var(--fwd) 16%,var(--surface))":"var(--surface-2)"}" stroke="${on?"var(--fwd)":"var(--line-strong)"}" stroke-width="2"/>`+
+        `<text x="${inX}" y="${inY[i]+6}" text-anchor="middle" font-size="17" font-weight="700" class="mono" fill="var(--ink)">${st.mode==="bin"?st.x[i]:fx(st.x[i],1)}</text>`+
+        `<text x="${inX}" y="${inY[i]+42}" text-anchor="middle" font-size="13" font-weight="600" fill="var(--muted)">${f[0]} ${f[1]}</text>`;});
+    s+=`<circle cx="${B.x}" cy="${B.y}" r="15" fill="var(--surface-2)" stroke="var(--line-strong)" stroke-width="1.5"/><text x="${B.x}" y="${B.y+5}" text-anchor="middle" font-size="14" font-weight="700" class="mono" fill="var(--ink)">1</text>`;
+    // Σ
+    s+=`<circle cx="${S.x}" cy="${S.y}" r="${S.r}" fill="var(--surface)" stroke="var(--sk-accent)" stroke-width="2.6"/><text x="${S.x}" y="${S.y-4}" text-anchor="middle" font-size="24" font-weight="700" fill="var(--ink)">Σ</text><text x="${S.x}" y="${S.y+20}" text-anchor="middle" font-size="13" font-weight="700" class="mono" fill="var(--ink)">${fx(z,2)}</text>`;
+    s+=`<text x="${S.x}" y="${S.y-S.r-10}" text-anchor="middle" font-size="13" font-weight="600" fill="var(--muted)">가중합 z</text>`;
+    // 화살표 Σ→f→y
+    const fy=S.y-F.h/2;
+    s+=`<line x1="${S.x+S.r}" y1="${S.y}" x2="${F.x-3}" y2="${S.y}" stroke="var(--fwd)" stroke-width="2.6" marker-end="url(#nArr)"/>`;
+    s+=`<line x1="${F.x+F.w}" y1="${S.y}" x2="${Yc.x-Yc.r-3}" y2="${S.y}" stroke="var(--fwd)" stroke-width="2.6" marker-end="url(#nArr)"/>`;
+    s+=`<rect x="${F.x}" y="${fy}" width="${F.w}" height="${F.h}" rx="10" fill="var(--surface)" stroke="var(--line-strong)" stroke-width="1.6"/>`;
+    // 박스 안 작은 그래프
+    const A=ACT[st.act];let d="";for(let k=0;k<=60;k++){const zz=-4+8*k/60;const yy=A.f(zz);const px=F.x+8+(F.w-16)*k/60;const lo=st.act==="tanh"?-1:0,hi=st.act==="relu"?4:1;const pyy=fy+F.h-10-(F.h-20)*(Math.min(hi,yy)-lo)/(hi-lo);d+=(k?"L":"M")+px.toFixed(1)+" "+pyy.toFixed(1);}
+    s+=`<path d="${d}" fill="none" stroke="var(--sk-accent)" stroke-width="2.4" stroke-linejoin="round"/>`;
+    s+=`<text x="${F.x+F.w/2}" y="${fy+F.h+20}" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">${A.name}</text><text x="${F.x+F.w/2}" y="${fy-10}" text-anchor="middle" font-size="13" font-weight="600" fill="var(--muted)">활성 함수</text>`;
+    // y
+    const v=verdict(z,y);
+    s+=`<circle cx="${Yc.x}" cy="${S.y}" r="${Yc.r}" fill="${v.need?"color-mix(in srgb,var(--pos) 18%,var(--surface))":"color-mix(in srgb,var(--neg) 16%,var(--surface))"}" stroke="${v.need?"var(--pos)":"var(--neg)"}" stroke-width="2.4"/><text x="${Yc.x}" y="${S.y+6}" text-anchor="middle" font-size="${st.act==="step"?19:14}" font-weight="700" class="mono" fill="var(--ink)">${yStr(y)}</text>`;
+    s+=`<text x="${Yc.x}" y="${S.y-Yc.r-10}" text-anchor="middle" font-size="13" font-weight="600" fill="var(--muted)">출력 y</text><text x="${Yc.x}" y="${S.y+Yc.r+22}" text-anchor="middle" font-size="13" font-weight="700" fill="${v.need?"var(--pos)":"var(--neg)"}">${v.need?"검사 필요":"불필요"}</text>`;
+    s+=`<line class="pc-flow" x1="${S.x+S.r}" y1="${S.y}" x2="${F.x-8}" y2="${S.y}" stroke-width="2"/><line class="pc-flow" x1="${F.x+F.w}" y1="${S.y}" x2="${Yc.x-Yc.r-8}" y2="${S.y}" stroke-width="2"/>`;
+    return s+"</svg>";
+  }
+  function actSvg(z,y){
+    const A=ACT[st.act];const W=400,H=230,mL=40,mR=14,mT=12,mB=30,pw=W-mL-mR,ph=H-mT-mB,zl=-6,zh=6;
+    const X=v=>mL+(v-zl)/(zh-zl)*pw,Y=v=>mT+(1-(v-A.lo)/(A.hi-A.lo))*ph;
+    let s=`<svg viewBox="0 0 ${W} ${H}" aria-hidden="true">`;
+    [-6,-4,-2,0,2,4,6].forEach(t=>{s+=`<line x1="${X(t)}" y1="${mT}" x2="${X(t)}" y2="${mT+ph}" stroke="${t===0?"var(--line-strong)":"var(--line)"}"/><text x="${X(t)}" y="${H-10}" text-anchor="middle" font-size="11" class="mono" fill="var(--muted)">${t<0?"−"+(-t):t}</text>`;});
+    A.ticks.forEach(t=>{s+=`<line x1="${mL}" y1="${Y(t)}" x2="${mL+pw}" y2="${Y(t)}" stroke="${t===0?"var(--line-strong)":"var(--line)"}"/><text x="${mL-6}" y="${Y(t)+4}" text-anchor="end" font-size="11" class="mono" fill="var(--muted)">${t<0?"−"+(-t):t}</text>`;});
+    s+=`<text x="${mL+pw}" y="${H-10}" text-anchor="end" font-size="11" font-weight="700" fill="var(--muted)" dx="-2" dy="-14">z</text>`;
+    if(st.act==="step"){s+=`<path d="M${X(zl)} ${Y(0)} L${X(0)} ${Y(0)}" stroke="var(--sk-accent)" stroke-width="2.6" fill="none"/><path d="M${X(0)} ${Y(1)} L${X(zh)} ${Y(1)}" stroke="var(--sk-accent)" stroke-width="2.6" fill="none"/><line x1="${X(0)}" y1="${Y(0)}" x2="${X(0)}" y2="${Y(1)}" stroke="var(--sk-accent)" stroke-dasharray="3 4"/><circle cx="${X(0)}" cy="${Y(0)}" r="4" fill="var(--sk-accent)"/><circle cx="${X(0)}" cy="${Y(1)}" r="4" fill="var(--surface)" stroke="var(--sk-accent)" stroke-width="2"/>`;}
+    else{let d="";for(let k=0;k<=240;k++){const zz=zl+(zh-zl)*k/240;const yy=Math.min(A.hi,A.f(zz));d+=(k?"L":"M")+X(zz).toFixed(1)+" "+Y(yy).toFixed(1);}s+=`<path d="${d}" stroke="var(--sk-accent)" stroke-width="2.6" fill="none"/>`;}
+    const zc=Math.max(zl,Math.min(zh,z)),yc=Math.max(A.lo,Math.min(A.hi,y));const out=z<zl||z>zh||y>A.hi;
+    s+=`<line x1="${X(zc)}" y1="${Y(yc)}" x2="${X(zc)}" y2="${mT+ph}" stroke="var(--fwd)" stroke-dasharray="4 4"/><line x1="${mL}" y1="${Y(yc)}" x2="${X(zc)}" y2="${Y(yc)}" stroke="var(--fwd)" stroke-dasharray="4 4"/><circle cx="${X(zc)}" cy="${Y(yc)}" r="6.5" fill="var(--fwd)" stroke="var(--surface)" stroke-width="2"/>`;
+    const lx=X(zc)>W/2?X(zc)-10:X(zc)+10;const anc=X(zc)>W/2?"end":"start";const ly=Y(yc)<40?Y(yc)+24:Y(yc)-12;
+    s+=`<text x="${lx}" y="${ly}" text-anchor="${anc}" font-size="12.5" font-weight="700" class="mono" fill="var(--ink)">z=${fx(z,2)} → y=${yStr(y)}${out?" (범위 밖)":""}</text>`;
+    return s+"</svg>";
+  }
+  function render(){
+    const {z,y}=calc(st.x);const A=ACT[st.act];const d=st.mode==="bin"?0:1;
+    $("nSvg").innerHTML=svg(z,y);
+    const terms=st.w.map((w,i)=>`${fp(w,1)}×${fx(st.x[i],d)}`).join(" + ");
+    const prods=st.w.map((w,i)=>snap(w*st.x[i]));
+    const prodStr=prods.map((p,i)=>i?fplus(p,2):fx(p,2)).join("")+fplus(st.b,2);
+    let yline;
+    if(st.act==="step")yline=`y = 계단(z) = 계단(${fx(z,2)}) = ${y}      (z > 0 이면 1, 아니면 0)`;
+    else if(st.act==="sigmoid")yline=`y = σ(z) = 1 / (1 + e^(−z)) = 1 / (1 + e^(${fx(-z,2)})) = ${fx(y,3)}`;
+    else if(st.act==="tanh")yline=`y = tanh(z) = tanh(${fx(z,2)}) = ${fx(y,3)}`;
+    else yline=`y = ReLU(z) = max(0, z) = max(0, ${fx(z,2)}) = ${fx(y,2)}`;
+    $("nFormula").innerHTML=`z = w₁x₁ + w₂x₂ + w₃x₃ + b\n  = ${terms} + ${fp(st.b,1)}\n  = ${prodStr} = <b>${fx(z,2)}</b>\n${yline}`;
+    const v=verdict(z,y);
+    $("nVerdict").innerHTML=`<span class="${v.need?"pc-pos":"pc-neg"}">${v.text}</span>`;
+    $("nActTitle").textContent=`활성 함수 그래프: ${A.name}`;
+    $("nActSvg").innerHTML=actSvg(z,y);
+    FEAT.forEach((f,i)=>{const b=$("nTog"+i);b.setAttribute("aria-pressed",st.x[i]>0?"true":"false");b.textContent=st.x[i]>0?"1 (있음)":"0 (없음)";});
+    let t=`<thead><tr><th class="c">발열</th><th class="c">기침</th><th class="c">호흡곤란</th><th class="c">z</th><th class="c">y</th><th>판정</th></tr></thead><tbody>`;
+    for(let k=0;k<8;k++){const x=[(k>>2)&1,(k>>1)&1,k&1];const r=calc(x);const cur=st.mode==="bin"&&x.every((v,i)=>v===st.x[i]);
+      t+=`<tr class="${cur?"cur":""}"><td class="c n">${x[0]}</td><td class="c n">${x[1]}</td><td class="c n">${x[2]}</td><td class="n">${fx(r.z,2)}</td><td class="n">${yStr(r.y)}</td><td class="${r.z>0?"pc-pos":"pc-neg"}">${r.z>0?"필요":"불필요"}</td></tr>`;}
+    $("nTable").innerHTML=t+"</tbody>";
+  }
+  build();
+  return{render,st};
+})();
+
+/* ================= 2. 논리 게이트 ================= */
+const GATES={AND:[0,0,0,1],OR:[0,1,1,1],NAND:[1,1,1,0],XOR:[0,1,1,0]};
+const IN4=[[0,0],[0,1],[1,0],[1,1]];
+const GT=(function(){
+  const SOL={AND:[1,1,-1.5],OR:[1,1,-0.5],NAND:[-1,-1,1.5]};
+  const st={gate:"AND",w1:1,w2:1,b:-0.5};
+  const f1=v=>fx(v,1);
+  let hist=null;
+  function coverage(){
+    if(hist)return hist;hist=new Map();let total=0;
+    for(let W1=-20;W1<=20;W1++)for(let W2=-20;W2<=20;W2++)for(let B=-30;B<=30;B++){
+      let code="";for(const[a,b]of IN4)code+=(W1*a+W2*b+B>0)?"1":"0";hist.set(code,(hist.get(code)||0)+1);total++;}
+    hist.total=total;return hist;
+  }
+  function pred(x){const z=snap(st.w1*x[0]+st.w2*x[1]+st.b);return{z,y:z>0?1:0};}
+  function render(){
+    const tgt=GATES[st.gate];let ok=0;
+    let t=`<thead><tr><th class="c">x₁</th><th class="c">x₂</th><th>z = w₁x₁ + w₂x₂ + b</th><th class="c">ŷ</th><th class="c">정답</th><th class="c"></th></tr></thead><tbody>`;
+    IN4.forEach((x,i)=>{const p=pred(x);const good=p.y===tgt[i];if(good)ok++;
+      t+=`<tr><td class="c n">${x[0]}</td><td class="c n">${x[1]}</td><td class="n">${fp(st.w1,1)}×${x[0]} + ${fp(st.w2,1)}×${x[1]} + ${fp(st.b,1)} = <b>${fx(p.z,1)}</b></td><td class="c n">${p.y}</td><td class="c n">${tgt[i]}</td><td class="c ${good?"pc-ok":"pc-err"}"><b>${good?"✓":"✗"}</b></td></tr>`;});
+    $("gTable").innerHTML=t+"</tbody>";
+    const H=coverage();const code=tgt.join("");const cnt=H.get(code)||0;
+    let best=0;H.forEach((v,k)=>{if(typeof k!=="string")return;let m=0;for(let i=0;i<4;i++)if(k[i]===code[i])m++;best=Math.max(best,m);});
+    $("gStats").innerHTML=`<div class="sk-stat"><b class="${ok===4?"pc-ok":""}">${ok} / 4</b><span>맞은 행</span></div><div class="sk-stat"><b>${cnt.toLocaleString("en-US")}</b><span>4행을 다 맞히는 슬라이더 조합 (전체 ${H.total.toLocaleString("en-US")})</span></div>`;
+    const c=C();const P=makePlane($("gCv"),-0.5,1.5);
+    halfPlanes(P,st.w1,st.w2,st.b,c);planeAxes(P,[-0.5,0,0.5,1,1.5],"x₁","x₂",c);
+    drawLine(P,st.w1,st.w2,st.b,c.ink,2.6);drawNormal(P,st.w1,st.w2,st.b,c.ink,"w");
+    const{ctx,X,Y}=P;
+    IN4.forEach((x,i)=>{const p=pred(x);drawPt(P,x[0],x[1],tgt[i],c,{r:11,wrong:p.y!==tgt[i]});
+      ctx.save();ctx.font="600 12px "+c.mono;ctx.fillStyle=c.text;ctx.textAlign=x[0]?"left":"right";ctx.textBaseline=x[1]?"bottom":"top";
+      ctx.fillText(`(${x[0]},${x[1]})`,X(x[0])+(x[0]?16:-16),Y(x[1])+(x[1]?-12:12));ctx.restore();});
+    let fm=`결정 경계: ${f1(st.w1)}·x₁${fplus(st.w2,1)}·x₂${fplus(st.b,1)} = 0`;
+    if(Math.abs(st.w2)>1e-9)fm+=`\n       ⇔  x₂ = ${fx(-st.w1/st.w2,2)}·x₁${fplus(-st.b/st.w2,2)}`;
+    else if(Math.abs(st.w1)>1e-9)fm+=`\n       ⇔  x₁ = ${fx(-st.b/st.w1,2)}  (세로선)`;
+    else fm+=`\n       w = 0 이면 경계가 없고 모든 점이 같은 쪽 (b ${st.b>0?"> 0 → 전부 1":"≤ 0 → 전부 0"})`;
+    fm+=`\n화살표 w = (${f1(st.w1)}, ${f1(st.w2)}) 가 가리키는 쪽이 z > 0, ŷ = 1`;
+    $("gFormula").textContent=fm;
+    let note="";
+    if(st.gate==="XOR")note=`<p class="sk-note sk-note--warn"><b>XOR은 직선 하나로 나눌 수 없습니다.</b> (0,1)·(1,0)은 1, (0,0)·(1,1)은 0이라 대각선으로 엇갈려 있습니다. 슬라이더로 만들 수 있는 ${H.total.toLocaleString("en-US")}개 조합을 모두 시험해도 4행을 다 맞힌 조합은 ${cnt}개, 최고 ${best}/4 입니다. 해법은 층을 하나 더 쌓는 것입니다.</p><div class="sk-controls" style="margin-top:10px"><button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="gToXor">4. XOR과 다층 퍼셉트론으로 →</button></div>`;
+    else if(ok===4)note=`<p class="sk-note"><b>${st.gate} 완성.</b> 같은 게이트를 만드는 (w₁, w₂, b)는 하나가 아닙니다. 직선이 네 점을 같은 방식으로 나누기만 하면 됩니다.</p>`;
+    else note=`<p class="sk-note">빨간 고리 점이 반대편에 있습니다. b를 바꾸면 직선이 평행 이동하고, w₁·w₂를 바꾸면 기울기가 바뀝니다.</p>`;
+    $("gNote").innerHTML=note;
+    const tx=$("gToXor");if(tx)tx.addEventListener("click",()=>showTab("xor",true));
+    $("gSol").disabled=st.gate==="XOR";
+  }
+  function setW(w1,w2,b){st.w1=w1;st.w2=w2;st.b=b;setSlider("gW1",w1,f1);setSlider("gW2",w2,f1);setSlider("gB",b,f1);render();}
+  bindSlider("gW1",f1,v=>{st.w1=v;render();});bindSlider("gW2",f1,v=>{st.w2=v;render();});bindSlider("gB",f1,v=>{st.b=v;render();});
+  segInit($("gGate"),v=>{st.gate=v;render();});
+  $("gSol").addEventListener("click",()=>{const s=SOL[st.gate];if(s)setW(s[0],s[1],s[2]);});
+  $("gReset").addEventListener("click",()=>setW(1,1,-0.5));
+  return{render,st};
+})();
+
+/* ================= 3. 학습 규칙 ================= */
+const LR=(function(){
+  const DIG={"0.01":4,"0.05":4,"0.1":3,"0.5":3,"1":2};
+  const st={kind:"sep",seed:3,eta:0.1,init:"zero",maxEp:50,click:"1",pts:[],T:null,hist:[],log:[],playing:false,timer:0,anim:null,prevLine:null,speed:2};
+  const KCODE={sep:11,narrow:23,overlap:37,empty:0};
+  function initParams(){
+    if(st.init==="zero")return[0,0,0];
+    const r=mulberry32(st.seed*104729+7);return[r2(r()*2-1),r2(r()*2-1),r2(r()*2-1)];
+  }
+  function newT(){const p=initParams();return{w1:p[0],w2:p[1],b:p[2],epoch:1,idx:0,epErr:0,errs:[],total:0,done:false,conv:false,last:null};}
+  function stepOne(T,pts,eta,maxEp){
+    const p=pts[T.idx];const z=T.w1*p.x1+T.w2*p.x2+T.b;const yh=z>0?1:0;const e=p.y-yh;
+    const ev={i:T.idx,x1:p.x1,x2:p.x2,y:p.y,z,yh,e,ow1:T.w1,ow2:T.w2,ob:T.b,epoch:T.epoch};
+    if(e!==0){const u=eta*e;T.w1+=u*p.x1;T.w2+=u*p.x2;T.b+=u;T.epErr++;T.total++;}
+    ev.nw1=T.w1;ev.nw2=T.w2;ev.nb=T.b;
+    T.idx++;
+    if(T.idx>=pts.length){T.errs.push(T.epErr);ev.endEpoch=true;ev.epErrs=T.epErr;
+      if(T.epErr===0){T.conv=true;T.done=true;}else if(T.epoch>=maxEp){T.done=true;}else T.epoch++;
+      T.idx=0;T.epErr=0;}
+    T.last=ev;return ev;
+  }
+  function runAll(pts,eta,maxEp,init){const T=init?Object.assign(newT(),{w1:init[0],w2:init[1],b:init[2]}):newT();if(!pts.length)return T;let g=0;while(!T.done&&g++<1e6)stepOne(T,pts,eta,maxEp);return T;}
+  function genData(kind,seed){
+    if(kind==="empty")return[];
+    const r=mulberry32(seed*7919+KCODE[kind]);
+    if(kind==="sep"||kind==="narrow"){
+      const gap=kind==="sep"?0.3:0.08,N=kind==="sep"?30:36;
+      for(let a=0;a<80;a++){
+        const th=r()*2*Math.PI,c=(r()-0.5)*3.2,n=[Math.cos(th),Math.sin(th)];const pts=[];let g=0;
+        while(pts.length<N&&g++<20000){const x1=r2(r()*5.2-2.6),x2=r2(r()*5.2-2.6);const m=n[0]*x1+n[1]*x2+c;if(Math.abs(m)<gap)continue;
+          if(kind==="narrow"&&Math.abs(m)>1.6&&r()<0.55)continue;pts.push({x1,x2,y:m>0?1:0});}
+        const k=pts.filter(p=>p.y).length;if(k>=N*0.3&&k<=N*0.7)return pts;
+      }
+    }
+    for(let a=0;a<40;a++){
+      const pts=[];const ang=r()*2*Math.PI,cx=Math.cos(ang)*0.55,cy=Math.sin(ang)*0.55;
+      for(let i=0;i<32;i++){const y=i%2===0?1:0;const s=y?1:-1;
+        pts.push({x1:r2(Math.max(-2.8,Math.min(2.8,s*cx+gauss(r)*0.9))),x2:r2(Math.max(-2.8,Math.min(2.8,s*cy+gauss(r)*0.9))),y});}
+      if(!runAll(pts,1,400).conv)return pts;
+    }
+    return[];
+  }
+  function reset(){pause();st.T=newT();st.hist=[];st.log=[];st.anim=null;st.prevLine=null;if(!st.pts.length)st.T.done=true;}
+  function load(){st.pts=genData(st.kind,st.seed);$("lSeedV").textContent=st.kind==="empty"?"":"seed "+st.seed;reset();}
+  function snapshot(){const T=st.T;return JSON.stringify({T:{...T,errs:T.errs.slice()},logN:st.log.length});}
+  function doStep(animate){
+    const T=st.T;if(T.done||!st.pts.length)return null;
+    st.hist.push(snapshot());if(st.hist.length>6000)st.hist.shift();
+    const ev=stepOne(T,st.pts,st.eta,st.maxEp);
+    if(ev.e!==0){st.log.push(ev);st.prevLine=[ev.ow1,ev.ow2,ev.ob];if(animate&&!reduceMotion)startAnim([ev.ow1,ev.ow2,ev.ob],[ev.nw1,ev.nw2,ev.nb]);else st.anim=null;}
+    else st.prevLine=null;
+    return ev;
+  }
+  function prev(){pause();if(!st.hist.length)return;const s=JSON.parse(st.hist.pop());st.T=s.T;st.log.length=s.logN;st.anim=null;st.prevLine=null;
+    if(st.T.last&&st.T.last.e!==0)st.prevLine=[st.T.last.ow1,st.T.last.ow2,st.T.last.ob];draw();}
+  function next(){pause();doStep(true);draw();}
+  function epoch(){pause();const T=st.T;if(T.done)return;const from=[T.w1,T.w2,T.b];const ep=T.epoch;let g=0;
+    while(!T.done&&g++<100000){const ev=doStep(false);if(!ev||ev.endEpoch)break;}
+    st.prevLine=from;if(!reduceMotion)startAnim(from,[T.w1,T.w2,T.b]);draw();void ep;}
+  function startAnim(a,b){st.anim={a,b,t0:performance.now(),dur:520/Math.sqrt(st.speed)};requestAnimationFrame(tickAnim);}
+  function tickAnim(now){if(!st.anim)return;drawCanvas();if(now-st.anim.t0<st.anim.dur)requestAnimationFrame(tickAnim);else{st.anim=null;drawCanvas();}}
+  function dispLine(){const T=st.T;if(!st.anim)return[T.w1,T.w2,T.b];let t=(performance.now()-st.anim.t0)/st.anim.dur;t=Math.max(0,Math.min(1,t));t=t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2;const{a,b}=st.anim;return[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
+  function play(){if(st.playing){pause();return;}if(st.T.done)reset();st.playing=true;$("lPlay").textContent="멈춤";loop();}
+  function loop(){if(!st.playing)return;const ev=doStep(true);draw();if(!ev||st.T.done){pause();return;}
+    const d=(ev.e!==0?900:110)/st.speed;st.timer=setTimeout(loop,d);}
+  function pause(){st.playing=false;clearTimeout(st.timer);const b=$("lPlay");if(b)b.textContent="재생";}
+  let lastP=null;
+  function drawCanvas(){
+    const c=C();const P=makePlane($("lCv"),-3,3);lastP=P;const T=st.T;const L=dispLine();
+    halfPlanes(P,L[0],L[1],L[2],c);planeAxes(P,[-3,-2,-1,0,1,2,3],"x₁ 수축기 혈압 (표준화)","x₂ 공복 혈당 (표준화)",c);
+    if(st.prevLine&&!st.anim)drawLine(P,st.prevLine[0],st.prevLine[1],st.prevLine[2],c.muted,1.6,[5,5]);
+    else if(st.anim)drawLine(P,st.anim.a[0],st.anim.a[1],st.anim.a[2],c.muted,1.6,[5,5]);
+    drawLine(P,L[0],L[1],L[2],c.ink,2.6);drawNormal(P,L[0],L[1],L[2],c.ink,"w");
+    const ev=T.last;const curI=ev?ev.i:-1;
+    st.pts.forEach((p,i)=>{const z=T.w1*p.x1+T.w2*p.x2+T.b;const wrong=(z>0?1:0)!==p.y;drawPt(P,p.x1,p.x2,p.y,c,{r:6.5,wrong,cur:i===curI});});
+    if(ev){const p=st.pts[curI];if(p){const{ctx,X,Y}=P;ctx.save();ctx.font="700 12px "+c.mono;ctx.fillStyle=ev.e!==0?c.err:c.ink;ctx.textAlign="left";ctx.textBaseline="bottom";
+      const lx=X(p.x1)+14,ly=Y(p.x2)-10;ctx.fillText("#"+(curI+1)+(ev.e!==0?" 틀림 → 갱신":" 맞음"),Math.min(lx,P.ox+P.s-110),Math.max(ly,P.oy+16));ctx.restore();}}
+    if(!st.pts.length){const{ctx}=P;ctx.save();ctx.font="600 14px "+c.sans;ctx.fillStyle=c.muted;ctx.textAlign="center";ctx.fillText("평면을 클릭해 점을 찍어 보세요",P.ox+P.s/2,P.oy+P.s/2);ctx.restore();}
+  }
+  function misCount(){const T=st.T;let m=0;st.pts.forEach(p=>{if(((T.w1*p.x1+T.w2*p.x2+T.b)>0?1:0)!==p.y)m++;});return m;}
+  function drawChart(){
+    const T=st.T;const host=$("lChart");const W=Math.max(280,Math.round(host.clientWidth||480)),H=170,mL=34,mR=10,mT=10,mB=28,pw=W-mL-mR,ph=H-mT-mB;
+    const vals=T.errs.slice();const partial=!T.done&&T.idx>0?T.epErr:null;
+    const n=Math.max(10,vals.length+(partial!==null?1:0));const mx=Math.max(4,...vals,partial||0);
+    const bw=pw/n;let s=`<svg viewBox="0 0 ${W} ${H}" aria-hidden="true">`;
+    const Y=v=>mT+ph*(1-v/mx);const step=mx<=8?2:mx<=20?5:10;
+    for(let v=0;v<=mx;v+=step)s+=`<line x1="${mL}" x2="${mL+pw}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${mL-5}" y="${Y(v)+4}" text-anchor="end" font-size="11" class="mono" fill="var(--muted)">${v}</text>`;
+    vals.forEach((v,i)=>{const x=mL+i*bw+bw*0.15,w=Math.max(1,bw*0.7);s+=`<rect x="${x}" y="${Y(v)}" width="${w}" height="${Math.max(0,mT+ph-Y(v))}" fill="${v===0?"var(--ok)":"var(--sk-accent)"}" rx="1.5"/>`;if(v===0)s+=`<circle cx="${x+w/2}" cy="${mT+ph-4}" r="3.5" fill="var(--ok)"/>`;});
+    if(partial!==null){const i=vals.length,x=mL+i*bw+bw*0.15,w=Math.max(1,bw*0.7);s+=`<rect x="${x}" y="${Y(partial)}" width="${w}" height="${Math.max(0,mT+ph-Y(partial))}" fill="var(--sk-accent)" opacity=".35" rx="1.5"/>`;}
+    const lab=n<=12?1:n<=30?5:10;for(let i=1;i<=n;i++)if(i===1||i%lab===0)s+=`<text x="${mL+(i-0.5)*bw}" y="${H-12}" text-anchor="middle" font-size="11" class="mono" fill="var(--muted)">${i}</text>`;
+    s+=`<text x="${mL+pw}" y="${H-1}" text-anchor="end" font-size="11" font-weight="600" fill="var(--muted)">에폭</text>`;
+    host.innerHTML=s+"</svg>";
+  }
+  function draw(){
+    drawCanvas();drawChart();
+    const T=st.T,n=st.pts.length,dg=DIG[String(st.eta)]||3;const w=v=>fx(v,dg);
+    const epShow=T.done?T.errs.length:T.epoch;
+    $("lStats").innerHTML=`<div class="sk-stat"><b>${epShow}</b><span>에폭</span></div><div class="sk-stat"><b>${n?(T.done?"끝":(T.idx+1)+"/"+n):"–"}</b><span>다음 샘플</span></div><div class="sk-stat"><b>${T.total}</b><span>총 갱신</span></div><div class="sk-stat"><b>${misCount()}</b><span>지금 틀린 점</span></div><div class="sk-stat"><b style="font-size:15px">(${w(T.w1)}, ${w(T.w2)}) · ${w(T.b)}</b><span>w = (w₁, w₂) · b</span></div>`;
+    const ev=T.last;let f;
+    if(!ev){const p=st.pts[0];f=n?`시작: w = (${w(T.w1)}, ${w(T.w2)}),  b = ${w(T.b)},  η = ${st.eta}\n다음 샘플 #1  x = (${fx(p.x1)}, ${fx(p.x2)}),  정답 y = ${p.y}\n[한 샘플 →] 을 눌러 식에 대입해 보세요.`:"점이 없습니다. 평면을 클릭해 점을 추가하세요.";}
+    else{
+      f=`샘플 #${ev.i+1}  x = (${fx(ev.x1)}, ${fx(ev.x2)}),  정답 y = ${ev.y}      [에폭 ${ev.epoch}]\n`+
+        `z = w₁x₁ + w₂x₂ + b = ${fp(ev.ow1,dg)}×${fp(ev.x1)} + ${fp(ev.ow2,dg)}×${fp(ev.x2)} + ${fp(ev.ob,dg)} = ${fx(ev.z,dg)}\n`+
+        `ŷ = step(${fx(ev.z,dg)}) = ${ev.yh}     y − ŷ = ${ev.y} − ${ev.yh} = ${ev.e}`;
+      if(ev.e===0)f+=`  → 맞음, 가중치 그대로`;
+      else f+=`  → 틀림, 갱신\n`+
+        `w₁ ← ${w(ev.ow1)} + ${st.eta}×(${ev.e})×${fp(ev.x1)} = <b>${w(ev.nw1)}</b>\n`+
+        `w₂ ← ${w(ev.ow2)} + ${st.eta}×(${ev.e})×${fp(ev.x2)} = <b>${w(ev.nw2)}</b>\n`+
+        `b  ← ${w(ev.ob)} + ${st.eta}×(${ev.e}) = <b>${w(ev.nb)}</b>`;
+      if(ev.endEpoch)f+=`\n── 에폭 ${ev.epoch} 끝: 이번 에폭 갱신 ${ev.epErrs}회`;
+    }
+    $("lFormula").innerHTML=f;
+    let note="";
+    if(T.conv)note=`<p class="sk-note"><b>수렴.</b> 에폭 ${T.errs.length}에서 한 바퀴 동안 틀린 점이 0개 → 더 고칠 것이 없어 멈춥니다. 총 ${T.total}번 갱신, 최종 경계 ${w(T.w1)}·x₁${fplus(T.w2,dg)}·x₂${fplus(T.b,dg)} = 0.</p>`;
+    else if(T.done&&n)note=`<p class="sk-note sk-note--warn"><b>수렴하지 않음.</b> 최대 ${st.maxEp} 에폭까지 매 에폭 틀린 점이 남았습니다. 직선 하나로 나눌 수 없는 데이터에서는 경계가 계속 흔들리며 멈추지 않습니다 (이때는 로지스틱 회귀·다층망처럼 오차를 줄이는 방식이 필요).</p>`;
+    else if(st.init==="zero")note=`<p class="sk-hint" style="margin:0">초기값이 0이면 η는 경계의 <b>모양</b>을 바꾸지 않습니다 (w, b가 모두 η배로 커질 뿐). 초기값을 무작위로 두면 η에 따라 경로가 달라집니다.</p>`;
+    $("lNote").innerHTML=note;
+    const rows=st.log.slice(-40).reverse();
+    $("lLogHint").textContent=`${st.log.length}건`;
+    $("lLog").innerHTML=`<thead><tr><th>에폭</th><th>샘플</th><th>x₁</th><th>x₂</th><th class="c">y</th><th class="c">ŷ</th><th>w₁</th><th>w₂</th><th>b</th></tr></thead><tbody>`+
+      (rows.length?rows.map(e=>`<tr><td class="n">${e.epoch}</td><td class="n">#${e.i+1}</td><td class="n">${fx(e.x1)}</td><td class="n">${fx(e.x2)}</td><td class="c n">${e.y}</td><td class="c n pc-err">${e.yh}</td><td class="n">${w(e.nw1)}</td><td class="n">${w(e.nw2)}</td><td class="n">${w(e.nb)}</td></tr>`).join(""):`<tr><td colspan="9" class="sk-hint">아직 갱신 없음</td></tr>`)+`</tbody>`;
+    const dis=T.done||!n;$("lNext").disabled=dis;$("lEpoch").disabled=dis;$("lPrev").disabled=!st.hist.length;
+  }
+  function init(){
+    segInit($("lData"),v=>{st.kind=v;load();draw();});
+    $("lSeed").addEventListener("click",()=>{st.seed=st.seed%97+1;if(st.kind==="empty"){st.kind="sep";segSet($("lData"),"sep");}load();draw();});
+    segInit($("lClick"),v=>{st.click=v;});
+    segInit($("lEta"),v=>{st.eta=+v;reset();draw();});
+    segInit($("lInit"),v=>{st.init=v;reset();draw();});
+    segInit($("lMax"),v=>{st.maxEp=+v;reset();draw();});
+    bindSlider("lSpeed",v=>v+"×",v=>{st.speed=v;});st.speed=+$("lSpeed").value;
+    $("lFirst").addEventListener("click",()=>{reset();draw();});
+    $("lPrev").addEventListener("click",prev);$("lNext").addEventListener("click",next);
+    $("lEpoch").addEventListener("click",epoch);$("lPlay").addEventListener("click",play);
+    $("lCv").addEventListener("click",e=>{
+      if(!lastP)return;const r=$("lCv").getBoundingClientRect();const x=lastP.IX(e.clientX-r.left),y=lastP.IY(e.clientY-r.top);
+      if(x<-3||x>3||y<-3||y>3)return;
+      if(st.click==="del"){let bi=-1,bd=0.35;st.pts.forEach((p,i)=>{const d=Math.hypot(p.x1-x,p.x2-y);if(d<bd){bd=d;bi=i;}});if(bi<0)return;st.pts.splice(bi,1);}
+      else{if(st.pts.length>=80)return;st.pts.push({x1:r2(x),x2:r2(y),y:+st.click});}
+      reset();draw();
+    });
+    document.addEventListener("keydown",e=>{
+      if(curTab!=="learn")return;const t=e.target;if(t&&(t.matches("input,select,textarea,.sk-tab")||t.isContentEditable))return;
+      if(e.key==="ArrowRight"){next();e.preventDefault();}else if(e.key==="ArrowLeft"){prev();e.preventDefault();}
+    });
+    load();
+  }
+  init();
+  return{render:draw,pause,st,runAll,newT,stepOne};
+})();
+
+/* ================= 4. XOR과 MLP ================= */
+const TT_NAME={"0000":"항상 0","0001":"AND","0111":"OR","1110":"NAND","1000":"NOR","0110":"XOR","1001":"XNOR","0011":"#1","0101":"#2","1100":"NOT #1","1010":"NOT #2","0010":"#1 AND NOT #2","0100":"NOT #1 AND #2","1111":"항상 1","1011":"#1 OR NOT #2","1101":"NOT #1 OR #2"};
+const XR=(function(){
+  const NAMES=[["a11","h₁ ← x₁"],["a12","h₁ ← x₂"],["c1","h₁ bias"],["a21","h₂ ← x₁"],["a22","h₂ ← x₂"],["c2","h₂ bias"],["v1","출력 ← h₁"],["v2","출력 ← h₂"],["d","출력 bias"]];
+  const P1=[1,1,-0.5,-1,-1,1.5,1,1,-1.5],P2=[1,-1,-0.5,-1,1,-0.5,1,1,-0.5];
+  const st={p:P1.slice(),act:"step",k:10,t:1,raf:0,playing:false};
+  const f1=v=>fx(v,1);
+  const sig=z=>1/(1+Math.exp(-z));
+  function fwd(x1,x2){const p=st.p,m=st.act==="sig"?st.k:1,f=st.act==="sig"?sig:(z=>z>0?1:0);
+    const z1=snap(m*(p[0]*x1+p[1]*x2+p[2])),z2=snap(m*(p[3]*x1+p[4]*x2+p[5]));const h1=f(z1),h2=f(z2);
+    const zo=snap(m*(p[6]*h1+p[7]*h2+p[8]));const y=f(zo);return{z1,z2,h1,h2,zo,y,pred:zo>0?1:0};}
+  function nameOf(w1,w2,b,sym){let code="";IN4.forEach(([a,c])=>code+=(snap(w1*a+w2*c+b)>0?"1":"0"));return(TT_NAME[code]||"?").replace(/#1/g,sym+"₁").replace(/#2/g,sym+"₂");}
+  function build(){
+    const grp=[["h₁ 은닉 노드","var(--h1)",0],["h₂ 은닉 노드","var(--h2)",3],["출력 노드","var(--sk-accent)",6]];
+    $("xW").innerHTML=grp.map(g=>`<div class="sk-card sk-card--sunk"><h3><span class="pc-dot" style="background:${g[1]}"></span>${g[0]} <span class="sk-hint" id="xName${g[2]}"></span></h3>`+
+      [0,1,2].map(j=>{const i=g[2]+j;return`<div class="sk-slider pc-wsl"><div class="sk-sl-head"><label for="xw${i}">${NAMES[i][1]}</label><b id="xw${i}v"></b></div><input type="range" id="xw${i}" min="-3" max="3" step="0.1" value="${st.p[i]}"></div>`;}).join("")+`</div>`).join("");
+    for(let i=0;i<9;i++)bindSlider("xw"+i,f1,v=>{st.p[i]=v;render();});
+    segInit($("xAct"),v=>{st.act=v;$("xKWrap").hidden=v!=="sig";render();});
+    bindSlider("xK",v=>"×"+v,v=>{st.k=v;render();});
+    bindSlider("xT",v=>v.toFixed(2),v=>{stop();st.t=v;drawHid();});
+    $("xP1").addEventListener("click",()=>setP(P1));$("xP2").addEventListener("click",()=>setP(P2));
+    let rs=5;$("xP3").addEventListener("click",()=>{const r=mulberry32(rs++*977);setP(Array.from({length:9},()=>Math.round((r()*4-2)*10)/10));});
+    $("xPlay").addEventListener("click",play);
+  }
+  const setT=v=>{st.t=v;setSlider("xT",v,x=>x.toFixed(2));};
+  function play(){
+    if(st.playing){stop();return;}
+    if(st.t>=0.99)setT(0);
+    if(reduceMotion){setT(1);drawHid();return;}
+    st.playing=true;$("xPlay").textContent="멈춤";const t0=performance.now(),s0=st.t,dur=1700*(1-s0);
+    const tick=now=>{if(!st.playing)return;const u=dur>0?Math.min(1,(now-t0)/dur):1;const e=u<0.5?2*u*u:1-Math.pow(-2*u+2,2)/2;setT(s0+(1-s0)*e);drawHid();
+      if(u<1)st.raf=requestAnimationFrame(tick);else stop();};
+    st.raf=requestAnimationFrame(tick);
+  }
+  function stop(){st.playing=false;cancelAnimationFrame(st.raf);const b=$("xPlay");if(b)b.textContent="변환 재생";}
+  function setP(a){st.p=a.slice();for(let i=0;i<9;i++)setSlider("xw"+i,st.p[i],f1);stop();setT(reduceMotion||curTab!=="xor"?1:0);render();if(!reduceMotion&&curTab==="xor")play();}
+  function netSvg(){
+    const p=st.p,W=660,H=312,X=[{x:74,y:84},{x:74,y:228}],Hn=[{x:330,y:84},{x:330,y:228}],O={x:566,y:156},r=28;
+    const wcol=w=>w>0?"var(--pos)":w<0?"var(--neg)":"var(--faint)";
+    const edge=(a,b)=>{const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy);return[a.x+dx/L*r,a.y+dy/L*r,b.x-dx/L*r,b.y-dy/L*r];};
+    let s=`<svg viewBox="0 0 ${W} ${H}" aria-hidden="true">`;const labs=[];
+    const conn=(a,b,w,t,name)=>{const e=edge(a,b);s+=`<line x1="${e[0]}" y1="${e[1]}" x2="${e[2]}" y2="${e[3]}" stroke="${wcol(w)}" stroke-width="${1.2+2.6*Math.abs(w)}" stroke-linecap="round"${w===0?' stroke-dasharray="4 5"':""}/>`;
+      labs.push([e[0]+(e[2]-e[0])*t,e[1]+(e[3]-e[1])*t,`${name}=${f1(w)}`,wcol(w)]);};
+    conn(X[0],Hn[0],p[0],0.28,"w");conn(X[1],Hn[0],p[1],0.28,"w");conn(X[0],Hn[1],p[3],0.28,"w");conn(X[1],Hn[1],p[4],0.28,"w");
+    conn(Hn[0],O,p[6],0.5,"v");conn(Hn[1],O,p[7],0.5,"v");
+    labs.forEach(l=>{s+=`<rect x="${l[0]-34}" y="${l[1]-11}" width="68" height="22" rx="6" fill="var(--surface)" stroke="var(--line)"/><text x="${l[0]}" y="${l[1]+5}" text-anchor="middle" font-size="13" font-weight="700" class="mono" fill="${l[3]}">${l[2]}</text>`;});
+    const node=(n,label,col,top,bias)=>{s+=`<circle cx="${n.x}" cy="${n.y}" r="${r}" fill="color-mix(in srgb,${col} 14%,var(--surface))" stroke="${col}" stroke-width="2.4"/><text x="${n.x}" y="${n.y+6}" text-anchor="middle" font-size="17" font-weight="700" fill="var(--ink)">${label}</text>`;
+      if(top)s+=`<text x="${n.x}" y="${n.y-r-10}" text-anchor="middle" font-size="14" font-weight="700" fill="${col}">${top}</text>`;
+      if(bias!==undefined)s+=`<text x="${n.x}" y="${n.y+r+19}" text-anchor="middle" font-size="13" font-weight="700" class="mono" fill="${wcol(bias)}">b=${f1(bias)}</text>`;};
+    node(X[0],"x₁","var(--line-strong)");node(X[1],"x₂","var(--line-strong)");
+    node(Hn[0],"h₁","var(--h1)",nameOf(p[0],p[1],p[2],"x"),p[2]);node(Hn[1],"h₂","var(--h2)",nameOf(p[3],p[4],p[5],"x"),p[5]);
+    node(O,"y","var(--sk-accent)",nameOf(p[6],p[7],p[8],"h"),p[8]);
+    s+=`<text x="${X[0].x}" y="${H-8}" text-anchor="middle" font-size="12.5" font-weight="600" fill="var(--muted)">입력층</text><text x="${Hn[0].x}" y="${H-8}" text-anchor="middle" font-size="12.5" font-weight="600" fill="var(--muted)">은닉층 (${st.act==="sig"?"시그모이드":"계단"})</text><text x="${O.x}" y="${H-8}" text-anchor="middle" font-size="12.5" font-weight="600" fill="var(--muted)">출력층</text>`;
+    return s+"</svg>";
+  }
+  function drawIn(){
+    const c=C();const P=makePlane($("xCvIn"),-0.3,1.3);const{ctx,X,Y}=P;const p=st.p;
+    const cell=4;const a=c.dark?0.22:0.15;
+    for(let py0=P.oy;py0<P.oy+P.s;py0+=cell)for(let px0=P.ox;px0<P.ox+P.s;px0+=cell){const x=P.IX(px0+cell/2),y=P.IY(py0+cell/2);const o=fwd(x,y);ctx.fillStyle=rgba(o.pred?c.pos:c.neg,a);ctx.fillRect(px0,py0,cell,cell);}
+    planeAxes(P,[0,0.5,1],"x₁","x₂",c);
+    drawLine(P,p[0],p[1],p[2],c.h1,2.6);drawLine(P,p[3],p[4],p[5],c.h2,2.6);
+    drawNormal(P,p[0],p[1],p[2],c.h1,"h₁");drawNormal(P,p[3],p[4],p[5],c.h2,"h₂");
+    IN4.forEach((x,i)=>{const o=fwd(x[0],x[1]);drawPt(P,x[0],x[1],GATES.XOR[i],c,{r:10,wrong:o.pred!==GATES.XOR[i]});
+      ctx.save();ctx.font="600 12px "+c.mono;ctx.fillStyle=c.text;ctx.textAlign=x[0]?"left":"right";ctx.textBaseline=x[1]?"bottom":"top";ctx.fillText(`(${x[0]},${x[1]})`,X(x[0])+(x[0]?15:-15),Y(x[1])+(x[1]?-10:10));ctx.restore();});
+  }
+  function drawHid(){
+    const c=C();const P=makePlane($("xCvHid"),-0.3,1.3);const{ctx,X,Y}=P;const p=st.p,t=st.t;
+    const a=(c.dark?0.22:0.15)*t;
+    if(t>0.001){halfPlanes(P,p[6],p[7],p[8],c,a);}
+    planeAxes(P,[0,0.5,1],t>0.5?"h₁ (은닉 노드 1)":"x₁ → h₁",t>0.5?"h₂ (은닉 노드 2)":"x₂ → h₂",c);
+    if(st.act==="sig"){ctx.save();ctx.strokeStyle=rgba(c.muted,0.45);ctx.lineWidth=1;
+      const gl=[-0.25,0,0.25,0.5,0.75,1,1.25];
+      const mp=(x,y)=>{const o=fwd(x,y);return[(1-t)*x+t*o.h1,(1-t)*y+t*o.h2];};
+      gl.forEach(g=>{[0,1].forEach(dir=>{ctx.beginPath();for(let k=0;k<=60;k++){const u=-0.3+1.6*k/60;const q=dir?mp(g,u):mp(u,g);const px=X(q[0]),pyy=Y(q[1]);k?ctx.lineTo(px,pyy):ctx.moveTo(px,pyy);}ctx.stroke();});});ctx.restore();}
+    if(t>0.001){ctx.save();ctx.globalAlpha=t;drawLine(P,p[6],p[7],p[8],c.acc,2.8);ctx.restore();}
+    const off=[[-1,-1],[-1,1],[1,-1],[1,1]];
+    IN4.forEach((x,i)=>{const o=fwd(x[0],x[1]);const hx=(1-t)*x[0]+t*o.h1,hy=(1-t)*x[1]+t*o.h2;
+      ctx.save();ctx.strokeStyle=rgba(c.muted,0.6);ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(X(x[0]),Y(x[1]));ctx.lineTo(X(hx),Y(hy));ctx.stroke();ctx.restore();
+      drawPt(P,hx,hy,GATES.XOR[i],c,{r:10,wrong:t>0.99&&o.pred!==GATES.XOR[i]});
+      ctx.save();ctx.font="600 12px "+c.mono;ctx.fillStyle=c.text;ctx.textAlign=off[i][0]>0?"left":"right";ctx.textBaseline=off[i][1]>0?"bottom":"top";
+      ctx.fillText(`(${x[0]},${x[1]})`,X(hx)+off[i][0]*15,Y(hy)-off[i][1]*10);ctx.restore();});
+    $("xHidTitle").textContent=t>0.99?"은닉 공간 (h₁, h₂): 이제 직선 하나로 분리":"은닉 공간으로 옮기는 중";
+  }
+  function render(){
+    const p=st.p;$("xSvg").innerHTML=netSvg();
+    [0,3,6].forEach(i=>{$("xName"+i).textContent="= "+nameOf(p[i],p[i+1],p[i+2],i===6?"h":"x");});
+    drawIn();drawHid();
+    const d=st.act==="sig"?3:0;const hv=v=>st.act==="sig"?fx(v,3):String(v);
+    let ok=0;let t=`<thead><tr><th class="c">x₁</th><th class="c">x₂</th><th class="pc-h1">z₁</th><th class="pc-h1 c">h₁</th><th class="pc-h2">z₂</th><th class="pc-h2 c">h₂</th><th>z (출력)</th><th class="c">y</th><th class="c">판정</th><th class="c">XOR 정답</th><th class="c"></th></tr></thead><tbody>`;
+    IN4.forEach((x,i)=>{const o=fwd(x[0],x[1]);const good=o.pred===GATES.XOR[i];if(good)ok++;
+      t+=`<tr><td class="c n">${x[0]}</td><td class="c n">${x[1]}</td><td class="n">${fx(o.z1,2)}</td><td class="c n">${hv(o.h1)}</td><td class="n">${fx(o.z2,2)}</td><td class="c n">${hv(o.h2)}</td><td class="n">${fx(o.zo,d?2:1)}</td><td class="c n">${hv(o.y)}</td><td class="c n">${o.pred}</td><td class="c n">${GATES.XOR[i]}</td><td class="c ${good?"pc-ok":"pc-err"}"><b>${good?"✓":"✗"}</b></td></tr>`;});
+    $("xTable").innerHTML=t+"</tbody>";
+    $("xTHint").textContent=st.act==="sig"?"시그모이드: 판정 = y > 0.5 (z > 0)":"계단: z > 0 이면 1";
+    let note;
+    if(ok===4)note=`<p class="sk-note"><b>XOR 4행 모두 정답.</b> 은닉층이 입력을 (h₁, h₂)라는 새 좌표로 옮기자, 입력 공간에서는 불가능했던 직선 분리가 은닉 공간에서 가능해졌습니다. 이것이 층을 쌓는 이유입니다.</p>`;
+    else note=`<p class="sk-note sk-note--warn"><b>${ok}/4 정답.</b> ${st.act==="sig"&&st.k<4?"시그모이드는 가중치가 작으면 출력이 0.5 근처에 몰려 계단처럼 딱 나누지 못합니다. 배율 k를 키워 보세요.":"은닉 노드 두 경계가 (0,1)·(1,0)만 가운데 띠에 남기도록 조정해 보세요. [OR · NAND → AND] 예시가 한 가지 답입니다."}</p>`;
+    $("xNote").innerHTML=note;
+  }
+  build();
+  return{render,stop,st,fwd};
+})();
+
+/* ================= 5. 선형 붕괴 ================= */
+const LN=(function(){
+  const st={L:4,act:"relu",H:8,seed:14,ghost:true,net:null};
+  function build(H,seed){
+    const r=mulberry32(seed*6151+H*31);const g=(nin)=>r2(gauss(r)*1.6/Math.sqrt(nin));const gb=()=>r2(gauss(r)*0.8);
+    const mat=(o,i)=>Array.from({length:o},()=>Array.from({length:i},()=>g(i)));const vec=o=>Array.from({length:o},gb);
+    const single={W:[[r2(gauss(r)*1.2)]],b:[gb()]};
+    const first={W:mat(H,1),b:vec(H)};const hidden=[];for(let k=0;k<8;k++)hidden.push({W:mat(H,H),b:vec(H)});
+    const head={W:mat(1,H),b:vec(1)};return{single,first,hidden,head};
+  }
+  function layers(){const n=st.net;if(st.L===1)return[n.single];return[n.first,...n.hidden.slice(0,st.L-2),n.head];}
+  const actF={none:v=>v,relu:v=>Math.max(0,v),tanh:Math.tanh};
+  function forward(x,act){const Ls=layers();let h=[x];Ls.forEach((l,k)=>{const o=l.W.map((row,i)=>row.reduce((s,w,j)=>s+w*h[j],0)+l.b[i]);h=k<Ls.length-1?o.map(actF[act]):o;});return h[0];}
+  function collapse(){const Ls=layers();let A=[1],B=[0];const steps=[];Ls.forEach(l=>{const nA=l.W.map(row=>row.reduce((s,w,j)=>s+w*A[j],0));const nB=l.W.map((row,i)=>row.reduce((s,w,j)=>s+w*B[j],0)+l.b[i]);A=nA;B=nB;steps.push({A:A.slice(),B:B.slice(),l});});return{A:A[0],B:B[0],steps};}
+  function pieces(ys,dx){let cnt=0,prev=null,lastChange=-5;const sl=[];for(let i=1;i<ys.length;i++)sl.push((ys[i]-ys[i-1])/dx);const sc=Math.max(1e-9,...sl.map(Math.abs));
+    for(let i=1;i<sl.length;i++){if(Math.abs(sl[i]-sl[i-1])>1e-7*sc+1e-12){if(i-lastChange>1)cnt++;lastChange=i;}}void prev;return cnt+1;}
+  function chart(){
+    const host=$("zChart");const W=Math.max(280,Math.round(host.clientWidth||520)),H=320,mL=50,mR=12,mT=12,mB=30,pw=W-mL-mR,ph=H-mT-mB;
+    const N=600,xs=[],ys=[],gs=[];for(let i=0;i<=N;i++){const x=-3+6*i/N;xs.push(x);ys.push(forward(x,st.act));if(st.act!=="none"&&st.ghost)gs.push(forward(x,"none"));}
+    let lo=Math.min(...ys),hi=Math.max(...ys);
+    if(hi-lo<1e-6){lo-=1;hi+=1;}const padv=(hi-lo)*0.08;lo-=padv;hi+=padv;
+    const X=x=>mL+(x+3)/6*pw,Y=y=>Math.max(-5000,Math.min(5000,mT+(1-(y-lo)/(hi-lo))*ph));
+    const nice=(span)=>{const raw=span/5,p=Math.pow(10,Math.floor(Math.log10(raw))),m=raw/p;return(m<1.5?1:m<3.5?2:m<7.5?5:10)*p;};
+    const stp=nice(hi-lo);let s=`<svg viewBox="0 0 ${W} ${H}" aria-hidden="true">`;
+    const dec=stp>=1?0:Math.min(4,Math.ceil(-Math.log10(stp)));
+    for(let v=Math.ceil(lo/stp)*stp;v<=hi;v+=stp){const vv=Math.abs(v)<stp/1e6?0:v;s+=`<line x1="${mL}" x2="${mL+pw}" y1="${Y(vv)}" y2="${Y(vv)}" stroke="${vv===0?"var(--line-strong)":"var(--line)"}"/><text x="${mL-6}" y="${Y(vv)+4}" text-anchor="end" font-size="11" class="mono" fill="var(--muted)">${fx(vv,dec)}</text>`;}
+    [-3,-2,-1,0,1,2,3].forEach(t=>{s+=`<line x1="${X(t)}" x2="${X(t)}" y1="${mT}" y2="${mT+ph}" stroke="${t===0?"var(--line-strong)":"var(--line)"}"/><text x="${X(t)}" y="${H-10}" text-anchor="middle" font-size="11" class="mono" fill="var(--muted)">${t<0?"−"+(-t):t}</text>`;});
+    s+=`<text x="${mL+pw}" y="${H-10}" dy="-14" text-anchor="end" font-size="11" font-weight="700" fill="var(--muted)">x</text>`;
+    const path=a=>a.map((y,i)=>(i?"L":"M")+X(xs[i]).toFixed(1)+" "+Y(y).toFixed(1)).join("");
+    if(gs.length)s+=`<defs><clipPath id="zClip"><rect x="${mL}" y="${mT}" width="${pw}" height="${ph}"/></clipPath></defs><path d="${path(gs)}" clip-path="url(#zClip)" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="6 5"/>`;
+    s+=`<path d="${path(ys)}" fill="none" stroke="var(--sk-accent)" stroke-width="2.8" stroke-linejoin="round"/>`;
+    host.innerHTML=s+"</svg>";
+    return{ys,dx:6/N};
+  }
+  function render(){
+    const{ys,dx}=chart();const col=collapse();const Ls=layers();
+    let params=0;Ls.forEach(l=>{params+=l.W.length*l.W[0].length+l.b.length;});
+    const pc=pieces(ys,dx);
+    const shape=st.act==="none"?"직선 1개":st.act==="relu"?`꺾인 선 (조각 ${pc}개)`:"매끄러운 곡선";
+    $("zChartTitle").textContent=`출력 함수 y = f(x) · ${st.L}층 · ${st.act==="none"?"활성 없음":st.act==="relu"?"ReLU":"tanh"}`;
+    $("zStats").innerHTML=`<div class="sk-stat"><b>${st.L}</b><span>가중치 층 수</span></div><div class="sk-stat"><b>${params}</b><span>파라미터 수</span></div><div class="sk-stat"><b style="font-size:16px">${shape}</b><span>출력 모양</span></div><div class="sk-stat"><b style="font-size:16px">y = ${fx(col.A,3)}x${fplus(col.B,3)}</b><span>활성 없음이면 이 한 줄과 같음</span></div>`;
+    let e="";
+    if(st.L===1){const l=Ls[0];e=`1층뿐: y = a₁x + b₁ = ${fx(l.W[0][0],2)}x${fplus(l.b[0],2)}\n층 수를 2 이상으로 올려 보세요.`;}
+    else if(st.H===1){
+      const a1=Ls[0].W[0][0],b1=Ls[0].b[0],a2=Ls[1].W[0][0],b2=Ls[1].b[0];
+      e=`지금 망의 1층·2층 (폭 1이라 a, b가 숫자 하나):\na₁ = ${fx(a1)}, b₁ = ${fx(b1)}, a₂ = ${fx(a2)}, b₂ = ${fx(b2)}\n`+
+        `f₂(f₁(x)) = (${fp(a2)}×${fp(a1)})x + (${fp(a2)}×${fp(b1)} + ${fp(b2)})\n          = <b>${fx(snap(a2*a1),4)}</b>x + <b>(${fx(snap(a2*b1+b2),4)})</b>\n\n층을 하나씩 합치기 (A·x + B):`;
+      col.steps.forEach((s,k)=>{e+=`\n  ${k+1}층까지: A = ${fx(s.A[0],4)}, B = ${fx(s.B[0],4)}`;});
+    }else if(st.L===2){
+      const W1=Ls[0].W.map(r=>r[0]),b1=Ls[0].b,W2=Ls[1].W[0],b2=Ls[1].b[0];
+      const t1=W2.map((w,j)=>`${fp(w)}×${fp(W1[j])}`).join(" + "),t2=W2.map((w,j)=>`${fp(w)}×${fp(b1[j])}`).join(" + ");
+      e=`폭 ${st.H}: a₁ = W₁ (${st.H}×1), a₂ = W₂ (1×${st.H}) → 곱하면 숫자 하나\n`+
+        `a₂a₁ = ${t1}\n     = <b>${fx(col.A,4)}</b>\n`+
+        `a₂b₁ + b₂ = ${t2} + ${fp(b2)}\n          = <b>${fx(col.B,4)}</b>`;
+    }else{
+      e=`폭 ${st.H}, ${st.L}층: a는 행렬이지만 곱하면 결국\nA = W${sub(st.L)}⋯W₂W₁ = <b>${fx(col.A,4)}</b>\nB = <b>${fx(col.B,4)}</b>  (b들이 뒤 층 W를 거쳐 모인 값)\n\n층을 하나씩 합치기 (A·x + B, 벡터의 크기만):`;
+      col.steps.forEach((s,k)=>{const nA=Math.hypot(...s.A),nB=Math.hypot(...s.B);e+=`\n  ${k+1}층까지: |A| = ${fx(nA,3)}, |B| = ${fx(nB,3)}`;});
+      e+=`\n\n폭을 1로 바꾸면 층마다 숫자를 그대로 대입해 볼 수 있습니다.`;
+    }
+    const x0=2,netv=forward(x0,"none"),linv=col.A*x0+col.B;
+    e+=`\n\n검산 x = 2 (활성 없음): 층별 계산 = ${fx(netv,6)},  A·2 + B = ${fx(linv,6)}`;
+    $("zExpand").innerHTML=e;
+    let note;
+    if(st.act==="none")note=`<p class="sk-note"><b>활성 함수가 없으면 ${st.L}층이 y = ${fx(col.A,3)}x${fplus(col.B,3)} 한 줄과 똑같습니다.</b> 층 수 슬라이더를 10까지 올려도 그래프는 직선 하나입니다. 파라미터 ${params}개가 결국 숫자 2개(A, B)로 줄어드는 셈입니다.</p>`;
+    else if(st.act==="relu")note=`<p class="sk-note"><b>ReLU는 0에서 꺾이는 함수라 층을 지날 때마다 꺾이는 곳이 생깁니다.</b> 지금 출력은 조각 ${pc}개로 된 꺾은선입니다 (−3 ≤ x ≤ 3 범위). 점선(같은 가중치, 활성 없음)은 여전히 직선입니다.</p>`;
+    else note=`<p class="sk-note"><b>tanh는 매끄럽게 휘는 함수라 출력이 곡선이 됩니다.</b> 점선(같은 가중치, 활성 없음)은 여전히 직선입니다. 층이 깊어질수록 굴곡이 복잡해집니다.</p>`;
+    $("zNote").innerHTML=note;
+  }
+  const sub=n=>String(n).split("").map(ch=>"₀₁₂₃₄₅₆₇₈₉"[+ch]).join("");
+  function init(){
+    bindSlider("zL",v=>String(v),v=>{st.L=v;render();});
+    segInit($("zAct"),v=>{st.act=v;render();});
+    segInit($("zH"),v=>{st.H=+v;st.net=build(st.H,st.seed);render();});
+    $("zSeed").addEventListener("click",()=>{st.seed=st.seed%97+1;st.net=build(st.H,st.seed);$("zSeedV").textContent="seed "+st.seed;render();});
+    $("zGhost").addEventListener("change",e=>{st.ghost=e.target.checked;render();});
+    st.net=build(st.H,st.seed);$("zSeedV").textContent="seed "+st.seed;
+  }
+  init();
+  return{render,st,forward,collapse};
+})();
+
+/* ================= 6. 코드 ================= */
+const CD=(function(){
+  let lang="np";
+  function arr(pts){if(!pts.length)return{X:"np.empty((0, 2))",y:"np.array([], dtype=int)"};
+    let X="np.array([\n";pts.forEach((p,i)=>{X+=(i%4===0?"    ":"")+`[${py(p.x1)}, ${py(p.x2)}],`+(i%4===3||i===pts.length-1?"\n":" ");});X+="])";
+    return{X,y:"np.array(["+pts.map(p=>p.y).join(", ")+"])"};}
+  function gen(){
+    const L=LR.st,N=ND.st,Xs=XR.st;const pts=L.pts;const{X,y}=arr(pts);
+    const init=L.init==="zero"?[0,0,0]:(()=>{const T=LR.newT();return[T.w1,T.w2,T.b];})();
+    const R=LR.runAll(pts,L.eta,L.maxEp);const dg=({"0.01":4,"0.05":4,"0.1":3,"0.5":3,"1":2})[String(L.eta)]||3;
+    const res=!pts.length?"점이 없음":R.conv?`에폭 ${R.errs.length}에서 수렴 (총 갱신 ${R.total}회) → w = [${fx(R.w1,dg)}, ${fx(R.w2,dg)}], b = ${fx(R.b,dg)}`.replace(/−/g,"-"):`${L.maxEp} 에폭 동안 수렴하지 않음 (마지막 에폭 갱신 ${R.errs[R.errs.length-1]}회)`;
+    const kindName={sep:"분리 가능",narrow:"여백 좁음",overlap:"분리 불가",empty:"빈 평면"}[L.kind];
+    const kv=[["데이터 (화면 3)",`${kindName}${L.kind==="empty"?"":", seed "+L.seed} · ${pts.length}개`],["학습률 η · 초기값 · 최대 에폭",`${L.eta} · ${L.init==="zero"?"모두 0":"무작위 ("+init.map(v=>fx(v)).join(", ")+")"} · ${L.maxEp}`],["노드 (화면 1)",`w = (${N.w.map(v=>fx(v,1)).join(", ")}), b = ${fx(N.b,1)}, ${ACT[N.act].name}`],["XOR 망 (화면 4)",`${Xs.act==="sig"?"시그모이드 ×"+Xs.k:"계단"}`]];
+    $("cKv").innerHTML=kv.map(r=>`<dt>${r[0]}</dt><dd>${esc(r[1])}</dd>`).join("");
+    let code="",note="";
+    if(lang==="np"){
+      code=`import numpy as np
+
+# 화면 3의 데이터: x₁ 수축기 혈압, x₂ 공복 혈당 (표준화) · y = 1 고위험, 0 저위험
+X = ${X}
+y = ${y}
+
+eta = ${L.eta}                         # 학습률 η
+w = np.array([${py(init[0])}, ${py(init[1])}])            # 초기 가중치
+b = ${py(init[2])}                          # 초기 bias
+max_epochs = ${L.maxEp}
+
+def step(z):
+    return 1 if z > 0 else 0          # 계단 함수: z > 0 이면 1
+
+for epoch in range(1, max_epochs + 1):
+    errors = 0
+    for xi, yi in zip(X, y):          # 섞지 않고 순서대로 한 점씩
+        z = w[0] * xi[0] + w[1] * xi[1] + b
+        y_hat = step(z)
+        update = eta * (yi - y_hat)   # 맞히면 0 → 그대로
+        if update != 0:
+            w = w + update * xi       # w ← w + η(y − ŷ)x
+            b = b + update            # b ← b + η(y − ŷ)
+            errors += 1
+    print(f"에폭 {epoch}: 갱신 {errors}회, w = {np.round(w, ${dg})}, b = {b:.${dg}f}")
+    if errors == 0:
+        print("수렴: 한 에폭 동안 틀린 점이 없음")
+        break
+
+# 이 화면의 결과: ${res}
+`;
+      note="시뮬레이터와 같은 순서·같은 규칙이라 결과 숫자가 화면과 똑같이 나옵니다.";
+    }else if(lang==="sk"){
+      const ci=L.init==="zero"?"":`,\n        coef_init=np.array([[${py(init[0])}, ${py(init[1])}]]),\n        intercept_init=np.array([${py(init[2])}])`;
+      code=`import numpy as np
+from sklearn.linear_model import Perceptron
+
+X = ${X}
+y = ${y}
+
+clf = Perceptron(
+    eta0=${L.eta},          # 학습률 η
+    max_iter=${L.maxEp},        # 최대 에폭
+    shuffle=False,      # 화면처럼 순서대로
+    tol=None,           # 손실 개선 기준으로 일찍 멈추지 않음
+)
+clf.fit(X, y${ci})
+
+print("w =", clf.coef_[0], " b =", clf.intercept_[0])
+print("훈련 정확도 =", clf.score(X, y))
+print("판정:", clf.predict([[1.0, 1.5]]))   # 새 환자 한 명
+
+# 참고 · 화면(numpy) 결과: ${res}
+`;
+      note="sklearn Perceptron은 z = 0 인 점도 '틀림'으로 보고 갱신합니다(화면은 z > 0 이면 1). 그래서 초기값이 0일 때 첫 샘플부터 달라질 수 있어, 최종 w·b 숫자는 화면과 다를 수 있습니다. 선형 분리 가능한 데이터면 둘 다 정확도 1.0에 도달합니다.";
+    }else{
+      const nk=N.act==="step"?"None":`"${N.act}"`;
+      const m=Xs.act==="sig"?Xs.k:10;const p=Xs.p.map(v=>v*m);const q=v=>py(Math.round(v*1000)/1000);
+      const nodeOut=(()=>{const z=snap(N.w[0]*N.x[0]+N.w[1]*N.x[1]+N.w[2]*N.x[2]+N.b);return N.act==="step"?`z = ${fx(z,2).replace("−","-")} → z > 0 이면 1 → ${z>0?1:0}`:`${fx(ACT[N.act].f(z),3).replace("−","-")}`;})();
+      code=`import numpy as np
+from tensorflow import keras
+
+# (1) 노드 하나 = Dense(1)  ·  화면 1의 가중치를 그대로 넣기
+node = keras.Sequential([
+    keras.Input(shape=(3,)),                      # 발열, 기침, 호흡곤란
+    keras.layers.Dense(1, activation=${nk}),${N.act==="step"?"      # 계단 함수는 Keras에 없어 z를 받고 직접 자름":""}
+])
+node.layers[0].set_weights([np.array([[${N.w.map(py).join("], [")}]]), np.array([${py(N.b)}])])
+out = node.predict(np.array([[${N.x.map(py).join(", ")}]]), verbose=0)
+print(out${N.act==="step"?" > 0":""})        # 화면 값: ${nodeOut}
+
+# (2) 화면 3의 데이터로 학습: Dense(1, sigmoid) = 로지스틱 회귀
+X = ${X}
+y = ${y}
+model = keras.Sequential([
+    keras.Input(shape=(2,)),
+    keras.layers.Dense(1, activation="sigmoid"),
+])
+model.compile(optimizer=keras.optimizers.SGD(learning_rate=${L.eta}),
+              loss="binary_crossentropy", metrics=["accuracy"])
+model.fit(X, y, epochs=${L.maxEp*4}, verbose=0)
+w, b = model.layers[0].get_weights()
+print("w =", w.ravel(), " b =", b, " 정확도 =", model.evaluate(X, y, verbose=0)[1])
+
+# (3) XOR: 은닉 2노드 + 출력 1노드 · 화면 4의 가중치${Xs.act==="sig"?" × k="+Xs.k:" × 10 (계단 대신 시그모이드를 쓰므로 크게)"}
+mlp = keras.Sequential([
+    keras.Input(shape=(2,)),
+    keras.layers.Dense(2, activation="sigmoid"),  # h₁, h₂
+    keras.layers.Dense(1, activation="sigmoid"),  # 출력
+])
+mlp.layers[0].set_weights([np.array([[${q(p[0])}, ${q(p[3])}],     # x₁ → (h₁, h₂)
+                                     [${q(p[1])}, ${q(p[4])}]]),    # x₂ → (h₁, h₂)
+                           np.array([${q(p[2])}, ${q(p[5])}])])
+mlp.layers[1].set_weights([np.array([[${q(p[6])}], [${q(p[7])}]]), np.array([${q(p[8])}])])
+X_xor = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
+print((mlp.predict(X_xor, verbose=0) > 0.5).astype(int).ravel())   # 기대: [0 1 1 0]
+`;
+      note="(1) Keras에는 계단 함수가 없어 activation=None으로 z를 받아 직접 자릅니다. (2) 원 퍼셉트론 규칙이 아니라 교차 엔트로피를 줄이는 경사 하강이라, 분리 불가능한 데이터에서도 멈추지 않고 가장 나은 경계에 다가갑니다. (3) 가중치를 크게 하면 시그모이드가 계단처럼 동작합니다.";
+    }
+    $("cCode").textContent=code;$("cNote").textContent=note;
+  }
+  segInit($("cLang"),v=>{lang=v;gen();});
+  $("cCopy").addEventListener("click",()=>{const txt=$("cCode").textContent;const done=()=>{$("cCopied").textContent="복사됨";setTimeout(()=>{$("cCopied").textContent="";},1600);};
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(done,()=>fallback(txt,done));else fallback(txt,done);});
+  function fallback(txt,done){const ta=document.createElement("textarea");ta.value=txt;ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();try{document.execCommand("copy");}catch(e){}ta.remove();done();}
+  return{render:gen};
+})();
+
+/* ================= 시작 ================= */
+const start=(location.hash||"").slice(1);
+showTab(TABS.includes(start)?start:"node");
+function redraw(){render(curTab);}
+new MutationObserver(redraw).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",redraw);}catch(e){}
+let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(redraw,150);});
+})();
+</script>
+</body>
+</html>

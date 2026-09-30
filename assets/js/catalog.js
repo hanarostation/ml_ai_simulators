@@ -24,6 +24,109 @@ window.DS_CATEGORIES = [
 ];
 
 window.DS_SIMULATORS = [
+  /* ---------- 머신러닝 ---------- */
+  {
+    id: "linear-regression",
+    category: "ml",
+    href: "simulators/ml/linear-regression.html",
+    title: "선형회귀 (최소제곱법 · 경사하강법)",
+    summary: "잔차 제곱을 실제 정사각형으로 그려 최소제곱 직선을 찾고, 손실 곡면 위에서 경사하강법이 같은 답에 도달하는 과정을 학습률·배치·스케일링을 바꿔 가며 확인합니다.",
+    tags: ["선형회귀", "최소제곱법", "경사하강법", "특성 스케일링"],
+    glyph: "linreg"
+  },
+  {
+    id: "logistic-regression",
+    category: "ml",
+    href: "simulators/ml/logistic-regression.html",
+    title: "로지스틱 회귀",
+    summary: "시그모이드로 질환 확률을 모델링하고, 오즈·계수 해석, 로그손실과 경사하강법, 결정 경계와 L2 규제, 임계값·ROC까지 검진 데이터로 직접 조작합니다.",
+    tags: ["시그모이드", "로그손실", "결정 경계", "ROC · AUC"],
+    glyph: "logreg"
+  },
+  {
+    id: "decision-tree",
+    category: "ml",
+    href: "simulators/ml/decision-tree.html",
+    title: "의사결정나무 (분류 · 회귀)",
+    summary: "지니·엔트로피와 MSE 감소로 최적 기준값을 찾고, 나무가 한 노드씩 자라며 영역과 계단 예측선이 생기는 과정, 깊이에 따른 과적합을 분류·회귀 파트로 나눠 확인합니다.",
+    tags: ["의사결정나무", "지니 불순도", "회귀 트리", "과적합"],
+    glyph: "tree"
+  },
+  {
+    id: "random-forest",
+    category: "ml",
+    href: "simulators/ml/random-forest.html",
+    title: "랜덤포레스트",
+    summary: "부트스트랩과 노드별 특성 무작위 선택으로 서로 다른 트리를 키우고, 투표로 경계가 매끄러워지는 과정과 OOB 오차·특성 중요도를 확인합니다.",
+    tags: ["앙상블", "배깅", "OOB", "특성 중요도"],
+    glyph: "forest"
+  },
+  {
+    id: "gradient-boosting",
+    category: "ml",
+    href: "simulators/ml/gradient-boosting.html",
+    title: "그래디언트 부스팅",
+    summary: "얕은 트리를 한 그루씩 더하며 잔차(음의 기울기)를 이어서 맞추는 과정을 회귀·분류로 따라가고, 학습률·트리 수에 따른 과적합과 조기 종료, 랜덤포레스트와의 차이를 확인합니다.",
+    tags: ["앙상블", "부스팅", "잔차", "조기 종료"],
+    glyph: "boost"
+  },
+  {
+    id: "imbalanced-sampling",
+    category: "ml",
+    href: "simulators/ml/imbalanced-sampling.html",
+    title: "불균형 데이터 샘플링",
+    summary: "SMOTE·ADASYN·Tomek·NearMiss 등 Over / Under / Combine 샘플링이 점을 어떻게 만들고 지우는지 한 단계씩 보고, 원본 분포 검증 세트에서 재현율·F1 변화를 비교합니다.",
+    tags: ["불균형 데이터", "SMOTE", "imbalanced-learn", "데이터 누수"],
+    glyph: "imb"
+  },
+  {
+    id: "feature-pipeline",
+    category: "ml",
+    href: "simulators/ml/feature-pipeline.html",
+    title: "특성공학 파이프라인",
+    summary: "결측 대치 → 스케일링·인코딩 → 특성 선택 → 모델이 환자 표에서 단계마다 어떻게 바뀌는지 따라가고, fit·transform의 차이와 데이터 누수, GridSearchCV를 직접 돌려 봅니다.",
+    tags: ["Pipeline", "ColumnTransformer", "데이터 누수", "GridSearchCV"],
+    glyph: "pipe"
+  },
+
+  /* ---------- 신경망 ---------- */
+  {
+    id: "perceptron",
+    category: "nn",
+    href: "simulators/nn/perceptron.html",
+    title: "퍼셉트론",
+    summary: "노드 하나의 가중합과 활성 함수, 논리 게이트, 틀린 점마다 경계가 움직이는 학습 규칙을 따라가고, XOR을 은닉층으로 푸는 과정과 선형 붕괴를 확인합니다.",
+    tags: ["퍼셉트론", "학습 규칙", "XOR · MLP", "활성 함수"],
+    glyph: "perceptron"
+  },
+  {
+    id: "backpropagation",
+    category: "nn",
+    href: "simulators/nn/backpropagation.html",
+    title: "순전파 · 역전파 가중치 갱신",
+    summary: "작은 신경망의 순전파·손실·역전파(연쇄 법칙)·가중치 갱신을 숫자 하나하나 따라가고, 학습 루프, 기울기 소실·폭발, 계산 그래프까지 조작해 봅니다.",
+    tags: ["역전파", "연쇄 법칙", "학습 루프", "기울기 소실"],
+    glyph: "backprop"
+  },
+  {
+    id: "nn-playground",
+    category: "nn",
+    href: "simulators/nn/nn-playground.html",
+    title: "신경망 구조 · 하이퍼파라미터 실험실",
+    summary: "노드·층·활성 함수·학습률·배치·L2를 바꿔 학습시키고 손실·정확도·파라미터 수·시간을 기록해 비교합니다. 한 변수만 바꾸는 자동 스윕도 지원합니다.",
+    tags: ["하이퍼파라미터", "과적합", "활성 함수", "성능 비교"],
+    glyph: "playground"
+  },
+  {
+    id: "nn-optimization",
+    category: "nn",
+    href: "simulators/nn/nn-optimization.html",
+    title: "신경망 최적화 기법",
+    summary: "가중치 초기화, 배치 정규화, 드롭아웃, 옵티마이저, Gradient Clipping, 조기 종료·L2 규제를 켜고 끄며 활성값 분포·기울기·손실 곡선이 어떻게 달라지는지 확인합니다.",
+    tags: ["배치 정규화", "드롭아웃", "옵티마이저", "가중치 초기화"],
+    glyph: "optim"
+  },
+
   /* ---------- 컴퓨터 비전 ---------- */
   {
     id: "cnn-conv-pooling",

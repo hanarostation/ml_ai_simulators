@@ -1,0 +1,1081 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>로지스틱 회귀 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20260930c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20260930c">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 클래스 0 파랑 · 클래스 1 주황 · 모델(시그모이드·경계·경로) 보라 · 한계(선형회귀·오분류) 빨강 · 최적점 초록 · 검증 청록 */
+:root{ --sk-accent: var(--cat-ml);
+  --c0:#2563EB; --c1:#EA580C; --mdl:#7C3AED; --lim:#DC2626; --ok:#16A34A; --val:#0D9488; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --c0:#6AA5FF; --c1:#FF914D; --mdl:#B294FF; --lim:#F87171; --ok:#4ADE80; --val:#33D1BD; } }
+:root[data-theme="dark"]{ --c0:#6AA5FF; --c1:#FF914D; --mdl:#B294FF; --lim:#F87171; --ok:#4ADE80; --val:#33D1BD; }
+
+.lg-main{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:16px;align-items:start}
+.lg-main--r{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}
+@media (max-width:1000px){.lg-main,.lg-main--r{grid-template-columns:minmax(0,1fr)}}
+.lg-stack{display:flex;flex-direction:column;gap:16px;min-width:0}
+.lg-cv{display:block;width:100%;border-radius:10px;touch-action:manipulation}
+.lg-cv--wide{aspect-ratio:16/9}
+.lg-cv--bars{aspect-ratio:16/5;cursor:pointer}
+.lg-cv--land{aspect-ratio:5/4;cursor:crosshair}
+.lg-cv--2d{aspect-ratio:5/4;cursor:crosshair}
+@media (max-width:600px){.lg-cv--wide{aspect-ratio:5/4}.lg-cv--bars{aspect-ratio:16/8}.lg-cv--2d{aspect-ratio:1/1}}
+
+.lg-dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.lg-ln{display:inline-block;width:18px;height:3px;border-radius:2px;margin-right:5px;vertical-align:3px}
+.lg-ln.dash{background:repeating-linear-gradient(90deg,currentColor 0 5px,transparent 5px 8px)!important;height:2px}
+.lg-f{white-space:pre-wrap}
+.lg-f.lg-pre{white-space:pre}
+.lg-f .m{color:var(--mdl);font-weight:600} .lg-f .o{color:var(--c1);font-weight:600} .lg-f .b{color:var(--c0);font-weight:600}
+.lg-f .r{color:var(--lim);font-weight:600} .lg-f .g{color:var(--ok);font-weight:600} .lg-f .c{color:var(--muted)}
+.lg-f b{color:var(--ink)}
+.lg-table td.bad{color:var(--lim);font-weight:700}
+.lg-table tr.cur td{background:color-mix(in srgb,var(--sk-accent) 12%,var(--surface))}
+.lg-sub{font-size:12.5px;color:var(--muted);margin:0}
+
+/* SVG 차트 */
+.lg-chart{width:100%;min-width:0}
+.lg-chart svg{display:block;width:100%;height:auto}
+.lg-chart .gl{stroke:var(--line);stroke-width:1}
+.lg-chart .gl0{stroke:var(--line-strong);stroke-width:1.2}
+.lg-chart .ax{fill:var(--muted);font-size:11px;font-family:var(--mono)}
+.lg-chart .axl{fill:var(--muted);font-size:11.5px;font-family:var(--sans);font-weight:600}
+.lg-chart .ref{stroke:var(--ok);stroke-dasharray:5 4;stroke-width:1.4}
+.lg-chart .reft{fill:var(--ok);font-size:11px;font-family:var(--sans);font-weight:700}
+.lg-chart .lbl{font-size:11.5px;font-family:var(--sans);font-weight:700}
+.lg-chart .diag{stroke:var(--faint);stroke-dasharray:4 4;stroke-width:1.2}
+.lg-chart .click{cursor:crosshair}
+.lg-chart .tl{stroke:var(--ink);stroke-width:2}
+
+/* 혼동행렬 */
+.lg-cm{display:grid;grid-template-columns:auto repeat(2,minmax(0,1fr));gap:4px;font-size:13px;max-width:380px;width:100%}
+.lg-cm .h{color:var(--muted);font-weight:700;font-size:12px;display:grid;place-items:center;padding:2px 6px;text-align:center;line-height:1.3}
+.lg-cm .c{border-radius:9px;padding:7px 6px;display:flex;flex-direction:column;align-items:center;background:var(--surface-2);border:1.5px solid transparent;min-width:0}
+.lg-cm .c b{font-family:var(--mono);font-size:21px;color:var(--ink);line-height:1.2;font-variant-numeric:tabular-nums}
+.lg-cm .c span{font-size:11.5px;color:var(--muted);font-weight:600;text-align:center}
+.lg-cm .c.tp{border-color:var(--c1)} .lg-cm .c.tn{border-color:var(--c0)}
+.lg-cm .c.fp,.lg-cm .c.fn{background:color-mix(in srgb,var(--lim) 9%,var(--surface));border-color:color-mix(in srgb,var(--lim) 45%,var(--surface))}
+
+/* 계수 막대 */
+.lg-coef{display:grid;grid-template-columns:auto minmax(0,1fr) 70px;gap:6px 10px;align-items:center;font-size:13px}
+.lg-coef .nm{color:var(--muted);font-weight:600;white-space:nowrap}
+.lg-coef .tr{height:14px;background:var(--surface-2);border-radius:4px;position:relative;overflow:hidden}
+.lg-coef .tr .z{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line-strong)}
+.lg-coef .tr .fl{position:absolute;top:0;bottom:0;background:var(--mdl);border-radius:3px}
+.lg-coef .v{font-family:var(--mono);text-align:right;color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* 코드 */
+.lg-code{position:relative}
+.lg-code pre{margin:0;font-family:var(--mono);font-size:12.5px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow:auto;color:var(--ink);max-height:640px}
+.lg-code pre .cm{color:var(--muted)}
+.lg-code pre .kw{color:var(--sk-accent);font-weight:600}
+.lg-code pre .st{color:var(--val)}
+.lg-copy{position:absolute;top:8px;right:8px}
+.lg-kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--ink)}
+.lg-warn{color:var(--lim);font-weight:700}
+.lg-row{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.sk-stat.lg-hl{border-color:var(--sk-accent)}
+@media (max-width:520px){
+  .sk-slider{min-width:0;width:100%}
+  .sk-controls{gap:10px 12px}
+  .lg-coef{grid-template-columns:auto minmax(0,1fr) 60px}
+  .sk-stat{min-width:0;flex:1 1 30%}
+  .sk-seg button{padding:6px 8px}
+}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)" aria-current="page">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">로지스틱 회귀 시뮬레이터</h1>
+      <p class="ds-hero__lede">직선 대신 S자 시그모이드로 '질환일 확률'을 모델링하는 로지스틱 회귀를 혈당·나이·BMI 검진 데이터로 직접 조작합니다. 오즈와 계수 해석, 로그손실과 경사하강법, 결정 경계와 L2 규제, 임계값·ROC까지 한 흐름으로 따라갑니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button type="button" class="sk-tab" role="tab" id="tab-sig" aria-controls="pane-sig" aria-selected="true"><span class="sk-num">1</span>왜 직선이 아니라 S자인가</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-loss" aria-controls="pane-loss" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>로그손실과 학습</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-2d" aria-controls="pane-2d" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>2차원 결정 경계</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-roc" aria-controls="pane-roc" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>임계값과 ROC</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>코드</button>
+  </nav>
+
+  <!-- ================= 1. 왜 S자인가 ================= -->
+  <section id="pane-sig" role="tabpanel" aria-labelledby="tab-sig">
+    <div class="lg-main">
+      <div class="sk-card">
+        <div class="sk-head"><h2>공복혈당으로 당뇨 여부 예측하기</h2>
+          <div class="sk-legend"><span><i class="lg-dot" style="background:var(--c0)"></i>당뇨 아님 (y = 0)</span><span><i class="lg-dot" style="background:var(--c1)"></i>당뇨 (y = 1)</span><span><i class="lg-ln" style="background:var(--mdl)"></i>시그모이드 σ(z)</span><span id="lgOlsLeg"><i class="lg-ln" style="background:var(--lim)"></i>선형회귀 직선</span></div>
+        </div>
+        <canvas id="c1" class="lg-cv lg-cv--wide" aria-label="공복혈당(가로축)과 당뇨 여부 0/1(세로축) 산점도 위에 시그모이드 곡선과 선형회귀 직선을 그린 그래프"></canvas>
+        <div class="sk-controls">
+          <div class="sk-slider" style="min-width:220px"><div class="sk-sl-head"><label for="s1x">살펴볼 혈당 x</label><b id="s1xv">140</b></div><input type="range" id="s1x" min="60" max="240" step="1" value="140"></div>
+          <label class="sk-check"><input type="checkbox" id="s1ols" checked>선형회귀 직선 보기</label>
+          <button type="button" class="sk-btn sk-btn--sm" id="s1seed">다른 환자 40명</button>
+          <span class="sk-hint" id="s1seedv"></span>
+        </div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>z = b₀ + b₁·x 를 조절</h2><span class="sk-hint">b₀: 곡선 위치 · b₁: 가파름</span></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="s1b0">절편 b₀</label><b id="s1b0v">−4.0</b></div><input type="range" id="s1b0" min="-25" max="5" step="0.1" value="-4"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="s1b1">기울기 b₁ (혈당 1당)</label><b id="s1b1v">0.030</b></div><input type="range" id="s1b1" min="-0.05" max="0.25" step="0.001" value="0.03"></div>
+        <div class="sk-controls">
+          <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="s1mle">최대우도 해로 맞추기</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="s1reset">처음 값</button>
+        </div>
+        <div class="sk-formula lg-f" id="s1f" aria-live="polite"></div>
+        <p class="sk-note" id="s1note"></p>
+        <div class="sk-stats" id="s1stats"></div>
+      </div>
+    </div>
+    <div class="sk-grid2" style="margin-top:16px">
+      <div class="sk-card">
+        <div class="sk-head"><h2>확률 · 오즈 · 로그 오즈, 세 가지 눈금</h2><span class="sk-hint">현재 b₀, b₁ 기준</span></div>
+        <div class="sk-scroll"><table class="sk-table lg-table" id="s1tab"></table></div>
+        <p class="lg-sub">빨간 숫자: 선형회귀 직선이 확률로는 불가능한 값(0 미만, 1 초과)을 내놓은 곳</p>
+      </div>
+      <div class="sk-card">
+        <h2>직선을 그대로 쓰면 생기는 문제</h2>
+        <div class="sk-formula lg-f" id="s1ols2"></div>
+        <p class="sk-lead">선형회귀 ŷ = a + b·x 는 x가 커지면 끝없이 커지고 작아지면 음수가 됩니다. 확률은 0과 1 사이여야 하므로, 직선 z 를 시그모이드에 넣어 0~1로 눌러 담습니다. 이때 z 는 사라지지 않고 <b>로그 오즈</b>로 남습니다.</p>
+        <div class="sk-formula lg-f lg-pre">σ(z) = 1 / (1 + e<sup>−z</sup>)      z → +∞ 이면 1,  z → −∞ 이면 0,  z = 0 이면 0.5
+오즈 = p / (1 − p)                   p = 0.8 → 오즈 4 (4 : 1)
+ln(오즈) = z = b₀ + b₁·x             로그 오즈가 x에 대해 '직선'
+x가 1 늘면  z는 b₁ 늘고  오즈는 e<sup>b₁</sup>배</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 2. 로그손실과 학습 ================= -->
+  <section id="pane-loss" role="tabpanel" aria-labelledby="tab-loss" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>경사하강법으로 w₀, w₁ 찾기</h2><span class="sk-hint">1번 화면과 같은 40명 · 혈당은 표준화 x̃ = (x − 평균)/표준편차 · 키보드 <span class="lg-kbd">→</span> 한 스텝</span></div>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--sm" id="g2first">처음 (w = 시작점)</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="g2step">한 스텝</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="g2x10">10 스텝</button>
+          <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="g2play">재생</button>
+        </div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="g2eta">학습률 η</label><b id="g2etav">0.50</b></div><input type="range" id="g2eta" min="0.05" max="6" step="0.05" value="0.5"></div>
+        <div class="sk-slider" style="min-width:150px"><div class="sk-sl-head"><label for="g2spd">속도 (스텝/초)</label><b id="g2spdv">8</b></div><input type="range" id="g2spd" min="1" max="60" step="1" value="8"></div>
+      </div>
+      <div class="sk-stats" id="g2stats"></div>
+    </div>
+    <div class="lg-main" style="margin-top:16px">
+      <div class="lg-stack">
+        <div class="sk-card">
+          <div class="sk-head"><h3>현재 곡선과 점별 로그손실</h3><div class="sk-legend"><span><i class="lg-dot" style="background:var(--c0)"></i>y = 0</span><span><i class="lg-dot" style="background:var(--c1)"></i>y = 1</span><span><i class="lg-ln" style="background:var(--mdl)"></i>현재 σ(w₀ + w₁x̃)</span></div></div>
+          <canvas id="c2a" class="lg-cv lg-cv--wide" aria-label="혈당과 당뇨 여부 산점도 위의 현재 시그모이드 곡선"></canvas>
+          <canvas id="c2b" class="lg-cv lg-cv--bars" aria-label="환자별 로그손실 막대그래프, 혈당 순서. 막대를 누르면 그 환자의 계산을 보여 줌"></canvas>
+          <p class="lg-sub">아래 막대 = 환자 한 명의 손실 −log p(정답), 혈당 순 정렬. 정답 쪽 확률이 낮을수록(틀릴수록) 막대가 가파르게 커집니다. 막대를 누르면 오른쪽에 그 환자의 계산이 나옵니다. 점선 = 전체 평균(로그손실).</p>
+        </div>
+      </div>
+      <div class="lg-stack">
+        <div class="sk-card">
+          <div class="sk-head"><h3>선택한 환자와 기울기 계산</h3></div>
+          <div class="sk-formula lg-f" id="g2f" aria-live="polite"></div>
+        </div>
+        <div class="sk-card">
+          <div class="sk-head"><h3>손실 곡선 (스텝별 로그손실)</h3></div>
+          <div class="lg-chart" id="g2curve" role="img" aria-label="경사하강 스텝에 따른 로그손실 변화 그래프"></div>
+        </div>
+      </div>
+    </div>
+    <div class="sk-grid2" style="margin-top:16px">
+      <div class="sk-card">
+        <div class="sk-head"><h3>손실 지형 위의 이동 경로</h3><span class="sk-hint">지형을 누르면 그 자리에서 다시 출발</span></div>
+        <canvas id="c2c" class="lg-cv lg-cv--land" aria-label="w0(가로), w1(세로)에 따른 로그손실 등고선과 경사하강법 이동 경로"></canvas>
+        <div class="sk-legend"><span><i class="lg-ln" style="background:var(--mdl)"></i>경사하강 경로</span><span><i class="lg-dot" style="background:var(--ok)"></i>최소점 (최대우도 해)</span><span>진할수록 손실이 작음</span></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h3>왜 MSE가 아니라 로그손실인가</h3><div class="sk-legend"><span><i class="lg-ln" style="background:var(--mdl)"></i>로그손실</span><span><i class="lg-ln" style="background:var(--lim)"></i>MSE (σ − y)²</span></div></div>
+        <div class="lg-chart" id="g2cvx" role="img" aria-label="w1을 바꿀 때 로그손실과 MSE의 모양 비교"></div>
+        <p class="lg-sub" id="g2cvxcap"></p>
+        <p class="sk-note"><b>비볼록(non-convex)</b>: 시그모이드 뒤에 MSE를 붙이면 양 끝이 평평해져 기울기가 0에 가까워집니다. 잘못된 방향으로 크게 틀려도 학습 신호가 거의 없고, 손실면이 볼록하지 않아 최적점 보장이 사라집니다. 로그손실은 볼록이라 어디서 출발해도 같은 최소점으로 내려갑니다.</p>
+        <p class="sk-note" id="g2mle"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 3. 2차원 결정 경계 ================= -->
+  <section id="pane-2d" role="tabpanel" aria-labelledby="tab-2d" hidden>
+    <div class="lg-main">
+      <div class="sk-card">
+        <div class="sk-head"><h2>나이 · BMI 로 질환 여부 분류</h2>
+          <div class="sk-legend"><span><i class="lg-dot" style="background:var(--c0)"></i>정상 (0)</span><span><i class="lg-dot" style="background:var(--c1)"></i>질환 (1)</span><span><i class="lg-ln" style="background:var(--mdl)"></i>p = 임계값 경계</span><span><i class="lg-ln dash" style="color:var(--mdl)"></i>z = 0 (p = 0.5)</span><span><i class="lg-dot" style="background:transparent;border:2px solid var(--lim)"></i>오분류</span></div>
+        </div>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">데이터</span>
+            <div class="sk-seg" id="d3preset" role="group" aria-label="데이터 모양">
+              <button type="button" data-v="base" aria-pressed="true">기본</button>
+              <button type="button" data-v="overlap" aria-pressed="false">많이 겹침</button>
+              <button type="button" data-v="circle" aria-pressed="false">원형 (선형 분리 불가)</button>
+            </div>
+          </div>
+          <button type="button" class="sk-btn sk-btn--sm" id="d3seed">다른 표본</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="d3clear">모두 지우기</button>
+        </div>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">클릭하면</span>
+            <div class="sk-seg" id="d3mode" role="group" aria-label="클릭 동작">
+              <button type="button" data-v="0" aria-pressed="true">정상(0) 추가</button>
+              <button type="button" data-v="1" aria-pressed="false">질환(1) 추가</button>
+              <button type="button" data-v="del" aria-pressed="false">삭제</button>
+            </div>
+          </div>
+        </div>
+        <canvas id="c3" class="lg-cv lg-cv--2d" aria-label="나이(가로)와 BMI(세로) 산점도, 배경은 질환일 확률, 선은 결정 경계. 클릭해서 점을 추가하거나 삭제"></canvas>
+        <p class="lg-sub">배경색 = 모델이 예측한 질환 확률 (파랑 쪽 0, 주황 쪽 1). 점을 더하거나 지우면 바로 다시 학습합니다(뉴턴법).</p>
+        <p class="sk-note" id="d3note"></p>
+      </div>
+      <div class="lg-stack">
+        <div class="sk-card">
+          <div class="sk-slider"><div class="sk-sl-head"><label for="d3t">임계값 t (p ≥ t 이면 질환으로 예측)</label><b id="d3tv">0.50</b></div><input type="range" id="d3t" min="0.05" max="0.95" step="0.01" value="0.5"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><label for="d3c">규제 강도 C (= 1/λ, 작을수록 강한 규제)</label><b id="d3cv">1</b></div><input type="range" id="d3c" min="0" max="18" step="1" value="9"></div>
+          <label class="sk-check"><input type="checkbox" id="d3poly">특성 추가 (나이², 나이×BMI, BMI²)</label>
+          <div class="sk-stats" id="d3stats"></div>
+          <div class="lg-cm" id="d3cm"></div>
+        </div>
+        <div class="sk-card">
+          <div class="sk-head"><h3>학습된 계수 (표준화 특성 기준)</h3><span class="sk-hint" id="d3norm"></span></div>
+          <div class="lg-coef" id="d3coef"></div>
+          <div class="sk-formula lg-f" id="d3eq"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 4. 임계값과 ROC ================= -->
+  <section id="pane-roc" role="tabpanel" aria-labelledby="tab-roc" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>임계값을 옮기면 무엇이 바뀌나</h2><span class="sk-hint">그래프를 눌러도 임계값이 바뀝니다</span></div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">데이터·모델</span>
+          <div class="sk-seg" id="r4src" role="group" aria-label="데이터와 모델">
+            <button type="button" data-v="screen" aria-pressed="true">검진 데이터 300명</button>
+            <button type="button" data-v="tab3" aria-pressed="false">3번 화면의 데이터·모델</button>
+          </div>
+        </div>
+        <div class="sk-slider" style="min-width:260px"><div class="sk-sl-head"><label for="r4t">임계값 t</label><b id="r4tv">0.500</b></div><input type="range" id="r4t" min="0" max="1" step="0.001" value="0.5"></div>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">빠른 선택</span>
+          <button type="button" class="sk-btn sk-btn--sm" id="r4half">0.5 (기본)</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="r4sens">민감도 ≥ 90% 중 가장 높은 t</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="r4youden">Youden J 최대</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="r4f1">F1 최대</button>
+        </div>
+      </div>
+      <p class="lg-sub" id="r4info"></p>
+    </div>
+    <div class="lg-main lg-main--r" style="margin-top:16px">
+      <div class="sk-card">
+        <div class="sk-head"><h3>예측 확률 분포와 임계값</h3><div class="sk-legend"><span><i class="lg-dot" style="background:var(--c0)"></i>실제 정상</span><span><i class="lg-dot" style="background:var(--c1)"></i>실제 질환</span><span>진한 막대 = 질환으로 예측(p ≥ t)</span></div></div>
+        <div class="lg-chart" id="r4hist" role="img" aria-label="실제 정상과 실제 질환의 예측 확률 히스토그램과 임계값 선"></div>
+        <p class="lg-sub" id="r4histcap"></p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h3>현재 임계값의 성적</h3></div>
+        <div class="lg-cm" id="r4cm"></div>
+        <div class="sk-stats" id="r4stats"></div>
+      </div>
+    </div>
+    <div class="sk-grid2" style="margin-top:16px">
+      <div class="sk-card">
+        <div class="sk-head"><h3>ROC 곡선</h3><span class="sk-hint" id="r4auc"></span></div>
+        <div class="lg-chart" id="r4roc" role="img" aria-label="ROC 곡선: 가로 위양성률, 세로 민감도, 현재 임계값의 점 표시"></div>
+        <p class="lg-sub" id="r4auccap"></p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h3>정밀도-재현율(PR) 곡선</h3><span class="sk-hint" id="r4ap"></span></div>
+        <div class="lg-chart" id="r4pr" role="img" aria-label="PR 곡선: 가로 재현율, 세로 정밀도, 현재 임계값의 점 표시"></div>
+        <p class="lg-sub">질환자가 적을수록(불균형) ROC보다 PR 곡선이 모델 차이를 더 솔직하게 보여 줍니다. 점선 = 유병률(아무렇게나 찍을 때의 정밀도).</p>
+      </div>
+    </div>
+    <div class="sk-card" style="margin-top:16px">
+      <div class="sk-head"><h2>의료 현장의 판단: 놓치는 환자 vs 불필요한 재검</h2></div>
+      <div class="sk-controls">
+        <div class="sk-slider" style="min-width:260px"><div class="sk-sl-head"><label for="r4k">환자 1명을 놓치는 비용 = 위양성 몇 명분?</label><b id="r4kv">5</b></div><input type="range" id="r4k" min="1" max="20" step="1" value="5"></div>
+        <button type="button" class="sk-btn sk-btn--sm" id="r4cost">총비용 최소 t 로</button>
+      </div>
+      <div class="sk-formula lg-f" id="r4costf"></div>
+      <p class="sk-note"><b>선별검사(스크리닝)는 민감도 우선</b>: 질환자를 놓치면(FN) 치료 시기를 놓치지만, 위양성(FP)은 2차 정밀검사로 걸러낼 수 있습니다. 그래서 임계값을 0.5보다 낮춰 민감도를 올리고, 늘어나는 위양성은 감수합니다. 반대로 확진·수술 결정처럼 위양성이 큰 부담이면 임계값을 올려 정밀도를 챙깁니다. 임계값은 모델이 아니라 <b>사용 목적</b>이 정합니다.</p>
+    </div>
+  </section>
+
+  <!-- ================= 5. 코드 ================= -->
+  <section id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>scikit-learn 코드 (현재 설정 반영)</h2><span class="sk-hint">화면에서 바꾼 값이 바로 들어갑니다</span></div>
+      <div class="sk-controls">
+        <div class="sk-seg" id="k5kind" role="group" aria-label="코드 종류">
+          <button type="button" data-v="2d" aria-pressed="true">2차원 분류 (3번)</button>
+          <button type="button" data-v="roc" aria-pressed="false">임계값·ROC (4번)</button>
+          <button type="button" data-v="1d" aria-pressed="false">1차원 혈당 (1·2번)</button>
+        </div>
+      </div>
+      <p class="sk-lead" id="k5lead"></p>
+      <div class="lg-code"><pre id="k5code" tabindex="0" aria-label="파이썬 코드"></pre><button type="button" class="sk-btn sk-btn--sm lg-copy" id="k5copy">복사</button></div>
+      <p class="sk-note">맨 아래 주석은 이 페이지가 같은 데이터로 계산한 값입니다. scikit-learn의 기본 최적화(lbfgs)는 허용오차가 있어 소수 셋째~넷째 자리에서 조금 다를 수 있습니다.</p>
+    </div>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20260930c"></script>
+<!-- TensorFlow.js가 필요하면 아래 줄의 주석을 풉니다 (공용 파일, 약 1.4MB) -->
+<!-- <script src="../../assets/vendor/tf.min.js"></script> -->
+<script>
+(function () {
+"use strict";
+const $ = id => document.getElementById(id);
+
+/* ================= 공통 도구 ================= */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function gauss(r){let u=0;while(!u)u=r();const v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const sig=z=>z>=0?1/(1+Math.exp(-z)):Math.exp(z)/(1+Math.exp(z));
+const softplus=z=>z>0?z+Math.log1p(Math.exp(-z)):Math.log1p(Math.exp(z));
+const logit=p=>Math.log(p/(1-p));
+const SUP={"-":"⁻","0":"⁰","1":"¹","2":"²","3":"³","4":"⁴","5":"⁵","6":"⁶","7":"⁷","8":"⁸","9":"⁹"};
+function f(v,d=2){ if(!isFinite(v))return v>0?"∞":"−∞"; const s=Math.abs(v).toFixed(d); return (v<0&&Number(s)!==0?"−":"")+s; }
+function g(v,d=3){ if(!isFinite(v))return v>0?"∞":"−∞"; const a=Math.abs(v); if(a!==0&&(a>=1e4||a<1e-3)){const e=Math.floor(Math.log10(a));return (v<0?"−":"")+(a/Math.pow(10,e)).toFixed(2)+"×10"+String(e).split("").map(c=>SUP[c]).join("");} return f(v,d); }
+const pct=v=>isFinite(v)?(v*100).toFixed(1)+"%":"—";
+const py=(v,d)=>{const s=v.toFixed(d);return Number(s)===0?(0).toFixed(d):s;};
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+function hexRgb(h){h=h.replace("#","");if(h.length===3)h=h.split("").map(c=>c+c).join("");const n=parseInt(h,16);return[(n>>16)&255,(n>>8)&255,n&255];}
+function mix(a,b,t){return[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
+const rgb=c=>`rgb(${c[0]|0},${c[1]|0},${c[2]|0})`;
+function fitCanvas(cv){const dpr=window.devicePixelRatio||1;const w=Math.max(40,cv.clientWidth),h=Math.max(40,cv.clientHeight||w*0.6);cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);const ctx=cv.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);return{ctx,w,h};}
+function segInit(el,onChange){el.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{segSet(el,b.dataset.v);onChange(b.dataset.v);}));}
+function segSet(el,v){el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x.dataset.v===String(v)?"true":"false"));}
+const mean=a=>a.reduce((s,v)=>s+v,0)/a.length;
+const pstd=a=>{const m=mean(a);return Math.sqrt(a.reduce((s,v)=>s+(v-m)*(v-m),0)/a.length);};
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+/* 선형연립방정식 (부분 피벗 가우스 소거) */
+function solve(A,b){const n=b.length,M=A.map((r,i)=>[...r,b[i]]);
+  for(let c=0;c<n;c++){let p=c;for(let r=c+1;r<n;r++)if(Math.abs(M[r][c])>Math.abs(M[p][c]))p=r;[M[c],M[p]]=[M[p],M[c]];const d=M[c][c]||1e-12;for(let r=c+1;r<n;r++){const k=M[r][c]/d;for(let j=c;j<=n;j++)M[r][j]-=k*M[c][j];}}
+  const x=new Array(n).fill(0);for(let r=n-1;r>=0;r--){let s=M[r][n];for(let j=r+1;j<n;j++)s-=M[r][j]*x[j];x[r]=s/(M[r][r]||1e-12);}return x;}
+
+/* 로지스틱 회귀 (뉴턴법 + 되돌림 선탐색)
+   최소화: Σ 로그손실_i + (1/(2C))·‖w‖²  (절편 제외) — scikit-learn의 C·Σℓ + ½‖w‖² 와 같은 해 */
+function fitLR(X,y,C){
+  const n=X.length,d=X[0].length,lam=isFinite(C)?1/C:0;let th=new Array(d+1).fill(0);
+  const obj=t=>{let s=0;for(let i=0;i<n;i++){let z=t[0];for(let j=0;j<d;j++)z+=t[j+1]*X[i][j];s+=softplus(z)-y[i]*z;}let r=0;for(let j=1;j<=d;j++)r+=t[j]*t[j];return s+0.5*lam*r;};
+  let fv=obj(th),it=0,conv=false;
+  for(it=0;it<200;it++){
+    const gr=new Array(d+1).fill(0),H=[...Array(d+1)].map(()=>new Array(d+1).fill(0));
+    for(let i=0;i<n;i++){const r=[1,...X[i]];let z=0;for(let j=0;j<=d;j++)z+=th[j]*r[j];const p=sig(z),s=p*(1-p);
+      for(let j=0;j<=d;j++){gr[j]+=(p-y[i])*r[j];for(let k=0;k<=d;k++)H[j][k]+=s*r[j]*r[k];}}
+    for(let j=1;j<=d;j++){gr[j]+=lam*th[j];H[j][j]+=lam;}
+    for(let j=0;j<=d;j++)H[j][j]+=1e-12;
+    if(Math.max(...gr.map(Math.abs))<1e-10){conv=true;break;}
+    const st=solve(H,gr),dec=gr.reduce((s,v,j)=>s+v*st[j],0);let a=1,nt=null,fn=fv;
+    while(a>1e-10){nt=th.map((v,j)=>v-a*st[j]);fn=obj(nt);if(fn<=fv-1e-4*a*dec)break;a*=0.5;}
+    if(a<=1e-10){conv=true;break;}
+    th=nt;fv=fn;
+  }
+  return{b:th[0],w:th.slice(1),iters:it,obj:fv,conv};
+}
+
+/* 캔버스 좌표계 */
+function frame(w,h,o){const mL=o.mL??46,mR=o.mR??12,mT=o.mT??10,mB=o.mB??36;const pw=w-mL-mR,ph=h-mT-mB;
+  return{mL,mR,mT,mB,pw,ph,w,h,o,
+    X:v=>mL+(v-o.x0)/(o.x1-o.x0)*pw, Y:v=>mT+(1-(v-o.y0)/(o.y1-o.y0))*ph,
+    IX:px=>o.x0+(px-mL)/pw*(o.x1-o.x0), IY:py=>o.y0+(1-(py-mT)/ph)*(o.y1-o.y0)};}
+function axes(ctx,F,o){
+  const ln=css("--line"),mu=css("--muted"),mono=css("--mono"),sans=css("--sans");
+  ctx.save();ctx.lineWidth=1;ctx.strokeStyle=ln;ctx.fillStyle=mu;ctx.font=`11px ${mono}`;
+  (o.yt||[]).forEach(v=>{const y=Math.round(F.Y(v))+.5;ctx.globalAlpha=o.gridAlpha??1;ctx.beginPath();ctx.moveTo(F.mL,y);ctx.lineTo(F.mL+F.pw,y);ctx.stroke();ctx.globalAlpha=1;ctx.textAlign="right";ctx.textBaseline="middle";ctx.fillText(o.yf?o.yf(v):String(v),F.mL-6,y);});
+  (o.xt||[]).forEach(v=>{const x=Math.round(F.X(v))+.5;if(o.xgrid){ctx.globalAlpha=o.gridAlpha??1;ctx.beginPath();ctx.moveTo(x,F.mT);ctx.lineTo(x,F.mT+F.ph);ctx.stroke();ctx.globalAlpha=1;}ctx.textAlign="center";ctx.textBaseline="top";ctx.fillText(o.xf?o.xf(v):String(v),x,F.mT+F.ph+5);});
+  ctx.strokeStyle=css("--line-strong");ctx.beginPath();ctx.moveTo(F.mL,F.mT);ctx.lineTo(F.mL,F.mT+F.ph);ctx.lineTo(F.mL+F.pw,F.mT+F.ph);ctx.stroke();
+  ctx.font=`600 11.5px ${sans}`;ctx.textAlign="center";ctx.textBaseline="alphabetic";
+  if(o.xl)ctx.fillText(o.xl,F.mL+F.pw/2,F.h-4);
+  if(o.yl){ctx.translate(12,F.mT+F.ph/2);ctx.rotate(-Math.PI/2);ctx.fillText(o.yl,0,0);}
+  ctx.restore();
+}
+function ticks(a,b,maxN){const raw=(b-a)/maxN,mag=Math.pow(10,Math.floor(Math.log10(raw))),st=[1,2,5,10].map(k=>k*mag).find(k=>k>=raw);const out=[];for(let v=Math.ceil(a/st-1e-9)*st;v<=b+1e-9;v+=st)out.push(+v.toFixed(10));return out;}
+
+/* SVG 차트 틀 */
+function svgFrame(host,o){
+  const W=Math.max(260,Math.round(host.clientWidth||520)),H=o.h||Math.round(W*(o.ratio||0.6));
+  const mL=o.mL??(o.yl?56:46),mR=o.mR??14,mT=o.mT??12,mB=o.mB??40,pw=W-mL-mR,ph=H-mT-mB;
+  const X=v=>mL+(v-o.x0)/(o.x1-o.x0)*pw, Y=v=>mT+(1-(Math.max(o.y0,Math.min(o.y1,v))-o.y0)/(o.y1-o.y0))*ph;
+  let s="";
+  (o.yt||[]).forEach(v=>{const y=Y(v).toFixed(1);s+=`<line class="gl" x1="${mL}" x2="${mL+pw}" y1="${y}" y2="${y}"/><text class="ax" x="${mL-6}" y="${+y+4}" text-anchor="end">${o.yf?o.yf(v):v}</text>`;});
+  (o.xt||[]).forEach(v=>{const x=X(v).toFixed(1);if(o.xgrid)s+=`<line class="gl" x1="${x}" x2="${x}" y1="${mT}" y2="${mT+ph}"/>`;s+=`<text class="ax" x="${x}" y="${mT+ph+15}" text-anchor="middle">${o.xf?o.xf(v):v}</text>`;});
+  s+=`<path class="gl0" fill="none" d="M${mL},${mT}V${mT+ph}H${mL+pw}"/>`;
+  if(o.xl)s+=`<text class="axl" x="${mL+pw/2}" y="${H-5}" text-anchor="middle">${o.xl}</text>`;
+  if(o.yl)s+=`<text class="axl" transform="translate(12,${mT+ph/2}) rotate(-90)" text-anchor="middle">${o.yl}</text>`;
+  return{W,H,mL,mT,pw,ph,X,Y,s};
+}
+function svgPut(host,F,body,extraCls){host.innerHTML=`<svg viewBox="0 0 ${F.W} ${F.H}" class="${extraCls||""}" aria-hidden="true">${F.s}${body}</svg>`;return host.firstChild;}
+function svgPoint(svg,F,e){const r=svg.getBoundingClientRect();return[(e.clientX-r.left)*F.W/r.width,(e.clientY-r.top)*F.H/r.height];}
+
+/* ================= 탭 ================= */
+const TABS=["sig","loss","2d","roc","code"];let curTab="sig";
+const onShow={};
+function showTab(k,focus){
+  if(!TABS.includes(k))k="sig";
+  TABS.forEach(t=>{const b=$("tab-"+t),p=$("pane-"+t),on=t===k;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;p.hidden=!on;});
+  if(curTab==="loss"&&k!=="loss")G2.pause();
+  curTab=k;if(focus)$("tab-"+k).focus();
+  if(location.hash!=="#"+k)history.replaceState(null,"","#"+k);
+  onShow[k]&&onShow[k]();
+}
+TABS.forEach(t=>$("tab-"+t).addEventListener("click",()=>showTab(t)));
+document.querySelector(".sk-tabs").addEventListener("keydown",e=>{
+  if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;e.preventDefault();e.stopPropagation();
+  const i=TABS.indexOf(curTab),n=(i+(e.key==="ArrowRight"?1:-1)+TABS.length)%TABS.length;showTab(TABS[n],true);
+});
+window.addEventListener("hashchange",()=>{const k=location.hash.slice(1);if(TABS.includes(k)&&k!==curTab)showTab(k);});
+
+/* ================= 데이터 1: 공복혈당 40명 ================= */
+const D1={seed:3};
+function genD1(seed){const r=mulberry32(seed*7919+101),xs=[],ys=[];
+  for(let i=0;i<40;i++){const hi=r()<0.45;let x=hi?148+gauss(r)*24:104+gauss(r)*14;x=Math.round(Math.min(232,Math.max(66,x)));
+    ys.push(r()<sig(0.075*(x-128))?1:0);xs.push(x);}
+  return{xs,ys};}
+function prepD1(){
+  const {xs,ys}=genD1(D1.seed);D1.xs=xs;D1.ys=ys;D1.n=xs.length;D1.mu=mean(xs);D1.sd=pstd(xs);
+  D1.xt=xs.map(x=>(x-D1.mu)/D1.sd);
+  const r=fitLR(D1.xt.map(v=>[v]),ys,Infinity);D1.w=[r.b,r.w[0]];D1.iters=r.iters;
+  D1.mle={b0:r.b-r.w[0]*D1.mu/D1.sd,b1:r.w[0]/D1.sd};
+  const mx=D1.mu,my=mean(ys);let sxy=0,sxx=0;xs.forEach((x,i)=>{sxy+=(x-mx)*(ys[i]-my);sxx+=(x-mx)*(x-mx);});
+  D1.ols={b:sxy/sxx,a:my-sxy/sxx*mx};
+  D1.order=xs.map((_,i)=>i).sort((a,b)=>xs[a]-xs[b]||a-b);
+  D1.minLoss=lossRaw(D1.mle.b0,D1.mle.b1);
+}
+function lossRaw(b0,b1){let s=0;for(let i=0;i<D1.n;i++){const z=b0+b1*D1.xs[i];s+=softplus(z)-D1.ys[i]*z;}return s/D1.n;}
+
+/* ================= 1. 왜 S자인가 ================= */
+const S1={b0:-4,b1:0.03,x:140,ols:true};
+const T1={b0:-4,b1:0.03};
+function syncS1(){ $("s1b0").value=S1.b0;$("s1b1").value=S1.b1;$("s1b0v").textContent=f(S1.b0,Math.abs(S1.b0-Math.round(S1.b0*10)/10)>1e-9?3:1);$("s1b1v").textContent=f(S1.b1,Math.abs(S1.b1-Math.round(S1.b1*1000)/1000)>1e-9?4:3);$("s1xv").textContent=S1.x; }
+function draw1(){
+  const cv=$("c1");if(!cv.clientWidth)return;const {ctx,w,h}=fitCanvas(cv);
+  const narrow=w<520;
+  const F=frame(w,h,{x0:60,x1:240,y0:-0.35,y1:1.35,mL:44,mB:36,mT:10,mR:12});
+  const lim=css("--lim"),mdl=css("--mdl"),c0=css("--c0"),c1=css("--c1"),ink=css("--ink"),mu=css("--muted"),sf=css("--surface"),sans=css("--sans"),mono=css("--mono");
+  if(S1.ols){ctx.save();ctx.fillStyle=lim;ctx.globalAlpha=.07;ctx.fillRect(F.mL,F.mT,F.pw,F.Y(1)-F.mT);ctx.fillRect(F.mL,F.Y(0),F.pw,F.mT+F.ph-F.Y(0));ctx.restore();
+    ctx.save();ctx.fillStyle=lim;ctx.font=`700 11.5px ${sans}`;ctx.textAlign="left";ctx.fillText("확률 > 1 ?",F.mL+6,F.mT+15);ctx.fillText("확률 < 0 ?",F.mL+6,F.mT+F.ph-8);ctx.restore();}
+  axes(ctx,F,{yt:[0,0.5,1],yf:v=>v===0.5?"0.5":String(v),xt:ticks(60,240,narrow?4:9),xl:"공복혈당 x (mg/dL)",yl:"당뇨일 확률 p"});
+  ctx.save();ctx.beginPath();ctx.rect(F.mL,F.mT,F.pw,F.ph);ctx.clip();
+  // p = 0.5 가 되는 x
+  const x50=-S1.b0/S1.b1;
+  if(isFinite(x50)&&x50>60&&x50<240){ctx.strokeStyle=mdl;ctx.globalAlpha=.5;ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(F.X(x50),F.Y(0.5));ctx.lineTo(F.X(x50),F.Y(-0.35));ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;}
+  // 선형회귀
+  if(S1.ols){ctx.strokeStyle=lim;ctx.lineWidth=2.2;ctx.setLineDash([7,4]);ctx.beginPath();ctx.moveTo(F.X(60),F.Y(D1.ols.a+D1.ols.b*60));ctx.lineTo(F.X(240),F.Y(D1.ols.a+D1.ols.b*240));ctx.stroke();ctx.setLineDash([]);}
+  // 시그모이드
+  ctx.strokeStyle=mdl;ctx.lineWidth=3;ctx.lineJoin="round";ctx.beginPath();
+  for(let k=0;k<=240;k++){const x=60+180*k/240,p=sig(S1.b0+S1.b1*x);k?ctx.lineTo(F.X(x),F.Y(p)):ctx.moveTo(F.X(x),F.Y(p));}ctx.stroke();
+  // 점
+  D1.xs.forEach((x,i)=>{const y=D1.ys[i],jit=((i*37)%7-3)*0.012;ctx.beginPath();ctx.arc(F.X(x),F.Y(y+jit),5,0,Math.PI*2);ctx.fillStyle=y?c1:c0;ctx.globalAlpha=.85;ctx.fill();ctx.globalAlpha=1;ctx.lineWidth=1.2;ctx.strokeStyle=sf;ctx.stroke();});
+  // 살펴볼 x
+  const px=F.X(S1.x),pp=sig(S1.b0+S1.b1*S1.x);
+  ctx.strokeStyle=ink;ctx.lineWidth=1.2;ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(px,F.mT);ctx.lineTo(px,F.mT+F.ph);ctx.stroke();ctx.setLineDash([]);
+  if(S1.ols){const yo=D1.ols.a+D1.ols.b*S1.x;ctx.beginPath();ctx.arc(px,F.Y(yo),5,0,Math.PI*2);ctx.fillStyle=lim;ctx.fill();}
+  ctx.beginPath();ctx.arc(px,F.Y(pp),6.5,0,Math.PI*2);ctx.fillStyle=mdl;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=sf;ctx.stroke();
+  ctx.restore();
+  ctx.font=`600 12px ${mono}`;ctx.fillStyle=ink;const lab=`p = ${f(pp,3)}`;const tw=ctx.measureText(lab).width;
+  let lx=px+10;if(lx+tw>F.mL+F.pw-4)lx=px-10-tw;let ly=F.Y(pp)-10;if(ly<F.mT+14)ly=F.Y(pp)+20;
+  ctx.fillStyle=sf;ctx.globalAlpha=.85;ctx.fillRect(lx-3,ly-12,tw+6,16);ctx.globalAlpha=1;ctx.fillStyle=mdl;ctx.fillText(lab,lx,ly);
+}
+function render1(){
+  syncS1();
+  $("lgOlsLeg").style.display=S1.ols?"":"none";
+  const x=S1.x,z=S1.b0+S1.b1*x,p=sig(z),odds=Math.exp(z);
+  const b0s=f(S1.b0,2),b1s=f(S1.b1,4);
+  const e1=Math.exp(S1.b1),e10=Math.exp(10*S1.b1);
+  const z2=S1.b0+S1.b1*(x+1),ratio=Math.exp(z2)/Math.exp(z);
+  $("s1f").innerHTML=
+`<span class="c">① 선형 결합 (로그 오즈)</span>
+z = b₀ + b₁·x = ${b0s} + ${b1s} × ${x} = <b class="m">${f(z,3)}</b>
+<span class="c">② 시그모이드로 0~1</span>
+p = 1 / (1 + e<sup>−z</sup>) = 1 / (1 + e<sup>${f(-z,3)}</sup>) = <b class="m">${f(p,4)}</b>
+<span class="c">③ 오즈와 로그 오즈</span>
+오즈 = p / (1 − p) = ${f(p,4)} / ${f(1-p,4)} = <b>${g(odds,3)}</b>
+ln(오즈) = ln(${g(odds,3)}) = <b class="m">${f(z,3)}</b> = z`;
+  const dir=S1.b1>=0?"증가":"감소",chg=Math.abs(e1-1)*100;
+  $("s1note").innerHTML=`<b>계수 해석</b>: 혈당이 1 mg/dL 오르면 로그 오즈가 ${b1s} 늘고, 오즈는 e<sup>${b1s}</sup> = <b>${f(e1,4)}배</b> (${f(chg,1)}% ${dir}). 10 오르면 e<sup>${f(10*S1.b1,3)}</sup> = <b>${g(e10,3)}배</b>. `+
+    `검산: 오즈(${x+1}) ÷ 오즈(${x}) = ${g(Math.exp(z2),4)} ÷ ${g(odds,4)} = ${f(ratio,4)}. `+
+    (Math.abs(S1.b1)>1e-9?`p = 0.5 가 되는 혈당은 x = −b₀/b₁ = <b>${f(-S1.b0/S1.b1,1)}</b>.`:"");
+  // 통계
+  const L=lossRaw(S1.b0,S1.b1);let acc=0;D1.xs.forEach((xx,i)=>{acc+=((sig(S1.b0+S1.b1*xx)>=0.5?1:0)===D1.ys[i])?1:0;});
+  const nPos=D1.ys.reduce((s,v)=>s+v,0);
+  $("s1stats").innerHTML=`<div class="sk-stat"><b>${f(L,4)}</b><span>현재 로그손실</span></div><div class="sk-stat"><b>${f(D1.minLoss,4)}</b><span>최소 로그손실 (MLE)</span></div><div class="sk-stat"><b>${acc}/${D1.n}</b><span>0.5 기준 정답</span></div><div class="sk-stat"><b>${nPos}/${D1.n}</b><span>당뇨 환자 수</span></div>`;
+  // 표
+  const rows=[80,100,120,x,160,180,200,220].filter((v,i,a)=>a.indexOf(v)===i).sort((a,b)=>a-b);
+  let t=`<thead><tr><th>혈당 x</th><th>z = 로그 오즈</th><th>p = σ(z)</th><th>오즈 p/(1−p)</th>${S1.ols?"<th>선형회귀 ŷ</th>":""}</tr></thead><tbody>`;
+  rows.forEach(v=>{const zz=S1.b0+S1.b1*v,pp=sig(zz),yo=D1.ols.a+D1.ols.b*v;
+    t+=`<tr class="${v===x?"cur":""}"><td class="n">${v}${v===x?" ◀":""}</td><td class="n">${f(zz,3)}</td><td class="n">${f(pp,4)}</td><td class="n">${g(Math.exp(zz),3)}</td>${S1.ols?`<td class="n ${yo<0||yo>1?"bad":""}">${f(yo,3)}</td>`:""}</tr>`;});
+  $("s1tab").innerHTML=t+"</tbody>";
+  const o=D1.ols,y60=o.a+o.b*60,y240=o.a+o.b*240;
+  $("s1ols2").innerHTML=`<span class="c">최소제곱 직선 (0/1 을 그냥 숫자로 회귀)</span>
+ŷ = ${f(o.a,3)} + ${f(o.b,5)}·x
+x = 60 → ŷ = <span class="${y60<0?"r":""}">${f(y60,3)}</span>     x = 240 → ŷ = <span class="${y240>1?"r":""}">${f(y240,3)}</span>
+x = ${x} → ŷ = <span class="${(o.a+o.b*x)<0||(o.a+o.b*x)>1?"r":""}">${f(o.a+o.b*x,3)}</span>    (같은 x에서 로지스틱 p = ${f(p,3)})`;
+  draw1();
+}
+$("s1b0").addEventListener("input",e=>{S1.b0=+e.target.value;render1();});
+$("s1b1").addEventListener("input",e=>{S1.b1=+e.target.value;render1();});
+$("s1x").addEventListener("input",e=>{S1.x=+e.target.value;render1();});
+$("s1ols").addEventListener("change",e=>{S1.ols=e.target.checked;render1();});
+$("s1mle").onclick=()=>{S1.b0=D1.mle.b0;S1.b1=D1.mle.b1;render1();};
+$("s1reset").onclick=()=>{S1.b0=T1.b0;S1.b1=T1.b1;render1();};
+$("s1seed").onclick=()=>{D1.seed=D1.seed%97+1;prepD1();$("s1seedv").textContent=`표본 번호 ${D1.seed}`;G2.reset([0,0]);G2.buildLand();render1();};
+onShow.sig=render1;
+
+/* ================= 2. 로그손실과 학습 ================= */
+const G2=(function(){
+  const S={w:[0,0],start:[0,0],eta:0.5,t:0,hist:[],path:[],sel:0,playing:false,timer:null,spd:8,land:null};
+  function lossW(w){let s=0;for(let i=0;i<D1.n;i++){const z=w[0]+w[1]*D1.xt[i];s+=softplus(z)-D1.ys[i]*z;}return s/D1.n;}
+  function gradW(w){let g0=0,g1=0;for(let i=0;i<D1.n;i++){const e=sig(w[0]+w[1]*D1.xt[i])-D1.ys[i];g0+=e;g1+=e*D1.xt[i];}return[g0/D1.n,g1/D1.n];}
+  function defaultSel(){let best=-1,bx=-Infinity;D1.xs.forEach((x,i)=>{if(!D1.ys[i]&&x>bx){bx=x;best=i;}});return best<0?0:best;}
+  function reset(start){if(start)S.start=start;S.w=S.start.slice();S.t=0;S.hist=[lossW(S.w)];S.path=[S.w.slice()];S.sel=defaultSel();}
+  function step(){const gg=gradW(S.w);S.w=[S.w[0]-S.eta*gg[0],S.w[1]-S.eta*gg[1]];S.t++;S.hist.push(lossW(S.w));S.path.push(S.w.slice());}
+  function pause(){S.playing=false;clearInterval(S.timer);S.timer=null;$("g2play").textContent="재생";}
+  function play(){if(S.playing){pause();return;}S.playing=true;$("g2play").textContent="멈춤";
+    S.timer=setInterval(()=>{step();render();if(S.t>=5000)pause();},1000/S.spd);}
+  function bounds(){const w=D1.w;return{a0:Math.min(-3,w[0]-3),a1:Math.max(3,w[0]+3),b0:Math.min(-2.5,w[1]-4),b1:Math.max(3,w[1]+3)};}
+  function buildLand(){const B=bounds(),N=90,Z=new Float64Array((N+1)*(N+1));
+    for(let j=0;j<=N;j++)for(let i=0;i<=N;i++){Z[j*(N+1)+i]=lossW([B.a0+(B.a1-B.a0)*i/N,B.b1-(B.b1-B.b0)*j/N]);}
+    S.land={B,N,Z};}
+  function drawA(){const cv=$("c2a");if(!cv.clientWidth)return;const {ctx,w,h}=fitCanvas(cv);
+    const F=frame(w,h,{x0:60,x1:240,y0:-0.08,y1:1.08,mL:44,mB:36});
+    axes(ctx,F,{yt:[0,0.5,1],xt:ticks(60,240,w<520?4:9),xl:"공복혈당 x (mg/dL)",yl:"p"});
+    const mdl=css("--mdl"),c0=css("--c0"),c1=css("--c1"),ink=css("--ink"),sf=css("--surface");
+    ctx.save();ctx.beginPath();ctx.rect(F.mL,F.mT,F.pw,F.ph);ctx.clip();
+    ctx.strokeStyle=mdl;ctx.lineWidth=3;ctx.beginPath();
+    for(let k=0;k<=240;k++){const x=60+180*k/240,p=sig(S.w[0]+S.w[1]*(x-D1.mu)/D1.sd);k?ctx.lineTo(F.X(x),F.Y(p)):ctx.moveTo(F.X(x),F.Y(p));}ctx.stroke();
+    D1.xs.forEach((x,i)=>{const y=D1.ys[i],p=sig(S.w[0]+S.w[1]*D1.xt[i]);
+      if(i===S.sel){ctx.strokeStyle=ink;ctx.lineWidth=1.5;ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(F.X(x),F.Y(y));ctx.lineTo(F.X(x),F.Y(p));ctx.stroke();ctx.setLineDash([]);}
+      ctx.beginPath();ctx.arc(F.X(x),F.Y(y+((i*37)%7-3)*0.01),i===S.sel?7:5,0,Math.PI*2);ctx.fillStyle=y?c1:c0;ctx.globalAlpha=.85;ctx.fill();ctx.globalAlpha=1;
+      ctx.lineWidth=i===S.sel?2.5:1.2;ctx.strokeStyle=i===S.sel?ink:sf;ctx.stroke();});
+    ctx.restore();}
+  let barGeo=null;
+  function drawB(){const cv=$("c2b");if(!cv.clientWidth)return;const {ctx,w,h}=fitCanvas(cv);
+    const Ls=D1.order.map(i=>{const z=S.w[0]+S.w[1]*D1.xt[i];return softplus(z)-D1.ys[i]*z;});
+    const top=Math.max(2,Math.min(6,Math.ceil(Math.max(...Ls)*2)/2));
+    const F=frame(w,h,{x0:0,x1:D1.n,y0:0,y1:top,mL:44,mB:14,mT:8,mR:12});
+    axes(ctx,F,{yt:ticks(0,top,3),yl:"−log p"});
+    const c0=css("--c0"),c1=css("--c1"),ink=css("--ink"),mu=css("--muted");
+    const bw=F.pw/D1.n;barGeo={F,bw};
+    D1.order.forEach((i,k)=>{const L=Ls[k],x=F.mL+k*bw+bw*0.12,hh=F.Y(0)-F.Y(Math.min(L,top));
+      ctx.fillStyle=D1.ys[i]?c1:c0;ctx.globalAlpha=i===S.sel?1:.78;ctx.fillRect(x,F.Y(0)-hh,bw*0.76,hh);ctx.globalAlpha=1;
+      if(L>top){ctx.fillStyle=ink;ctx.fillRect(x,F.mT,bw*0.76,2);}
+      if(i===S.sel){ctx.strokeStyle=ink;ctx.lineWidth=2;ctx.strokeRect(x-1,F.Y(0)-hh-1,bw*0.76+2,hh+2);}});
+    const m=S.hist[S.hist.length-1];ctx.strokeStyle=mu;ctx.setLineDash([5,4]);ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(F.mL,F.Y(m));ctx.lineTo(F.mL+F.pw,F.Y(m));ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle=mu;ctx.font=`600 11px ${css("--sans")}`;ctx.textAlign="left";ctx.fillText(`평균 ${f(m,3)}`,F.mL+4,F.Y(m)-4);}
+  function drawLand(){const cv=$("c2c");if(!cv.clientWidth)return;const {ctx,w,h}=fitCanvas(cv);if(!S.land)buildLand();
+    const {B,N,Z}=S.land;const F=frame(w,h,{x0:B.a0,x1:B.a1,y0:B.b0,y1:B.b1,mL:44,mB:36,mT:10,mR:12});
+    const sf=hexRgb(css("--surface")),bl=hexRgb(css("--c0")),mdl=css("--mdl"),ok=css("--ok"),ink=css("--ink"),ls=css("--line-strong");
+    const lmin=D1.minLoss;let lmax=0;for(const v of Z)lmax=Math.max(lmax,v);
+    const cw=F.pw/N,ch=F.ph/N;
+    for(let j=0;j<N;j++)for(let i=0;i<N;i++){const v=(Z[j*(N+1)+i]+Z[j*(N+1)+i+1]+Z[(j+1)*(N+1)+i]+Z[(j+1)*(N+1)+i+1])/4;
+      const t=1-Math.min(1,Math.log(v/lmin)/Math.log(lmax/lmin));ctx.fillStyle=rgb(mix(sf,bl,0.08+0.6*Math.pow(t,1.6)));ctx.fillRect(F.mL+i*cw,F.mT+j*ch,cw+.6,ch+.6);}
+    // 등고선
+    ctx.strokeStyle=ls;ctx.lineWidth=1;
+    [1.02,1.1,1.25,1.5,2,3,4.5].forEach(k=>{const L=lmin*k;ctx.beginPath();
+      for(let j=0;j<N;j++)for(let i=0;i<N;i++){const a=Z[j*(N+1)+i]-L,b=Z[j*(N+1)+i+1]-L,c=Z[(j+1)*(N+1)+i+1]-L,d=Z[(j+1)*(N+1)+i]-L,pts=[];
+        const e=(v1,v2,x1,y1,x2,y2)=>{if((v1<0)!==(v2<0)){const t=v1/(v1-v2);pts.push([x1+(x2-x1)*t,y1+(y2-y1)*t]);}};
+        e(a,b,i,j,i+1,j);e(b,c,i+1,j,i+1,j+1);e(c,d,i+1,j+1,i,j+1);e(d,a,i,j+1,i,j);
+        for(let q=0;q+1<pts.length;q+=2){ctx.moveTo(F.mL+pts[q][0]*cw,F.mT+pts[q][1]*ch);ctx.lineTo(F.mL+pts[q+1][0]*cw,F.mT+pts[q+1][1]*ch);}}
+      ctx.stroke();});
+    axes(ctx,F,{xt:ticks(B.a0,B.a1,w<420?4:6),yt:ticks(B.b0,B.b1,5),xl:"w₀ (절편)",yl:"w₁ (표준화 혈당 계수)",yf:v=>f(v,0),xf:v=>f(v,0)});
+    ctx.save();ctx.beginPath();ctx.rect(F.mL,F.mT,F.pw,F.ph);ctx.clip();
+    // 최소점
+    const ox=F.X(D1.w[0]),oy=F.Y(D1.w[1]);ctx.strokeStyle=ok;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(ox-7,oy-7);ctx.lineTo(ox+7,oy+7);ctx.moveTo(ox+7,oy-7);ctx.lineTo(ox-7,oy+7);ctx.stroke();
+    // 경로
+    const P=S.path,stride=Math.max(1,Math.ceil(P.length/600));ctx.strokeStyle=mdl;ctx.lineWidth=2;ctx.beginPath();
+    for(let k=0;k<P.length;k+=stride){const x=F.X(P[k][0]),y=F.Y(P[k][1]);k?ctx.lineTo(x,y):ctx.moveTo(x,y);}
+    const last=P[P.length-1];ctx.lineTo(F.X(last[0]),F.Y(last[1]));ctx.stroke();
+    ctx.fillStyle=mdl;for(let k=0;k<Math.min(P.length,40);k++){ctx.beginPath();ctx.arc(F.X(P[k][0]),F.Y(P[k][1]),2.4,0,Math.PI*2);ctx.fill();}
+    ctx.beginPath();ctx.arc(F.X(S.start[0]),F.Y(S.start[1]),4.5,0,Math.PI*2);ctx.strokeStyle=mdl;ctx.lineWidth=2;ctx.stroke();
+    ctx.beginPath();ctx.arc(F.X(last[0]),F.Y(last[1]),6,0,Math.PI*2);ctx.fillStyle=ink;ctx.fill();ctx.strokeStyle=css("--surface");ctx.lineWidth=2;ctx.stroke();
+    ctx.restore();S.landF=F;}
+  function drawCurve(){const host=$("g2curve");if(!host.clientWidth)return;
+    const H=S.hist,n=H.length-1,xmax=Math.max(20,n),ymax=Math.max(0.1,Math.ceil(Math.max(...H)*1.1*20)/20);
+    const F=svgFrame(host,{x0:0,x1:xmax,y0:0,y1:ymax,yt:ticks(0,ymax,4),xt:ticks(0,xmax,host.clientWidth<420?4:6),xl:"스텝",yl:"로그손실",ratio:0.5,yf:v=>f(v,2)});
+    const stride=Math.max(1,Math.ceil(H.length/500));let d="";for(let k=0;k<H.length;k+=stride)d+=(d?"L":"M")+F.X(k).toFixed(1)+","+F.Y(H[k]).toFixed(1);d+="L"+F.X(n).toFixed(1)+","+F.Y(H[n]).toFixed(1);
+    const yr=F.Y(D1.minLoss);
+    svgPut(host,F,`<line class="ref" x1="${F.mL}" x2="${F.mL+F.pw}" y1="${yr}" y2="${yr}"/><text class="reft" x="${F.mL+F.pw-4}" y="${yr-5}" text-anchor="end">최소 ${f(D1.minLoss,4)}</text><path d="${d}" fill="none" stroke="var(--mdl)" stroke-width="2.4" stroke-linejoin="round"/><circle cx="${F.X(n)}" cy="${F.Y(H[n])}" r="4" fill="var(--mdl)"/>`);}
+  function drawCvx(){const host=$("g2cvx");if(!host.clientWidth)return;
+    const w0=D1.w[0],A=-10,Bv=10,K=200,LL=[],MS=[];
+    for(let k=0;k<=K;k++){const w1=A+(Bv-A)*k/K;let l=0,m=0;for(let i=0;i<D1.n;i++){const z=w0+w1*D1.xt[i],p=sig(z);l+=softplus(z)-D1.ys[i]*z;m+=(p-D1.ys[i])**2;}LL.push(l/D1.n);MS.push(m/D1.n);}
+    const nz=a=>{const lo=Math.min(...a),hi=Math.max(...a);return a.map(v=>(v-lo)/(hi-lo));};
+    const nl=nz(LL),nm=nz(MS);
+    const F=svgFrame(host,{x0:A,x1:Bv,y0:0,y1:1.05,xt:ticks(A,Bv,host.clientWidth<420?4:8),yt:[0,0.5,1],xl:"w₁ (w₀ = 최적값 고정)",yl:"손실 (각각 0~1로 맞춤)",ratio:0.55,xf:v=>f(v,0),yf:v=>v===0.5?"0.5":String(v)});
+    const path=a=>a.map((v,k)=>(k?"L":"M")+F.X(A+(Bv-A)*k/K).toFixed(1)+","+F.Y(v).toFixed(1)).join("");
+    const cx=F.X(Math.max(A,Math.min(Bv,S.w[1])));
+    // 평평한 구간 표시 (MSE 기울기 작은 곳, w1 < 0 쪽)
+    let flatEnd=A;for(let k=1;k<=K;k++){const w1=A+(Bv-A)*k/K;if(w1>0)break;if(Math.abs(nm[k]-nm[k-1])<0.004)flatEnd=w1;}
+    const fx=F.X(flatEnd);
+    svgPut(host,F,`${flatEnd>A+0.5?`<rect x="${F.mL}" y="${F.mT}" width="${fx-F.mL}" height="${F.ph}" fill="var(--lim)" opacity=".07"/><text class="lbl" x="${F.mL+6}" y="${F.mT+14}" fill="var(--lim)">평평: 기울기 ≈ 0</text>`:""}<line x1="${cx}" x2="${cx}" y1="${F.mT}" y2="${F.mT+F.ph}" stroke="var(--ink)" stroke-dasharray="3 4"/><path d="${path(nm)}" fill="none" stroke="var(--lim)" stroke-width="2.4"/><path d="${path(nl)}" fill="none" stroke="var(--mdl)" stroke-width="2.4"/><text class="lbl" x="${cx+4}" y="${F.mT+12}" fill="var(--ink)">현재 w₁</text>`);
+    $("g2cvxcap").textContent=`w₁ = −10 에서 로그손실 ${f(LL[0],2)}, MSE ${f(MS[0],3)} · w₁ = ${f(D1.w[1],2)} (최적) 에서 로그손실 ${f(D1.minLoss,3)}. 크게 틀린 쪽에서 로그손실은 계속 커지며 되돌아오라는 신호를 주지만, MSE는 ${f(Math.max(...MS),3)} 근처에서 멈춥니다.`;}
+  function render(){
+    const w=S.w,gg=gradW(w),L=S.hist[S.hist.length-1],i=S.sel;
+    $("g2etav").textContent=f(S.eta,2);$("g2spdv").textContent=S.spd;
+    const b1=w[1]/D1.sd,b0=w[0]-w[1]*D1.mu/D1.sd;
+    $("g2stats").innerHTML=`<div class="sk-stat"><b>${S.t}</b><span>스텝 t</span></div><div class="sk-stat"><b>${f(w[0],4)}</b><span>w₀</span></div><div class="sk-stat"><b>${f(w[1],4)}</b><span>w₁</span></div><div class="sk-stat lg-hl"><b>${f(L,4)}</b><span>로그손실</span></div><div class="sk-stat"><b>${g(Math.hypot(gg[0],gg[1]),3)}</b><span>기울기 크기 ‖∇L‖</span></div>`;
+    const xi=D1.xs[i],xti=D1.xt[i],yi=D1.ys[i],zi=w[0]+w[1]*xti,pi=sig(zi),li=softplus(zi)-yi*zi;
+    $("g2f").innerHTML=
+`<span class="c">선택: ${D1.order.indexOf(i)+1}번째 환자 (혈당 순) · 혈당 ${xi} · 실제 y = ${yi} (${yi?"당뇨":"정상"})</span>
+x̃ = (${xi} − ${f(D1.mu,1)}) / ${f(D1.sd,2)} = ${f(xti,3)}
+z = w₀ + w₁·x̃ = ${f(w[0],3)} + ${f(w[1],3)} × ${f(xti,3)} = ${f(zi,3)}
+p = σ(z) = <b class="m">${f(pi,4)}</b>
+손실 = −[y·log p + (1−y)·log(1−p)] = −log ${yi?f(pi,4):f(1-pi,4)} = <b class="${li>1?"r":""}">${f(li,4)}</b>
+<span class="c">이 환자의 기울기 기여 (p − y 가 오차)</span>
+p − y = ${f(pi-yi,4)}     (p − y)·x̃ = ${f((pi-yi)*xti,4)}
+<span class="c">전체 평균 기울기 (n = ${D1.n})</span>
+∂L/∂w₀ = (1/n)Σ(p − y)    = <b>${f(gg[0],4)}</b>
+∂L/∂w₁ = (1/n)Σ(p − y)·x̃  = <b>${f(gg[1],4)}</b>
+<span class="c">다음 스텝 (η = ${f(S.eta,2)})</span>
+w₀ ← ${f(w[0],4)} − ${f(S.eta,2)} × ${f(gg[0],4)} = <b class="m">${f(w[0]-S.eta*gg[0],4)}</b>
+w₁ ← ${f(w[1],4)} − ${f(S.eta,2)} × ${f(gg[1],4)} = <b class="m">${f(w[1]-S.eta*gg[1],4)}</b>
+<span class="c">원래 혈당 단위로 바꾸면  b₁ = w₁/σ = ${f(b1,4)},  b₀ = w₀ − w₁·μ/σ = ${f(b0,3)}</span>`;
+    const lik=Math.exp(-D1.n*L);
+    $("g2mle").innerHTML=`<b>최대우도 관점</b>: 우도 = Π p<sub>i</sub><sup>y</sup>(1−p<sub>i</sub>)<sup>1−y</sup> = e<sup>−n·로그손실</sup>. 지금 우도 = e<sup>−${D1.n}×${f(L,4)}</sup> = ${g(lik,3)}. 로그손실을 줄이는 것 = 데이터가 나올 확률(우도)을 키우는 것입니다. 최소점에서 우도는 ${g(Math.exp(-D1.n*D1.minLoss),3)}.`;
+    drawA();drawB();drawLand();drawCurve();drawCvx();
+  }
+  $("g2first").onclick=()=>{pause();reset();render();};
+  $("g2step").onclick=()=>{step();render();};
+  $("g2x10").onclick=()=>{for(let k=0;k<10;k++)step();render();};
+  $("g2play").onclick=()=>play();
+  $("g2eta").addEventListener("input",e=>{S.eta=+e.target.value;render();});
+  $("g2spd").addEventListener("input",e=>{S.spd=+e.target.value;if(S.playing){pause();play();}else render();});
+  $("c2b").addEventListener("click",e=>{if(!barGeo)return;const r=e.currentTarget.getBoundingClientRect();const k=Math.floor((e.clientX-r.left-barGeo.F.mL)/barGeo.bw);if(k>=0&&k<D1.n){S.sel=D1.order[k];render();}});
+  $("c2c").addEventListener("click",e=>{const F=S.landF;if(!F)return;const r=e.currentTarget.getBoundingClientRect();const px=e.clientX-r.left,pyy=e.clientY-r.top;
+    if(px<F.mL||px>F.mL+F.pw||pyy<F.mT||pyy>F.mT+F.ph)return;pause();reset([+F.IX(px).toFixed(2),+F.IY(pyy).toFixed(2)]);render();});
+  document.addEventListener("keydown",e=>{if(curTab!=="loss"||e.key!=="ArrowRight")return;const tg=e.target;if(tg&&(tg.tagName==="INPUT"||tg.tagName==="SELECT"||tg.tagName==="TEXTAREA"||tg.classList.contains("sk-tab")))return;e.preventDefault();step();render();});
+  return{S,reset,render,pause,buildLand,step};
+})();
+onShow.loss=()=>G2.render();
+
+/* ================= 3. 2차원 결정 경계 ================= */
+const C_LIST=[0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.2,0.5,1,2,5,10,20,50,100,200,500,1000];
+const S3={preset:"base",seed:1,pts:[],mode:"0",t:0.5,ci:9,poly:false,fit:null,sc:null};
+const AX3={x0:15,x1:85,y0:14,y1:42};
+const r1=v=>Math.round(v*10)/10;
+function gen3(preset,seed){const r=mulberry32(seed*1013+(preset==="base"?1:preset==="overlap"?2:3)*77),P=[];
+  const clampA=v=>r1(Math.min(84,Math.max(18,v))),clampB=v=>r1(Math.min(41,Math.max(15,v)));
+  if(preset==="circle"){for(let i=0;i<90;i++){const a=18+r()*66,b=15+r()*26,d=((a-50)/24)**2+((b-28)/10)**2;let c=d>1?1:0;if(r()<0.03)c=1-c;P.push({a:clampA(a),b:clampB(b),c});}}
+  else{const ov=preset==="overlap";const n0=ov?40:34,n1=ov?30:26;
+    for(let i=0;i<n0;i++)P.push({a:clampA((ov?46:41)+(ov?11:10)*gauss(r)),b:clampB((ov?25.5:24)+(ov?3.8:3.2)*gauss(r)),c:0});
+    for(let i=0;i<n1;i++)P.push({a:clampA((ov?53:57)+(ov?11:9)*gauss(r)),b:clampB((ov?27.5:29.5)+(ov?3.8:3.6)*gauss(r)),c:1});}
+  return P;}
+function feat3(a,b,sc,poly){const u=(a-sc.ma)/sc.sa,v=(b-sc.mb)/sc.sb;return poly?[u,v,u*u,u*v,v*v]:[u,v];}
+const FN3=["나이","BMI","나이²","나이×BMI","BMI²"];
+function fit3(){
+  const P=S3.pts,n1=P.filter(p=>p.c).length;
+  if(P.length<3||n1===0||n1===P.length){S3.fit=null;S3.sc=null;return;}
+  const A=P.map(p=>p.a),B=P.map(p=>p.b);
+  S3.sc={ma:mean(A),sa:pstd(A)||1,mb:mean(B),sb:pstd(B)||1};
+  S3.fit=fitLR(P.map(p=>feat3(p.a,p.b,S3.sc,S3.poly)),P.map(p=>p.c),C_LIST[S3.ci]);
+}
+function z3(a,b){const F=S3.fit,x=feat3(a,b,S3.sc,S3.poly);let z=F.b;for(let j=0;j<x.length;j++)z+=F.w[j]*x[j];return z;}
+function probs3(){return S3.fit?S3.pts.map(p=>sig(z3(p.a,p.b))):null;}
+function metrics(p,y,t){let TP=0,FP=0,TN=0,FN=0;for(let i=0;i<y.length;i++){const pr=p[i]>=t?1:0;if(pr&&y[i])TP++;else if(pr)FP++;else if(y[i])FN++;else TN++;}
+  const prec=TP+FP?TP/(TP+FP):NaN,rec=TP+FN?TP/(TP+FN):NaN,spec=TN+FP?TN/(TN+FP):NaN,f1=TP?2*TP/(2*TP+FP+FN):0;
+  return{TP,FP,TN,FN,acc:(TP+TN)/y.length,prec,rec,spec,f1,fpr:TN+FP?FP/(TN+FP):NaN};}
+function cmHTML(m){return`<span></span><span class="h">예측 정상 (0)</span><span class="h">예측 질환 (1)</span>
+<span class="h">실제<br>정상</span><div class="c tn"><b>${m.TN}</b><span>TN 참음성</span></div><div class="c fp"><b>${m.FP}</b><span>FP 위양성</span></div>
+<span class="h">실제<br>질환</span><div class="c fn"><b>${m.FN}</b><span>FN 놓침</span></div><div class="c tp"><b>${m.TP}</b><span>TP 참양성</span></div>`;}
+let geo3=null;
+function draw3(){
+  const cv=$("c3");if(!cv.clientWidth)return;const {ctx,w,h}=fitCanvas(cv);
+  const F=frame(w,h,{...AX3,mL:44,mB:36,mT:10,mR:12});geo3=F;
+  const sf=hexRgb(css("--surface")),c0r=hexRgb(css("--c0")),c1r=hexRgb(css("--c1"));
+  const c0=css("--c0"),c1=css("--c1"),mdl=css("--mdl"),lim=css("--lim"),sfc=css("--surface"),ink=css("--ink");
+  const ps=probs3();
+  if(S3.fit){const cs=4,gx=Math.ceil(F.pw/cs),gy=Math.ceil(F.ph/cs),Z=new Float64Array((gx+1)*(gy+1));
+    for(let j=0;j<=gy;j++)for(let i=0;i<=gx;i++)Z[j*(gx+1)+i]=z3(F.IX(F.mL+Math.min(i*cs,F.pw)),F.IY(F.mT+Math.min(j*cs,F.ph)));
+    ctx.save();ctx.beginPath();ctx.rect(F.mL,F.mT,F.pw,F.ph);ctx.clip();
+    for(let j=0;j<gy;j++)for(let i=0;i<gx;i++){const z=(Z[j*(gx+1)+i]+Z[j*(gx+1)+i+1]+Z[(j+1)*(gx+1)+i]+Z[(j+1)*(gx+1)+i+1])/4,p=sig(z);
+      ctx.fillStyle=rgb(p>=0.5?mix(sf,c1r,(p-0.5)*2*0.5):mix(sf,c0r,(0.5-p)*2*0.5));ctx.fillRect(F.mL+i*cs,F.mT+j*cs,cs+.5,cs+.5);}
+    const cont=(L,dash,lw)=>{ctx.setLineDash(dash);ctx.lineWidth=lw;ctx.strokeStyle=mdl;ctx.beginPath();
+      for(let j=0;j<gy;j++)for(let i=0;i<gx;i++){const a=Z[j*(gx+1)+i]-L,b=Z[j*(gx+1)+i+1]-L,c=Z[(j+1)*(gx+1)+i+1]-L,d=Z[(j+1)*(gx+1)+i]-L,pts=[];
+        const e=(v1,v2,x1,y1,x2,y2)=>{if((v1<0)!==(v2<0)){const t=v1/(v1-v2);pts.push([x1+(x2-x1)*t,y1+(y2-y1)*t]);}};
+        e(a,b,i,j,i+1,j);e(b,c,i+1,j,i+1,j+1);e(c,d,i+1,j+1,i,j+1);e(d,a,i,j+1,i,j);
+        for(let q=0;q+1<pts.length;q+=2){ctx.moveTo(F.mL+Math.min(pts[q][0]*cs,F.pw),F.mT+Math.min(pts[q][1]*cs,F.ph));ctx.lineTo(F.mL+Math.min(pts[q+1][0]*cs,F.pw),F.mT+Math.min(pts[q+1][1]*cs,F.ph));}}
+      ctx.stroke();ctx.setLineDash([]);};
+    if(Math.abs(S3.t-0.5)>1e-9)cont(0,[6,5],1.6);
+    cont(logit(S3.t),[],3);
+    ctx.restore();}
+  axes(ctx,F,{xt:ticks(AX3.x0,AX3.x1,w<520?5:7),yt:ticks(AX3.y0,AX3.y1,5),xgrid:true,gridAlpha:.55,xl:"나이 (세)",yl:"BMI (kg/m²)"});
+  S3.pts.forEach((p,i)=>{const x=F.X(p.a),y=F.Y(p.b);
+    if(ps&&((ps[i]>=S3.t?1:0)!==p.c)){ctx.beginPath();ctx.arc(x,y,9,0,Math.PI*2);ctx.strokeStyle=lim;ctx.lineWidth=2.2;ctx.stroke();}
+    ctx.beginPath();ctx.arc(x,y,5.5,0,Math.PI*2);ctx.fillStyle=p.c?c1:c0;ctx.fill();ctx.lineWidth=1.5;ctx.strokeStyle=sfc;ctx.stroke();});
+  if(!S3.pts.length){ctx.fillStyle=css("--muted");ctx.font=`600 14px ${css("--sans")}`;ctx.textAlign="center";ctx.fillText("그래프를 눌러 점을 추가하세요",F.mL+F.pw/2,F.mT+F.ph/2);}
+}
+function render3(refit){
+  if(refit)fit3();
+  const C=C_LIST[S3.ci];
+  $("d3tv").textContent=f(S3.t,2);$("d3cv").textContent=C<1?String(C):String(C);
+  $("d3c").setAttribute("aria-valuetext",`C = ${C}`);
+  const P=S3.pts,y=P.map(p=>p.c),n1=y.reduce((s,v)=>s+v,0);
+  if(!S3.fit){
+    $("d3stats").innerHTML=`<div class="sk-stat"><b>${P.length}</b><span>환자 수 (질환 ${n1})</span></div>`;
+    $("d3cm").innerHTML="";$("d3coef").innerHTML="";$("d3eq").textContent="두 클래스가 모두 있어야(각 1명 이상, 전체 3명 이상) 학습할 수 있습니다.";$("d3norm").textContent="";
+    $("d3note").innerHTML="점이 부족합니다. 위의 데이터 버튼을 누르거나 그래프를 눌러 두 클래스의 점을 추가하세요.";$("d3note").className="sk-note sk-note--warn";
+    draw3();return;}
+  const ps=probs3(),m=metrics(ps,y,S3.t);
+  let ll=0;P.forEach((p,i)=>{const z=z3(p.a,p.b);ll+=softplus(z)-p.c*z;});ll/=P.length;
+  S3.m=m;S3.ll=ll;
+  $("d3stats").innerHTML=`<div class="sk-stat lg-hl"><b>${f(m.acc,3)}</b><span>정확도</span></div><div class="sk-stat"><b>${isNaN(m.prec)?"—":f(m.prec,3)}</b><span>정밀도</span></div><div class="sk-stat"><b>${isNaN(m.rec)?"—":f(m.rec,3)}</b><span>재현율(민감도)</span></div><div class="sk-stat"><b>${f(m.f1,3)}</b><span>F1</span></div><div class="sk-stat"><b>${f(ll,4)}</b><span>로그손실</span></div><div class="sk-stat"><b>${P.length}</b><span>환자 (질환 ${n1})</span></div>`;
+  $("d3cm").innerHTML=cmHTML(m);
+  const W=S3.fit.w,nm=W.length,mx=Math.max(1,...W.map(Math.abs));
+  let ch="";W.forEach((v,j)=>{const wd=Math.abs(v)/mx*50;ch+=`<span class="nm">${FN3[j]}</span><span class="tr"><span class="z"></span><span class="fl" style="${v>=0?`left:50%`:`left:${50-wd}%`};width:${wd}%"></span></span><span class="v">${f(v,3)}</span>`;});
+  ch+=`<span class="nm">절편 w₀</span><span class="sk-hint">규제하지 않음</span><span class="v">${f(S3.fit.b,3)}</span>`;
+  $("d3coef").innerHTML=ch;
+  const norm=Math.sqrt(W.reduce((s,v)=>s+v*v,0));
+  $("d3norm").textContent=`‖w‖₂ = ${f(norm,3)} · 뉴턴 ${S3.fit.iters}회`;
+  const sc=S3.sc;let eq;
+  if(!S3.poly){const ba=W[0]/sc.sa,bb=W[1]/sc.sb,b0=S3.fit.b-W[0]*sc.ma/sc.sa-W[1]*sc.mb/sc.sb,L=logit(S3.t);
+    eq=`<span class="c">표준화: u = (나이 − ${f(sc.ma,2)}) / ${f(sc.sa,2)},  v = (BMI − ${f(sc.mb,2)}) / ${f(sc.sb,2)}</span>
+z = ${f(S3.fit.b,3)} + ${f(W[0],3)}·u + ${f(W[1],3)}·v
+<span class="c">원래 단위로</span>
+z = ${f(b0,3)} + ${f(ba,4)}·나이 + ${f(bb,4)}·BMI
+오즈비: 나이 +1세 → ×${f(Math.exp(ba),3)},  BMI +1 → ×${f(Math.exp(bb),3)}
+<span class="c">결정 경계 p = ${f(S3.t,2)}  ⇔  z = ln(t/(1−t)) = ${f(L,3)}</span>
+BMI = ${Math.abs(bb)>1e-9?`(${f(L,3)} − (${f(b0,3)}) − ${f(ba,4)}·나이) / ${f(bb,4)}`:"(BMI 계수가 0)"}`;}
+  else{eq=`<span class="c">표준화 u = (나이 − ${f(sc.ma,2)})/${f(sc.sa,2)}, v = (BMI − ${f(sc.mb,2)})/${f(sc.sb,2)} 로 2차 특성을 만든 뒤 학습</span>
+z = ${f(S3.fit.b,3)} ${W.map((v,j)=>(v<0?"− ":"+ ")+f(Math.abs(v),3)+"·"+["u","v","u²","u·v","v²"][j]).join(" ")}
+<span class="c">z 는 여전히 계수에 대해 선형 → 여전히 로지스틱 회귀. 특성 공간이 곡면이라 경계가 휘어짐</span>
+결정 경계: z = ${f(logit(S3.t),3)}  (p = ${f(S3.t,2)})`;}
+  $("d3eq").innerHTML=eq;
+  // 안내
+  let note="",warn=false;
+  if(S3.preset==="circle"&&!S3.poly){note=`<b>직선 하나로는 원 모양을 가를 수 없습니다.</b> 지금 정확도 ${f(m.acc,3)} — 대부분을 한쪽으로 몰아 맞히는 수준입니다. 오른쪽의 '특성 추가'를 켜 보세요. 나이², BMI² 가 들어가면 z = 0 이 타원이 됩니다.`;warn=true;}
+  else if(S3.preset==="circle"&&S3.poly)note=`<b>특성 추가로 해결</b>: 모델은 그대로 로지스틱 회귀지만 입력에 나이², 나이×BMI, BMI² 를 넣어 경계가 타원이 되었습니다. 정확도 ${f(m.acc,3)}. C 를 아주 작게 하면 계수가 눌려 다시 경계가 흐려집니다.`;
+  else if(C<=0.01)note=`<b>강한 규제 (C = ${C})</b>: 계수가 0 쪽으로 눌려 확률이 거의 모든 곳에서 유병률 근처로 평평해집니다. 배경색이 옅어지는 것을 보세요.`;
+  else if(C>=100)note=`<b>약한 규제 (C = ${C})</b>: 학습 데이터에 더 강하게 맞추려 계수가 커지고 확률 변화가 가팔라집니다(경계 근처 색이 급변). 겹친 점이 많으면 과적합 위험.`;
+  else note=`임계값을 낮추면 경계선이 정상(파랑) 쪽으로 밀려 더 많은 사람을 질환으로 예측합니다 → 재현율 ↑, 정밀도 ↓. C = 1/λ 를 바꾸면 계수 크기(‖w‖)와 경계의 기울기가 바뀝니다.`;
+  $("d3note").innerHTML=note;$("d3note").className="sk-note"+(warn?" sk-note--warn":"");
+  draw3();
+}
+segInit($("d3preset"),v=>{S3.preset=v;S3.seed=1;S3.pts=gen3(v,1);if(v==="circle"){S3.poly=false;$("d3poly").checked=false;}render3(true);});
+segInit($("d3mode"),v=>{S3.mode=v;});
+$("d3seed").onclick=()=>{S3.seed=S3.seed%97+1;S3.pts=gen3(S3.preset,S3.seed);render3(true);};
+$("d3clear").onclick=()=>{S3.pts=[];render3(true);};
+$("d3t").addEventListener("input",e=>{S3.t=+e.target.value;render3(false);});
+$("d3c").addEventListener("input",e=>{S3.ci=+e.target.value;render3(true);});
+$("d3poly").addEventListener("change",e=>{S3.poly=e.target.checked;render3(true);});
+$("c3").addEventListener("click",e=>{const F=geo3;if(!F)return;const r=e.currentTarget.getBoundingClientRect(),px=e.clientX-r.left,pyy=e.clientY-r.top;
+  if(S3.mode==="del"){let bi=-1,bd=14*14;S3.pts.forEach((p,i)=>{const d=(F.X(p.a)-px)**2+(F.Y(p.b)-pyy)**2;if(d<bd){bd=d;bi=i;}});if(bi>=0){S3.pts.splice(bi,1);render3(true);}return;}
+  if(px<F.mL||px>F.mL+F.pw||pyy<F.mT||pyy>F.mT+F.ph)return;
+  S3.pts.push({a:r1(F.IX(px)),b:r1(F.IY(pyy)),c:+S3.mode});render3(true);});
+onShow["2d"]=()=>render3(false);
+
+/* ================= 4. 임계값과 ROC ================= */
+const S4={src:"screen",t:0.5,k:5,scr:null};
+function genScreen(){const r=mulberry32(20260930),P=[];
+  for(let i=0;i<300;i++){const c=r()<0.22?1:0;const a=Math.round(Math.min(85,Math.max(25,c?58+10*gauss(r):47+12*gauss(r))));const gl=Math.round(Math.min(220,Math.max(70,c?127+22*gauss(r):101+14*gauss(r))));P.push({a,g:gl,c});}
+  const A=P.map(p=>p.a),G=P.map(p=>p.g),sc={ma:mean(A),sa:pstd(A),mg:mean(G),sg:pstd(G)};
+  const X=P.map(p=>[(p.a-sc.ma)/sc.sa,(p.g-sc.mg)/sc.sg]),fit=fitLR(X,P.map(p=>p.c),1);
+  const p=X.map(x=>sig(fit.b+fit.w[0]*x[0]+fit.w[1]*x[1]));
+  return{P,sc,fit,p,y:P.map(q=>q.c)};}
+function roc(p,y){const idx=p.map((_,i)=>i).sort((a,b)=>p[b]-p[a]);const P=y.reduce((s,v)=>s+v,0),N=y.length-P;let tp=0,fp=0;const pts=[{t:Infinity,fpr:0,tpr:0,tp:0,fp:0}];
+  for(let k=0;k<idx.length;k++){const i=idx[k];if(y[i])tp++;else fp++;if(k===idx.length-1||p[idx[k+1]]!==p[i])pts.push({t:p[i],fpr:fp/N,tpr:tp/P,tp,fp});}
+  let auc=0,ap=0;for(let k=1;k<pts.length;k++){auc+=(pts[k].fpr-pts[k-1].fpr)*(pts[k].tpr+pts[k-1].tpr)/2;ap+=(pts[k].tpr-pts[k-1].tpr)*(pts[k].tp/(pts[k].tp+pts[k].fp));}
+  return{pts,auc,ap,P,N};}
+function mannWhitney(p,y){let s=0,c=0;for(let i=0;i<p.length;i++)if(y[i])for(let j=0;j<p.length;j++)if(!y[j]){c++;s+=p[i]>p[j]?1:p[i]===p[j]?0.5:0;}return s/c;}
+function data4(){
+  if(S4.src==="tab3"){if(!S3.fit)fit3();if(!S3.fit)return null;return{p:probs3(),y:S3.pts.map(q=>q.c),label:`3번 화면의 ${S3.pts.length}명 · 학습 데이터 그대로 평가`};}
+  if(!S4.scr)S4.scr=genScreen();const d=S4.scr;return{p:d.p,y:d.y,label:`검진 300명 (나이·공복혈당, 질환 ${d.y.reduce((s,v)=>s+v,0)}명) · LogisticRegression(C=1) 로 학습한 확률`};}
+function best4(kind,d,R){const cands=R.pts.slice(1).map(q=>q.t).concat([1]);let bt=0.5,bv=-Infinity;
+  if(kind==="sens"){for(let k=1;k<R.pts.length;k++){if(R.pts[k].tpr>=0.9)return R.pts[k].t;}return R.pts[R.pts.length-1].t;}
+  cands.forEach(t=>{const m=metrics(d.p,d.y,t);let v;if(kind==="youden")v=m.rec-m.fpr;else if(kind==="f1")v=m.f1;else v=-(S4.k*m.FN+m.FP);if(v>bv+1e-12){bv=v;bt=t;}});return bt;}
+function render4(){
+  const d=data4();
+  if(!d){["r4hist","r4roc","r4pr"].forEach(id=>$(id).innerHTML="");$("r4cm").innerHTML="";$("r4stats").innerHTML="";$("r4info").textContent="3번 화면에 두 클래스의 점이 모두 있어야 합니다.";$("r4histcap").textContent="";$("r4costf").textContent="";return;}
+  $("r4info").textContent=d.label;
+  const R=roc(d.p,d.y),m=metrics(d.p,d.y,S4.t);S4.R=R;S4.d=d;S4.m=m;
+  $("r4histcap").innerHTML=`위(파랑) = 실제 정상 ${R.N}명: t 오른쪽 진한 막대가 <b>위양성 FP ${m.FP}명</b>. 아래(주황) = 실제 질환 ${R.P}명: t 왼쪽 옅은 막대가 <b>놓친 환자 FN ${m.FN}명</b>. 막대 높이는 그룹마다 따로 맞춤. 그래프를 누르면 그 위치로 임계값이 옮겨집니다.`;
+  $("r4tv").textContent=f(S4.t,3);$("r4kv").textContent=S4.k;
+  $("r4cm").innerHTML=cmHTML(m);
+  $("r4stats").innerHTML=`<div class="sk-stat lg-hl"><b>${pct(m.rec)}</b><span>민감도 = 재현율 (TPR)</span></div><div class="sk-stat"><b>${pct(m.spec)}</b><span>특이도 (TNR)</span></div><div class="sk-stat"><b>${pct(m.fpr)}</b><span>위양성률 FPR</span></div><div class="sk-stat"><b>${isNaN(m.prec)?"—":pct(m.prec)}</b><span>정밀도 (PPV)</span></div><div class="sk-stat"><b>${f(m.f1,3)}</b><span>F1</span></div><div class="sk-stat"><b>${pct(m.acc)}</b><span>정확도</span></div>`;
+  const mw=mannWhitney(d.p,d.y);S4.mw=mw;
+  $("r4auc").textContent=`AUC = ${f(R.auc,4)}`;$("r4ap").textContent=`AP = ${f(R.ap,4)}`;
+  $("r4auccap").innerHTML=`AUC = 곡선 아래 넓이(사다리꼴 합) = <b>${f(R.auc,4)}</b>. 검산: 질환자 ${R.P}명 × 정상 ${R.N}명 = ${R.P*R.N}쌍 중 질환자의 확률이 더 높은 쌍의 비율 = <b>${f(mw,4)}</b>. 현재 점: FPR ${f(m.fpr,3)}, TPR ${f(m.rec,3)}.`;
+  // 히스토그램
+  (function(){const host=$("r4hist");if(!host.clientWidth)return;const nb=20,H0=new Array(nb).fill(0).map(()=>[0,0]),H1=new Array(nb).fill(0).map(()=>[0,0]);
+    d.p.forEach((p,i)=>{const b=Math.min(nb-1,Math.floor(p*nb)),pos=p>=S4.t?1:0;(d.y[i]?H1:H0)[b][pos]++;});
+    const m0=Math.max(1,...H0.map(v=>v[0]+v[1])),m1=Math.max(1,...H1.map(v=>v[0]+v[1]));
+    const F=svgFrame(host,{x0:0,x1:1,y0:0,y1:1,xt:[0,0.2,0.4,0.6,0.8,1],xf:v=>String(v),xl:"예측 확률 p (질환일 확률)",ratio:host.clientWidth<500?0.8:0.5,mL:18,mR:14,mT:36});
+    const mid=F.mT+F.ph/2,hh=F.ph/2-14,bw=F.pw/nb;let s=`<line class="gl0" x1="${F.mL}" x2="${F.mL+F.pw}" y1="${mid}" y2="${mid}"/>`;
+    for(let b=0;b<nb;b++){const x=F.X(b/nb)+1,wd=bw-2;
+      const a0=H0[b][0]/m0*hh,a1=H0[b][1]/m0*hh;s+=`<rect x="${x}" y="${mid-a0-a1}" width="${wd}" height="${a1}" fill="var(--c0)"/><rect x="${x}" y="${mid-a0}" width="${wd}" height="${a0}" fill="var(--c0)" opacity=".3"/>`;
+      const q0=H1[b][0]/m1*hh,q1=H1[b][1]/m1*hh;s+=`<rect x="${x}" y="${mid}" width="${wd}" height="${q1}" fill="var(--c1)"/><rect x="${x}" y="${mid+q1}" width="${wd}" height="${q0}" fill="var(--c1)" opacity=".3"/>`;}
+    const tx=F.X(S4.t);s+=`<line class="tl" x1="${tx}" x2="${tx}" y1="${F.mT}" y2="${F.mT+F.ph}"/>`;
+    const lt=tx>F.mL+F.pw*0.6;
+    s+=`<text class="lbl" x="${F.mL}" y="12" fill="var(--c0)">▲ 위: 실제 정상 (가장 높은 칸 ${m0}명)</text><text class="lbl" x="${F.mL}" y="27" fill="var(--c1)">▼ 아래: 실제 질환 (가장 높은 칸 ${m1}명)</text>`;
+    s+=`<text class="lbl" x="${lt?tx-6:tx+6}" y="${mid-8}" text-anchor="${lt?"end":"start"}" fill="var(--ink)">t = ${f(S4.t,3)}</text>`;
+    s+=`<rect class="click" x="${F.mL}" y="${F.mT}" width="${F.pw}" height="${F.ph}" fill="transparent"/>`;
+    const svg=svgPut(host,F,s);svg.addEventListener("click",e=>{const [vx]=svgPoint(svg,F,e);S4.t=Math.min(1,Math.max(0,+((vx-F.mL)/F.pw).toFixed(3)));$("r4t").value=S4.t;render4();});})();
+  // ROC
+  (function(){const host=$("r4roc");if(!host.clientWidth)return;
+    const F=svgFrame(host,{x0:0,x1:1,y0:0,y1:1,xt:[0,0.2,0.4,0.6,0.8,1],yt:[0,0.2,0.4,0.6,0.8,1],xf:v=>String(v),yf:v=>String(v),xl:"위양성률 FPR = 1 − 특이도",yl:"민감도 TPR",ratio:0.8,xgrid:true});
+    const pts=R.pts;let d0=pts.map((q,k)=>(k?"L":"M")+F.X(q.fpr).toFixed(1)+","+F.Y(q.tpr).toFixed(1)).join("");
+    const area=d0+`L${F.X(1)},${F.Y(0)}L${F.X(0)},${F.Y(0)}Z`;
+    const cx=F.X(m.fpr),cy=F.Y(m.rec);
+    let s=`<path d="${area}" fill="var(--c1)" opacity=".1"/><line class="diag" x1="${F.X(0)}" y1="${F.Y(0)}" x2="${F.X(1)}" y2="${F.Y(1)}"/><path d="${d0}" fill="none" stroke="var(--c1)" stroke-width="2.4" stroke-linejoin="round"/>`;
+    s+=`<text class="lbl" x="${F.X(0.55)}" y="${F.Y(0.3)}" fill="var(--c1)">AUC ${f(R.auc,3)}</text><text class="lbl" x="${F.X(0.62)}" y="${F.Y(0.58)}" fill="var(--faint)">무작위 (0.5)</text>`;
+    s+=`<circle cx="${cx}" cy="${cy}" r="7" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"/><text class="lbl" x="${cx+10}" y="${cy+16}" fill="var(--ink)">t = ${f(S4.t,3)}</text>`;
+    s+=`<rect class="click" x="${F.mL}" y="${F.mT}" width="${F.pw}" height="${F.ph}" fill="transparent"/>`;
+    const svg=svgPut(host,F,s);svg.addEventListener("click",e=>{const [vx,vy]=svgPoint(svg,F,e);let bk=1,bd=Infinity;for(let k=1;k<pts.length;k++){const dd=(F.X(pts[k].fpr)-vx)**2+(F.Y(pts[k].tpr)-vy)**2;if(dd<bd){bd=dd;bk=k;}}setT4(pts[bk].t);});})();
+  // PR
+  (function(){const host=$("r4pr");if(!host.clientWidth)return;
+    const F=svgFrame(host,{x0:0,x1:1,y0:0,y1:1,xt:[0,0.2,0.4,0.6,0.8,1],yt:[0,0.2,0.4,0.6,0.8,1],xf:v=>String(v),yf:v=>String(v),xl:"재현율 (민감도)",yl:"정밀도",ratio:0.8,xgrid:true});
+    const pr=R.pts.slice(1).map(q=>({r:q.tpr,p:q.tp/(q.tp+q.fp),t:q.t}));
+    let d0=`M${F.X(0)},${F.Y(pr[0].p)}`+pr.map(q=>"L"+F.X(q.r).toFixed(1)+","+F.Y(q.p).toFixed(1)).join("");
+    const prev=R.P/(R.P+R.N),by=F.Y(prev);
+    const cx=F.X(m.rec),cy=F.Y(isNaN(m.prec)?1:m.prec);
+    let s=`<line class="diag" x1="${F.mL}" x2="${F.mL+F.pw}" y1="${by}" y2="${by}"/><text class="lbl" x="${F.mL+6}" y="${by-5}" fill="var(--faint)">유병률 ${f(prev,3)}</text><path d="${d0}" fill="none" stroke="var(--val)" stroke-width="2.4" stroke-linejoin="round"/>`;
+    s+=`<circle cx="${cx}" cy="${cy}" r="7" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"/><text class="lbl" x="${cx>F.mL+F.pw*0.7?cx-10:cx+10}" y="${cy+18}" text-anchor="${cx>F.mL+F.pw*0.7?"end":"start"}" fill="var(--ink)">t = ${f(S4.t,3)}</text>`;
+    s+=`<rect class="click" x="${F.mL}" y="${F.mT}" width="${F.pw}" height="${F.ph}" fill="transparent"/>`;
+    const svg=svgPut(host,F,s);svg.addEventListener("click",e=>{const [vx,vy]=svgPoint(svg,F,e);let bk=0,bd=Infinity;pr.forEach((q,k)=>{const dd=(F.X(q.r)-vx)**2+(F.Y(q.p)-vy)**2;if(dd<bd){bd=dd;bk=k;}});setT4(pr[bk].t);});})();
+  // 비용
+  const cost=S4.k*m.FN+m.FP,tc=best4("cost",d,R),mc=metrics(d.p,d.y,tc);
+  $("r4costf").innerHTML=`<span class="c">총비용 = ${S4.k} × FN + 1 × FP</span>
+지금 t = ${f(S4.t,3)}:  ${S4.k} × ${m.FN} + ${m.FP} = <b>${cost}</b>    (민감도 ${pct(m.rec)}, 정밀도 ${isNaN(m.prec)?"—":pct(m.prec)})
+비용 최소 t = ${f(tc,3)}:  ${S4.k} × ${mc.FN} + ${mc.FP} = <b class="g">${S4.k*mc.FN+mc.FP}</b>    (민감도 ${pct(mc.rec)}, 정밀도 ${isNaN(mc.prec)?"—":pct(mc.prec)})
+<span class="c">확률이 잘 보정되어 있다면 이론상 최적 임계값 = 1 / (1 + ${S4.k}) = ${f(1/(1+S4.k),3)}  → 놓치는 비용이 클수록 임계값이 내려감</span>`;
+}
+function setT4(t){S4.t=Math.min(1,Math.max(0,t));$("r4t").value=S4.t;render4();}
+segInit($("r4src"),v=>{S4.src=v;render4();});
+$("r4t").addEventListener("input",e=>{S4.t=+e.target.value;render4();});
+$("r4k").addEventListener("input",e=>{S4.k=+e.target.value;render4();});
+$("r4half").onclick=()=>setT4(0.5);
+$("r4sens").onclick=()=>{const d=data4();if(d)setT4(best4("sens",d,roc(d.p,d.y)));};
+$("r4youden").onclick=()=>{const d=data4();if(d)setT4(best4("youden",d,roc(d.p,d.y)));};
+$("r4f1").onclick=()=>{const d=data4();if(d)setT4(best4("f1",d,roc(d.p,d.y)));};
+$("r4cost").onclick=()=>{const d=data4();if(d)setT4(best4("cost",d,roc(d.p,d.y)));};
+onShow.roc=render4;
+
+/* ================= 5. 코드 ================= */
+const S5={kind:"2d",code:""};
+function hl(code){return code.split("\n").map(line=>{const i=line.indexOf("#");let a=i>=0?line.slice(0,i):line,b=i>=0?line.slice(i):"";
+  a=esc(a).replace(/(&quot;|"[^"]*"|'[^']*')/g,'<span class="st">$1</span>').replace(/\b(import|from|as|for|in|print|def|return|range)\b/g,'<span class="kw">$1</span>');
+  return a+(b?`<span class="cm">${esc(b)}</span>`:"");}).join("\n");}
+function wrapNums(arr,per,indent){const out=[];for(let i=0;i<arr.length;i+=per)out.push(indent+arr.slice(i,i+per).join(", ")+(i+per<arr.length?",":""));return out.join("\n");}
+function code2d(){
+  if(!S3.fit)fit3();
+  const P=S3.pts;if(!S3.fit)return{lead:"3번 화면에 두 클래스의 점이 있어야 코드를 만들 수 있습니다.",code:"# 3번 화면에서 점을 추가하세요."};
+  const C=C_LIST[S3.ci],t=S3.t,ps=probs3(),y=P.map(q=>q.c),m=metrics(ps,y,t),R=roc(ps,y);
+  let ll=0;P.forEach((p,i)=>{const z=z3(p.a,p.b);ll+=softplus(z)-p.c*z;});ll/=P.length;
+  const rows=P.map(p=>`[${p.a.toFixed(1)}, ${p.b.toFixed(1)}]`);
+  const L=[];
+  L.push("import numpy as np");
+  L.push("from sklearn.pipeline import make_pipeline");
+  L.push(`from sklearn.preprocessing import StandardScaler${S3.poly?", PolynomialFeatures":""}`);
+  L.push("from sklearn.linear_model import LogisticRegression");
+  L.push("from sklearn.metrics import (confusion_matrix, accuracy_score, precision_score,");
+  L.push("                             recall_score, f1_score, log_loss, roc_auc_score)");
+  L.push("");
+  L.push(`# 3번 화면의 데이터: [나이, BMI] ${P.length}명, y = 질환 여부 (1 = 질환)`);
+  L.push("X = np.array([");L.push(wrapNums(rows,6,"    "));L.push("])");
+  L.push("y = np.array([");L.push(wrapNums(y.map(String),30,"    "));L.push("])");
+  L.push("");
+  L.push("model = make_pipeline(");
+  L.push("    StandardScaler(),                        # 나이·BMI 표준화 (규제는 계수 크기에 걸리므로 필수)");
+  if(S3.poly)L.push("    PolynomialFeatures(degree=2, include_bias=False),  # 나이², 나이×BMI, BMI² 추가");
+  L.push(`    LogisticRegression(C=${C}, penalty="l2"),   # C = 1/λ, 작을수록 강한 규제`);
+  L.push(")");
+  L.push("# scikit-learn 1.8 이상에서는 penalty 인자가 경고를 냅니다 → penalty를 빼면 같은 L2 규제(기본값)");
+  L.push("model.fit(X, y)");
+  L.push("");
+  L.push("lr = model[-1]");
+  L.push('print("절편:", lr.intercept_.round(3))');
+  L.push('print("계수:", lr.coef_.round(3))' + (S3.poly?"   # [나이, BMI, 나이², 나이×BMI, BMI²] (표준화 기준)":"   # [나이, BMI] (표준화 기준)"));
+  L.push("");
+  L.push("proba = model.predict_proba(X)[:, 1]      # 질환(1)일 확률");
+  L.push(`threshold = ${t.toFixed(2)}`);
+  L.push("pred = (proba >= threshold).astype(int)   # predict()는 0.5 고정이라 직접 임계값 적용");
+  L.push("");
+  L.push("print(confusion_matrix(y, pred))           # [[TN, FP], [FN, TP]]");
+  L.push('print("정확도", round(accuracy_score(y, pred), 3))');
+  L.push('print("정밀도", round(precision_score(y, pred, zero_division=0), 3))');
+  L.push('print("재현율", round(recall_score(y, pred), 3))');
+  L.push('print("F1   ", round(f1_score(y, pred), 3))');
+  L.push('print("로그손실", round(log_loss(y, proba), 4))');
+  L.push('print("AUC  ", round(roc_auc_score(y, proba), 4))');
+  L.push("");
+  L.push("# ---- 이 페이지의 계산 결과 (비교용) ----");
+  L.push(`# 절편: [${py(S3.fit.b,3)}]`);
+  L.push(`# 계수: [[${S3.fit.w.map(v=>py(v,3)).join(" ")}]]`);
+  L.push(`# 혼동행렬: [[${m.TN} ${m.FP}] [${m.FN} ${m.TP}]]`);
+  L.push(`# 정확도 ${py(m.acc,3)} / 정밀도 ${py(isNaN(m.prec)?0:m.prec,3)} / 재현율 ${py(m.rec,3)} / F1 ${py(m.f1,3)}`);
+  L.push(`# 로그손실 ${py(ll,4)} / AUC ${py(R.auc,4)}`);
+  return{lead:`3번 화면의 ${P.length}명, C = ${C}${S3.poly?", 2차 특성 추가":""}, 임계값 ${t.toFixed(2)} 설정 그대로입니다.`,code:L.join("\n")};
+}
+function codeRoc(){
+  const d=data4();if(!d)return{lead:"3번 화면에 두 클래스의 점이 있어야 합니다.",code:"# 데이터가 부족합니다."};
+  const R=roc(d.p,d.y),m=metrics(d.p,d.y,S4.t),L=[];
+  L.push("import numpy as np");
+  L.push("from sklearn.pipeline import make_pipeline");
+  L.push(`from sklearn.preprocessing import StandardScaler${S4.src==="tab3"&&S3.poly?", PolynomialFeatures":""}`);
+  L.push("from sklearn.linear_model import LogisticRegression");
+  L.push("from sklearn.metrics import (roc_curve, roc_auc_score, precision_recall_curve,");
+  L.push("                             average_precision_score, confusion_matrix, recall_score, precision_score)");
+  L.push("");
+  if(S4.src==="screen"){const P=S4.scr.P;
+    L.push(`# 검진 데이터 ${P.length}명: 나이(세), 공복혈당(mg/dL), 질환 여부`);
+    L.push("age = np.array([");L.push(wrapNums(P.map(q=>String(q.a)),20,"    "));L.push("])");
+    L.push("glucose = np.array([");L.push(wrapNums(P.map(q=>String(q.g)),20,"    "));L.push("])");
+    L.push("y = np.array([");L.push(wrapNums(P.map(q=>String(q.c)),30,"    "));L.push("])");
+    L.push("X = np.column_stack([age, glucose])");L.push("");
+    L.push("model = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, penalty=\"l2\"))");}
+  else{const P=S3.pts;
+    L.push(`# 3번 화면의 데이터: [나이, BMI] ${P.length}명`);
+    L.push("X = np.array([");L.push(wrapNums(P.map(p=>`[${p.a.toFixed(1)}, ${p.b.toFixed(1)}]`),6,"    "));L.push("])");
+    L.push("y = np.array([");L.push(wrapNums(P.map(p=>String(p.c)),30,"    "));L.push("])");L.push("");
+    L.push(`model = make_pipeline(StandardScaler(),${S3.poly?" PolynomialFeatures(degree=2, include_bias=False),":""} LogisticRegression(C=${C_LIST[S3.ci]}, penalty="l2"))`);}
+  L.push("model.fit(X, y)");
+  L.push("proba = model.predict_proba(X)[:, 1]");
+  L.push("");
+  L.push("fpr, tpr, thr = roc_curve(y, proba)          # 임계값을 내리며 (FPR, TPR) 계산");
+  L.push('print("AUC:", round(roc_auc_score(y, proba), 4))');
+  L.push('print("AP :", round(average_precision_score(y, proba), 4))   # PR 곡선 아래 넓이');
+  L.push("");
+  L.push("# 민감도 90% 이상을 만족하는 가장 높은 임계값 (선별검사용)");
+  L.push("i = np.argmax(tpr >= 0.90)");
+  L.push('print("임계값", round(thr[i], 3), "민감도", round(tpr[i], 3), "FPR", round(fpr[i], 3))');
+  L.push("");
+  L.push(`threshold = ${S4.t.toFixed(3)}`);
+  L.push("pred = (proba >= threshold).astype(int)");
+  L.push("print(confusion_matrix(y, pred))              # [[TN, FP], [FN, TP]]");
+  L.push('print("민감도", round(recall_score(y, pred), 3), "정밀도", round(precision_score(y, pred, zero_division=0), 3))');
+  L.push("");
+  L.push(`# 놓침(FN) 1명 = 위양성(FP) ${S4.k}명 비용일 때 총비용 최소 임계값`);
+  L.push(`cost = [${S4.k} * ((proba < t) & (y == 1)).sum() + ((proba >= t) & (y == 0)).sum() for t in thr[1:]]`);
+  L.push('print("비용 최소 임계값", round(thr[1:][int(np.argmin(cost))], 3))');
+  L.push("");
+  const ts=best4("sens",d,R),ms=metrics(d.p,d.y,ts),tc=best4("cost",d,R);
+  L.push("# ---- 이 페이지의 계산 결과 (비교용) ----");
+  L.push(`# AUC ${py(R.auc,4)} / AP ${py(R.ap,4)}`);
+  L.push(`# 민감도 ≥ 0.9 최고 임계값 ${py(ts,3)} → 민감도 ${py(ms.rec,3)}, FPR ${py(ms.fpr,3)}`);
+  L.push(`# 임계값 ${S4.t.toFixed(3)}: [[${m.TN} ${m.FP}] [${m.FN} ${m.TP}]] 민감도 ${py(m.rec,3)} 정밀도 ${py(isNaN(m.prec)?0:m.prec,3)}`);
+  L.push(`# 비용 최소 임계값 ${py(tc,3)}`);
+  return{lead:`4번 화면의 ${S4.src==="screen"?"검진 데이터 300명":"3번 화면 데이터"}, 임계값 ${S4.t.toFixed(3)}, 놓침 비용 ${S4.k}배 설정입니다.`,code:L.join("\n")};
+}
+function code1d(){
+  const S=G2.S,L=[];
+  L.push("import numpy as np");
+  L.push("from sklearn.pipeline import make_pipeline");
+  L.push("from sklearn.preprocessing import StandardScaler");
+  L.push("from sklearn.linear_model import LogisticRegression");
+  L.push("from sklearn.metrics import log_loss");
+  L.push("");
+  L.push(`# 1·2번 화면의 데이터 (표본 번호 ${D1.seed}): 공복혈당 40명과 당뇨 여부`);
+  L.push("glucose = np.array([");L.push(wrapNums(D1.xs.map(String),20,"    "));L.push("])");
+  L.push("y = np.array([");L.push(wrapNums(D1.ys.map(String),20,"    "));L.push("])");
+  L.push("X = glucose.reshape(-1, 1)");
+  L.push("");
+  L.push("# 1) 최대우도 해: C를 아주 크게 해서 규제를 사실상 끈다");
+  L.push("model = make_pipeline(StandardScaler(), LogisticRegression(C=1e6))");
+  L.push("model.fit(X, y)");
+  L.push("scaler, lr = model");
+  L.push("w0, w1 = lr.intercept_[0], lr.coef_[0, 0]");
+  L.push("mu, sd = scaler.mean_[0], scaler.scale_[0]");
+  L.push("b1 = w1 / sd                      # 원래 혈당 단위로 되돌리기");
+  L.push("b0 = w0 - w1 * mu / sd");
+  L.push('print(f"b0 = {b0:.3f}, b1 = {b1:.4f}")');
+  L.push('print(f"혈당 +1 → 오즈 {np.exp(b1):.4f}배, +10 → {np.exp(10 * b1):.3f}배")');
+  L.push('print("로그손실:", round(log_loss(y, model.predict_proba(X)[:, 1]), 4))');
+  L.push("");
+  L.push("# 슬라이더로 정한 b0, b1 의 로그손실");
+  L.push(`b0_my, b1_my = ${py(S1.b0,4)}, ${py(S1.b1,4)}`);
+  L.push("p_my = 1 / (1 + np.exp(-(b0_my + b1_my * glucose)))");
+  L.push('print("내 곡선 로그손실:", round(log_loss(y, p_my), 4))');
+  L.push("");
+  L.push("# 2) 경사하강법 직접 구현 (2번 화면과 같은 설정)");
+  L.push("xs = (glucose - glucose.mean()) / glucose.std()   # 표준화 (모표준편차)");
+  L.push(`w = np.array([${py(S.start[0],2)}, ${py(S.start[1],2)}])   # 시작점 [w0, w1]`);
+  L.push(`eta = ${py(S.eta,2)}`);
+  L.push(`for step in range(${S.t}):`);
+  L.push("    p = 1 / (1 + np.exp(-(w[0] + w[1] * xs)))");
+  L.push("    grad = np.array([np.mean(p - y), np.mean((p - y) * xs)])   # (p − y), (p − y)·x");
+  L.push("    w -= eta * grad");
+  L.push("p = 1 / (1 + np.exp(-(w[0] + w[1] * xs)))");
+  L.push('print("w0, w1 =", w.round(4), " 로그손실 =", round(log_loss(y, p), 4))');
+  L.push("");
+  L.push("# ---- 이 페이지의 계산 결과 (비교용) ----");
+  L.push(`# b0 = ${py(D1.mle.b0,3)}, b1 = ${py(D1.mle.b1,4)} / 오즈 ${py(Math.exp(D1.mle.b1),4)}배, ${py(Math.exp(10*D1.mle.b1),3)}배 / 로그손실 ${py(D1.minLoss,4)}`);
+  L.push(`# 내 곡선 로그손실 ${py(lossRaw(S1.b0,S1.b1),4)}`);
+  L.push(`# ${S.t} 스텝 후 w0, w1 = [${py(S.w[0],4)} ${py(S.w[1],4)}], 로그손실 ${py(S.hist[S.hist.length-1],4)}`);
+  return{lead:`표본 번호 ${D1.seed}의 40명, 슬라이더 b₀ = ${f(S1.b0,3)}, b₁ = ${f(S1.b1,4)}, 경사하강 η = ${f(S.eta,2)} · ${S.t} 스텝 설정입니다.`,code:L.join("\n")};
+}
+function render5(){const r=S5.kind==="2d"?code2d():S5.kind==="roc"?codeRoc():code1d();S5.code=r.code;$("k5lead").textContent=r.lead;$("k5code").innerHTML=hl(r.code);}
+segInit($("k5kind"),v=>{S5.kind=v;render5();});
+$("k5copy").onclick=async()=>{const b=$("k5copy");try{await navigator.clipboard.writeText(S5.code);b.textContent="복사됨";}catch(e){const r=document.createRange();r.selectNodeContents($("k5code"));const s=getSelection();s.removeAllRanges();s.addRange(r);b.textContent="선택됨";}setTimeout(()=>b.textContent="복사",1400);};
+onShow.code=render5;
+
+/* ================= 시작 ================= */
+prepD1();$("s1seedv").textContent=`표본 번호 ${D1.seed}`;
+G2.reset([0,0]);G2.buildLand();
+S3.pts=gen3("base",1);fit3();
+function redraw(){onShow[curTab]&&onShow[curTab]();}
+new MutationObserver(redraw).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+if(window.matchMedia)matchMedia("(prefers-color-scheme: dark)").addEventListener("change",redraw);
+let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(redraw,150);});
+const startK=location.hash.slice(1);showTab(TABS.includes(startK)?startK:"sig");
+})();
+</script>
+</body>
+</html>

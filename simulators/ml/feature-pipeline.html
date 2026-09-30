@@ -1,0 +1,1330 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>특성공학 파이프라인 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20260930c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20260930c">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색 (강의 도식): 파랑 데이터·학습 / 청록 Validation·대치 / 보라 학습·CV·튜닝 / 주황 평가·샘플링 / 빨강 누수 / 초록 활용 */
+:root{ --sk-accent: var(--cat-ml);
+  --c-data:#2563EB; --c-imp:#0D9488; --c-cv:#7C3AED; --c-eval:#EA580C; --c-leak:#DC2626; --c-use:#15803D; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --c-data:#6AA5FF; --c-imp:#33D1BD; --c-cv:#B294FF; --c-eval:#FF914D; --c-leak:#FF6B6B; --c-use:#4ADE80; } }
+:root[data-theme="dark"]{ --c-data:#6AA5FF; --c-imp:#33D1BD; --c-cv:#B294FF; --c-eval:#FF914D; --c-leak:#FF6B6B; --c-use:#4ADE80; }
+
+.fp-data{color:var(--c-data)} .fp-imp{color:var(--c-imp)} .fp-cv{color:var(--c-cv)} .fp-eval{color:var(--c-eval)} .fp-leak{color:var(--c-leak)} .fp-use{color:var(--c-use)}
+.fp-dot{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.fp-kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--ink)}
+.fp-note-leak{border-left-color:var(--c-leak);background:color-mix(in srgb,var(--c-leak) 8%,var(--surface))}
+.fp-note-use{border-left-color:var(--c-use);background:color-mix(in srgb,var(--c-use) 8%,var(--surface))}
+.fp-note-imp{border-left-color:var(--c-imp);background:color-mix(in srgb,var(--c-imp) 8%,var(--surface))}
+.fp-opts label{display:inline-flex;align-items:center;gap:6px}
+.fp-opts .sk-slider{min-width:170px}
+
+/* ---------- 파이프라인 도식 ---------- */
+.fp-gs{position:relative;border:2px dashed var(--c-cv);border-radius:14px;padding:24px 12px 12px;background:color-mix(in srgb,var(--c-cv) 4%,var(--surface));margin-top:8px}
+.fp-tag{position:absolute;top:-11px;left:12px;background:var(--surface);padding:0 7px;font-size:12.5px;font-weight:700;line-height:20px;white-space:nowrap;border-radius:6px}
+.fp-tag small{font-weight:600;color:var(--muted);margin-left:4px}
+.fp-flow{display:flex;align-items:center;gap:6px}
+.fp-arr{flex:none;width:20px;text-align:center;color:var(--faint);font-weight:700;font-size:15px;line-height:1}
+.fp-arr::before{content:"→"}
+.fp-io{flex:none;border:1.6px solid var(--r);border-radius:10px;padding:8px 10px;background:color-mix(in srgb,var(--r) 9%,var(--surface));display:flex;flex-direction:column;gap:1px;font-size:13.5px;font-weight:700;color:var(--ink);min-width:0}
+.fp-io small{font-size:11.5px;font-weight:600;color:var(--muted)}
+.fp-pipe{flex:1 1 auto;position:relative;border:1.6px solid var(--line-strong);border-radius:12px;padding:20px 8px 8px;background:var(--surface);min-width:0}
+.fp-pipe-body{display:flex;align-items:center;gap:6px}
+.fp-ct{flex:0 0 auto;position:relative;border:1.5px dashed var(--c-data);border-radius:10px;padding:18px 8px 8px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.fp-br{display:flex;align-items:center;gap:6px;min-width:0}
+.fp-br-l{flex:none;width:40px;font-size:11.5px;font-weight:700;color:var(--muted);line-height:1.25}
+.fp-blk{appearance:none;font:inherit;text-align:left;border:1.6px solid var(--r);border-radius:9px;background:var(--surface);color:var(--ink);padding:6px 9px;cursor:pointer;min-width:0;display:flex;flex-direction:column;gap:1px;flex:1 1 0;transition:background .2s,box-shadow .2s}
+.fp-blk b{font-size:13px;line-height:1.3;overflow-wrap:anywhere}
+.fp-blk small{font-size:11.5px;color:var(--muted);overflow-wrap:break-word;line-height:1.35}
+.fp-blk:hover{background:color-mix(in srgb,var(--r) 7%,var(--surface))}
+.fp-blk.on{background:color-mix(in srgb,var(--r) 16%,var(--surface));box-shadow:0 0 0 2px var(--r)}
+.fp-blk.sel{outline:2px dashed var(--ink);outline-offset:3px}
+.fp-blk:focus-visible{outline:2px solid var(--focus);outline-offset:3px}
+.fp-blk.opt{border-style:dashed}
+.fp-blk.off{opacity:.42}
+.fp-flow>.fp-blk{flex:1 1 0}
+.fp-pipe-body>.fp-blk{flex:1 1 0;min-width:110px}
+.fp-br .fp-blk{min-width:142px}
+@media (max-width:1180px){
+  .fp-flow,.fp-pipe-body{flex-direction:column;align-items:stretch}
+  .fp-flow>.fp-arr::before,.fp-pipe-body>.fp-arr::before{content:"↓"}
+  .fp-flow>.fp-arr,.fp-pipe-body>.fp-arr{width:auto}
+  .fp-ct{flex:none}
+}
+@media (max-width:520px){
+  .fp-gs{padding:22px 8px 8px} .fp-pipe{padding:20px 6px 6px} .fp-ct{padding:18px 6px 6px}
+  .fp-br{flex-wrap:wrap} .fp-br-l{width:100%} .fp-br .fp-blk{min-width:0}
+  .fp-br .fp-blk{flex:1 1 0}
+  .fp-blk{padding:6px 7px} .fp-blk b{font-size:12px} .fp-blk small{font-size:10.5px}
+}
+
+/* ---------- 표 ---------- */
+.fp-main{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start}
+@media (max-width:1080px){.fp-main{grid-template-columns:minmax(0,1fr)}}
+.fp-tbl{width:auto;min-width:100%}
+.fp-tbl th,.fp-tbl td{padding:5px 6px}
+.fp-tbl td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.fp-tbl th .ty{display:block;font-size:10.5px;font-weight:600;color:var(--faint)}
+.fp-tbl th.gnum{box-shadow:inset 0 3px 0 var(--c-data)}
+.fp-tbl th.gcat{box-shadow:inset 0 3px 0 var(--c-cv)}
+.fp-tbl th.gy{box-shadow:inset 0 3px 0 var(--ink)}
+.fp-tbl th.gp{box-shadow:inset 0 3px 0 var(--c-use)}
+.fp-tbl td.na{color:var(--faint);font-style:italic;background:repeating-linear-gradient(135deg,transparent 0 5px,color-mix(in srgb,var(--faint) 16%,transparent) 5px 7px)}
+.fp-tbl td.imp{background:color-mix(in srgb,var(--c-imp) 20%,var(--surface));color:var(--ink);font-weight:700}
+.fp-tbl td.sc{color:var(--c-data)}
+.fp-tbl td.one{font-weight:700;color:var(--ink)}
+.fp-tbl td.zero{color:var(--faint)}
+.fp-tbl .drop{opacity:.42;text-decoration:line-through;text-decoration-color:var(--muted)}
+.fp-tbl th.keep{color:var(--ink)}
+.fp-tbl tr.copy td{background:color-mix(in srgb,var(--c-eval) 12%,var(--surface))}
+.fp-tbl tr.copy td:first-child{color:var(--c-eval);font-weight:700}
+.fp-tbl tfoot td,.fp-tbl tfoot th{border-top:2px solid var(--line-strong);background:var(--surface-2);font-size:12.5px}
+.fp-tbl tfoot th{text-align:left;color:var(--muted);position:static}
+.fp-tbl thead tr.frow th{font-family:var(--mono);font-weight:600;font-size:12px;text-align:right;position:static}
+.fp-tbl tr.sel td{box-shadow:inset 0 0 0 9999px color-mix(in srgb,var(--sk-accent) 7%,transparent)}
+.fp-tbl tbody tr.clk{cursor:pointer}
+.fp-tbl tr.wrong td{color:var(--c-leak);font-size:12.5px;background:color-mix(in srgb,var(--c-leak) 6%,var(--surface))}
+.fp-tbl td.diff{font-weight:700;text-decoration:underline;text-decoration-color:var(--c-leak)}
+.fp-yp{display:inline-grid;place-items:center;min-width:22px;height:20px;border-radius:5px;font-family:var(--mono);font-weight:700;font-size:12px;color:var(--on-ink)}
+.fp-yp.y0{background:var(--c-data)} .fp-yp.y1{background:var(--c-eval)}
+.fp-cap{margin:0;min-height:3.2em;font-size:14.5px;line-height:1.6}
+.fp-cap b{color:var(--ink)}
+.fp-info{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:9px;min-width:0}
+.fp-info h3{margin:0;font-size:14.5px}
+.fp-info .attr{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.fp-info .sk-kv{font-size:13px}
+.fp-info .sk-kv dd{overflow-wrap:anywhere}
+.fp-info .sk-formula{font-size:12.5px;background:var(--surface)}
+.fp-info p{margin:0;font-size:13px;color:var(--muted)}
+.fp-bar{height:8px;border-radius:4px;background:var(--c-data)}
+.fp-fs{display:grid;grid-template-columns:minmax(0,auto) minmax(40px,1fr) auto;gap:4px 8px;align-items:center;font-size:12.5px}
+.fp-fs .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fp-fs .v{font-family:var(--mono);text-align:right}
+.fp-fs .dropped{opacity:.45}
+.fp-fs .dropped .fp-bar{background:var(--faint)}
+
+@keyframes fp-flash-imp{0%{background:var(--c-imp);color:var(--on-ink)}100%{background:color-mix(in srgb,var(--c-imp) 20%,var(--surface))}}
+@keyframes fp-flash-sc{0%{background:color-mix(in srgb,var(--c-data) 35%,var(--surface))}100%{background:transparent}}
+@keyframes fp-grow{0%{opacity:0;transform:scaleX(.2);background:color-mix(in srgb,var(--c-data) 40%,var(--surface))}60%{opacity:1;transform:none}100%{background:transparent}}
+@keyframes fp-rowin{0%{opacity:0;transform:translateY(-6px)}100%{opacity:1;transform:none}}
+.fp-tbl td.fl-imp{animation:fp-flash-imp 1.1s ease-out}
+.fp-tbl td.fl-sc{animation:fp-flash-sc 1.1s ease-out}
+.fp-tbl .fl-enc{animation:fp-grow .8s ease-out;transform-origin:left center}
+.fp-tbl tr.fl-row td{animation:fp-rowin .6s ease-out}
+
+/* 큰 그림 */
+.fp-steps{display:flex;flex-wrap:wrap;gap:6px;align-items:stretch;list-style:none;margin:0;padding:0;counter-reset:st}
+.fp-steps li{counter-increment:st;flex:1 1 150px;border:1.5px solid var(--r);border-radius:10px;padding:8px 10px;background:color-mix(in srgb,var(--r) 7%,var(--surface));font-size:13px;color:var(--text);min-width:0}
+.fp-steps li b{display:block;color:var(--ink);font-size:13.5px}
+.fp-steps li b::before{content:counter(st) ". ";color:var(--r)}
+.fp-tech{display:flex;flex-wrap:wrap;gap:6px}
+.fp-tech button{appearance:none;font:inherit;font-size:13px;font-weight:600;border:1.5px solid var(--r);color:var(--ink);background:color-mix(in srgb,var(--r) 8%,var(--surface));border-radius:999px;padding:4px 12px;cursor:pointer}
+.fp-tech button:hover{background:color-mix(in srgb,var(--r) 16%,var(--surface))}
+.fp-tech button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.fp-warn{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (max-width:700px){.fp-warn{grid-template-columns:minmax(0,1fr)}}
+.fp-big{font-family:var(--mono);font-weight:600;font-size:22px;color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* ---------- 2. fit vs transform ---------- */
+.fp-two{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:1000px){.fp-two{grid-template-columns:minmax(0,1fr)}}
+.fp-rules .sk-table{font-size:12.5px}
+.fp-rules td.n{font-family:var(--mono)}
+.fp-edit{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 12px}
+.fp-edit label{display:flex;flex-direction:column;gap:3px;font-size:12.5px;font-weight:600;color:var(--muted);min-width:0}
+.fp-edit .sk-input,.fp-edit .sk-select{width:100%}
+@media (max-width:520px){.fp-edit{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.fp-err{font-family:var(--mono);font-size:13px;border:1.5px solid var(--c-leak);color:var(--c-leak);background:color-mix(in srgb,var(--c-leak) 8%,var(--surface));border-radius:8px;padding:9px 12px;overflow-wrap:anywhere}
+.fp-ok{font-size:14px;border:1.5px solid var(--c-use);background:color-mix(in srgb,var(--c-use) 8%,var(--surface));border-radius:8px;padding:9px 12px}
+.sk-btn.fp-danger[aria-pressed="true"]{background:var(--c-leak);border-color:var(--c-leak);color:var(--on-ink)}
+.fp-path{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;font-weight:700}
+.fp-path span.b{border:1.5px solid var(--r);border-radius:8px;padding:4px 9px;background:color-mix(in srgb,var(--r) 8%,var(--surface));color:var(--ink)}
+.fp-path i{font-style:normal;color:var(--faint)}
+.fp-formula-list{white-space:pre-wrap}
+
+/* ---------- 3. 누수 ---------- */
+.fp-flows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:900px){.fp-flows{grid-template-columns:minmax(0,1fr)}}
+.fp-flowcard{border:2px solid var(--r);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0;background:color-mix(in srgb,var(--r) 4%,var(--surface))}
+.fp-flowcard h3{margin:0;font-size:15px;color:var(--r)}
+.fp-svg{width:100%;max-width:520px;margin:0 auto;display:block}
+.fp-svg svg{display:block;width:100%;height:auto}
+.fp-svg .chip{stroke-width:1.4}
+.fp-svg .chip.tr{fill:color-mix(in srgb,var(--c-data) 22%,var(--surface));stroke:var(--c-data)}
+.fp-svg .chip.te{fill:color-mix(in srgb,var(--c-eval) 25%,var(--surface));stroke:var(--c-eval)}
+.fp-svg .chip.nu{fill:var(--surface-2);stroke:var(--line-strong)}
+.fp-svg .chip.cp{stroke-dasharray:3 2;stroke-width:1.8}
+.fp-svg .cid{font-family:var(--mono);font-size:8.5px;fill:var(--ink);text-anchor:middle}
+.fp-svg .pos{fill:var(--ink)}
+.fp-svg .box{fill:var(--surface);stroke:var(--line-strong);stroke-width:1.5}
+.fp-svg .box.fit{stroke:var(--c-cv);stroke-width:2}
+.fp-svg .box.bad{stroke:var(--c-leak);stroke-width:2}
+.fp-svg .box.good{stroke:var(--c-use);stroke-width:2}
+.fp-svg .tt{font-family:var(--sans);font-size:12px;font-weight:700;fill:var(--ink)}
+.fp-svg .ts{font-family:var(--sans);font-size:11px;font-weight:600;fill:var(--muted)}
+.fp-svg .tm{font-family:var(--mono);font-size:11.5px;font-weight:600;fill:var(--ink)}
+.fp-svg .tl{font-family:var(--sans);font-size:11px;font-weight:700;fill:var(--c-leak)}
+.fp-svg .tg{font-family:var(--sans);font-size:11px;font-weight:700;fill:var(--c-use)}
+.fp-svg .ln{fill:none;stroke-linecap:round}
+.fp-svg .ln.tr{stroke:var(--c-data);opacity:.55;stroke-width:1.1}
+.fp-svg .ln.lk{stroke:var(--c-leak);stroke-width:2.2}
+.fp-svg .ln.te{stroke:var(--c-eval);stroke-width:1.6}
+.fp-svg .ln.nu{stroke:var(--muted);stroke-width:1.6}
+.fp-svg .ln.dash{stroke:var(--c-cv);stroke-width:1.8;stroke-dasharray:5 4}
+.fp-svg .ahl{fill:var(--c-leak)} .fp-svg .ahe{fill:var(--c-eval)} .fp-svg .ahn{fill:var(--muted)} .fp-svg .ahc{fill:var(--c-cv)}
+.fp-exp{display:flex;flex-direction:column;gap:10px}
+.fp-hbar{display:grid;grid-template-columns:250px minmax(0,1fr) 64px;gap:8px;align-items:center;font-size:13.5px}
+.fp-hbar .tr{height:24px;background:var(--surface-2);border-radius:6px;position:relative;overflow:hidden}
+.fp-hbar .fl{height:100%;border-radius:6px;transition:width .5s}
+.fp-hbar .ref{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed var(--muted)}
+.fp-hbar .v{font-family:var(--mono);font-weight:600;text-align:right;color:var(--ink)}
+@media (max-width:520px){.fp-hbar{grid-template-columns:minmax(0,1fr) 58px}.fp-hbar .lb{grid-column:1/-1}}
+.fp-foldgrid{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.fp-foldgrid{grid-template-columns:minmax(0,1fr)}}
+.fp-tbl td.wrap{white-space:normal;min-width:200px}
+.fp-foldmini{display:flex;flex-direction:column;gap:4px}
+.fp-foldmini .r{display:flex;align-items:center;gap:6px;border-radius:7px;padding:3px 4px}
+.fp-foldmini .r.on{background:color-mix(in srgb,var(--c-cv) 12%,var(--surface));box-shadow:0 0 0 1.5px var(--c-cv)}
+.fp-foldmini .lb{font-size:12px;font-weight:700;color:var(--muted);width:44px;flex:none}
+.fp-foldmini .c{width:20px;height:18px;border-radius:4px;font-family:var(--mono);font-size:9.5px;display:grid;place-items:center;color:var(--ink);flex:none}
+.fp-foldmini .c.t{background:color-mix(in srgb,var(--c-data) 30%,var(--surface))}
+.fp-foldmini .c.v{background:color-mix(in srgb,var(--c-imp) 45%,var(--surface))}
+@media (max-width:420px){.fp-foldmini .c{width:17px}}
+
+/* ---------- 4. CV ---------- */
+.fp-folds{display:flex;flex-direction:column;gap:5px}
+.fp-folds .row{display:grid;grid-template-columns:62px minmax(0,1fr);gap:8px;align-items:center;border-radius:8px;padding:2px 4px}
+.fp-folds .row.on{background:color-mix(in srgb,var(--c-cv) 10%,var(--surface));box-shadow:0 0 0 1.5px var(--c-cv)}
+.fp-folds .lb{font-size:12px;font-weight:700;color:var(--muted)}
+.fp-folds .bar{display:flex;gap:2px;height:22px}
+.fp-folds .seg{flex:1 1 0;border-radius:4px;background:color-mix(in srgb,var(--c-data) 30%,var(--surface));display:grid;place-items:center;font-size:10.5px;font-weight:700;color:var(--ink);overflow:hidden;white-space:nowrap;min-width:0}
+.fp-folds .seg.v{background:color-mix(in srgb,var(--c-imp) 55%,var(--surface))}
+.fp-folds .seg.all{background:color-mix(in srgb,var(--c-data) 45%,var(--surface))}
+.fp-folds .seg.test{flex:none;width:22%;margin-left:8px;background:repeating-linear-gradient(135deg,var(--surface-2) 0 6px,color-mix(in srgb,var(--faint) 22%,var(--surface-2)) 6px 9px);color:var(--muted);border:1px solid var(--line-strong)}
+.fp-folds .seg.test.open{background:color-mix(in srgb,var(--c-eval) 45%,var(--surface));color:var(--ink);border-color:var(--c-eval)}
+.fp-gt th,.fp-gt td{text-align:center}
+@media (max-width:520px){.fp-folds .sfx{display:none}.fp-folds .row{grid-template-columns:48px minmax(0,1fr)}}
+.fp-gt td.cur{box-shadow:inset 0 0 0 2px var(--c-cv)}
+.fp-gt td.sc{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.fp-gt tr.best td{background:color-mix(in srgb,var(--c-cv) 14%,var(--surface))}
+.fp-gt tr.now td:first-child{box-shadow:inset 3px 0 0 var(--c-cv)}
+.fp-gt td.pend{color:var(--faint)}
+.fp-res{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:900px){.fp-res{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.fp-res .sk-stat{border-left:4px solid var(--r)}
+.fp-res .sk-stat b{font-size:19px}
+
+/* ---------- 5. 코드 ---------- */
+.fp-code{margin:0;font-family:var(--mono);font-size:13px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto;white-space:pre;color:var(--ink);tab-size:4}
+.fp-code .cm{color:var(--muted)} .fp-code .kw{color:var(--c-cv);font-weight:600} .fp-code .st{color:var(--c-imp)} .fp-code .hl{background:color-mix(in srgb,var(--c-eval) 16%,transparent);border-radius:3px}
+
+details.fp-more{font-size:13.5px;color:var(--muted)}
+details.fp-more summary{cursor:pointer;font-weight:600;color:var(--ink)}
+details.fp-more summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.sk-stepper li{cursor:default}
+@media (max-width:520px){ .sk-slider{min-width:0;width:100%} .fp-opts label{width:100%} .fp-opts label .sk-select{flex:1} }
+@media (prefers-reduced-motion: reduce){
+  .fp-tbl td.fl-imp,.fp-tbl td.fl-sc,.fp-tbl .fl-enc,.fp-tbl tr.fl-row td{animation:none}
+  .fp-blk,.fp-hbar .fl{transition:none}
+}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)" aria-current="page">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">특성공학 파이프라인 시뮬레이터</h1>
+      <p class="ds-hero__lede">결측값 대치 → 스케일링·인코딩 → 특성 선택 → (샘플링) → 모델 fit을 하나의 Pipeline으로 묶으면, 전처리 규칙은 Train에서만 배우고 Test와 새 데이터에는 그대로 transform만 합니다. 환자 표가 단계마다 바뀌는 모습, 데이터 누수가 생기는 순서, 교차검증 × 하이퍼파라미터 튜닝을 직접 돌려 봅니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button type="button" class="sk-tab" role="tab" id="tab-flow" aria-controls="pane-flow" aria-selected="true"><span class="sk-num">1</span>파이프라인 따라가기</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-fit" aria-controls="pane-fit" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>fit vs transform</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-leak" aria-controls="pane-leak" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>데이터 누수 비교</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-cv" aria-controls="pane-cv" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>교차검증 × 튜닝</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>코드</button>
+  </nav>
+
+  <!-- ================= 1. 파이프라인 따라가기 ================= -->
+  <section id="pane-flow" role="tabpanel" aria-labelledby="tab-flow">
+    <div class="sk-card">
+      <div class="sk-head"><h2>GridSearchCV 안의 Pipeline</h2>
+        <div class="sk-legend"><span><i style="background:var(--c-imp)"></i>대치</span><span><i style="background:var(--c-data)"></i>스케일링·인코딩·선택</span><span><i style="background:var(--c-eval)"></i>샘플링*</span><span><i style="background:var(--c-cv)"></i>모델 fit·튜닝</span></div>
+      </div>
+      <p class="sk-lead">각 단계의 옵션을 바꾸면 아래 표와 fit 결과가 곧바로 다시 계산됩니다. 블록을 누르면 그 단계가 fit에서 배운 값이 오른쪽에 나옵니다.</p>
+      <div class="sk-controls fp-opts">
+        <label><span class="sk-label">수치 대치</span><select class="sk-select" id="oNumImp"><option value="mean">mean (평균)</option><option value="median">median (중앙값)</option><option value="most_frequent">most_frequent (최빈값)</option><option value="constant">constant (0)</option></select></label>
+        <label><span class="sk-label">범주 대치</span><select class="sk-select" id="oCatImp"><option value="most_frequent">most_frequent (최빈값)</option><option value="constant">constant ("missing")</option></select></label>
+        <label><span class="sk-label">스케일러</span><select class="sk-select" id="oScaler"><option value="standard">StandardScaler</option><option value="minmax">MinMaxScaler</option><option value="robust">RobustScaler</option><option value="none">없음 (passthrough)</option></select></label>
+        <label><span class="sk-label">인코더</span><select class="sk-select" id="oEnc"><option value="onehot">OneHotEncoder</option><option value="ordinal">OrdinalEncoder</option></select></label>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="oK">SelectKBest k</label><b id="oKv">6</b></div><input type="range" id="oK" min="1" max="12" step="1" value="6"></div>
+        <label class="sk-check"><input type="checkbox" id="oSamp">불균형 샘플링 넣기 (imblearn)</label>
+      </div>
+      <div class="fp-gs" id="diagram">
+        <span class="fp-tag fp-cv">GridSearchCV<small>교차검증 × 하이퍼파라미터 튜닝</small></span>
+        <div class="fp-flow">
+          <div class="fp-io" style="--r:var(--c-data)">Train Set<small>12행 · X 6열 + y</small></div>
+          <span class="fp-arr" aria-hidden="true"></span>
+          <div class="fp-pipe">
+            <span class="fp-tag">Pipeline</span>
+            <div class="fp-pipe-body">
+              <div class="fp-ct">
+                <span class="fp-tag fp-data">ColumnTransformer</span>
+                <div class="fp-br"><span class="fp-br-l">수치 3열</span>
+                  <button type="button" class="fp-blk" data-b="numImp" style="--r:var(--c-imp)"><b>SimpleImputer</b><small id="bNumImp"></small></button>
+                  <span class="fp-arr fp-arr--h" aria-hidden="true"></span>
+                  <button type="button" class="fp-blk" data-b="scaler" style="--r:var(--c-data)"><b id="bScalerN">StandardScaler</b><small id="bScaler"></small></button>
+                </div>
+                <div class="fp-br"><span class="fp-br-l">범주 3열</span>
+                  <button type="button" class="fp-blk" data-b="catImp" style="--r:var(--c-imp)"><b>SimpleImputer</b><small id="bCatImp"></small></button>
+                  <span class="fp-arr fp-arr--h" aria-hidden="true"></span>
+                  <button type="button" class="fp-blk" data-b="enc" style="--r:var(--c-data)"><b id="bEncN">OneHotEncoder</b><small id="bEnc"></small></button>
+                </div>
+              </div>
+              <span class="fp-arr" aria-hidden="true"></span>
+              <button type="button" class="fp-blk" data-b="select" style="--r:var(--c-data)"><b>특성 선택</b><small id="bSel"></small></button>
+              <span class="fp-arr" aria-hidden="true"></span>
+              <button type="button" class="fp-blk opt" data-b="sampler" style="--r:var(--c-eval)"><b>불균형 샘플링*</b><small id="bSamp"></small></button>
+              <span class="fp-arr" aria-hidden="true"></span>
+              <button type="button" class="fp-blk" data-b="model" style="--r:var(--c-cv)"><b>모델 fit</b><small>Logistic<wbr>Regression C=1.0</small></button>
+            </div>
+          </div>
+          <span class="fp-arr" aria-hidden="true"></span>
+          <div class="fp-io" style="--r:var(--c-use)">최적 Pipeline<small>.pkl 저장 → predict</small></div>
+        </div>
+      </div>
+      <p class="sk-hint" style="margin:0">* 샘플링은 imblearn Pipeline에서만 넣을 수 있고, fit(학습)할 때만 동작합니다. transform·predict 때는 건너뜁니다.</p>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>환자 표가 파이프라인을 통과하는 모습</h2><span class="sk-hint">키보드 <span class="fp-kbd">→</span> 다음 단계</span></div>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--sm" id="t1First">처음</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="t1Prev">이전</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="t1Next">다음 단계</button>
+          <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="t1Play">재생</button>
+        </div>
+        <div class="sk-slider" style="min-width:150px"><div class="sk-sl-head"><label for="t1Speed">속도</label><b id="t1SpeedV">1×</b></div><input type="range" id="t1Speed" min="0.5" max="3" step="0.5" value="1"></div>
+      </div>
+      <ol class="sk-stepper" id="t1Stepper"></ol>
+      <p class="fp-cap" id="t1Cap" aria-live="polite"></p>
+      <div class="fp-main">
+        <div class="sk-scroll"><table class="sk-table fp-tbl" id="t1Tbl"></table></div>
+        <aside class="fp-info" id="t1Info" aria-live="polite"></aside>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>큰 그림: 지도학습 절차 6단계</h2><span class="sk-hint">특성공학은 4단계 '학습' 안에서 fit 직전에 일어납니다</span></div>
+      <ol class="fp-steps">
+        <li style="--r:var(--c-data)"><b>데이터 핸들링</b>불러오기·정리·병합</li>
+        <li style="--r:var(--c-data)"><b>Y·X 지정</b>y = 질환 여부, X = 나머지 열</li>
+        <li style="--r:var(--c-eval)"><b>Train/Test 분할</b>Test는 마지막 평가까지 잠금</li>
+        <li style="--r:var(--c-cv)"><b>학습</b>특성공학 → fit (Pipeline)</li>
+        <li style="--r:var(--c-eval)"><b>학습·일반화 성능</b>Train 점수와 Test 점수 비교</li>
+        <li style="--r:var(--c-use)"><b>모델 구조화 → predict</b>.pkl / joblib 저장 후 새 데이터 예측</li>
+      </ol>
+      <div class="sk-head" style="margin-top:4px"><h3>특성공학 기법 6가지</h3><span class="sk-hint">누르면 해당 화면으로 이동</span></div>
+      <div class="fp-tech">
+        <button type="button" data-go="flow" style="--r:var(--c-data)">Scaling &amp; Encoding</button>
+        <button type="button" data-go="flow" style="--r:var(--c-imp)">Imputation</button>
+        <button type="button" data-go="cv" style="--r:var(--c-cv)">Cross Validation</button>
+        <button type="button" data-go="cv" style="--r:var(--c-cv)">Hyperparameter Tuning</button>
+        <button type="button" data-go="leak" style="--r:var(--c-eval)">Imbalanced Sampling</button>
+        <button type="button" data-go="flow" style="--r:var(--c-data)">Feature Selection</button>
+      </div>
+      <div class="fp-warn">
+        <p class="sk-note fp-note-leak"><b>데이터 누수</b> — Test(또는 Validation fold)의 정보가 fit에 섞이면 평가 점수가 실제보다 좋게 나옵니다. 전처리 fit은 반드시 Train 부분에서만. → 3번 화면</p>
+        <p class="sk-note fp-note-leak"><b>과적합</b> — 학습 성능 <span class="fp-big" style="font-size:17px">97%</span> vs 일반화 성능 <span class="fp-big" style="font-size:17px">55%</span>. 학습 데이터만 외운 모델은 새 데이터에서 무너집니다. 교차검증 점수로 판단하세요. → 4번 화면</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 2. fit vs transform ================= -->
+  <section id="pane-fit" role="tabpanel" aria-labelledby="tab-fit" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>새 데이터 경로: 다시 fit 하지 않고 transform → predict</h2></div>
+      <div class="fp-path">
+        <span class="b" style="--r:var(--c-data)">Train</span><i>→</i><span class="b" style="--r:var(--c-cv)">pipe.fit()</span><i>→</i><span class="b" style="--r:var(--c-cv)">배운 규칙 (평균·표준편차·카테고리·선택 열·계수)</span><i>→</i><span class="b" style="--r:var(--c-use)">Test · 새 환자: transform → predict</span>
+      </div>
+      <p class="sk-lead">1번 화면의 설정으로 Train 12행에 fit한 파이프라인을 그대로 씁니다. Test의 결측값도 <b>Train에서 배운 대치값</b>으로, 표준화도 <b>Train의 평균·표준편차</b>로 계산됩니다.</p>
+    </div>
+    <div class="fp-two" style="margin-top:16px">
+      <div class="sk-card fp-rules">
+        <div class="sk-head"><h2>Train에서 fit한 규칙</h2></div>
+        <div id="t2Rules"></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">적용 대상</span>
+            <div class="sk-seg" id="t2Target" role="group" aria-label="적용 대상"><button type="button" data-v="test" aria-pressed="true">Test 4행</button><button type="button" data-v="new" aria-pressed="false">새 환자 1명</button></div></div>
+          <div class="sk-group"><span class="sk-label">handle_unknown</span>
+            <div class="sk-seg" id="t2HU" role="group" aria-label="처음 보는 범주 처리"><button type="button" data-v="error" aria-pressed="true" id="t2HUe">'error' (기본값)</button><button type="button" data-v="ignore" aria-pressed="false" id="t2HUi">'ignore'</button></div></div>
+          <button type="button" class="sk-btn fp-danger" id="t2Wrong" aria-pressed="false">Test로 다시 fit (잘못된 예)</button>
+        </div>
+        <div id="t2NewBox" hidden>
+          <div class="fp-edit">
+            <label>나이<input class="sk-input" id="nAge" type="number" step="1" placeholder="비우면 결측"></label>
+            <label>혈당<input class="sk-input" id="nGlu" type="number" step="1" placeholder="비우면 결측"></label>
+            <label>BMI<input class="sk-input" id="nBmi" type="number" step="0.1" placeholder="비우면 결측"></label>
+            <label>성별<select class="sk-select" id="nSex"><option>남</option><option>여</option></select></label>
+            <label>흡연<select class="sk-select" id="nSmk"><option value="">결측 (NaN)</option><option>과거</option><option>비흡연</option><option>현재</option></select></label>
+            <label>지역<select class="sk-select" id="nReg"><option>경기</option><option>대구</option><option>부산</option><option>서울</option><option value="제주">제주 (처음 보는 값)</option></select></label>
+          </div>
+          <div class="sk-controls" style="margin-top:8px"><button type="button" class="sk-btn sk-btn--sm" id="nUnseen">처음 보는 지역 '제주' 넣기</button><button type="button" class="sk-btn sk-btn--sm" id="nReset">기본 환자로</button></div>
+        </div>
+        <h3>입력 (원본)</h3>
+        <div class="sk-scroll"><table class="sk-table fp-tbl" id="t2In"></table></div>
+        <h3>transform 결과 → predict <span class="sk-hint">흐린 열은 SelectKBest에서 빠진 특성 · 행을 누르면 아래에 계산 과정</span></h3>
+        <div id="t2ErrBox"></div>
+        <div class="sk-scroll"><table class="sk-table fp-tbl" id="t2Out"></table></div>
+        <div class="sk-formula fp-formula-list" id="t2Formula"></div>
+        <div id="t2Note"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 3. 누수 ================= -->
+  <section id="pane-leak" role="tabpanel" aria-labelledby="tab-leak" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>잘못된 순서 vs 올바른 순서</h2>
+        <div class="sk-legend"><span><i style="background:var(--c-data)"></i>Train 행</span><span><i style="background:var(--c-eval)"></i>Test 행</span><span><i style="background:var(--c-leak)"></i>Test 정보가 fit으로 새어 들어감</span></div></div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">전처리</span>
+          <div class="sk-seg" id="t3Mode" role="group" aria-label="전처리 종류"><button type="button" data-v="scale" aria-pressed="true">스케일링</button><button type="button" data-v="imp" aria-pressed="false">결측 대치</button><button type="button" data-v="samp" aria-pressed="false">오버샘플링</button></div></div>
+      </div>
+      <div class="fp-flows">
+        <div class="fp-flowcard" style="--r:var(--c-leak)"><h3>잘못: 전체 데이터로 fit → 분할</h3><div class="fp-svg" id="t3Bad" role="img"></div><div id="t3BadTxt"></div></div>
+        <div class="fp-flowcard" style="--r:var(--c-use)"><h3>올바름: 분할 → Train으로만 fit</h3><div class="fp-svg" id="t3Good" role="img"></div><div id="t3GoodTxt"></div></div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>누수는 점수를 얼마나 부풀릴까 (실제 계산)</h2><span class="sk-hint">5-fold 교차검증 · 난수 고정</span></div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">실험</span>
+          <div class="sk-seg" id="t3Exp" role="group" aria-label="누수 실험 종류"><button type="button" data-v="sel" aria-pressed="true">특성 선택 누수</button><button type="button" data-v="ros" aria-pressed="false">오버샘플링 누수</button></div></div>
+        <div class="sk-slider" id="t3SlBox"><div class="sk-sl-head"><label for="t3Sl" id="t3SlL">노이즈 특성 수 p</label><b id="t3SlV">1000</b></div><input type="range" id="t3Sl" min="50" max="2000" step="50" value="1000"></div>
+        <button type="button" class="sk-btn sk-btn--sm" id="t3Seed">다른 난수로</button>
+      </div>
+      <p class="sk-lead" id="t3ExpLead"></p>
+      <div class="fp-exp" id="t3Bars"></div>
+      <div id="t3ExpNote"></div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>교차검증에서도: fold마다 파이프라인 전체를 다시 fit</h2><span class="sk-hint">Train 12행 · KFold(순서대로 나눔) · 1번 화면 설정 사용</span></div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">K</span><div class="sk-seg" id="t3K" role="group" aria-label="fold 수"><button type="button" data-v="3" aria-pressed="false">3</button><button type="button" data-v="4" aria-pressed="true">4</button><button type="button" data-v="6" aria-pressed="false">6</button></div></div>
+        <div class="sk-group"><button type="button" class="sk-btn sk-btn--sm" id="t3FPrev">이전 fold</button><button type="button" class="sk-btn sk-btn--sm" id="t3FNext">다음 fold</button><button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="t3FPlay">재생</button></div>
+      </div>
+      <div class="fp-foldgrid">
+        <div class="fp-foldmini" id="t3Mini" aria-label="fold별 Train·Validation 행 배정"></div>
+        <div class="sk-scroll"><table class="sk-table fp-tbl" id="t3FoldTbl"></table></div>
+      </div>
+      <p class="sk-note fp-note-imp" id="t3FoldNote"></p>
+    </div>
+  </section>
+
+  <!-- ================= 4. 교차검증 × 튜닝 ================= -->
+  <section id="pane-cv" role="tabpanel" aria-labelledby="tab-cv" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>GridSearchCV: 조합마다 K번 fit → 평균으로 고르기 → refit → Test 1회</h2><span class="sk-hint" id="t4DataHint"></span></div>
+      <div class="sk-controls">
+        <div class="sk-slider"><div class="sk-sl-head"><label for="t4K">fold 수 K</label><b id="t4Kv">5</b></div><input type="range" id="t4K" min="3" max="10" step="1" value="5"></div>
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--sm" id="t4First">처음</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="t4Prev">이전</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="t4Next">다음</button>
+          <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="t4Play">재생</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="t4End">끝까지</button>
+        </div>
+        <div class="sk-slider" style="min-width:150px"><div class="sk-sl-head"><label for="t4Speed">속도</label><b id="t4SpeedV">2×</b></div><input type="range" id="t4Speed" min="0.5" max="8" step="0.5" value="2"></div>
+        <button type="button" class="sk-btn sk-btn--sm" id="t4Seed">데이터 다시 생성</button>
+      </div>
+      <div class="sk-legend"><span><i style="background:var(--c-data)"></i>Train 부분 (fit)</span><span><i style="background:var(--c-imp)"></i>Validation fold (채점)</span><span><i style="background:var(--c-eval)"></i>Test (마지막 1회만)</span><span><i style="background:var(--c-cv)"></i>현재 조합·최적 조합</span></div>
+      <div class="fp-folds" id="t4Folds"></div>
+      <p class="fp-cap" id="t4Cap" aria-live="polite"></p>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>파라미터 그리드 2 × 3 × 3 = 18조합</h2><span class="sk-hint">점수 = Validation 정확도 · 평균이 같으면 먼저 나온 조합</span></div>
+      <div class="sk-formula">param_grid = { 'model__C': [0.01, 0.1, 1.0],  'preprocess__num__scaler': [StandardScaler(), MinMaxScaler()],  'select__k': [3, 5, 8] }</div>
+      <div class="sk-scroll"><table class="sk-table fp-tbl fp-gt" id="t4Tbl"></table></div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>최적 Pipeline refit → Test 평가</h2></div>
+      <div class="fp-res" id="t4Res"></div>
+      <div id="t4Note"></div>
+    </div>
+  </section>
+
+  <!-- ================= 5. 코드 ================= -->
+  <section id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>현재 설정을 scikit-learn 코드로</h2><span class="sk-hint">1번 옵션 · 2번 handle_unknown · 4번 K가 반영됩니다</span></div>
+      <div class="sk-controls">
+        <label class="sk-check"><input type="checkbox" id="cImb">imblearn Pipeline (샘플러 포함)</label>
+        <div class="sk-group"><span class="sk-label">샘플러</span><div class="sk-seg" id="cSamp" role="group" aria-label="샘플러 종류"><button type="button" data-v="ros" aria-pressed="true">RandomOverSampler</button><button type="button" data-v="smote" aria-pressed="false">SMOTE</button></div></div>
+        <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="cCopy">코드 복사</button>
+        <span class="sk-hint" id="cCopyMsg" aria-live="polite"></span>
+      </div>
+      <pre class="fp-code" id="cCode" tabindex="0" aria-label="생성된 파이썬 코드"></pre>
+      <div class="sk-grid2">
+        <p class="sk-note"><b>이중 밑줄 이름</b> — <span class="sk-mono">preprocess__num__scaler</span> = Pipeline의 'preprocess' 단계 → ColumnTransformer의 'num' 가지 → 그 안의 'scaler' 단계. GridSearchCV는 이 이름으로 안쪽 부품을 바꿔 끼웁니다.</p>
+        <p class="sk-note fp-note-use"><b>저장과 활용</b> — <span class="sk-mono">joblib.dump(search.best_estimator_)</span>에는 전처리 규칙과 모델이 함께 들어 있습니다. 불러온 뒤에는 <span class="sk-mono">predict</span>만 호출하면 내부에서 transform이 먼저 실행됩니다.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20260930c"></script>
+<script>
+(function () {
+"use strict";
+const $ = id => document.getElementById(id);
+const RM = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function gauss(r){let u=0;while(!u)u=r();const v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function shuffle(a,r){for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function f2(v,d=2){ if(v===null||v===undefined||Number.isNaN(v)) return "NaN"; if(!isFinite(v)) return v>0?"inf":"−inf";
+  let s=v.toFixed(d); if(/^-0(\.0+)?$/.test(s)) s=s.slice(1); return s.replace("-","−"); }
+const pct = v => Number.isNaN(v) ? "nan" : (v*100).toFixed(1)+"%";
+const sig = z => z>=0 ? 1/(1+Math.exp(-z)) : Math.exp(z)/(1+Math.exp(z));
+function segInit(el,onChange){
+  el.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b?"true":"false"));onChange(b.dataset.v);}));
+}
+function segSet(el,v){el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x.dataset.v===String(v)?"true":"false"));}
+
+/* ============================================================
+   데이터: Train 12행 + Test 4행 (환자 표)
+   ============================================================ */
+const NUM=["나이","혈당","BMI"], CAT=["성별","흡연","지역"], DEC={나이:0,혈당:0,BMI:1};
+const _=null;
+const RAW=[
+ [1,45,102,24.1,"남","현재","서울",0],[2,62,128,27.5,"여","비흡연","경기",1],[3,_,95,22.8,"남","과거","부산",0],
+ [4,38,88,21.0,"여",_,"서울",0],[5,71,310,29.3,"남","현재","대구",1],[6,55,115,25.6,"여","비흡연","경기",0],
+ [7,49,134,28.2,"남","현재","서울",1],[8,_,99,23.4,"여","비흡연","부산",0],[9,66,141,30.1,"남","과거","경기",1],
+ [10,33,92,20.5,"여","비흡연","서울",0],[11,58,122,26.8,"남",_,"대구",1],[12,42,105,24.9,"여","비흡연","경기",0],
+ [13,52,118,26.0,"여","현재","서울",1],[14,_,99,23.0,"남","비흡연","경기",0],[15,68,150,31.2,"남","과거","부산",1],[16,36,90,21.8,"여",_,"부산",0]];
+const rowObj = a => ({id:a[0],나이:a[1],혈당:a[2],BMI:a[3],성별:a[4],흡연:a[5],지역:a[6],y:a[7]});
+const ALL=RAW.map(rowObj), TRAIN=ALL.slice(0,12), TEST=ALL.slice(12);
+const NEWP0={id:"새",나이:59,혈당:131,BMI:27.4,성별:"여",흡연:null,지역:"서울",y:null};
+
+/* ============================================================
+   전처리 부품 (sklearn과 같은 규칙으로 직접 구현)
+   ============================================================ */
+function quantile(sorted,q){const pos=(sorted.length-1)*q,lo=Math.floor(pos),hi=Math.min(lo+1,sorted.length-1);return sorted[lo]+(sorted[hi]-sorted[lo])*(pos-lo);}
+const cmp=(a,b)=>a<b?-1:a>b?1:0;
+function impFit(vals,strategy,isNum){
+  const obs=vals.filter(v=>v!==null&&v!==undefined);
+  if(strategy==="constant") return isNum?0:"missing";
+  if(!obs.length) return NaN;
+  if(strategy==="mean") return obs.reduce((s,v)=>s+v,0)/obs.length;
+  if(strategy==="median") return quantile(obs.slice().sort((a,b)=>a-b),0.5);
+  const cnt=new Map(); obs.forEach(v=>cnt.set(v,(cnt.get(v)||0)+1));
+  let best=null,bc=-1; [...cnt.keys()].sort(cmp).forEach(k=>{if(cnt.get(k)>bc){bc=cnt.get(k);best=k;}});
+  return best; // 동률이면 가장 작은 값 (sklearn과 같음)
+}
+function scFit(vals,type){
+  const n=vals.length;
+  if(type==="standard"){const m=vals.reduce((s,v)=>s+v,0)/n;const sd=Math.sqrt(vals.reduce((s,v)=>s+(v-m)*(v-m),0)/n);return{type,center:m,scale:sd===0?1:sd,a:m,b:sd};}
+  if(type==="minmax"){const mn=Math.min(...vals),mx=Math.max(...vals);return{type,center:mn,scale:(mx-mn)||1,a:mn,b:mx};}
+  if(type==="robust"){const s=vals.slice().sort((a,b)=>a-b);const med=quantile(s,.5),q1=quantile(s,.25),q3=quantile(s,.75);return{type,center:med,scale:(q3-q1)||1,a:med,b:q3-q1,q1,q3};}
+  return{type:"none",center:0,scale:1};
+}
+const SC_LABEL={standard:["평균 μ","표준편차 σ","mean_","scale_"],minmax:["최솟값","최댓값","data_min_","data_max_"],robust:["중앙값","IQR (Q3−Q1)","center_","scale_"]};
+const SC_NAME={standard:"StandardScaler",minmax:"MinMaxScaler",robust:"RobustScaler",none:"passthrough"};
+const SC_FORM={standard:"z = (x − μ) / σ",minmax:"x' = (x − min) / (max − min)",robust:"x' = (x − 중앙값) / IQR",none:"x 그대로"};
+
+function fitPre(rows,o){
+  const Pre={o};
+  Pre.numFill=NUM.map(c=>impFit(rows.map(r=>r[c]),o.numImp,true));
+  Pre.catFill=CAT.map(c=>impFit(rows.map(r=>r[c]),o.catImp,false));
+  const A=rows.map(r=>imputeRow(Pre,r));
+  Pre.sc=NUM.map((c,j)=>scFit(A.map(a=>a.num[j]),o.scaler));
+  Pre.cats=CAT.map((c,j)=>[...new Set(A.map(a=>a.cat[j]))].sort(cmp));
+  Pre.names=[];Pre.src=[];Pre.grp=[];
+  NUM.forEach((c,j)=>{Pre.names.push(c);Pre.src.push("num");Pre.grp.push(j);});
+  CAT.forEach((c,j)=>{ if(o.enc==="onehot") Pre.cats[j].forEach(k=>{Pre.names.push(c+"_"+k);Pre.src.push("cat");Pre.grp.push(j);});
+    else {Pre.names.push(c);Pre.src.push("cat");Pre.grp.push(j);} });
+  return Pre;
+}
+function imputeRow(Pre,r){
+  const num=NUM.map((c,j)=>r[c]===null||r[c]===undefined||Number.isNaN(r[c])?Pre.numFill[j]:r[c]);
+  const cat=CAT.map((c,j)=>r[c]===null||r[c]===undefined||r[c]===""?Pre.catFill[j]:r[c]);
+  const filled={};NUM.forEach(c=>{if(r[c]===null||r[c]===undefined||Number.isNaN(r[c]))filled[c]=1;});CAT.forEach(c=>{if(r[c]===null||r[c]===undefined||r[c]==="")filled[c]=1;});
+  return{num,cat,filled};
+}
+/* 여러 행을 한 번에 transform (sklearn처럼 처음 보는 범주가 있으면 배치 전체가 오류) */
+function preTransform(Pre,rows,hu){
+  const A=rows.map(r=>imputeRow(Pre,r));
+  if(hu==="error"){
+    for(let j=0;j<CAT.length;j++){
+      const unk=[...new Set(A.map(a=>a.cat[j]).filter(v=>!Pre.cats[j].includes(v)))];
+      if(unk.length) return{err:{col:j,name:CAT[j],unk},A};
+    }
+  }
+  const Z=A.map(a=>{
+    const z=a.num.map((v,j)=>(v-Pre.sc[j].center)/Pre.sc[j].scale);
+    a.cat.forEach((v,j)=>{const idx=Pre.cats[j].indexOf(v);
+      if(Pre.o.enc==="onehot") Pre.cats[j].forEach((k,t)=>z.push(t===idx?1:0));
+      else z.push(idx<0?-1:idx);});
+    return z;});
+  return{A,Z};
+}
+function fClassif(Z,y){
+  const n=Z.length,p=Z[0].length,out=[];
+  for(let j=0;j<p;j++){
+    const s=[0,0],c=[0,0];for(let i=0;i<n;i++){s[y[i]]+=Z[i][j];c[y[i]]++;}
+    const m=(s[0]+s[1])/n,m0=s[0]/c[0],m1=s[1]/c[1];
+    const ssb=c[0]*(m0-m)**2+c[1]*(m1-m)**2;let ssw=0;
+    for(let i=0;i<n;i++){const d=Z[i][j]-(y[i]?m1:m0);ssw+=d*d;}
+    const msw=ssw/(n-2);let F;
+    if(msw<=1e-24) F= ssb>1e-24?Infinity:NaN; else F=ssb/msw;
+    out.push(F);
+  }
+  return out;
+}
+function selectK(scores,k){
+  const idx=scores.map((s,i)=>[Number.isNaN(s)?-Number.MAX_VALUE:s,i]).sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:a[1]-b[1]);
+  const sup=scores.map(()=>false);idx.slice(idx.length-k).forEach(e=>sup[e[1]]=true);return sup;
+}
+function solve(A,b){const n=b.length;const M=A.map((r,i)=>[...r,b[i]]);
+  for(let c=0;c<n;c++){let p=c;for(let r=c+1;r<n;r++)if(Math.abs(M[r][c])>Math.abs(M[p][c]))p=r;[M[c],M[p]]=[M[p],M[c]];
+    const d=M[c][c]||1e-300;for(let r=c+1;r<n;r++){const f=M[r][c]/d;if(f)for(let k=c;k<=n;k++)M[r][k]-=f*M[c][k];}}
+  const x=new Array(n).fill(0);for(let r=n-1;r>=0;r--){let s=M[r][n];for(let k=r+1;k<n;k++)s-=M[r][k]*x[k];x[r]=s/(M[r][r]||1e-300);}return x;}
+/* 로지스틱 회귀 (L2, 절편은 규제 없음): 최소화  ½‖w‖² + C·Σ logloss  — 뉴턴법 */
+function fitLR(X,y,C){
+  const n=X.length,p=X[0]?X[0].length:0,d=p+1;let th=new Array(d).fill(0);
+  for(let it=0;it<100;it++){
+    const g=new Array(d).fill(0),H=[...Array(d)].map(()=>new Array(d).fill(0));
+    for(let i=0;i<n;i++){const xi=[1,...X[i]];let z=0;for(let j=0;j<d;j++)z+=th[j]*xi[j];const s=sig(z),e=s-y[i],w=s*(1-s);
+      for(let j=0;j<d;j++){g[j]+=C*e*xi[j];const wj=C*w*xi[j];for(let k=0;k<=j;k++)H[j][k]+=wj*xi[k];}}
+    for(let j=0;j<d;j++)for(let k=j+1;k<d;k++)H[j][k]=H[k][j];
+    for(let j=1;j<d;j++){g[j]+=th[j];H[j][j]+=1;} H[0][0]+=1e-10;
+    const dl=solve(H,g);let mx=0;for(let j=0;j<d;j++){th[j]-=dl[j];mx=Math.max(mx,Math.abs(dl[j]));}
+    if(mx<1e-11)break;
+  }
+  return{b:th[0],w:th.slice(1)};
+}
+const lrProb=(m,x)=>{let z=m.b;for(let j=0;j<x.length;j++)z+=m.w[j]*x[j];return sig(z);};
+function ros(X,y,seed){
+  const r=mulberry32(seed),c=[0,0];y.forEach(v=>c[v]++);
+  const mi=c[0]<c[1]?0:1,need=Math.abs(c[0]-c[1]),pool=[];y.forEach((v,i)=>{if(v===mi)pool.push(i);});
+  const added=[];for(let t=0;t<need;t++)added.push(pool[Math.floor(r()*pool.length)]);
+  return{X:X.concat(added.map(i=>X[i])),y:y.concat(added.map(i=>y[i])),added,before:c.slice(),minority:mi};
+}
+function fitPipeline(rows,o,seed=4){
+  const P=fitPre(rows,o);P.rows=rows;
+  const y=rows.map(r=>r.y);P.y=y;
+  const T=preTransform(P,rows,"error");P.A=T.A;P.Z=T.Z;
+  P.scores=fClassif(P.Z,y);P.k=Math.min(o.k,P.names.length);P.support=selectK(P.scores,P.k);
+  P.selIdx=P.support.map((s,i)=>s?i:-1).filter(i=>i>=0);
+  let X=P.Z.map(z=>P.selIdx.map(i=>z[i])),yy=y.slice();P.added=[];
+  if(o.sampler){const R=ros(X,yy,seed);X=R.X;yy=R.y;P.added=R.added;P.ros=R;}
+  P.model=fitLR(X,yy,o.C);P.fitX=X;P.fitY=yy;
+  P.trainAcc=X.reduce((s,x,i)=>s+((lrProb(P.model,x)>=.5?1:0)===yy[i]?1:0),0)/X.length;
+  return P;
+}
+function predictRows(P,rows,hu){
+  const T=preTransform(P,rows,hu);if(T.err)return T;
+  T.X=T.Z.map(z=>P.selIdx.map(i=>z[i]));T.p=T.X.map(x=>lrProb(P.model,x));T.pred=T.p.map(p=>p>=.5?1:0);return T;
+}
+function accuracy(P,rows,hu){const T=predictRows(P,rows,hu);if(T.err)return NaN;return T.pred.reduce((s,v,i)=>s+(v===rows[i].y?1:0),0)/rows.length;}
+
+/* ============================================================
+   공통 상태
+   ============================================================ */
+const S={opt:{numImp:"mean",catImp:"most_frequent",scaler:"standard",enc:"onehot",k:6,C:1,sampler:false},hu:"error",sampType:"ros",K:5};
+let P1=null;
+function refit(){ P1=fitPipeline(TRAIN,S.opt); }
+
+/* ================= 탭 ================= */
+const TABS=["flow","fit","leak","cv","code"];let curTab="flow";const onShow={};
+function showTab(k,focus){
+  if(!TABS.includes(k))k="flow";
+  TABS.forEach(t=>{const b=$("tab-"+t),p=$("pane-"+t),on=t===k;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;p.hidden=!on;});
+  const prev=curTab;curTab=k;if(focus)$("tab-"+k).focus();
+  if(location.hash!=="#"+k)history.replaceState(null,"","#"+k);
+  if(prev!==k){T1.stop();T4.stop();T3F.stop();}
+  onShow[k]&&onShow[k]();
+}
+TABS.forEach(t=>$("tab-"+t).addEventListener("click",()=>showTab(t)));
+document.querySelector(".sk-tabs").addEventListener("keydown",e=>{
+  if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;e.preventDefault();e.stopPropagation();
+  const i=TABS.indexOf(curTab),n=(i+(e.key==="ArrowRight"?1:-1)+TABS.length)%TABS.length;showTab(TABS[n],true);
+});
+window.addEventListener("hashchange",()=>{const k=location.hash.slice(1);if(TABS.includes(k)&&k!==curTab)showTab(k);});
+document.querySelectorAll(".fp-tech button").forEach(b=>b.addEventListener("click",()=>{showTab(b.dataset.go);window.scrollTo({top:$("main").offsetTop-70,behavior:RM?"auto":"smooth"});}));
+document.addEventListener("keydown",e=>{
+  if(e.key!=="ArrowRight"||e.altKey||e.ctrlKey||e.metaKey)return;
+  const t=e.target;if(t&&(t.closest(".sk-tabs")||/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)||t.closest(".sk-seg")))return;
+  if(curTab==="flow"){T1.next();e.preventDefault();}
+  else if(curTab==="cv"){T4.next();e.preventDefault();}
+  else if(curTab==="leak"){T3F.next();e.preventDefault();}
+});
+
+/* ============================================================
+   1. 파이프라인 따라가기
+   ============================================================ */
+const T1=(function(){
+  const st={step:0,blk:null,playing:false,timer:null,speed:1};
+  function steps(){const s=[{k:"raw",t:"원본",b:null},{k:"imp",t:"① 결측값 대치",b:"numImp"},{k:"scale",t:"② 스케일링",b:"scaler"},{k:"enc",t:"③ 인코딩",b:"enc"},{k:"select",t:"④ 특성 선택",b:"select"}];
+    if(S.opt.sampler)s.push({k:"sample",t:"⑤ 샘플링*",b:"sampler"});s.push({k:"model",t:S.opt.sampler?"⑥ 모델 fit":"⑤ 모델 fit",b:"model"});return s;}
+  const nf=v=>f2(v,2);
+  function rawTxt(c,v){return v===null?"NaN":(typeof v==="number"?v.toFixed(DEC[c]):v);}
+  function blockLabels(){
+    const o=S.opt;
+    $("bNumImp").textContent="'"+o.numImp+"'";
+    $("bCatImp").textContent="'"+o.catImp+"'";
+    $("bScalerN").textContent=o.scaler==="none"?"스케일러 없음":SC_NAME[o.scaler];
+    $("bScaler").textContent=o.scaler==="none"?"'passthrough'":SC_FORM[o.scaler];
+    $("bEncN").textContent=o.enc==="onehot"?"OneHotEncoder":"OrdinalEncoder";
+    $("bEnc").textContent="unknown='"+(S.hu==="error"?"error":(o.enc==="onehot"?"ignore":"use_encoded_value"))+"'";
+    $("bSel").textContent="SelectKBest k="+P1.k;
+    $("bSamp").innerHTML=o.sampler?"RandomOver<wbr>Sampler":"꺼짐 (체크하면 켜짐)";
+    document.querySelector('.fp-blk[data-b="sampler"]').classList.toggle("off",!o.sampler);
+  }
+  function render(anim){
+    const S_=steps();if(st.step>=S_.length)st.step=S_.length-1;
+    const cur=S_[st.step];
+    if(anim||st.blk===null||st.follow)st.blk=cur.b||st.blk||"numImp";
+    blockLabels();
+    document.querySelectorAll(".fp-blk").forEach(b=>{const k=b.dataset.b;
+      const on=cur.b===k||(cur.k==="imp"&&k==="catImp");
+      b.classList.toggle("on",on);b.classList.toggle("sel",k===st.blk);b.setAttribute("aria-pressed",k===st.blk?"true":"false");});
+    $("t1Stepper").innerHTML=S_.map((s,i)=>`<li class="${i===st.step?"on":i<st.step?"done":""}">${s.t}</li>`).join("");
+    $("t1Cap").innerHTML=caption(cur.k);
+    table(cur.k,S_,anim);
+    info(st.blk);
+    $("t1Prev").disabled=st.step===0;$("t1First").disabled=st.step===0;$("t1Next").disabled=st.step===S_.length-1;
+  }
+  function at(S_,k){const i=S_.findIndex(s=>s.k===k);return i>=0&&i<=st.step;}
+  function table(cur,S_,anim){
+    const P=P1,o=S.opt,enc=at(S_,"enc"),removed=at(S_,"select")&&cur!=="select",selStep=cur==="select";
+    let cols=[];
+    if(!enc){NUM.forEach((c,j)=>cols.push({t:"num",j,name:c}));CAT.forEach((c,j)=>cols.push({t:"cat",j,name:c}));}
+    else P.names.forEach((nm,fi)=>{if(removed&&!P.support[fi])return;cols.push({t:"f",fi,name:nm,src:P.src[fi],g:P.grp[fi]});});
+    const rows=P.rows.map((r,i)=>({r,i,copy:false}));
+    if(at(S_,"sample"))P.added.forEach(i=>rows.push({r:P.rows[i],i,copy:true}));
+    const showP=cur==="model";
+    const hdr=c=>{
+      if(c.t==="num")return`<th class="gnum">${c.name}<span class="ty">수치</span></th>`;
+      if(c.t==="cat")return`<th class="gcat">${c.name}<span class="ty">범주</span></th>`;
+      const drop=selStep&&!P.support[c.fi],grow=anim&&cur==="enc"&&c.src==="cat";
+      const ty=c.src==="num"?(o.scaler==="none"?"수치":"스케일됨"):(o.enc==="onehot"?"원-핫":"순서 코드");
+      return`<th class="${c.src==="num"?"gnum":"gcat"}${drop?" drop":""}${selStep&&P.support[c.fi]?" keep":""}${grow?" fl-enc":""}">${esc(c.name)}<span class="ty">${ty}</span></th>`;
+    };
+    let h=`<thead><tr><th>#</th>${cols.map(hdr).join("")}<th class="gy">질환 y</th>${showP?'<th class="gp">P(y=1)</th><th class="gp">예측</th>':""}</tr>`;
+    if(selStep){
+      const rank=P.scores.map((s,i)=>[Number.isNaN(s)?-1e308:s,i]).sort((a,b)=>b[0]-a[0]||a[1]-b[1]).map(e=>e[1]);
+      h+=`<tr class="frow"><th style="text-align:left">F 점수</th>${cols.map(c=>`<th class="${P.support[c.fi]?"keep":"drop"}">${f2(P.scores[c.fi],2)}<span class="ty">${rank.indexOf(c.fi)+1}위</span></th>`).join("")}<th></th></tr>`;
+    }
+    h+="</thead><tbody>";
+    const T=showP?predictRows(P,P.rows,"error"):null;
+    rows.forEach((R,ri)=>{
+      const r=R.r,a=P.A[R.i],z=P.Z[R.i];
+      let tr=`<tr class="${R.copy?"copy":""}${R.copy&&anim&&cur==="sample"?" fl-row":""}"><td class="n">${R.copy?"#"+r.id+"′":"#"+r.id}</td>`;
+      cols.forEach(c=>{
+        if(c.t==="num"){const cn=NUM[c.j],v=r[cn];
+          if(!at(S_,"imp"))tr+=v===null?`<td class="n na">NaN</td>`:`<td class="n">${rawTxt(cn,v)}</td>`;
+          else if(!at(S_,"scale")){const f=a.filled[cn];tr+=`<td class="n${f?" imp":""}${f&&anim&&cur==="imp"?" fl-imp":""}">${f?nf(a.num[c.j]):rawTxt(cn,v)}</td>`;}
+          else{const f=a.filled[cn],val=z[c.j],from=a.num[c.j],tw=anim&&cur==="scale"&&o.scaler!=="none";
+            tr+=`<td class="n${f?" imp":" sc"}${tw?" fl-sc":""}"${tw?` data-a="${from}" data-b="${val}"`:""}>${nf(val)}</td>`;}
+        }else if(c.t==="cat"){const cn=CAT[c.j],v=r[cn];
+          if(!at(S_,"imp"))tr+=v===null?`<td class="na">NaN</td>`:`<td>${esc(v)}</td>`;
+          else{const f=a.filled[cn];tr+=`<td class="${f?"imp":""}${f&&anim&&cur==="imp"?" fl-imp":""}">${esc(a.cat[c.j])}</td>`;}
+        }else{
+          const v=z[c.fi],drop=selStep&&!P.support[c.fi],grow=anim&&cur==="enc"&&c.src==="cat";
+          let cls="n",txt;
+          if(c.src==="num"){txt=nf(v);cls+=a.filled[NUM[c.g]]?" imp":" sc";}
+          else{txt=String(v);const fl=a.filled[CAT[c.g]];
+            if(o.enc==="onehot"){cls+=v===1?" one":" zero";if(fl&&v===1)cls+=" imp";}else if(fl)cls+=" imp";}
+          if(drop)cls+=" drop";if(grow)cls+=" fl-enc";
+          tr+=`<td class="${cls}">${txt}</td>`;
+        }
+      });
+      tr+=`<td><span class="fp-yp y${r.y}">${r.y}</span></td>`;
+      if(showP){const p=R.copy?T.p[R.i]:T.p[R.i];const pr=p>=.5?1:0;tr+=`<td class="n">${f2(p,3)}</td><td><span class="fp-yp y${pr}">${pr}</span>${pr===r.y?"":' <span class="fp-leak" title="틀림">✕</span>'}</td>`;}
+      h+=tr+"</tr>";
+    });
+    h+="</tbody>";
+    // 바닥 줄: fit에서 배운 값
+    let ft="";
+    const foot=(label,fn)=>`<tr><th>${label}</th>${cols.map(fn).join("")}<td></td>${showP?"<td></td><td></td>":""}</tr>`;
+    if(cur==="imp")ft+=foot("대치값",c=>c.t==="num"?`<td class="n fp-imp"><b>${nf(P.numFill[c.j])}</b></td>`:`<td class="fp-imp"><b>${esc(P.catFill[c.j])}</b></td>`);
+    if(cur==="scale"&&o.scaler!=="none"){const L=SC_LABEL[o.scaler];
+      ft+=foot(L[0],c=>c.t==="num"?`<td class="n fp-data"><b>${nf(P.sc[c.j].a)}</b></td>`:"<td></td>");
+      ft+=foot(L[1],c=>c.t==="num"?`<td class="n fp-data"><b>${nf(P.sc[c.j].b)}</b></td>`:"<td></td>");}
+    if(cur==="model"){ft+=foot("계수 w",c=>{const k=P.selIdx.indexOf(c.fi);return`<td class="n fp-cv"><b>${f2(P.model.w[k],3)}</b></td>`;});}
+    if(ft)h+=`<tfoot>${ft}</tfoot>`;
+    $("t1Tbl").innerHTML=h;
+    if(anim&&cur==="scale"&&!RM){
+      const cells=[...$("t1Tbl").querySelectorAll("td[data-a]")];const t0=performance.now(),dur=700/st.speed;
+      const tick=now=>{const u=Math.min(1,(now-t0)/dur),e=1-Math.pow(1-u,3);cells.forEach(td=>{const a=+td.dataset.a,b=+td.dataset.b;td.textContent=nf(u>=1?b:a+(b-a)*e);});if(u<1)requestAnimationFrame(tick);};
+      cells.forEach(td=>td.textContent=nf(+td.dataset.a));requestAnimationFrame(tick);
+    }
+  }
+  function caption(k){
+    const P=P1,o=S.opt;
+    const miss=c=>TRAIN.filter(r=>r[c]===null).length;
+    if(k==="raw")return`Train <b>12행</b> 원본입니다. 결측(NaN): 나이 <b>${miss("나이")}칸</b>, 흡연 <b>${miss("흡연")}칸</b>. 혈당에 이상값 <b>310</b>이 하나 있습니다. <b>[다음 단계]</b>로 한 단계씩 통과시켜 보세요.`;
+    if(k==="imp"){const nm={mean:"평균",median:"중앙값",most_frequent:"최빈값",constant:"상수"}[o.numImp];
+      return`SimpleImputer가 fit에서 나이의 ${nm} <b>${f2(P.numFill[0])}</b>을 배워 빈칸 ${miss("나이")}개를 채웠습니다. 흡연은 ${o.catImp==="constant"?"상수":"최빈값"} <b>'${esc(P.catFill[1])}'</b>로 ${miss("흡연")}칸. 채운 칸은 <span class="fp-imp"><b>청록</b></span>으로 표시합니다.${o.numImp==="most_frequent"?" (나이는 모두 다른 값이라 최빈값이 가장 작은 값이 됩니다.)":""}`;}
+    if(k==="scale"){if(o.scaler==="none")return"스케일러를 'passthrough'로 두었습니다. 수치 열이 그대로 다음 단계로 갑니다.";
+      const g=P.sc[1];
+      if(o.scaler==="standard")return`StandardScaler: <b>z = (x − μ) / σ</b>. 혈당은 μ = <b>${f2(g.a)}</b>, σ = <b>${f2(g.b)}</b> — 이상값 310 때문에 σ가 커져 나머지 값이 0 근처로 몰립니다. RobustScaler로 바꿔 비교해 보세요.`;
+      if(o.scaler==="minmax")return`MinMaxScaler: 최솟값 → 0, 최댓값 → 1. 혈당은 최댓값이 이상값 <b>310</b>이라 나머지가 0~0.24에 몰립니다.`;
+      return`RobustScaler: 중앙값을 빼고 IQR로 나눕니다. 혈당 중앙값 <b>${f2(g.a)}</b>, IQR <b>${f2(g.b)}</b> — 이상값 310이 기준값을 흔들지 못합니다.`;}
+    if(k==="enc"){const n=P.names.length-3;
+      return o.enc==="onehot"?`OneHotEncoder: 범주 3열이 <b>${n}열</b>로 펼쳐집니다 (${CAT.map((c,j)=>c+" "+P.cats[j].length).join(" + ")}). 전체 특성 <b>${P.names.length}개</b>.`:
+        `OrdinalEncoder: 범주를 정렬 순서대로 0, 1, 2 … 정수로 바꿉니다. 열 수는 그대로 <b>${P.names.length}개</b>지만 '서울 = 3 > 경기 = 0' 같은 가짜 순서가 생깁니다.`;}
+    if(k==="select"){const drop=P.names.length-P.k;
+      return`SelectKBest(f_classif, k=${P.k}): 질환 0/1 집단의 평균 차이를 보는 <b>F 점수</b> 상위 ${P.k}개만 남기고 ${drop}개 열(취소선)을 지웁니다. 다음 단계에서 사라집니다.`;}
+    if(k==="sample"){const R=P.ros;
+      return`RandomOverSampler: 질환 0 = <b>${R.before[0]}행</b>, 1 = <b>${R.before[1]}행</b> → 적은 쪽(${R.minority})을 ${P.added.length}행 복제해 ${R.before[0]+(R.minority===0?P.added.length:0)} : ${R.before[1]+(R.minority===1?P.added.length:0)}. 주황 행이 복제본이며, <b>fit할 때만</b> 생깁니다.`;}
+    return`LogisticRegression(C=1.0)이 선택된 <b>${P.k}개 특성</b>${o.sampler?"과 복제 행을 포함한 "+P.fitX.length+"행":""}으로 fit했습니다. 훈련 정확도 <b>${pct(P.trainAcc)}</b>. 이제 이 Pipeline 전체가 하나의 모델입니다.`;
+  }
+  function kvRows(pairs){return`<dl class="sk-kv">${pairs.map(p=>`<dt>${p[0]}</dt><dd>${p[1]}</dd>`).join("")}</dl>`;}
+  function info(b){
+    const P=P1,o=S.opt;let h="";
+    if(b==="numImp"){h=`<h3 class="fp-imp">수치 SimpleImputer</h3><span class="attr">strategy='${o.numImp}' · statistics_</span>`+kvRows(NUM.map((c,j)=>[c,f2(P.numFill[j])]))+
+      `<p>fit: Train에서 열마다 ${({mean:"평균",median:"중앙값",most_frequent:"최빈값",constant:"상수 0"})[o.numImp]}을 계산해 저장. transform: NaN 자리를 이 값으로 채움. Test·새 데이터도 이 값을 씁니다.</p>`;}
+    else if(b==="catImp"){h=`<h3 class="fp-imp">범주 SimpleImputer</h3><span class="attr">strategy='${o.catImp}' · statistics_</span>`+kvRows(CAT.map((c,j)=>[c,"'"+esc(P.catFill[j])+"'"]))+
+      `<p>${o.catImp==="constant"?"결측을 'missing'이라는 새 범주로 둡니다. 결측 자체가 정보일 때 유용합니다.":"흡연 최빈값: 비흡연 5 · 현재 3 · 과거 2 (결측 제외)."}</p>`;}
+    else if(b==="scaler"){if(o.scaler==="none"){h=`<h3 class="fp-data">스케일러 없음</h3><p>'passthrough' — 배우는 값이 없습니다. 로지스틱 회귀의 L2 규제는 특성 크기에 민감하므로 보통 스케일링을 합니다.</p>`;}
+      else{const L=SC_LABEL[o.scaler];h=`<h3 class="fp-data">${SC_NAME[o.scaler]}</h3><span class="attr">${L[2]} · ${L[3]}</span>`+
+        `<div class="sk-scroll"><table class="sk-table"><thead><tr><th>열</th><th>${L[0]}</th><th>${L[1]}</th></tr></thead><tbody>${NUM.map((c,j)=>`<tr><td>${c}</td><td class="n">${f2(P.sc[j].a)}</td><td class="n">${f2(P.sc[j].b)}</td></tr>`).join("")}</tbody></table></div>`+
+        `<div class="sk-formula">${SC_FORM[o.scaler]}<br>예) 혈당 102 → (102 − ${f2(P.sc[1].center)}) / ${f2(P.sc[1].scale)} = ${f2((102-P.sc[1].center)/P.sc[1].scale)}</div>`+
+        (o.scaler==="standard"?`<p>σ는 모집단 표준편차(n으로 나눔)입니다. 대치된 값까지 포함해 계산합니다.</p>`:"");}}
+    else if(b==="enc"){h=`<h3 class="fp-data">${o.enc==="onehot"?"OneHotEncoder":"OrdinalEncoder"}</h3><span class="attr">categories_ (Train에서 본 범주, 정렬)</span>`+
+      kvRows(CAT.map((c,j)=>[c,"["+P.cats[j].map(esc).join(", ")+"]"]))+
+      `<p>${o.enc==="onehot"?"범주마다 0/1 열 하나. 출력 "+(P.names.length-3)+"열.":"범주를 0부터 정수 코드로. 출력 3열."} Test에 categories_에 없는 값이 오면 handle_unknown 설정에 따라 오류 또는 ${o.enc==="onehot"?"모두 0":"−1"}. → 2번 화면</p>`;}
+    else if(b==="select"){
+      const mx=Math.max(...P.scores.filter(isFinite),1e-9);
+      const order=P.scores.map((s,i)=>i).sort((a,b2)=>(Number.isNaN(P.scores[b2])?-1:P.scores[b2])-(Number.isNaN(P.scores[a])?-1:P.scores[a]));
+      h=`<h3 class="fp-data">SelectKBest(f_classif, k=${P.k})</h3><span class="attr">scores_ · get_support()</span><div class="fp-fs">`+
+        order.map(i=>`<span class="nm${P.support[i]?"":" dropped"}">${esc(P.names[i])}</span><div class="${P.support[i]?"":"dropped"}"><div class="fp-bar" style="width:${Math.max(2,(isFinite(P.scores[i])?P.scores[i]:0)/mx*100)}%"></div></div><span class="v${P.support[i]?"":" dropped"}">${f2(P.scores[i])}</span>`).join("")+
+        `</div><div class="sk-formula">F = 집단 간 평균제곱 / 집단 내 평균제곱</div><p>선택 기준도 fit에서 정해집니다. 그래서 특성 선택을 전체 데이터로 하면 누수가 됩니다. → 3번 화면</p>`;}
+    else if(b==="sampler"){
+      if(!o.sampler)h=`<h3 class="fp-eval">불균형 샘플링 (꺼짐)</h3><p>위의 '불균형 샘플링 넣기'를 체크하면 RandomOverSampler가 모델 앞에 들어갑니다. sklearn Pipeline에는 넣을 수 없고 imblearn Pipeline을 써야 합니다.</p>`;
+      else{const R=P.ros;h=`<h3 class="fp-eval">RandomOverSampler</h3><span class="attr">fit_resample (학습 때만)</span>`+kvRows([["전: 0 / 1",R.before[0]+" / "+R.before[1]],["후: 0 / 1",(R.before[0]+(R.minority===0?P.added.length:0))+" / "+(R.before[1]+(R.minority===1?P.added.length:0))],["복제한 행",P.added.map(i=>"#"+TRAIN[i].id).join(", ")]])+
+        `<p>predict 때는 이 단계를 건너뜁니다. 교차검증에서도 Train fold 안에서만 복제해야 합니다.</p>`;}}
+    else if(b==="model"){
+      h=`<h3 class="fp-cv">LogisticRegression(C=1.0)</h3><span class="attr">coef_ · intercept_</span>`+
+        kvRows(P.selIdx.map((fi,k)=>[esc(P.names[fi]),f2(P.model.w[k],3)]).concat([["절편 b",f2(P.model.b,3)],["훈련 정확도",pct(P.trainAcc)]]))+
+        `<div class="sk-formula">P(y=1) = σ(b + Σ wⱼxⱼ)</div><p>계수는 스케일된 특성 기준입니다. 규제(C)가 작을수록 계수가 0 쪽으로 줄어듭니다.</p>`;}
+    $("t1Info").innerHTML=`<span class="sk-label">fit에서 배운 값</span>`+h;
+  }
+  function go(i,anim){const n=steps().length;st.step=Math.max(0,Math.min(n-1,i));st.follow=true;render(anim);st.follow=false;}
+  function next(){const n=steps().length;if(st.step<n-1)go(st.step+1,true);else stop();}
+  function tick(){next();if(st.step>=steps().length-1)stop();}
+  function play(){if(st.playing){stop();return;}if(st.step>=steps().length-1)go(0,false);st.playing=true;$("t1Play").textContent="멈춤";
+    st.timer=setInterval(tick,Math.max(500,2000/st.speed));}
+  function stop(){st.playing=false;clearInterval(st.timer);$("t1Play").textContent="재생";}
+  $("t1First").onclick=()=>{stop();go(0,false);};
+  $("t1Prev").onclick=()=>{stop();go(st.step-1,false);};
+  $("t1Next").onclick=()=>{stop();next();};
+  $("t1Play").onclick=play;
+  $("t1Speed").oninput=e=>{st.speed=+e.target.value;$("t1SpeedV").textContent=st.speed+"×";if(st.playing){clearInterval(st.timer);st.timer=setInterval(tick,Math.max(500,2000/st.speed));}};
+  document.querySelectorAll(".fp-blk").forEach(b=>b.addEventListener("click",()=>{st.blk=b.dataset.b;render(false);}));
+  return{render:()=>render(false),next,stop,go,st};
+})();
+
+/* 옵션 */
+function syncK(){const n=P1?P1.names.length:12;const sl=$("oK");const nmax=fitPre(TRAIN,S.opt).names.length;sl.max=nmax;if(S.opt.k>nmax)S.opt.k=nmax;sl.value=S.opt.k;$("oKv").textContent=S.opt.k;return n;}
+function optChanged(){syncK();refit();T1.render();T4.invalidate();if(curTab==="fit")T2.render();if(curTab==="leak")T3.render();if(curTab==="code")T5.render();}
+$("oNumImp").onchange=e=>{S.opt.numImp=e.target.value;optChanged();};
+$("oCatImp").onchange=e=>{S.opt.catImp=e.target.value;optChanged();};
+$("oScaler").onchange=e=>{S.opt.scaler=e.target.value;optChanged();};
+$("oEnc").onchange=e=>{S.opt.enc=e.target.value;optChanged();};
+$("oK").oninput=e=>{S.opt.k=+e.target.value;$("oKv").textContent=S.opt.k;refit();T1.render();T4.invalidate();};
+$("oSamp").onchange=e=>{S.opt.sampler=e.target.checked;$("cImb").checked=S.opt.sampler;optChanged();};
+
+/* ============================================================
+   2. fit vs transform
+   ============================================================ */
+const T2=(function(){
+  const st={target:"test",wrong:false,sel:0,newp:Object.assign({},NEWP0)};
+  function rowsNow(){return st.target==="test"?TEST:[st.newp];}
+  function huLabel(){const oh=S.opt.enc==="onehot";$("t2HUi").textContent=oh?"'ignore'":"'use_encoded_value' (−1)";}
+  function rules(){
+    const P=P1,o=S.opt,L=SC_LABEL[o.scaler];
+    let h=`<div class="sk-scroll"><table class="sk-table"><thead><tr><th>수치 열</th><th>대치값</th>${o.scaler!=="none"?`<th>${L[0]}</th><th>${L[1]}</th>`:""}</tr></thead><tbody>`+
+      NUM.map((c,j)=>`<tr><td>${c}</td><td class="n">${f2(P.numFill[j])}</td>${o.scaler!=="none"?`<td class="n">${f2(P.sc[j].a)}</td><td class="n">${f2(P.sc[j].b)}</td>`:""}</tr>`).join("")+`</tbody></table></div>`;
+    h+=`<div class="sk-scroll"><table class="sk-table"><thead><tr><th>범주 열</th><th>대치값</th><th>categories_</th></tr></thead><tbody>`+
+      CAT.map((c,j)=>`<tr><td>${c}</td><td>${esc(P.catFill[j])}</td><td>${P.cats[j].map(esc).join(", ")}</td></tr>`).join("")+`</tbody></table></div>`;
+    h+=`<p class="sk-hint" style="margin:6px 0 0">선택된 특성 ${P.k}개: ${P.selIdx.map(i=>esc(P.names[i])).join(", ")}</p>`;
+    $("t2Rules").innerHTML=h;
+  }
+  function render(){
+    huLabel();rules();
+    const P=P1,o=S.opt,rows=rowsNow();if(st.sel>=rows.length)st.sel=0;
+    $("t2NewBox").hidden=st.target!=="new";
+    // 입력 표
+    let h=`<thead><tr><th>#</th>${NUM.map(c=>`<th class="gnum">${c}</th>`).join("")}${CAT.map(c=>`<th class="gcat">${c}</th>`).join("")}${st.target==="test"?'<th class="gy">실제 y</th>':""}</tr></thead><tbody>`;
+    rows.forEach((r,i)=>{h+=`<tr class="clk${i===st.sel?" sel":""}" data-i="${i}"><td class="n">${r.id==="새"?"새 환자":"#"+r.id}</td>`+
+      NUM.map(c=>r[c]===null||Number.isNaN(r[c])?`<td class="n na">NaN</td>`:`<td class="n">${+r[c].toFixed(DEC[c])===r[c]?r[c].toFixed(DEC[c]):r[c]}</td>`).join("")+
+      CAT.map((c,j)=>r[c]===null||r[c]===""?`<td class="na">NaN</td>`:`<td${P.cats[j].includes(r[c])?"":' class="fp-leak"'}>${esc(r[c])}${P.cats[j].includes(r[c])?"":" (처음 보는 값)"}</td>`).join("")+
+      (st.target==="test"?`<td><span class="fp-yp y${r.y}">${r.y}</span></td>`:"")+`</tr>`;});
+    $("t2In").innerHTML=h+"</tbody>";
+    // transform
+    const T=predictRows(P,rows,S.hu);
+    let W=null;
+    if(st.wrong){const Pw=fitPre(rows,o);W={Pre:Pw,T:preTransform(Pw,rows,"ignore")};}
+    if(T.err){
+      const e=T.err;
+      $("t2ErrBox").innerHTML=`<div class="fp-err">ValueError: Found unknown categories [${e.unk.map(u=>"'"+esc(u)+"'").join(", ")}] in column ${e.col} during transform<br><span style="font-family:var(--sans)">→ '${esc(e.name)}' 열의 categories_ [${P.cats[e.col].map(esc).join(", ")}]에 없는 값입니다. handle_unknown='${o.enc==="onehot"?"ignore":"use_encoded_value"}'로 바꾸면 ${o.enc==="onehot"?"그 열의 원-핫이 모두 0":"코드 −1"}이 됩니다.</span></div>`;
+      $("t2Out").innerHTML="";
+    }else{
+      $("t2ErrBox").innerHTML="";
+      let o2=`<thead><tr><th>#</th><th class="gp">P(y=1)</th><th class="gp">예측</th>${st.target==="test"?'<th class="gy">실제</th>':""}${P.names.map((n,fi)=>`<th class="${P.src[fi]==="num"?"gnum":"gcat"}${P.support[fi]?" keep":" drop"}">${esc(n)}</th>`).join("")}</tr></thead><tbody>`;
+      rows.forEach((r,i)=>{
+        const a=T.A[i],z=T.Z[i];
+        o2+=`<tr class="clk${i===st.sel?" sel":""}" data-i="${i}"><td class="n">${r.id==="새"?"새 환자":"#"+r.id}</td><td class="n">${f2(T.p[i],3)}</td><td><span class="fp-yp y${T.pred[i]}">${T.pred[i]}</span></td>${st.target==="test"?`<td><span class="fp-yp y${r.y}">${r.y}</span>${T.pred[i]===r.y?"":' <span class="fp-leak">✕</span>'}</td>`:""}`+
+          z.map((v,fi)=>{let cls="n";if(!P.support[fi])cls+=" drop";
+            if(P.src[fi]==="num"){if(a.filled[NUM[fi]])cls+=" imp";else cls+=" sc";return`<td class="${cls}">${f2(v)}</td>`;}
+            const fl=a.filled[CAT[P.grp[fi]]];if(o.enc==="onehot")cls+=v===1?" one":" zero";if(fl&&(o.enc!=="onehot"||v===1))cls+=" imp";return`<td class="${cls}">${v}</td>`;}).join("")+`</tr>`;
+        if(W){
+          const zw=W.T.Z[i],sameCats=W.Pre.cats.every((cs,j)=>cs.length===P.cats[j].length&&cs.every((c,t)=>c===P.cats[j][t]));
+          o2+=`<tr class="wrong"><td>다시 fit</td><td colspan="${st.target==="test"?3:2}">${sameCats?"P = "+f2(lrProb(P.model,P.selIdx.map(k=>zw[k])),3):"예측 불가"}</td>`+P.names.map((n,fi)=>{
+            if(P.src[fi]==="num"){const d=Math.abs(zw[fi]-z[fi])>0.005;return`<td class="n${d?" diff":""}">${f2(zw[fi])}</td>`;}
+            return`<td class="n">${fi===3?(sameCats?"같음":"열 불일치"):""}</td>`;}).join("")+`</tr>`;
+        }
+      });
+      $("t2Out").innerHTML=o2+"</tbody>";
+    }
+    // 계산 과정
+    const r=rows[st.sel],a=imputeRow(P,r);let f=`<b>${r.id==="새"?"새 환자":"#"+r.id}</b> — Train에서 배운 값으로 계산\n`;
+    NUM.forEach((c,j)=>{const raw=r[c]===null||Number.isNaN(r[c]);const x=a.num[j],sc=P.sc[j];
+      f+=`${c}: ${raw?`NaN → 대치 ${f2(x)}`:x}`;
+      if(o.scaler!=="none")f+=` → (${f2(x)} − ${f2(sc.center)}) / ${f2(sc.scale)} = ${f2((x-sc.center)/sc.scale)}`;f+="\n";});
+    CAT.forEach((c,j)=>{const raw=r[c]===null||r[c]==="";const v=a.cat[j];const idx=P.cats[j].indexOf(v);
+      f+=`${c}: ${raw?`NaN → 대치 '${esc(v)}'`:`'${esc(v)}'`} → `;
+      if(o.enc==="onehot")f+=idx<0?(S.hu==="error"?"categories_에 없음 → 오류":"categories_에 없음 → ["+P.cats[j].map(()=>0).join(", ")+"]"):"["+P.cats[j].map((k,t)=>esc(k)+" "+(t===idx?1:0)).join(", ")+"]";
+      else f+=idx<0?(S.hu==="error"?"categories_에 없음 → 오류":"−1"):String(idx);
+      f+="\n";});
+    $("t2Formula").innerHTML=f.trim();
+    // 메모
+    let note="";
+    if(W){
+      const Pw=W.Pre;
+      note+=`<p class="sk-note fp-note-leak"><b>잘못된 예: ${st.target==="test"?"Test 4행":"새 환자 1명"}으로 전처리를 다시 fit</b> — 대치값·${o.scaler==="none"?"":"기준값·"}categories_가 모두 대상 데이터 기준으로 바뀝니다 (빨간 줄).`;
+      if(o.scaler!=="none")note+=` 혈당 ${SC_LABEL[o.scaler][0]}: Train ${f2(P.sc[1].a)} → 다시 fit ${f2(Pw.sc[1].a)}.`;
+      if(st.target==="new"&&o.scaler!=="none")note+=` 1명으로 fit하면 표준편차(범위)가 0이라 수치 특성이 <b>전부 0</b>이 됩니다.`;
+      const diffCats=CAT.filter((c,j)=>Pw.cats[j].length!==P.cats[j].length);
+      if(diffCats.length)note+=` 범주 수도 달라져(${diffCats.map(c=>c+" "+P.cats[CAT.indexOf(c)].length+"→"+Pw.cats[CAT.indexOf(c)].length).join(", ")}) 원-핫 열 개수가 모델이 배운 것과 맞지 않습니다.`;
+      note+=`</p>`;
+    }else note+=`<p class="sk-note fp-note-use"><b>올바른 경로</b> — <span class="sk-mono">pipe.predict(X_new)</span>는 내부에서 transform만 실행합니다. 대치값 ${f2(P.numFill[0])}(나이)과 ${o.scaler!=="none"?SC_LABEL[o.scaler][0]+" "+f2(P.sc[1].a)+"(혈당)":"categories_"}는 Train에서 온 값입니다.</p>`;
+    $("t2Note").innerHTML=note;
+    document.querySelectorAll("#t2In tr.clk,#t2Out tr.clk").forEach(tr=>tr.addEventListener("click",()=>{st.sel=+tr.dataset.i;render();}));
+  }
+  segInit($("t2Target"),v=>{st.target=v;st.sel=0;render();});
+  segInit($("t2HU"),v=>{S.hu=v;T1.render();render();});
+  $("t2Wrong").onclick=()=>{st.wrong=!st.wrong;$("t2Wrong").setAttribute("aria-pressed",st.wrong?"true":"false");render();};
+  function readNew(){const nv=id=>{const s=$(id).value.trim();return s===""?null:+s;};
+    st.newp={id:"새",나이:nv("nAge"),혈당:nv("nGlu"),BMI:nv("nBmi"),성별:$("nSex").value,흡연:$("nSmk").value||null,지역:$("nReg").value,y:null};render();}
+  function writeNew(p){$("nAge").value=p.나이??"";$("nGlu").value=p.혈당??"";$("nBmi").value=p.BMI??"";$("nSex").value=p.성별;$("nSmk").value=p.흡연||"";$("nReg").value=p.지역;}
+  ["nAge","nGlu","nBmi"].forEach(id=>$(id).addEventListener("input",readNew));
+  ["nSex","nSmk","nReg"].forEach(id=>$(id).addEventListener("change",readNew));
+  $("nUnseen").onclick=()=>{$("nReg").value="제주";readNew();};
+  $("nReset").onclick=()=>{writeNew(NEWP0);readNew();};
+  writeNew(NEWP0);
+  return{render,st};
+})();
+onShow.fit=()=>T2.render();
+
+/* ============================================================
+   3. 누수 비교
+   ============================================================ */
+const T3=(function(){
+  const st={mode:"scale",exp:"sel",seed:11,p:1000,rate:12};
+  const mean=a=>a.reduce((s,v)=>s+v,0)/a.length;
+  const sd=a=>{const m=mean(a);return Math.sqrt(a.reduce((s,v)=>s+(v-m)*(v-m),0)/a.length);};
+  const defs=`<defs><marker id="mkL" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahl" d="M0,0L10,5L0,10z"/></marker><marker id="mkE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ahe" d="M0,0L10,5L0,10z"/></marker><marker id="mkN" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ahn" d="M0,0L10,5L0,10z"/></marker><marker id="mkC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ahc" d="M0,0L10,5L0,10z"/></marker></defs>`;
+  const chip=(x,y,w,cls,id,pos)=>`<rect class="chip ${cls}" x="${x}" y="${y}" width="${w}" height="20" rx="4"/><text class="cid" x="${x+w/2}" y="${y+13.5}">${id}</text>${pos?`<circle class="pos" cx="${x+w-3}" cy="${y+3}" r="2.3"/>`:""}`;
+  function statInfo(){
+    if(st.mode==="scale"){const tr=TRAIN.map(r=>r.혈당),al=ALL.map(r=>r.혈당);return{lab:"혈당",all:[mean(al),sd(al)],tr:[mean(tr),sd(tr)],line:v=>`μ = ${f2(v[0])},  σ = ${f2(v[1])}`,what:"평균·표준편차"};}
+    const tr=TRAIN.map(r=>r.나이).filter(v=>v!==null),al=ALL.map(r=>r.나이).filter(v=>v!==null);
+    return{lab:"나이",all:[mean(al),al.length],tr:[mean(tr),tr.length],line:v=>`대치값(평균) = ${f2(v[0])}  (${v[1]}개로 계산)`,what:"대치값"};
+  }
+  function svgStat(wrong){
+    const I=statInfo();let s=defs;
+    const W=360,cw=17;
+    const xs=ALL.map((r,i)=>wrong?8+i*21.5:(i<12?8+i*20:262+(i-12)*21));
+    s+=`<text class="ts" x="8" y="12">${wrong?"전체 16행":"Train 12행"}</text>`;
+    if(!wrong)s+=`<text class="ts" x="262" y="12">Test 4행 (잠금)</text>`;
+    ALL.forEach((r,i)=>{s+=chip(xs[i],18,cw,i<12?"tr":"te",r.id,false);});
+    if(wrong){
+      ALL.forEach((r,i)=>{const x0=xs[i]+cw/2,x1=24+i*15;s+=`<path class="ln ${i<12?"tr":"lk"}" d="M${x0},40 C${x0},72 ${x1},70 ${x1},${i<12?101:99}"${i<12?"":' marker-end="url(#mkL)"'}/>`;});
+      s+=`<rect class="box fit" x="8" y="102" width="266" height="52" rx="8"/><text class="tt" x="18" y="122">fit (${I.lab}, 전체 16행)</text><text class="tm" x="18" y="143">${I.line(I.all)}</text>`;
+      s+=`<text class="tl" x="${W-6}" y="124" text-anchor="end">Test 값</text><text class="tl" x="${W-6}" y="139" text-anchor="end">유입</text>`;
+      s+=`<path class="ln nu" d="M140,154 L140,186" marker-end="url(#mkN)"/><text class="ts" x="148" y="175">그다음 분할</text>`;
+      s+=`<rect class="box bad" x="8" y="190" width="344" height="62" rx="8"/><text class="tt" x="20" y="210">Train 12 / Test 4 모두 이 규칙으로 transform</text><text class="tl" x="20" y="229">Test가 이미 규칙을 만드는 데 쓰였음</text><text class="tl" x="20" y="245">→ 평가 점수가 실제보다 낙관적</text>`;
+    }else{
+      TRAIN.forEach((r,i)=>{const x0=xs[i]+cw/2,x1=24+i*18.5;s+=`<path class="ln tr" d="M${x0},40 C${x0},72 ${x1},70 ${x1},101"/>`;});
+      TEST.forEach((r,t)=>{const x0=xs[12+t]+cw/2;s+=`<path class="ln te" d="M${x0},40 L${x0},187" marker-end="url(#mkE)"/>`;});
+      s+=`<rect class="box fit" x="8" y="102" width="236" height="52" rx="8"/><text class="tt" x="18" y="122">fit (${I.lab}, Train 12행만)</text><text class="tm" x="18" y="143">${I.line(I.tr)}</text>`;
+      s+=`<path class="ln dash" d="M120,154 L120,186" marker-end="url(#mkC)"/><text class="ts" x="128" y="175">규칙 전달</text>`;
+      s+=`<rect class="box good" x="8" y="190" width="344" height="62" rx="8"/><text class="tt" x="20" y="210">transform: Test도 Train의 ${I.what}로 변환</text><text class="tg" x="20" y="229">Test는 fit에 한 번도 쓰이지 않음</text><text class="tg" x="20" y="245">→ 처음 보는 데이터처럼 정직한 평가</text>`;
+    }
+    return`<svg viewBox="0 0 ${W} 258" aria-hidden="true">${s}</svg>`;
+  }
+  // 오버샘플링: 잘못 = 전체 16행 복제 → 분할
+  function sampPlan(){
+    const ones=ALL.map((r,i)=>r.y===1?i:-1).filter(i=>i>=0),zeros=16-ones.length;
+    for(let seed=1;seed<500;seed++){
+      const r=mulberry32(seed);const cp=[];for(let t=0;t<zeros-ones.length;t++)cp.push(ones[Math.floor(r()*ones.length)]);
+      const items=ALL.map((x,i)=>({src:i,copy:false})).concat(cp.map(i=>({src:i,copy:true})));
+      const order=shuffle(items.map((x,i)=>i),r);const nTest=Math.ceil(items.length*0.25);
+      const testSet=new Set(order.slice(0,nTest));
+      const cross=items.map((it,i)=>i).filter(i=>items[i].copy).find(i=>{const orig=items.findIndex(x=>!x.copy&&x.src===items[i].src);return testSet.has(i)!==testSet.has(orig);});
+      if(cross!==undefined)return{items,testSet,cross,order};
+    }
+  }
+  function svgSamp(wrong){
+    let s=defs;const W=360;
+    if(wrong){
+      const Pl=sampPlan(),it=Pl.items,cw=16,gx=19;
+      s+=`<text class="ts" x="8" y="12">전체 16행 + 복제 ${it.length-16}행 (점 = 질환 1)</text>`;
+      const pos=i=>8+i*gx;
+      it.forEach((x,i)=>{s+=chip(pos(i),18,cw,x.copy?"nu cp":"nu",ALL[x.src].id+(x.copy?"′":""),ALL[x.src].y===1);});
+      s+=`<path class="ln nu" d="M180,42 L180,72" marker-end="url(#mkN)"/><text class="ts" x="188" y="62">무작위 분할 (25%)</text>`;
+      const trI=Pl.order.slice(Math.ceil(it.length*0.25)).sort((a,b)=>a-b),teI=Pl.order.slice(0,Math.ceil(it.length*0.25)).sort((a,b)=>a-b);
+      const px={};
+      s+=`<text class="tt" x="8" y="96">Train</text>`;trI.forEach((i,t)=>{const x=50+t*gx;px[i]=[x,82];s+=chip(x,82,cw,"tr"+(it[i].copy?" cp":""),ALL[it[i].src].id+(it[i].copy?"′":""),ALL[it[i].src].y===1);});
+      s+=`<text class="tt" x="8" y="166">Test</text>`;teI.forEach((i,t)=>{const x=50+t*gx;px[i]=[x,152];s+=chip(x,152,cw,"te"+(it[i].copy?" cp":""),ALL[it[i].src].id+(it[i].copy?"′":""),ALL[it[i].src].y===1);});
+      const c=Pl.cross,orig=it.findIndex(x=>!x.copy&&x.src===it[c].src);
+      const a=px[c],b=px[orig];const top=a[1]<b[1]?a:b,bot=a[1]<b[1]?b:a;
+      s+=`<path class="ln lk" d="M${top[0]+cw/2},${top[1]+20} C${top[0]+cw/2},${top[1]+50} ${bot[0]+cw/2},${bot[1]-30} ${bot[0]+cw/2},${bot[1]-1}" marker-end="url(#mkL)"/>`;
+      const id=ALL[it[c].src].id;
+      s+=`<rect class="box bad" x="8" y="186" width="344" height="62" rx="8"/><text class="tl" x="20" y="206">환자 #${id}와 복제본 #${id}′가 Train·Test 양쪽에</text><text class="tl" x="20" y="224">→ 모델이 외운 답으로 채점받음</text><text class="ts" x="20" y="241">(소수 클래스 재현율이 특히 부풀려짐)</text>`;
+      return`<svg viewBox="0 0 ${W} 254" aria-hidden="true">${s}</svg>`;
+    }
+    const cw=16,gx=19;
+    s+=`<text class="ts" x="8" y="12">분할 먼저: Train 12행 · Test 4행 (점 = 질환 1)</text>`;
+    ALL.forEach((r,i)=>{const x=i<12?8+i*gx:250+(i-12)*gx;s+=chip(x,18,cw,i<12?"tr":"te",r.id,r.y===1);});
+    s+=`<path class="ln nu" d="M120,42 L120,72" marker-end="url(#mkN)"/><text class="ts" x="128" y="62">Train만 RandomOverSampler</text>`;
+    const R=ros(TRAIN.map(r=>[0]),TRAIN.map(r=>r.y),4);
+    const trItems=TRAIN.map((r,i)=>({i,copy:false})).concat(R.added.map(i=>({i,copy:true})));
+    s+=`<text class="tt" x="8" y="96">Train</text>`;trItems.forEach((x,t)=>{s+=chip(50+t*gx,82,cw,"tr"+(x.copy?" cp":""),TRAIN[x.i].id+(x.copy?"′":""),TRAIN[x.i].y===1);});
+    s+=`<text class="tt" x="8" y="166">Test</text>`;TEST.forEach((r,t)=>{s+=chip(50+t*gx,152,cw,"te",r.id,r.y===1);});
+    s+=`<rect class="box good" x="8" y="186" width="344" height="62" rx="8"/><text class="tg" x="20" y="206">복제본은 Train 안에만 (${R.added.map(i=>"#"+TRAIN[i].id+"′").join(", ")})</text><text class="tg" x="20" y="224">Test는 원래 분포 그대로 → 정직한 평가</text><text class="ts" x="20" y="241">교차검증이면 fold의 Train 부분 안에서만 복제</text>`;
+    return`<svg viewBox="0 0 ${W} 254" aria-hidden="true">${s}</svg>`;
+  }
+  function renderFlows(){
+    const samp=st.mode==="samp";
+    $("t3Bad").innerHTML=samp?svgSamp(true):svgStat(true);$("t3Good").innerHTML=samp?svgSamp(false):svgStat(false);
+    $("t3Bad").setAttribute("aria-label",samp?"전체 데이터를 오버샘플링한 뒤 분할하면 같은 환자의 복제본이 Train과 Test에 동시에 들어간다":"전체 16행으로 fit하면 Test 4행의 값이 평균 계산에 섞인다");
+    $("t3Good").setAttribute("aria-label",samp?"분할 후 Train만 오버샘플링하면 Test에는 복제본이 없다":"Train 12행으로만 fit하고 Test는 그 규칙으로 transform만 한다");
+    if(samp){$("t3BadTxt").innerHTML=`<p class="sk-note fp-note-leak">Test 안의 복제본은 Train에 똑같은 쌍둥이가 있어 쉽게 맞힙니다. 샘플링은 반드시 분할 뒤, imblearn Pipeline 안에 둡니다.</p>`;$("t3GoodTxt").innerHTML=`<p class="sk-note fp-note-use">imblearn Pipeline은 fit 때만 fit_resample을 실행하고 predict·score 때는 건너뜁니다.</p>`;return;}
+    const I=statInfo();
+    const d=st.mode==="scale"?`${I.lab} 평균이 ${f2(I.tr[0])} → ${f2(I.all[0])}로 바뀝니다`:`${I.lab} 대치값이 ${f2(I.tr[0])} → ${f2(I.all[0])}로 바뀝니다`;
+    $("t3BadTxt").innerHTML=`<p class="sk-note fp-note-leak">Test 4행(#13~#16)이 fit에 들어가 ${d}. 숫자 차이가 작아도 Test를 미리 본 것이므로 누수입니다. 특성 선택처럼 y를 쓰는 단계에서는 차이가 훨씬 커집니다 (아래 실험).</p>`;
+    $("t3GoodTxt").innerHTML=`<p class="sk-note fp-note-use"><span class="sk-mono">pipe.fit(X_train, y_train)</span> → <span class="sk-mono">pipe.score(X_test, y_test)</span>. Pipeline으로 묶으면 순서가 자동으로 지켜집니다.</p>`;
+  }
+  /* ---- 실험 ---- */
+  function stratFolds(y,K,r){const folds=[...Array(K)].map(()=>[]);[0,1].forEach(c=>{const idx=shuffle(y.map((v,i)=>v===c?i:-1).filter(i=>i>=0),r);idx.forEach((i,t)=>folds[t%K].push(i));});return folds.map(f=>f.sort((a,b)=>a-b));}
+  function expSel(){
+    const r=mulberry32(st.seed*7919+1),n=80,p=st.p,k=10,K=5;
+    const X=[...Array(n)].map(()=>{const a=new Array(p);for(let j=0;j<p;j++)a[j]=gauss(r);return a;});
+    const y=shuffle([...Array(n)].map((v,i)=>i<n/2?1:0),r);
+    const folds=stratFolds(y,K,r);
+    const pick=(rows,idx)=>rows.map(x=>idx.map(j=>x[j]));
+    const topk=(Xs,ys)=>{const sup=selectK(fClassif(Xs,ys),k);return sup.map((s,i)=>s?i:-1).filter(i=>i>=0);};
+    const acc=(m,Xs,ys)=>Xs.reduce((s,x,i)=>s+((lrProb(m,x)>=.5?1:0)===ys[i]?1:0),0)/Xs.length;
+    const gIdx=topk(X,y);let wrong=0,right=0;
+    folds.forEach(vf=>{const vs=new Set(vf),tr=y.map((v,i)=>i).filter(i=>!vs.has(i));
+      const Xtr=tr.map(i=>X[i]),ytr=tr.map(i=>y[i]),Xva=vf.map(i=>X[i]),yva=vf.map(i=>y[i]);
+      const m1=fitLR(pick(Xtr,gIdx),ytr,1);wrong+=acc(m1,pick(Xva,gIdx),yva)/K;
+      const li=topk(Xtr,ytr);const m2=fitLR(pick(Xtr,li),ytr,1);right+=acc(m2,pick(Xva,li),yva)/K;});
+    const mAll=fitLR(pick(X,gIdx),y,1);let ok=0;const M=2000;
+    for(let t=0;t<M;t++){const x=gIdx.map(()=>gauss(r));const yy=r()<.5?1:0;ok+=((lrProb(mAll,x)>=.5?1:0)===yy)?1:0;}
+    return{wrong,right,truth:ok/M,metric:"정확도",ref:.5};
+  }
+  function expRos(){
+    const r=mulberry32(st.seed*104729+3),n=150,d=4,K=5,rate=st.rate/100;
+    const n1=Math.round(n*rate);const y=shuffle([...Array(n)].map((v,i)=>i<n1?1:0),r);
+    const gen=c=>[...Array(d)].map(()=>gauss(r)+(c?0.6:0));const X=y.map(gen);
+    const nn1=(Xtr,ytr,x)=>{let b=Infinity,c=0;for(let i=0;i<Xtr.length;i++){let s=0;for(let j=0;j<d;j++){const q=Xtr[i][j]-x[j];s+=q*q;}if(s<b){b=s;c=ytr[i];}}return c;};
+    const recall=(Xtr,ytr,Xva,yva)=>{let tp=0,p=0;Xva.forEach((x,i)=>{if(yva[i]===1){p++;if(nn1(Xtr,ytr,x)===1)tp++;}});return p?tp/p:NaN;};
+    // 잘못: 전체를 복제한 뒤 CV
+    const R=ros(X,y,st.seed);const f1=stratFolds(R.y,K,r);let wrong=0;
+    f1.forEach(vf=>{const vs=new Set(vf),tr=R.y.map((v,i)=>i).filter(i=>!vs.has(i));wrong+=recall(tr.map(i=>R.X[i]),tr.map(i=>R.y[i]),vf.map(i=>R.X[i]),vf.map(i=>R.y[i]))/K;});
+    // 올바름: fold의 Train 부분만 복제
+    const f2_=stratFolds(y,K,r);let right=0;
+    f2_.forEach((vf,fi)=>{const vs=new Set(vf),tr=y.map((v,i)=>i).filter(i=>!vs.has(i));const Rt=ros(tr.map(i=>X[i]),tr.map(i=>y[i]),st.seed+fi);right+=recall(Rt.X,Rt.y,vf.map(i=>X[i]),vf.map(i=>y[i]))/K;});
+    // 진짜: 새 환자 2000명
+    let tp=0,pp=0;for(let t=0;t<2000;t++){const c=r()<rate?1:0;if(!c)continue;pp++;if(nn1(R.X,R.y,gen(1))===1)tp++;}
+    return{wrong,right,truth:pp?tp/pp:NaN,metric:"재현율(질환 1)",ref:null};
+  }
+  function renderExp(){
+    const sel=st.exp==="sel";
+    $("t3SlL").textContent=sel?"노이즈 특성 수 p":"소수 클래스 비율(%)";
+    const sl=$("t3Sl");if(sel){sl.min=50;sl.max=2000;sl.step=50;sl.value=st.p;$("t3SlV").textContent=st.p;}else{sl.min=5;sl.max=30;sl.step=1;sl.value=st.rate;$("t3SlV").textContent=st.rate+"%";}
+    $("t3ExpLead").innerHTML=sel?`환자 80명, 특성 ${st.p}개가 <b>모두 순수 잡음</b>이고 y도 무작위(50:50)입니다. 어떤 모델도 50%보다 잘 맞힐 수 없는 데이터에서, SelectKBest(k=10)를 <b>분할 전 전체 데이터</b>에 fit하면 교차검증 점수가 어떻게 되는지 봅니다. 모델은 LogisticRegression.`:
+      `환자 150명 중 질환 1이 ${st.rate}%. 특성 4개에 약한 신호가 있습니다. 1-최근접 이웃 모델로, RandomOverSampler를 <b>분할 전 전체</b>에 적용한 경우와 <b>fold의 Train 부분에만</b> 적용한 경우의 교차검증 재현율을 비교합니다.`;
+    const R=sel?expSel():expRos();
+    const bars=[["잘못된 순서 (전체로 fit → CV)",R.wrong,"var(--c-leak)"],["올바른 순서 (Pipeline 안에서 CV)",R.right,"var(--c-cv)"],["실제 성능 (새 데이터 2,000명)",R.truth,"var(--c-use)"]];
+    $("t3Bars").innerHTML=bars.map(b=>`<div class="fp-hbar"><span class="lb">${b[0]}</span><div class="tr">${R.ref!==null?`<span class="ref" style="left:${R.ref*100}%"></span>`:""}<div class="fl" style="width:${Math.max(0,b[1])*100}%;background:${b[2]}"></div></div><span class="v">${pct(b[1])}</span></div>`).join("")+
+      `<p class="sk-hint" style="margin:0">지표: ${R.metric}${R.ref!==null?" · 점선 = 찍기 수준 50%":""}</p>`;
+    $("t3ExpNote").innerHTML=`<p class="sk-note fp-note-leak">잘못된 순서의 점수 <b>${pct(R.wrong)}</b>는 실제 성능 <b>${pct(R.truth)}</b>보다 <b>${f2((R.wrong-R.truth)*100,1)}%p</b> 높습니다. ${sel?"전체 데이터에서 y와 우연히 상관이 큰 잡음 열을 골랐기 때문에, Validation fold의 정답이 이미 선택에 반영되었습니다.":"Validation fold의 소수 클래스 환자와 똑같은 복제본이 Train fold에 있어 1-최근접 이웃이 그대로 맞힙니다."} 올바른 순서의 점수 <b>${pct(R.right)}</b>가 실제에 가깝습니다.</p>`;
+  }
+  segInit($("t3Mode"),v=>{st.mode=v;renderFlows();});
+  segInit($("t3Exp"),v=>{st.exp=v;renderExp();});
+  $("t3Sl").oninput=e=>{if(st.exp==="sel"){st.p=+e.target.value;$("t3SlV").textContent=st.p;}else{st.rate=+e.target.value;$("t3SlV").textContent=st.rate+"%";}};
+  $("t3Sl").onchange=()=>renderExp();
+  $("t3Seed").onclick=()=>{st.seed++;renderExp();};
+  function render(){renderFlows();renderExp();T3F.render();}
+  return{render,st};
+})();
+
+/* 3-3. fold마다 다시 fit */
+const T3F=(function(){
+  const st={K:4,f:0,playing:false,timer:null};
+  function folds(){const n=12,K=st.K,sz=n/K;return[...Array(K)].map((v,f)=>{const va=[...Array(sz)].map((x,t)=>f*sz+t);return{va,tr:[...Array(n)].map((x,i)=>i).filter(i=>!va.includes(i))};});}
+  function render(){
+    const Fs=folds();if(st.f>=Fs.length)st.f=0;
+    const o=Object.assign({},S.opt);
+    $("t3Mini").innerHTML=Fs.map((F,f)=>`<div class="r${f===st.f?" on":""}"><span class="lb">fold ${f+1}</span>${TRAIN.map((r,i)=>`<span class="c ${F.va.includes(i)?"v":"t"}">${r.id}</span>`).join("")}</div>`).join("")+
+      `<div class="sk-legend" style="margin-top:4px"><span><i style="background:color-mix(in srgb,var(--c-data) 40%,var(--surface))"></i>fit에 쓰는 Train 부분</span><span><i style="background:color-mix(in srgb,var(--c-imp) 55%,var(--surface))"></i>Validation (채점만)</span></div>`;
+    const L=o.scaler!=="none"?SC_LABEL[o.scaler]:null;
+    let h=`<thead><tr><th>fold</th><th>나이 대치값</th>${L?`<th>혈당 ${L[0]}</th><th>혈당 ${L[1]}</th>`:""}<th>선택된 특성 (k=${Math.min(o.k,fitPre(TRAIN,o).names.length)})</th><th>Val 정확도</th></tr></thead><tbody>`;
+    const accs=[];
+    Fs.forEach((F,f)=>{const tr=F.tr.map(i=>TRAIN[i]),va=F.va.map(i=>TRAIN[i]);const P=fitPipeline(tr,o);const ac=accuracy(P,va,"ignore");accs.push(ac);
+      h+=`<tr class="${f===st.f?"sel":""}"><td>fold ${f+1}</td><td class="n">${f2(P.numFill[0])}</td>${L?`<td class="n">${f2(P.sc[1].a)}</td><td class="n">${f2(P.sc[1].b)}</td>`:""}<td class="wrap">${P.selIdx.map(i=>esc(P.names[i])).join(", ")}</td><td class="n">${pct(ac)}</td></tr>`;});
+    const P=P1;
+    h+=`</tbody><tfoot><tr><th>12행 전체</th><td class="n">${f2(P.numFill[0])}</td>${L?`<td class="n">${f2(P.sc[1].a)}</td><td class="n">${f2(P.sc[1].b)}</td>`:""}<td class="wrap">${P.selIdx.map(i=>esc(P.names[i])).join(", ")}</td><td class="n">평균 ${pct(accs.reduce((s,v)=>s+v,0)/accs.length)}</td></tr></tfoot>`;
+    $("t3FoldTbl").innerHTML=h;
+    const F=Fs[st.f];
+    $("t3FoldNote").innerHTML=`<b>fold ${st.f+1}</b>: Validation #${F.va.map(i=>TRAIN[i].id).join(", #")}은 대치값·${L?"스케일 기준·":""}특성 선택·모델 계수 어디에도 쓰이지 않습니다. fold마다 대치값과 기준값, 선택된 특성이 조금씩 다른 것이 정상입니다 — 파이프라인 전체가 fold마다 새로 fit되기 때문입니다. (Validation에 처음 보는 지역이 나올 수 있어 여기서는 handle_unknown='ignore')`;
+  }
+  function next(){st.f=(st.f+1)%st.K;render();}
+  function stop(){st.playing=false;clearInterval(st.timer);$("t3FPlay").textContent="재생";}
+  $("t3FNext").onclick=()=>{stop();next();};
+  $("t3FPrev").onclick=()=>{stop();st.f=(st.f-1+st.K)%st.K;render();};
+  $("t3FPlay").onclick=()=>{if(st.playing){stop();return;}st.playing=true;$("t3FPlay").textContent="멈춤";st.timer=setInterval(next,1300);};
+  segInit($("t3K"),v=>{st.K=+v;st.f=0;render();});
+  return{render,next,stop};
+})();
+onShow.leak=()=>T3.render();
+
+/* ============================================================
+   4. 교차검증 × 하이퍼파라미터 튜닝
+   ============================================================ */
+const T4=(function(){
+  const st={seed:42,K:5,t:0,playing:false,timer:null,speed:2,R:null,dirty:true};
+  const REG=["경기","대구","부산","서울"],SMK=["비흡연","과거","현재"];
+  function genCohort(seed){
+    const r=mulberry32(seed),rows=[];
+    for(let i=0;i<200;i++){
+      const age=Math.max(25,Math.min(88,Math.round(55+12*gauss(r))));
+      let glu=Math.round(100+16*gauss(r)+0.5*(age-55));if(r()<.03)glu+=Math.round(150+100*r());
+      const bmi=Math.round((25+3.5*gauss(r))*10)/10;
+      const sex=r()<.5?"남":"여";const u=r();const smk=u<.5?"비흡연":u<.78?"과거":"현재";const reg=REG[Math.floor(r()*4)];
+      const logit=-0.4+0.06*(age-55)+0.04*(Math.min(glu,200)-105)+0.16*(bmi-25)+(smk==="현재"?1.0:smk==="과거"?0.35:0)+(sex==="남"?0.25:0);
+      const y=r()<sig(logit)?1:0;
+      rows.push({id:i+1,나이:r()<.08?null:age,혈당:glu,BMI:r()<.04?null:bmi,성별:sex,흡연:r()<.1?null:smk,지역:reg,y});
+    }
+    // 층화 분할 80 / 20
+    const tr=[],te=[];[0,1].forEach(c=>{const idx=shuffle(rows.map((x,i)=>x.y===c?i:-1).filter(i=>i>=0),r);const nt=Math.round(idx.length*.2);idx.forEach((i,t)=>(t<nt?te:tr).push(rows[i]));});
+    tr.sort((a,b)=>a.id-b.id);te.sort((a,b)=>a.id-b.id);
+    return{tr,te,r};
+  }
+  const GRID=[];[0.01,0.1,1].forEach(C=>["standard","minmax"].forEach(sc=>[3,5,8].forEach(k=>GRID.push({C,sc,k}))));
+  function compute(){
+    const D=genCohort(st.seed),K=st.K,y=D.tr.map(r=>r.y);
+    const rr=mulberry32(st.seed+K);const folds=[...Array(K)].map(()=>[]);
+    [0,1].forEach(c=>{const idx=shuffle(y.map((v,i)=>v===c?i:-1).filter(i=>i>=0),rr);idx.forEach((i,t)=>folds[t%K].push(i));});
+    folds.forEach(f=>f.sort((a,b)=>a-b));
+    const res=GRID.map(g=>{const o=Object.assign({},S.opt,{scaler:g.sc,k:g.k,C:g.C});
+      const sc=folds.map(vf=>{const vs=new Set(vf);const trR=D.tr.filter((x,i)=>!vs.has(i)),vaR=vf.map(i=>D.tr[i]);return accuracy(fitPipeline(trR,o),vaR,S.hu);});
+      const ok=sc.filter(v=>!Number.isNaN(v));const m=ok.length===sc.length?sc.reduce((s,v)=>s+v,0)/K:NaN;
+      const sd=Number.isNaN(m)?NaN:Math.sqrt(sc.reduce((s,v)=>s+(v-m)*(v-m),0)/K);
+      return{g,o,sc,m,sd};});
+    const key=v=>Number.isNaN(v.m)?-1:Math.round(v.m*1e12)/1e12;
+    res.forEach(a=>{a.rank=1+res.filter(b=>key(b)>key(a)).length;});
+    let best=0;res.forEach((a,i)=>{if(key(a)>key(res[best]))best=i;});
+    const Pb=fitPipeline(D.tr,res[best].o);
+    st.R={D,folds,res,best,trainAcc:accuracy(Pb,D.tr,S.hu),testAcc:accuracy(Pb,D.te,"ignore"),Pb};
+    st.dirty=false;
+  }
+  const total=()=>GRID.length*st.K+2;
+  function render(){
+    if(st.dirty)compute();
+    const R=st.R,K=st.K,t=st.t,nCV=GRID.length*K;
+    const phase=t<=nCV?"cv":t===nCV+1?"refit":"test";
+    const ci=t===0?-1:Math.min(GRID.length-1,Math.floor((t-1)/K)),fi=t===0?-1:(t-1)%K;
+    $("t4DataHint").textContent=`생성 데이터 200행 → Train ${R.D.tr.length} / Test ${R.D.te.length} (층화)`;
+    // fold 격자
+    let fh="";
+    if(phase==="cv"){
+      for(let f=0;f<K;f++){fh+=`<div class="row${f===fi?" on":""}"><span class="lb">fold ${f+1}</span><div class="bar">${[...Array(K)].map((v,s)=>`<span class="seg${s===f?" v":""}">${s===f?"Val "+R.folds[f].length:""}</span>`).join("")}<span class="seg test">Test ${R.D.te.length}<span class="sfx">&nbsp;잠김</span></span></div></div>`;}
+    }else{
+      fh+=`<div class="row on"><span class="lb">${phase==="refit"?"refit":"평가"}</span><div class="bar"><span class="seg all">${phase==="refit"?"최적 조합으로 Train "+R.D.tr.length+"행 전체 fit":"최적 Pipeline"}</span><span class="seg test${phase==="test"?" open":""}">${phase==="test"?"Test "+R.D.te.length+'<span class="sfx">&nbsp;평가</span>':'Test<span class="sfx">&nbsp;잠김</span>'}</span></div></div>`;
+    }
+    $("t4Folds").innerHTML=fh;
+    // 표
+    const done=(c,f)=>t>=c*K+f+1;
+    let h=`<thead><tr><th>#</th><th>model__C</th><th>scaler</th><th>select__k</th>${[...Array(K)].map((v,f)=>`<th>fold ${f+1}</th>`).join("")}<th>평균</th><th>표준편차</th><th>순위</th></tr></thead><tbody>`;
+    R.res.forEach((a,c)=>{const all=done(c,K-1),isBest=c===R.best&&t>=nCV;
+      h+=`<tr class="${isBest?"best":""}${c===ci&&phase==="cv"?" now":""}"><td class="n">${c+1}</td><td class="n">${a.g.C}</td><td>${a.g.sc==="standard"?"Standard":"MinMax"}</td><td class="n">${a.g.k}</td>`+
+        a.sc.map((v,f)=>`<td class="sc${done(c,f)?"":" pend"}${c===ci&&f===fi&&phase==="cv"?" cur":""}">${done(c,f)?f2(v,3):"·"}</td>`).join("")+
+        `<td class="sc">${all?`<b>${f2(a.m,3)}</b>`:""}</td><td class="sc">${all?f2(a.sd,3):""}</td><td class="n">${t>=nCV?a.rank+(isBest?' <span class="sk-pill fp-cv">최적</span>':""):""}</td></tr>`;});
+    $("t4Tbl").innerHTML=h+"</tbody>";
+    // 캡션
+    let cap="";
+    if(t===0)cap=`18조합 × ${K} fold = <b>${GRID.length*K}번</b> fit합니다. 매번 파이프라인 전체(대치 → 스케일 → 인코딩 → 선택 → 모델)를 fold의 Train 부분으로 새로 fit하고 Validation으로 채점합니다. Test는 끝까지 잠겨 있습니다.`;
+    else if(phase==="cv"){const a=R.res[ci];cap=`조합 <b>${ci+1}/18</b> · fold <b>${fi+1}/${K}</b>: C=${a.g.C}, ${a.g.sc==="standard"?"StandardScaler":"MinMaxScaler"}, k=${a.g.k} → Validation 정확도 <b>${f2(a.sc[fi],3)}</b>`;
+      if(t===nCV){const b=R.res[R.best];cap+=` · 완료. 평균이 가장 높은 조합 <b>#${R.best+1}</b> (평균 ${f2(b.m,3)} ± ${f2(b.sd,3)}) 선택.`;}}
+    else if(phase==="refit")cap=`refit=True: 최적 조합 #${R.best+1}로 <b>Train ${R.D.tr.length}행 전체</b>에 파이프라인을 다시 fit합니다 (best_estimator_). 훈련 정확도 ${f2(R.trainAcc,3)}.`;
+    else cap=`잠겨 있던 Test ${R.D.te.length}행으로 <b>딱 한 번</b> 평가: 정확도 <b>${f2(R.testAcc,3)}</b>. 이 숫자를 보고 다시 튜닝하면 Test도 누수됩니다.`;
+    $("t4Cap").innerHTML=cap;
+    // 결과
+    const b=R.res[R.best],show=t>=nCV;
+    $("t4Res").innerHTML=[["최적 조합",show?`C=${b.g.C}, ${b.g.sc==="standard"?"Std":"MinMax"}, k=${b.g.k}`:"—","var(--c-cv)"],["CV 평균 (best_score_)",show?f2(b.m,3):"—","var(--c-cv)"],["학습 성능 (Train 전체)",t>=nCV+1?f2(R.trainAcc,3):"—","var(--c-data)"],["일반화 성능 (Test)",t>=nCV+2?f2(R.testAcc,3):"잠김","var(--c-eval)"]]
+      .map(x=>`<div class="sk-stat" style="--r:${x[2]}"><b style="${x[0]==="최적 조합"?"font-size:15px":""}">${x[1]}</b><span>${x[0]}</span></div>`).join("");
+    $("t4Note").innerHTML=t>=nCV+2?`<p class="sk-note">학습 성능 ${pct(R.trainAcc)} vs 일반화 성능 ${pct(R.testAcc)} · 차이 ${f2((R.trainAcc-R.testAcc)*100,1)}%p. 강의 예의 97% vs 55%처럼 차이가 크면 과적합입니다. 규제 C가 작을수록(강할수록) 두 점수가 가까워지는 경향이 있습니다. 표에서 C=0.01 줄과 비교해 보세요.</p>`:
+      `<p class="sk-note">점수는 이 화면에서 로지스틱 회귀를 직접 fit해 계산한 실제 값입니다 (fold 배정 난수는 sklearn과 다르므로 숫자가 똑같지는 않습니다).</p>`;
+    $("t4Prev").disabled=t===0;$("t4First").disabled=t===0;$("t4Next").disabled=t>=total();$("t4End").disabled=t>=total();
+  }
+  function next(){if(st.t<total()){st.t++;render();}else stop();}
+  function stop(){st.playing=false;clearInterval(st.timer);$("t4Play").textContent="재생";}
+  function play(){if(st.playing){stop();return;}if(st.t>=total())st.t=0;st.playing=true;$("t4Play").textContent="멈춤";st.timer=setInterval(()=>{next();if(st.t>=total())stop();},Math.max(60,700/st.speed));}
+  $("t4First").onclick=()=>{stop();st.t=0;render();};
+  $("t4Prev").onclick=()=>{stop();st.t=Math.max(0,st.t-1);render();};
+  $("t4Next").onclick=()=>{stop();next();};
+  $("t4End").onclick=()=>{stop();st.t=total();render();};
+  $("t4Play").onclick=play;
+  $("t4Speed").oninput=e=>{st.speed=+e.target.value;$("t4SpeedV").textContent=st.speed+"×";if(st.playing){clearInterval(st.timer);st.timer=setInterval(()=>{next();if(st.t>=total())stop();},Math.max(60,700/st.speed));}};
+  $("t4K").oninput=e=>{st.K=+e.target.value;S.K=st.K;$("t4Kv").textContent=st.K;stop();st.t=0;st.dirty=true;render();};
+  $("t4Seed").onclick=()=>{stop();st.seed=(st.seed*31+7)%100000;st.t=0;st.dirty=true;render();};
+  function invalidate(){st.dirty=true;stop();st.t=0;if(curTab==="cv")render();}
+  return{render,next,stop,invalidate,st};
+})();
+onShow.cv=()=>T4.render();
+
+/* ============================================================
+   5. 코드
+   ============================================================ */
+const T5=(function(){
+  function gen(){
+    const o=S.opt,imb=o.sampler,K=S.K,oh=o.enc==="onehot";
+    const hu=S.hu==="error"?"":(oh?', handle_unknown="ignore"':', handle_unknown="use_encoded_value", unknown_value=-1');
+    const scalerCode={standard:"StandardScaler()",minmax:"MinMaxScaler()",robust:"RobustScaler()",none:'"passthrough"'}[o.scaler];
+    const numImp=o.numImp==="constant"?'SimpleImputer(strategy="constant", fill_value=0)':`SimpleImputer(strategy="${o.numImp}")`;
+    const catImp=o.catImp==="constant"?'SimpleImputer(strategy="constant", fill_value="missing")':'SimpleImputer(strategy="most_frequent")';
+    const enc=oh?`OneHotEncoder(${hu.replace(/^, /,"")})`:`OrdinalEncoder(${hu.replace(/^, /,"")})`;
+    const samp=S.sampType==="smote"?"SMOTE(random_state=42)":"RandomOverSampler(random_state=42)";
+    const scImports=new Set(["StandardScaler","MinMaxScaler"]);if(o.scaler==="robust")scImports.add("RobustScaler");
+    const L=[];
+    L.push("import pandas as pd","import joblib");
+    L.push("from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearchCV");
+    L.push("from sklearn.compose import ColumnTransformer");
+    L.push(imb?"from sklearn.pipeline import Pipeline            # 안쪽 가지(ColumnTransformer)용":"from sklearn.pipeline import Pipeline");
+    if(imb)L.push("from imblearn.pipeline import Pipeline as ImbPipeline   # 샘플러를 넣을 수 있는 Pipeline",`from imblearn.over_sampling import ${S.sampType==="smote"?"SMOTE":"RandomOverSampler"}`);
+    L.push("from sklearn.impute import SimpleImputer");
+    L.push(`from sklearn.preprocessing import ${[...scImports].join(", ")}, ${oh?"OneHotEncoder":"OrdinalEncoder"}`);
+    L.push("from sklearn.feature_selection import SelectKBest, f_classif","from sklearn.linear_model import LogisticRegression","");
+    L.push("# 1~3. 데이터 핸들링 → Y·X 지정 → Train/Test 분할",'df = pd.read_csv("patients.csv")','y = df["질환"]','X = df.drop(columns=["질환"])',
+      'num_cols = ["나이", "혈당", "BMI"]','cat_cols = ["성별", "흡연", "지역"]',"",
+      "X_train, X_test, y_train, y_test = train_test_split(","    X, y, test_size=0.2, stratify=y, random_state=42)","");
+    L.push("# 4. 특성공학: 수치 가지 / 범주 가지","num_pipe = Pipeline([",`    ("imputer", ${numImp}),`,`    ("scaler", ${scalerCode}),`,"])",
+      "cat_pipe = Pipeline([",`    ("imputer", ${catImp}),`,`    ("encoder", ${enc}),`,"])",
+      "preprocess = ColumnTransformer([",'    ("num", num_pipe, num_cols),','    ("cat", cat_pipe, cat_cols),',"])","");
+    L.push(`pipe = ${imb?"ImbPipeline":"Pipeline"}([`,'    ("preprocess", preprocess),',`    ("select", SelectKBest(f_classif, k=${o.k})),`);
+    if(imb)L.push(`    ("sampler", ${samp}),   # fit 때만 실행, predict 때는 건너뜀`);
+    L.push('    ("model", LogisticRegression(C=1.0, max_iter=1000)),',"])","");
+    L.push("# 교차검증 × 하이퍼파라미터 튜닝 (이중 밑줄로 안쪽 부품 지정)","param_grid = {",'    "preprocess__num__scaler": [StandardScaler(), MinMaxScaler()],','    "select__k": [3, 5, 8],','    "model__C": [0.01, 0.1, 1.0],',"}",
+      `cv = StratifiedKFold(n_splits=${K}, shuffle=True, random_state=42)`,
+      'search = GridSearchCV(pipe, param_grid, cv=cv, scoring="accuracy", n_jobs=-1)',
+      "search.fit(X_train, y_train)      # fold마다 파이프라인 전체를 Train 부분으로 fit → 누수 없음","");
+    L.push("# 5. 학습 성능 vs 일반화 성능",'print("최적 조합:", search.best_params_)','print("CV 평균  :", round(search.best_score_, 3))',
+      'print("Train    :", round(search.score(X_train, y_train), 3))','print("Test     :", round(search.score(X_test, y_test), 3))   # 마지막에 1회만',"");
+    L.push("# 6. 모델 구조화 → predict (새 데이터는 다시 fit 하지 않음)",'joblib.dump(search.best_estimator_, "pipeline.pkl")',"",'model = joblib.load("pipeline.pkl")',
+      "new = pd.DataFrame([{",'    "나이": 59, "혈당": 131, "BMI": 27.4,','    "성별": "여", "흡연": None, "지역": "서울",',"}])",
+      "print(model.predict_proba(new)[:, 1])   # 내부: Train에서 배운 규칙으로 transform → predict");
+    return L.join("\n");
+  }
+  function hl(code){
+    return code.split("\n").map(line=>{
+      const i=line.indexOf("#");let a=line,b="";
+      if(i>=0){const before=line.slice(0,i);if(((before.match(/"/g)||[]).length%2)===0){a=before;b=line.slice(i);}}
+      let h=esc(a).replace(/(&quot;[^&]*?&quot;)/g,'<span class="st">$1</span>').replace(/\b(import|from|as|print|None)\b/g,'<span class="kw">$1</span>');
+      h=h.replace(/(preprocess__num__scaler|select__k|model__C)/g,'<span class="hl">$1</span>');
+      return h+(b?`<span class="cm">${esc(b)}</span>`:"");}).join("\n");
+  }
+  function render(){$("cImb").checked=S.opt.sampler;$("cCode").innerHTML=hl(gen());}
+  $("cImb").onchange=e=>{S.opt.sampler=e.target.checked;$("oSamp").checked=S.opt.sampler;optChanged();render();};
+  segInit($("cSamp"),v=>{S.sampType=v;render();});
+  $("cCopy").onclick=()=>{const txt=gen();const done=()=>{$("cCopyMsg").textContent="복사했습니다.";setTimeout(()=>$("cCopyMsg").textContent="",1800);};
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(done,()=>fallback(txt,done));else fallback(txt,done);};
+  function fallback(txt,done){const ta=document.createElement("textarea");ta.value=txt;ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();try{document.execCommand("copy");done();}catch(e){}ta.remove();}
+  return{render,gen};
+})();
+onShow.code=()=>T5.render();
+
+/* ---------- 시작 ---------- */
+syncK();refit();T1.render();
+const startTab=location.hash.slice(1);showTab(TABS.includes(startTab)?startTab:"flow");
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1300 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>랜덤포레스트 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20260930c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20260930c">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 클래스 0 파랑 · 클래스 1 주황 · 뽑힌 행(학습) 파랑 · OOB(검증) 청록 · 튜닝 보라 · 잡음(한계) 빨강 · 활용 초록 */
+:root{ --sk-accent: var(--cat-ml);
+  --c0:#2563EB; --c1:#EA580C; --bag:#2563EB; --oob:#0E8F9C; --tune:#7C3AED; --leak:#DC2626; --use:#15803D; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --c0:#6AA5FF; --c1:#FF914D; --bag:#6AA5FF; --oob:#3CCBD8; --tune:#B294FF; --leak:#F87171; --use:#4ADE80; } }
+:root[data-theme="dark"]{ --c0:#6AA5FF; --c1:#FF914D; --bag:#6AA5FF; --oob:#3CCBD8; --tune:#B294FF; --leak:#F87171; --use:#4ADE80; }
+
+.rf-c0{color:var(--c0)} .rf-c1{color:var(--c1)} .rf-oobt{color:var(--oob)} .rf-bagt{color:var(--bag)} .rf-leakt{color:var(--leak)} .rf-tunet{color:var(--tune)}
+.rf-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.rf-ring{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;border:2px solid var(--muted)}
+.rf-pre{white-space:pre-wrap}
+.rf-cap{margin:0;font-size:14.5px;line-height:1.6;min-height:3.2em}
+.rf-cap b{color:var(--ink)}
+.rf-kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--ink)}
+.rf-sub{font-size:12.5px;font-weight:700;color:var(--faint);letter-spacing:.02em;margin:0}
+.sk-stepper li{cursor:default}
+
+/* ---- 1. 부트스트랩 ---- */
+.rf-draws{display:grid;grid-template-columns:repeat(20,minmax(0,1fr));gap:4px}
+@media (max-width:760px){.rf-draws{grid-template-columns:repeat(10,minmax(0,1fr))}}
+.rf-slot{height:42px;border-radius:7px;border:1px dashed var(--line-strong);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--mono);font-size:13.5px;font-weight:600;color:var(--ink);min-width:0;transition:background .2s,border-color .2s}
+.rf-slot small{font-size:10px;color:var(--faint);font-weight:500;line-height:1.1}
+.rf-slot.on{border-style:solid;border-color:var(--bag);background:color-mix(in srgb,var(--bag) 10%,var(--surface))}
+.rf-slot.cur{background:var(--bag);color:var(--on-ink);border-color:var(--bag)}
+.rf-slot.cur small{color:var(--on-ink)}
+.rf-boot{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:900px){.rf-boot{grid-template-columns:minmax(0,1fr)}}
+.rf-ptable td,.rf-ptable th{padding:4px 9px}
+.rf-ptable td{transition:background .25s}
+.rf-ptable tr.bag td{background:color-mix(in srgb,var(--bag) 11%,var(--surface))}
+.rf-ptable tr.oob td{background:color-mix(in srgb,var(--oob) 17%,var(--surface))}
+.rf-ptable tr.cur td{background:color-mix(in srgb,var(--bag) 32%,var(--surface))}
+.rf-badge{display:inline-grid;place-items:center;min-width:34px;height:22px;border-radius:999px;font-family:var(--mono);font-size:12.5px;font-weight:700;padding:0 7px;background:var(--surface-2);color:var(--faint)}
+.rf-badge.b1{background:var(--bag);color:var(--on-ink)}
+.rf-badge.b0{background:transparent;color:var(--oob);border:1.5px solid var(--oob)}
+.rf-mxw{overflow-x:auto;max-width:100%;padding-bottom:4px}
+.rf-mx{display:grid;grid-template-columns:62px repeat(20,minmax(26px,1fr)) 64px;gap:2px;font-family:var(--mono);font-size:11.5px;min-width:640px}
+.rf-mx .h{color:var(--faint);text-align:center;font-weight:600;align-self:end;padding-bottom:2px}
+.rf-mx .c{height:25px;display:grid;place-items:center;border-radius:4px;background:var(--surface-2);color:var(--ink);font-weight:600}
+.rf-mx .c.n1{background:color-mix(in srgb,var(--bag) 24%,var(--surface))}
+.rf-mx .c.n2{background:color-mix(in srgb,var(--bag) 46%,var(--surface))}
+.rf-mx .c.n3{background:color-mix(in srgb,var(--bag) 68%,var(--surface));color:var(--on-ink)}
+.rf-mx .c.o{background:color-mix(in srgb,var(--oob) 24%,var(--surface));color:var(--oob)}
+.rf-mx .t{appearance:none;font:inherit;font-weight:700;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:5px;cursor:pointer;height:25px;padding:0 4px}
+.rf-mx .t.on{background:var(--ink);color:var(--on-ink);border-color:var(--ink)}
+.rf-mx .t:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.rf-mx .r{display:grid;place-items:center;color:var(--muted);font-weight:600}
+.rf-mx .f{display:grid;place-items:center;color:var(--oob);font-weight:700;border-top:1.5px solid var(--line-strong);height:25px}
+.rf-mx .cur{box-shadow:inset 0 0 0 2px var(--ink)}
+
+/* ---- 2. 특성 무작위 ---- */
+.rf-tree{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.rf-tree li{display:flex;flex-wrap:wrap;align-items:center;gap:3px 6px;padding-left:calc(var(--d) * 14px);position:relative;min-width:0}
+.rf-tree li::before{content:"";position:absolute;left:calc(var(--d) * 14px - 8px);top:-2px;bottom:50%;width:6px;border-left:1.5px solid var(--line-strong);border-bottom:1.5px solid var(--line-strong);border-bottom-left-radius:4px}
+.rf-tree li[style*="--d:0"]::before{display:none}
+.rf-br{font-size:11px;color:var(--faint);font-weight:700;min-width:2.8em}
+.rf-split{appearance:none;font:inherit;font-weight:700;font-size:13px;border:1.5px solid var(--line-strong);background:var(--surface);color:var(--ink);border-radius:7px;padding:1px 8px;cursor:pointer;white-space:nowrap}
+.rf-split:hover{background:var(--surface-2)}
+.rf-split.on{border-color:var(--tune);background:color-mix(in srgb,var(--tune) 13%,var(--surface))}
+.rf-split:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.rf-chips{display:inline-flex;flex-wrap:wrap;gap:3px;align-items:center}
+.rf-chips i{font-style:normal;font-size:10.5px;color:var(--faint);margin-right:1px}
+.rf-chip{font-size:11px;font-weight:600;border-radius:999px;padding:0 7px;border:1px solid var(--line-strong);color:var(--muted);background:var(--surface-2);white-space:nowrap}
+.rf-chip.win{background:var(--tune);border-color:var(--tune);color:var(--on-ink)}
+.rf-lf{font-weight:700;font-size:12.5px;border-radius:6px;padding:0 7px;white-space:nowrap}
+.rf-lf.c0{color:var(--c0);background:color-mix(in srgb,var(--c0) 11%,var(--surface))}
+.rf-lf.c1{color:var(--c1);background:color-mix(in srgb,var(--c1) 11%,var(--surface))}
+.rf-n{font-size:11px;color:var(--faint);font-family:var(--mono);white-space:nowrap}
+.rf-tcard h3{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.rf-tcard h3 small{font-size:12px;font-weight:500;color:var(--muted)}
+.rf-gtable tr.win td{background:color-mix(in srgb,var(--tune) 12%,var(--surface));font-weight:700;color:var(--ink)}
+.rf-gtable tr.unseen td{color:var(--faint)}
+.rf-gtable td.flag{color:var(--leak);font-weight:600;white-space:normal;min-width:9em}
+.rf-g23{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:16px}
+@media (max-width:1080px){.rf-g23{grid-template-columns:minmax(0,1fr)}}
+.rf-dtable tr.cur td{background:color-mix(in srgb,var(--sk-accent) 11%,var(--surface))}
+.rf-dtable tr.cur td:first-child{font-weight:700;color:var(--ink)}
+
+/* ---- 막대 ---- */
+.rf-bars{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px 10px;align-items:center;font-size:13.5px}
+.rf-bars .lb{white-space:nowrap;font-weight:600;color:var(--ink)}
+.rf-bars .lb.noise{color:var(--leak)}
+.rf-bars .tr{height:18px;background:var(--surface-2);border-radius:5px;position:relative;overflow:hidden}
+.rf-bars .fl{position:absolute;top:0;bottom:0;border-radius:4px;transition:width .3s,left .3s}
+.rf-bars .z{position:absolute;top:0;bottom:0;width:1.5px;background:var(--ink);opacity:.55}
+.rf-bars .eb{position:absolute;top:calc(50% - 1px);height:2px;background:var(--ink);opacity:.7}
+.rf-bars .vv{font-family:var(--mono);font-size:12.5px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* ---- 3. 숲 ---- */
+.rf-stage{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+.rf-stage.cmp #boxVote{grid-column:1/-1}
+@media (max-width:900px){.rf-stage{grid-template-columns:minmax(0,1fr)}}
+.rf-fw{width:100%;max-width:580px;margin:0 auto;display:flex;flex-direction:column;gap:6px}
+.rf-field{width:100%;aspect-ratio:1/1;display:block;border-radius:10px;border:1px solid var(--line);cursor:crosshair;touch-action:manipulation}
+.rf-axis{font-size:12px;color:var(--muted);text-align:center}
+.rf-thumbs{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:10px}
+@media (max-width:760px){.rf-thumbs{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}}
+.rf-th{display:flex;flex-direction:column;gap:3px;min-width:0;transition:opacity .25s}
+.rf-th canvas{width:100%;aspect-ratio:1/1;display:block;border-radius:6px;border:1px solid var(--line)}
+.rf-th span{font-size:11.5px;color:var(--muted);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rf-th.off{opacity:.28}
+.rf-vbar{display:flex;height:28px;border-radius:7px;overflow:hidden;font-family:var(--mono);font-size:12.5px;font-weight:700;background:var(--surface-2)}
+.rf-vbar span{display:grid;place-items:center;color:var(--on-ink);min-width:0;overflow:hidden;white-space:nowrap;transition:width .25s}
+.rf-verdict{font-size:15px;font-weight:700;margin:0}
+.rf-prog{font-size:12.5px;color:var(--faint);font-family:var(--mono)}
+
+/* ---- 차트 ---- */
+.rf-chart{width:100%;min-width:0}
+.rf-chart svg{display:block;width:100%;height:auto}
+.rf-chart .gl{stroke:var(--line);stroke-width:1}
+.rf-chart .gl0{stroke:var(--line-strong);stroke-width:1}
+.rf-chart .ax{fill:var(--muted);font-size:11px;font-family:var(--mono)}
+.rf-chart .axl{fill:var(--muted);font-size:11.5px;font-family:var(--sans);font-weight:600}
+.rf-chart .ref{stroke-width:1.3;stroke-dasharray:5 4}
+.rf-chart .reft{font-size:11px;font-family:var(--sans);font-weight:600;paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round}
+.rf-chart .sr{fill:none;stroke-width:2.4;stroke-linejoin:round;stroke-linecap:round}
+.rf-chart .mk{stroke:var(--ink);stroke-width:1.2;stroke-dasharray:3 3;opacity:.7}
+.rf-chart .mkt{fill:var(--ink);font-size:11px;font-family:var(--sans);font-weight:700;paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round}
+
+/* ---- 6. 코드 ---- */
+.rf-code{position:relative}
+.rf-code pre{margin:0;font-family:var(--mono);font-size:12.5px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow:auto;color:var(--ink);max-height:640px}
+.rf-code pre .cm{color:var(--muted)}
+.rf-code pre .kw{color:var(--tune);font-weight:600}
+.rf-code pre .st{color:var(--use)}
+.rf-code pre .nb{color:var(--c1)}
+.rf-code .sk-btn{position:absolute;top:8px;right:8px}
+.rf-cmp td{white-space:normal;vertical-align:top;min-width:9em}
+.rf-cmp td:first-child{font-weight:700;color:var(--ink);min-width:7em}
+.rf-cmp code{font-family:var(--mono);font-size:12px}
+.rf-num{width:88px}
+details.rf-more{font-size:13.5px;color:var(--muted)}
+details.rf-more summary{cursor:pointer;font-weight:600;color:var(--ink)}
+details.rf-more summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+@media (max-width:520px){
+  .sk-slider{min-width:0;width:100%}
+  .rf-bars{font-size:12.5px;gap:5px 7px}
+  .rf-hide-sm{display:none}
+}
+@media (prefers-reduced-motion: reduce){
+  .rf-slot,.rf-ptable td,.rf-th,.rf-vbar span,.rf-bars .fl{transition:none}
+}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)" aria-current="page">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">랜덤포레스트 시뮬레이터</h1>
+      <p class="ds-hero__lede">결정 트리 여러 그루를 서로 다르게 키워 투표로 결론을 내는 방법입니다. 트리마다 행을 복원추출(부트스트랩)하고, 노드마다 특성 일부만 후보로 보게 해서 다양성을 만듭니다. 숲이 커질수록 경계가 매끄러워지고 OOB 오차가 안정되는 과정을 직접 확인합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button type="button" class="sk-tab" role="tab" id="tab-boot" aria-controls="pane-boot" aria-selected="true"><span class="sk-num">1</span>부트스트랩 샘플링</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-feat" aria-controls="pane-feat" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>특성 무작위 선택</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-forest" aria-controls="pane-forest" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>숲 키우기와 다수결</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-oob" aria-controls="pane-oob" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>성능과 OOB</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-imp" aria-controls="pane-imp" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>특성 중요도</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>코드</button>
+  </nav>
+
+  <!-- ================= 1. 부트스트랩 ================= -->
+  <section id="pane-boot" role="tabpanel" aria-labelledby="tab-boot">
+    <div class="sk-card">
+      <div class="sk-head"><h2>트리마다 20행을 복원추출로 새로 뽑는다</h2>
+        <div class="sk-legend"><span><i style="background:var(--bag)"></i>뽑힌 행 (in-bag, 트리 학습용)</span><span><i style="background:var(--oob)"></i>한 번도 안 뽑힌 행 (OOB)</span></div></div>
+      <p class="sk-lead">환자 표 20행에서 한 행을 무작위로 골라 적고 <b>다시 제자리에 넣습니다</b>(복원추출). 이것을 20번 하면 트리 한 그루의 학습 데이터가 됩니다. 같은 행이 두세 번 뽑히기도 하고, 한 번도 안 뽑히는 행도 생깁니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--sm" id="bFirst">처음</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="bPrev">이전</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="bNext">다음</button>
+          <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="bPlay">재생</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="bAll">끝까지</button>
+        </div>
+        <div class="sk-slider" style="min-width:150px"><div class="sk-sl-head"><label for="bSpeed">속도</label><b id="bSpeedV">1×</b></div><input type="range" id="bSpeed" min="0.5" max="4" step="0.5" value="1"></div>
+        <div class="sk-group"><span class="sk-label">트리</span>
+          <button type="button" class="sk-btn sk-btn--sm" id="bTreePrev" aria-label="이전 트리">◀</button>
+          <b class="sk-mono" id="bTreeNo" style="min-width:2.6em;text-align:center">#1</b>
+          <button type="button" class="sk-btn sk-btn--sm" id="bTreeNext">다음 트리 뽑기 ▶</button>
+        </div>
+      </div>
+      <div>
+        <p class="rf-sub" style="margin-bottom:6px">뽑은 순서 (몇 번째 뽑기 → 몇 번 행)</p>
+        <div class="rf-draws" id="bDraws"></div>
+      </div>
+      <p class="rf-cap" id="bCap" aria-live="polite"></p>
+      <div class="rf-boot">
+        <div class="sk-scroll"><table class="sk-table rf-ptable" id="bTable" aria-label="환자 표 20행과 뽑힌 횟수"></table></div>
+        <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+          <div class="sk-stats" id="bStats"></div>
+          <div class="sk-formula rf-pre" id="bFormula"></div>
+          <p class="sk-note">OOB(Out-Of-Bag) 행은 이 트리가 <b>한 번도 보지 못한 문제</b>입니다. 트리마다 OOB 행이 달라서, 각 행을 "그 행을 안 본 트리들"로만 채점하면 따로 떼어 둔 검증 데이터 없이도 성능을 추정할 수 있습니다(4번 탭).</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>트리 10그루 × 20행: 누가 누구를 봤나</h2><span class="sk-hint">칸 숫자 = 그 트리에서 뽑힌 횟수 · 트리 번호를 누르면 위에서 그 트리를 봅니다</span></div>
+      <div class="rf-mxw"><div class="rf-mx" id="bMatrix" role="table" aria-label="트리별 행 뽑힘 횟수 격자"></div></div>
+      <p class="sk-hint" style="margin:0" id="bMxNote"></p>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>정말 약 63.2%일까? 여러 번 뽑아 보기</h2></div>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">행 수 n</span>
+            <div class="sk-seg" id="cN" role="group" aria-label="행 수 n">
+              <button type="button" data-v="5" aria-pressed="false">5</button><button type="button" data-v="20" aria-pressed="true">20</button><button type="button" data-v="100" aria-pressed="false">100</button><button type="button" data-v="1000" aria-pressed="false">1000</button></div></div>
+          <div class="sk-group">
+            <button type="button" class="sk-btn sk-btn--sm" id="c1">1번</button>
+            <button type="button" class="sk-btn sk-btn--sm" id="c100">100번</button>
+            <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="c1000">1000번 뽑기</button>
+            <button type="button" class="sk-btn sk-btn--sm" id="cReset">초기화</button>
+          </div>
+        </div>
+        <div class="sk-stats" id="cStats"></div>
+        <div class="rf-chart" id="cChart" role="img" aria-label="반복 횟수에 따른 뽑힌 비율 누적 평균 차트"></div>
+      </div>
+      <div class="sk-card">
+        <h2>왜 1 − 1/e 인가</h2>
+        <div class="sk-formula rf-pre" id="cFormula"></div>
+        <p class="sk-lead">n이 커질수록 (1 − 1/n)<sup>n</sup> 은 1/e ≈ 0.3679 로 다가갑니다. 그래서 트리 한 그루는 원래 데이터의 약 <b>63.2%</b> 행을 보고, 약 <b>36.8%</b>는 OOB로 남습니다. 뽑힌 행 수(n번)는 원래와 같지만 중복이 있어 서로 다른 행은 줄어듭니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 2. 특성 무작위 선택 ================= -->
+  <section id="pane-feat" role="tabpanel" aria-labelledby="tab-feat" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>노드마다 특성 일부만 후보로 본다 (max_features)</h2><span class="sk-hint">환자 훈련 데이터 210명 · 특성 8개 · 지니 불순도</span></div>
+      <p class="sk-lead">분할할 때마다 8개 특성 중 <b>무작위로 고른 k개만</b> 살펴보고, 그 안에서 지니 불순도를 가장 많이 줄이는 기준을 고릅니다. 노드 옆 칩이 그 노드에서 <b>이번에 본 특성</b>이고, 보라색이 실제로 고른 특성입니다. 분할 버튼을 누르면 지니 계산을 따라갑니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">max_features</span>
+          <div class="sk-seg" id="fMf" role="group" aria-label="max_features">
+            <button type="button" data-v="sqrt" aria-pressed="true">sqrt (=2)</button><button type="button" data-v="log2" aria-pressed="false">log2 (=3)</button><button type="button" data-v="all" aria-pressed="false">전체 None (=8)</button></div></div>
+        <div class="sk-slider" style="min-width:170px"><div class="sk-sl-head"><label for="fK">숫자로 지정</label><b id="fKv">2</b></div><input type="range" id="fK" min="1" max="8" step="1" value="2"></div>
+        <div class="sk-slider" style="min-width:150px"><div class="sk-sl-head"><label for="fDepth">보여줄 깊이 max_depth</label><b id="fDepthV">3</b></div><input type="range" id="fDepth" min="1" max="4" step="1" value="3"></div>
+        <button type="button" class="sk-btn sk-btn--sm" id="fReseed">다른 난수로</button>
+      </div>
+      <div class="sk-formula" id="fFormula"></div>
+    </div>
+    <div class="sk-grid3" id="fTrees"></div>
+    <div class="sk-card">
+      <div class="sk-head"><h2 id="fGiniTitle">선택한 노드의 지니 계산</h2><span class="sk-hint">n은 부트스트랩 중복을 포함한 개수</span></div>
+      <div class="sk-formula rf-pre" id="fGini"></div>
+      <div class="sk-scroll"><table class="sk-table rf-gtable" id="fGTable"></table></div>
+      <p class="sk-note" id="fGNote"></p>
+    </div>
+    <div class="rf-g23">
+      <div class="sk-card">
+        <div class="sk-head"><h2>40그루의 뿌리(첫 분할) 특성</h2><span class="sk-hint" id="fRootHint"></span></div>
+        <div class="rf-bars" id="fRoot"></div>
+        <p class="sk-note" id="fRootNote"></p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>무작위성이 다양성을 만든다</h2><span class="rf-prog" id="fDivProg"></span></div>
+        <p class="sk-lead">max_features(k)마다 깊이 제한 없는 트리 40그루를 키워 검증 데이터 90명에 대한 예측을 비교했습니다. ρ는 트리 두 그루의 예측이 얼마나 닮았는지(상관계수 평균), 숲 정확도는 40그루 확률 평균의 검증 정확도입니다.</p>
+        <div class="sk-scroll"><table class="sk-table rf-dtable" id="fDiv"></table></div>
+        <p class="sk-note" id="fDivNote"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 3. 숲 키우기 ================= -->
+  <section id="pane-forest" role="tabpanel" aria-labelledby="tab-forest" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>나무를 한 그루씩 심어 숲을 키운다</h2>
+        <div class="sk-legend"><span><i class="rf-dot" style="background:var(--c0)"></i>클래스 0 (파랑)</span><span><i class="rf-dot" style="background:var(--c1)"></i>클래스 1 (주황)</span><span><i class="rf-ring"></i>빈 점 = 검증 데이터</span><span>검은 선 = 결정 경계</span></div></div>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--sm" id="gFirst">처음 (1그루)</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="gPrev">−1</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="gAdd">트리 추가 +1</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="gAdd10">+10</button>
+          <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="gPlay">재생</button>
+        </div>
+        <div class="sk-slider" style="min-width:220px"><div class="sk-sl-head"><label for="gK">n_estimators (트리 수)</label><b id="gKv">20</b></div><input type="range" id="gK" data-k min="1" max="100" step="1" value="20"></div>
+        <div class="sk-slider" style="min-width:130px"><div class="sk-sl-head"><label for="gSpeed">재생 속도</label><b id="gSpeedV">1×</b></div><input type="range" id="gSpeed" min="0.5" max="4" step="0.5" value="1"></div>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-slider" style="min-width:190px"><div class="sk-sl-head"><label for="gDepth">max_depth</label><b data-depth-v>None</b></div><input type="range" id="gDepth" data-depth min="1" max="16" step="1" value="16"></div>
+        <div class="sk-group"><span class="sk-label">max_features</span>
+          <div class="sk-seg" data-mf role="group" aria-label="max_features (특성 2개)">
+            <button type="button" data-v="sqrt" aria-pressed="true">sqrt (=1)</button><button type="button" data-v="all" aria-pressed="false">전체 None (=2)</button></div></div>
+        <div class="sk-group"><span class="sk-label">배경</span>
+          <div class="sk-seg" id="gHeat" role="group" aria-label="배경 색 기준">
+            <button type="button" data-v="vote" aria-pressed="true">투표 비율</button><button type="button" data-v="prob" aria-pressed="false">확률 평균</button></div></div>
+        <label class="sk-check"><input type="checkbox" id="gCmp">단일 깊은 트리와 나란히</label>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">데이터</span>
+          <div class="sk-seg" id="gShape" role="group" aria-label="데이터 모양">
+            <button type="button" data-v="moons" aria-pressed="true">반달</button><button type="button" data-v="blobs" aria-pressed="false">겹친 두 무리</button><button type="button" data-v="xor" aria-pressed="false">XOR</button></div></div>
+        <div class="sk-slider" style="min-width:140px"><div class="sk-sl-head"><label for="gN">점 수</label><b id="gNv">240</b></div><input type="range" id="gN" min="80" max="400" step="20" value="240"></div>
+        <div class="sk-slider" style="min-width:140px"><div class="sk-sl-head"><label for="gSp">퍼짐(잡음)</label><b id="gSpv">0.20</b></div><input type="range" id="gSp" min="0.05" max="0.6" step="0.05" value="0.2"></div>
+        <div class="sk-slider" style="min-width:140px"><div class="sk-sl-head"><label for="gFlip">라벨 뒤집힘</label><b id="gFlipv">5%</b></div><input type="range" id="gFlip" min="0" max="20" step="1" value="5"></div>
+        <button type="button" class="sk-btn sk-btn--sm" id="gSeed">다른 난수로</button>
+        <div class="sk-group"><span class="sk-label">클릭하면</span>
+          <div class="sk-seg" id="gEdit" role="group" aria-label="캔버스 클릭 동작">
+            <button type="button" data-v="probe" aria-pressed="true">투표 보기</button><button type="button" data-v="add0" aria-pressed="false">파랑 점 추가</button><button type="button" data-v="add1" aria-pressed="false">주황 점 추가</button><button type="button" data-v="del" aria-pressed="false">점 지우기</button></div></div>
+      </div>
+    </div>
+
+    <div class="rf-stage" id="stage">
+      <div class="sk-card" id="boxForest">
+        <div class="sk-head"><h3 id="gForestTitle">숲</h3><span class="rf-prog" id="gProg"></span></div>
+        <div class="rf-fw"><canvas class="rf-field" id="cvForest" aria-label="랜덤포레스트 결정 경계와 투표 비율 히트맵. 클릭하면 그 위치의 트리별 투표를 봅니다."></canvas>
+        <div class="rf-axis">가로: 특성 1 (예: 혈당, 표준화) · 세로: 특성 2 (예: BMI, 표준화)</div></div>
+        <div class="sk-stats" id="gStats"></div>
+      </div>
+      <div class="sk-card" id="boxSingle" hidden>
+        <div class="sk-head"><h3>단일 깊은 트리 (max_depth=None, 부트스트랩 없음)</h3></div>
+        <div class="rf-fw"><canvas class="rf-field" id="cvSingle" aria-label="단일 결정 트리의 결정 경계"></canvas>
+        <div class="rf-axis">같은 훈련 데이터 전체로 트리 한 그루</div></div>
+        <div class="sk-stats" id="gSStats"></div>
+      </div>
+      <div class="sk-card" id="boxVote">
+        <div class="sk-head"><h3>이 위치에서 트리별 투표</h3><span class="sk-hint">캔버스를 클릭해 위치를 바꿉니다</span></div>
+        <div class="rf-chart" id="gVotes" role="img" aria-label="트리별 투표 막대: 위는 주황 투표, 아래는 파랑 투표"></div>
+        <div class="rf-vbar" id="gVbar"></div>
+        <div class="sk-formula rf-pre" id="gVoteF"></div>
+        <p class="rf-verdict" id="gVerdict"></p>
+        <p class="sk-note" id="gNote"></p>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>개별 트리의 결정 경계 (처음 16그루)</h2><span class="sk-hint">점 = 그 트리가 부트스트랩으로 뽑은 훈련 점 · 숫자 = 그 트리 혼자의 검증 정확도</span></div>
+      <div class="rf-thumbs" id="gThumbs"></div>
+    </div>
+  </section>
+
+  <!-- ================= 4. 성능과 OOB ================= -->
+  <section id="pane-oob" role="tabpanel" aria-labelledby="tab-oob" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>트리 수에 따른 OOB 오차와 검증 오차</h2><span class="sk-hint">3번 탭과 같은 데이터·같은 숲</span></div>
+      <div class="sk-controls">
+        <div class="sk-slider" style="min-width:190px"><div class="sk-sl-head"><label for="oDepth">max_depth</label><b data-depth-v>None</b></div><input type="range" id="oDepth" data-depth min="1" max="16" step="1" value="16"></div>
+        <div class="sk-group"><span class="sk-label">max_features</span>
+          <div class="sk-seg" data-mf role="group" aria-label="max_features (특성 2개)">
+            <button type="button" data-v="sqrt" aria-pressed="true">sqrt (=1)</button><button type="button" data-v="all" aria-pressed="false">전체 None (=2)</button></div></div>
+        <div class="sk-slider" style="min-width:200px"><div class="sk-sl-head"><label for="oK">트리 수 B (표시 위치)</label><b id="oKv">20</b></div><input type="range" id="oK" data-k min="1" max="100" step="1" value="20"></div>
+        <div class="sk-group"><span class="sk-label">세로축</span>
+          <div class="sk-seg" id="oView" role="group" aria-label="세로축">
+            <button type="button" data-v="err" aria-pressed="true">오차</button><button type="button" data-v="acc" aria-pressed="false">정확도</button></div></div>
+        <label class="sk-check"><input type="checkbox" id="oGhost" checked>설정 바꾸면 이전 곡선 남기기</label>
+      </div>
+      <div class="sk-legend" id="oLegend"></div>
+      <div class="rf-chart" id="oChart" role="img" aria-label="트리 수에 따른 OOB 오차와 검증 오차 곡선"></div>
+      <div class="sk-stats" id="oStats"></div>
+      <p class="sk-note" id="oNote"></p>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>OOB 오차는 이렇게 계산한다</h2><button type="button" class="sk-btn sk-btn--sm" id="oRow">다른 행 보기</button></div>
+        <div class="sk-formula rf-pre" id="oCalc"></div>
+        <p class="sk-lead">각 훈련 행을 <b>그 행을 뽑지 않은 트리들</b>만으로 예측합니다(확률 평균 → 0.5 초과면 1). 트리가 적을 때는 OOB 트리가 하나도 없는 행이 있어 그 행은 빼고 계산합니다. scikit-learn의 <code>oob_score=True</code>와 같은 방식입니다.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>분산이 줄어드는 이유</h2></div>
+        <div class="sk-formula rf-pre" id="oVarF"></div>
+        <div class="rf-chart" id="oVar" role="img" aria-label="트리 수에 따른 평균 예측의 분산 비율"></div>
+        <p class="sk-note" id="oVarNote"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 5. 특성 중요도 ================= -->
+  <section id="pane-imp" role="tabpanel" aria-labelledby="tab-imp" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>어떤 특성이 중요했나: 불순도 감소(MDI) vs 순열 중요도</h2><span class="rf-prog" id="iProg"></span></div>
+      <p class="sk-lead">환자 훈련 데이터 210명으로 트리 100그루(max_features = sqrt)를 키웠습니다. <b>잡음 특성</b>(정답과 무관한 무작위 열)을 넣어 두 중요도가 어떻게 다른지 보세요.</p>
+      <div class="sk-controls">
+        <label class="sk-check"><input type="checkbox" id="iNoiseC" checked>연속 잡음 열 추가 (무작위 번호)</label>
+        <label class="sk-check"><input type="checkbox" id="iNoiseB">이진 잡음 열 추가 (동전)</label>
+        <div class="sk-slider" style="min-width:180px"><div class="sk-sl-head"><label for="iDepth">max_depth</label><b id="iDepthV">None</b></div><input type="range" id="iDepth" min="1" max="16" step="1" value="16"></div>
+        <div class="sk-group"><span class="sk-label">순열 중요도 계산</span>
+          <div class="sk-seg" id="iOn" role="group" aria-label="순열 중요도 계산 데이터">
+            <button type="button" data-v="val" aria-pressed="true">검증 데이터</button><button type="button" data-v="train" aria-pressed="false">훈련 데이터</button></div></div>
+        <button type="button" class="sk-btn sk-btn--sm" id="iSeed">다른 난수로</button>
+      </div>
+      <div class="sk-stats" id="iStats"></div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h3>불순도 감소 중요도 (MDI, feature_importances_)</h3><span class="sk-hint">합 = 1</span></div>
+        <div class="rf-bars" id="iMdi"></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h3>순열 중요도 (정확도 감소, 5회 평균 ± 표준편차)</h3><span class="sk-hint" id="iPermHint"></span></div>
+        <div class="rf-bars" id="iPerm"></div>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <h2>계산 방법</h2>
+        <div class="sk-formula rf-pre" id="iCalc"></div>
+      </div>
+      <div class="sk-card">
+        <h2>읽는 법</h2>
+        <p class="sk-note" id="iNote"></p>
+        <div class="sk-scroll"><table class="sk-table" id="iTable"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 6. 코드 ================= -->
+  <section id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>scikit-learn 코드</h2><button type="button" class="sk-btn sk-btn--sm" id="kImport">3·4번 탭 설정 불러오기</button></div>
+      <div class="sk-controls">
+        <label class="sk-group"><span class="sk-label">n_estimators</span><input class="sk-input rf-num" type="number" id="kN" min="1" max="2000" value="100"></label>
+        <div class="sk-slider" style="min-width:180px"><div class="sk-sl-head"><label for="kDepth">max_depth</label><b id="kDepthV">None</b></div><input type="range" id="kDepth" min="1" max="16" step="1" value="16"></div>
+        <div class="sk-group"><span class="sk-label">max_features</span>
+          <div class="sk-seg" id="kMf" role="group" aria-label="max_features">
+            <button type="button" data-v="sqrt" aria-pressed="true">"sqrt"</button><button type="button" data-v="log2" aria-pressed="false">"log2"</button><button type="button" data-v="all" aria-pressed="false">None</button><button type="button" data-v="int" aria-pressed="false">정수</button></div>
+          <input class="sk-input rf-num" type="number" id="kMfInt" min="1" max="100" value="3" aria-label="max_features 정수 값" disabled></div>
+        <label class="sk-group"><span class="sk-label">random_state</span><input class="sk-input rf-num" type="number" id="kRs" value="42"></label>
+      </div>
+      <div class="sk-controls">
+        <label class="sk-check"><input type="checkbox" id="kOob" checked>oob_score=True</label>
+        <label class="sk-check"><input type="checkbox" id="kPerm" checked>순열 중요도</label>
+        <label class="sk-check"><input type="checkbox" id="kCurve">트리 수별 OOB 곡선 (warm_start)</label>
+        <label class="sk-check"><input type="checkbox" id="kBag">배깅과 비교</label>
+      </div>
+      <div class="rf-code"><pre id="kCode"></pre><button type="button" class="sk-btn sk-btn--sm" id="kCopy">복사</button></div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>결정 트리 · 배깅 · 랜덤포레스트 비교</h2><span class="sk-hint">마지막 줄은 2번 탭 실험값 (환자 데이터, 트리 40그루)</span></div>
+      <div class="sk-scroll"><table class="sk-table rf-cmp" id="kCmp"></table></div>
+      <p class="sk-note">랜덤포레스트에서 <code>max_features=None</code>(전체)으로 두면 노드마다 모든 특성을 보므로 <b>배깅한 결정 트리</b>와 같아집니다. 둘의 차이는 오직 "노드마다 특성 샘플링"이고, 이것이 트리끼리의 상관을 낮춥니다.</p>
+    </div>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20260930c"></script>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const reduceMotion=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+function gauss(r){let u=0;while(!u)u=r();const v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const fmt=(v,d=2)=>{if(!isFinite(v))return "–";const s=v.toFixed(d);return /^-0\.?0*$/.test(s)?s.slice(1):s;};
+const sgn=(v,d=3)=>(v<0?"−":"")+fmt(Math.abs(v),d);
+const pct=(v,d=1)=>isFinite(v)?fmt(v*100,d)+"%":"–";
+const r4=v=>Math.round(v*1e4)/1e4;
+const thrTxt=v=>String(Math.round(v*1000)/1000);
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+function css(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
+function hexRgb(h){h=h.replace("#","");if(h.length===3)h=h.split("").map(c=>c+c).join("");const n=parseInt(h,16);return[(n>>16)&255,(n>>8)&255,n&255];}
+function mix(a,b,t){return[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
+const rgb=c=>`rgb(${c[0]|0},${c[1]|0},${c[2]|0})`;
+function fitCanvas(cv){const dpr=window.devicePixelRatio||1;const w=Math.max(40,cv.clientWidth),h=Math.max(40,cv.clientHeight||w);cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);const ctx=cv.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);return{ctx,w,h};}
+function segInit(el,onChange){
+  el.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b?"true":"false"));onChange(b.dataset.v);}));
+}
+function segSet(el,v){el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x.dataset.v===String(v)?"true":"false"));}
+const depthTxt=d=>d>=16||!isFinite(d)?"None":String(d);
+const depthVal=v=>v>=16?Infinity:v;
+
+/* 분할 실행: 긴 계산을 잘게 나눠 화면이 멈추지 않게 */
+function Job(){let tok=0;return{
+  run(genFn,onDone){const my=++tok;const it=genFn();const step=()=>{if(my!==tok)return;const t0=performance.now();let r;do{r=it.next();}while(!r.done&&performance.now()-t0<12);if(my!==tok)return;if(r.done){onDone&&onDone(r.value);}else setTimeout(step,0);};setTimeout(step,0);},
+  cancel(){tok++;}
+};}
+
+/* ================= CART 분류 트리 (지니) ================= */
+function giniOf(n0,n1){const n=n0+n1;if(!n)return 0;const a=n0/n,b=n1/n;return 1-a*a-b*b;}
+function mfK(mf,p){if(mf==="sqrt")return Math.max(1,Math.floor(Math.sqrt(p)));if(mf==="log2")return Math.max(1,Math.floor(Math.log2(p)));if(mf==="all")return p;return Math.max(1,Math.min(p,mf|0));}
+/* 한 특성에서 가중 지니가 가장 작은 기준값 (연속 값 사이 중점) */
+function bestSplitOn(cols,y,ids,f){
+  const v=cols[f];const s=ids.slice().sort((a,b)=>v[a]-v[b]);
+  const n=s.length;let t1=0;for(let i=0;i<n;i++)t1+=y[s[i]];const t0=n-t1;
+  let l0=0,l1=0,best=null;
+  for(let i=0;i<n-1;i++){
+    if(y[s[i]])l1++;else l0++;
+    const a=v[s[i]],b=v[s[i+1]];if(b<=a+1e-7)continue;
+    const nl=i+1,nr=n-nl,r0=t0-l0,r1=t1-l1;
+    const gl=giniOf(l0,l1),gr=giniOf(r0,r1),w=(nl*gl+nr*gr)/n;
+    if(!best||w<best.w-1e-12)best={f,thr:a/2+b/2,w,nl,nr,l0,l1,r0,r1,gl,gr};
+  }
+  return best;
+}
+/* D={cols,y,p}, idx=학습에 쓸 행 번호(중복 허용), o={maxDepth,k}, keep=노드별 행 목록 보관 */
+function buildTree(D,idx,o,rng,keep){
+  const nodes=[];let maxD=0;
+  function grow(ids,depth){
+    let n1=0;for(let q=0;q<ids.length;q++)n1+=D.y[ids[q]];const n=ids.length,n0=n-n1;
+    const nd={depth,n,n0,n1,g:giniOf(n0,n1),f:-1,thr:0,L:-1,R:-1,seen:null};
+    if(keep)nd.ids=ids;
+    const me=nodes.length;nodes.push(nd);if(depth>maxD)maxD=depth;
+    if(depth>=o.maxDepth||n0===0||n1===0||n<2)return me;
+    const p=D.p,perm=[];for(let j=0;j<p;j++)perm.push(j);
+    const seen=[];let best=null;
+    for(let j=0;j<p;j++){
+      if(seen.length>=o.k&&best)break;          // k개를 봤고 가능한 분할이 있으면 멈춤
+      const r=j+Math.floor(rng()*(p-j));const tmp=perm[j];perm[j]=perm[r];perm[r]=tmp;
+      const f=perm[j];seen.push(f);
+      const s=bestSplitOn(D.cols,D.y,ids,f);
+      if(s&&(!best||s.w<best.w-1e-12))best=s;
+    }
+    nd.seen=seen;
+    if(!best)return me;
+    nd.f=best.f;nd.thr=best.thr;nd.sp=best;
+    const v=D.cols[best.f],L=[],R=[];for(let q=0;q<ids.length;q++){const i=ids[q];(v[i]<=best.thr?L:R).push(i);}
+    nd.L=grow(L,depth+1);nd.R=grow(R,depth+1);
+    return me;
+  }
+  grow(idx,0);
+  const m=nodes.length,F=new Int16Array(m),T=new Float64Array(m),Lc=new Int32Array(m),Rc=new Int32Array(m),P=new Float64Array(m);
+  let leaves=0;
+  nodes.forEach((d,i)=>{F[i]=d.f;T[i]=d.thr;Lc[i]=d.L;Rc[i]=d.R;P[i]=d.n?d.n1/d.n:0;if(d.f<0)leaves++;});
+  const imp=new Float64Array(D.p),N=nodes[0].n;
+  nodes.forEach(d=>{if(d.f>=0){const l=nodes[d.L],r=nodes[d.R];imp[d.f]+=(d.n*d.g-l.n*l.g-r.n*r.g)/N;}});
+  let s=0;imp.forEach(v=>s+=v);const impN=imp.map(v=>s>0?v/s:0);
+  return{nodes,F,T,L:Lc,R:Rc,P,imp,impN,depth:maxD,leaves};
+}
+function predCol(t,cols,j){let i=0;while(t.F[i]>=0){i=cols[t.F[i]][j]<=t.T[i]?t.L[i]:t.R[i];}return t.P[i];}
+function predXY(t,x,y){let i=0;while(t.F[i]>=0){i=(t.F[i]===0?x:y)<=t.T[i]?t.L[i]:t.R[i];}return t.P[i];}
+function bootstrap(n,rng){const c=new Uint16Array(n),idx=new Array(n);for(let i=0;i<n;i++){const j=Math.floor(rng()*n);idx[i]=j;c[j]++;}return{idx,c};}
+function mkD(rows,y,p){const n=rows.length,cols=[];for(let f=0;f<p;f++){const c=new Float64Array(n);for(let i=0;i<n;i++)c[i]=rows[i][f];cols.push(c);}return{cols,y:Uint8Array.from(y),p,n};}
+function meanPairCorr(M){
+  const T=M.length;if(T<2)return NaN;const m=M[0].length,mu=[],sd=[];
+  M.forEach(v=>{let s=0;for(let j=0;j<m;j++)s+=v[j];const a=s/m;let q=0;for(let j=0;j<m;j++)q+=(v[j]-a)*(v[j]-a);mu.push(a);sd.push(Math.sqrt(q));});
+  let tot=0,c=0;
+  for(let a=0;a<T;a++){if(sd[a]<1e-12)continue;for(let b=a+1;b<T;b++){if(sd[b]<1e-12)continue;let s=0;const A=M[a],B=M[b];for(let j=0;j<m;j++)s+=(A[j]-mu[a])*(B[j]-mu[b]);tot+=s/(sd[a]*sd[b]);c++;}}
+  return c?tot/c:NaN;
+}
+
+/* ================= 환자 데이터 (seed 고정) ================= */
+const PN=["나이","BMI","혈당","수축기 혈압","콜레스테롤","흡연","운동 시간","가족력"];
+const PS=["나이","BMI","혈당","혈압","콜레","흡연","운동","가족력"];
+function makePatients(seed,N){
+  const r=mulberry32(seed),rows=[],y=[];
+  for(let i=0;i<N;i++){
+    const age=Math.round(clamp(55+12*gauss(r),25,85));
+    const bmi=Math.round(clamp(25+4*gauss(r),16,42)*10)/10;
+    const glu=Math.round(clamp(98+0.45*(age-55)+1.6*(bmi-25)+16*gauss(r),65,240));
+    const sbp=Math.round(clamp(122+0.5*(age-55)+0.9*(bmi-25)+13*gauss(r),90,200));
+    const chol=Math.round(clamp(195+35*gauss(r),110,320));
+    const smoke=r()<0.25?1:0;
+    const ex=Math.round(Math.max(0,3+2*gauss(r))*10)/10;
+    const fam=r()<0.3?1:0;
+    const z=-0.35+1.6*(glu-105)/20+0.7*(bmi-25)/4+0.55*(age-55)/12+0.8*fam+0.35*(sbp-125)/14+0.35*smoke-0.3*(ex-3)/2;
+    y.push(r()<1/(1+Math.exp(-z))?1:0);rows.push([age,bmi,glu,sbp,chol,smoke,ex,fam]);
+  }
+  return{rows,y};
+}
+const PAT=makePatients(20260930,300),NTR=210;
+const PTR=mkD(PAT.rows.slice(0,NTR),PAT.y.slice(0,NTR),8),PVA=mkD(PAT.rows.slice(NTR),PAT.y.slice(NTR),8);
+
+/* ================= 공통: 선 그래프(SVG) ================= */
+function lineChart(host,o){
+  const W=Math.max(280,Math.round(host.clientWidth||600)),H=o.h||250;
+  const mL=46,mR=o.mR||16,mT=14,mB=38,pw=W-mL-mR,ph=H-mT-mB;
+  const lo=o.yMin,hi=o.yMax,x0=o.xMin||0,x1=o.xMax;
+  const X=v=>mL+pw*(x1>x0?(v-x0)/(x1-x0):0),Y=v=>mT+ph*(1-clamp((v-lo)/(hi-lo),0,1));
+  let s="";
+  o.yTicks.forEach(v=>{const y=Y(v);s+=`<line class="gl" x1="${mL}" x2="${mL+pw}" y1="${y}" y2="${y}"/><text class="ax" x="${mL-6}" y="${y+4}" text-anchor="end">${o.yFmt?o.yFmt(v):v}</text>`;});
+  const xt=o.xTicks||[];xt.forEach(v=>{s+=`<text class="ax" x="${X(v)}" y="${mT+ph+16}" text-anchor="middle">${v}</text>`;});
+  s+=`<line class="gl0" x1="${mL}" x2="${mL+pw}" y1="${mT+ph}" y2="${mT+ph}"/>`;
+  s+=`<text class="axl" x="${mL+pw/2}" y="${H-4}" text-anchor="middle">${o.xLabel||""}</text>`;
+  (o.refs||[]).forEach(r=>{const y=Y(r.v);s+=`<line class="ref" style="stroke:${r.color}" x1="${mL}" x2="${mL+pw}" y1="${y}" y2="${y}"/><text class="reft" style="fill:${r.color}" x="${r.right?mL+pw-4:mL+6}" y="${y+(r.below?14:-5)}" text-anchor="${r.right?"end":"start"}">${r.label}</text>`;});
+  if(o.marker!=null){const x=X(o.marker);s+=`<line class="mk" x1="${x}" x2="${x}" y1="${mT}" y2="${mT+ph}"/><text class="mkt" x="${x+(x>mL+pw-60?-5:5)}" y="${mT+11}" text-anchor="${x>mL+pw-60?"end":"start"}">${o.markerLabel||""}</text>`;}
+  o.series.forEach(se=>{
+    const n=se.vals.length;if(!n)return;const stride=Math.max(1,Math.ceil(n/600));let d="",pen=false;
+    for(let i=0;i<n;i+=stride){const v=se.vals[i];if(!isFinite(v)){pen=false;continue;}d+=(pen?"L":"M")+X(se.x0+i).toFixed(1)+","+Y(v).toFixed(1);pen=true;}
+    if((n-1)%stride&&isFinite(se.vals[n-1]))d+="L"+X(se.x0+n-1).toFixed(1)+","+Y(se.vals[n-1]).toFixed(1);
+    s+=`<path class="sr" style="stroke:${se.color};${se.dash?"stroke-dasharray:"+se.dash+";":""}${se.w?"stroke-width:"+se.w+";":""}${se.op?"opacity:"+se.op+";":""}" d="${d}"/>`;
+    if(se.dotAt!=null&&isFinite(se.vals[se.dotAt]))s+=`<circle cx="${X(se.x0+se.dotAt)}" cy="${Y(se.vals[se.dotAt])}" r="4.2" style="fill:${se.color};stroke:var(--surface);stroke-width:1.5"/>`;
+  });
+  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${s}</svg>`;
+}
+function niceTicks(a,b,n){const raw=(b-a)/n,mag=Math.pow(10,Math.floor(Math.log10(raw))),st=[1,2,2.5,5,10].map(k=>k*mag).find(k=>k>=raw)||raw;const out=[];for(let v=Math.ceil(a/st-1e-9)*st;v<=b+1e-9;v+=st)out.push(Math.round(v*1e6)/1e6);return out;}
+
+/* ================= 탭 ================= */
+const TABS=["boot","feat","forest","oob","imp","code"];let curTab="boot";
+const onShow={},onHide={};
+function showTab(k,focus){
+  if(!TABS.includes(k))k="boot";
+  TABS.forEach(t=>{const b=$("tab-"+t),p=$("pane-"+t),on=t===k;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;p.hidden=!on;});
+  const prev=curTab;curTab=k;
+  if(focus)$("tab-"+k).focus();
+  if(location.hash!=="#"+k)history.replaceState(null,"","#"+k);
+  if(prev!==k&&onHide[prev])onHide[prev]();
+  onShow[k]&&onShow[k]();
+}
+TABS.forEach(t=>$("tab-"+t).addEventListener("click",()=>showTab(t)));
+document.querySelector(".sk-tabs").addEventListener("keydown",e=>{
+  if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;e.preventDefault();e.stopPropagation();
+  const i=TABS.indexOf(curTab),n=(i+(e.key==="ArrowRight"?1:-1)+TABS.length)%TABS.length;showTab(TABS[n],true);
+});
+window.addEventListener("hashchange",()=>{const k=location.hash.slice(1);if(TABS.includes(k)&&k!==curTab)showTab(k);});
+
+/* ================= 1. 부트스트랩 ================= */
+const BOOT=(function(){
+  const n=20,rows=PAT.rows.slice(0,n),ys=PAT.y.slice(0,n),MT=10;
+  const st={tree:1,step:n,playing:false,timer:null};
+  const sample=t=>{const r=mulberry32(4010+t*7919);const d=[];for(let i=0;i<n;i++)d.push(Math.floor(r()*n));return d;};
+  const SAMPLES=[];for(let t=1;t<=MT;t++)SAMPLES.push(sample(t));
+  const draws=()=>SAMPLES[st.tree-1];
+  const pNot=Math.pow(1-1/n,n);
+  function counts(k){const c=new Array(n).fill(0);const d=draws();for(let i=0;i<k;i++)c[d[i]]++;return c;}
+  function render(){
+    const d=draws(),c=counts(st.step),done=st.step>=n,cur=st.step>0?d[st.step-1]:-1;
+    $("bTreeNo").textContent="#"+st.tree;
+    $("bDraws").innerHTML=d.map((r,i)=>{const on=i<st.step;return `<div class="rf-slot${on?" on":""}${i===st.step-1?" cur":""}"><small>${i+1}회</small>${on?r+1:"·"}</div>`;}).join("");
+    let h=`<thead><tr><th>행</th><th>나이</th><th>BMI</th><th>혈당</th><th>수축기 혈압</th><th>질환</th><th>뽑힌 횟수</th></tr></thead><tbody>`;
+    for(let i=0;i<n;i++){
+      const R=rows[i],cls=i===cur?"cur":(c[i]>0?"bag":(done?"oob":""));
+      const badge=c[i]>0?`<span class="rf-badge b1">×${c[i]}</span>`:(done?`<span class="rf-badge b0">OOB</span>`:`<span class="rf-badge">–</span>`);
+      h+=`<tr class="${cls}"><td class="n">${i+1}</td><td class="n">${R[0]}</td><td class="n">${R[1].toFixed(1)}</td><td class="n">${R[2]}</td><td class="n">${R[3]}</td><td><span class="rf-dot" style="background:var(--c${ys[i]})"></span>${ys[i]?"있음":"없음"}</td><td>${badge}</td></tr>`;
+    }
+    $("bTable").innerHTML=h+"</tbody>";
+    const u=c.filter(v=>v>0).length;
+    $("bStats").innerHTML=
+      `<div class="sk-stat"><b>${st.step} / ${n}</b><span>뽑은 횟수</span></div>`+
+      `<div class="sk-stat"><b class="rf-bagt">${u}</b><span>서로 다른 행 (in-bag)</span></div>`+
+      `<div class="sk-stat"><b>${pct(u/n,0)}</b><span>원래 행 중 뽑힌 비율</span></div>`+
+      `<div class="sk-stat"><b class="rf-oobt">${done?n-u:"?"}</b><span>OOB 행</span></div>`;
+    const R=cur>=0?rows[cur]:null;
+    let cap;
+    if(st.step===0)cap=`<b>트리 #${st.tree}</b>의 부트스트랩을 시작합니다. <b>다음</b>(또는 <span class="rf-kbd">→</span>)으로 한 번씩, <b>재생</b>으로 자동으로 뽑습니다.`;
+    else if(!done)cap=`<b>${st.step}번째 뽑기: ${cur+1}번 행</b> (나이 ${R[0]}, BMI ${R[1].toFixed(1)}, 혈당 ${R[2]}) → 지금까지 ${cur+1}번 행은 <b>${c[cur]}번</b> 뽑혔습니다.${c[cur]>1?" 복원추출이라 같은 행이 다시 나올 수 있습니다.":""}`;
+    else cap=`<b>20번 뽑기 완료.</b> 서로 다른 행 <b class="rf-bagt">${u}개(${pct(u/n,0)})</b>가 트리 #${st.tree}의 학습 데이터가 되고, 한 번도 안 뽑힌 <b class="rf-oobt">${n-u}개(${pct((n-u)/n,0)})</b>는 이 트리의 OOB 행입니다. 이론값은 ${pct(1-pNot,1)} / ${pct(pNot,1)} 입니다.`;
+    $("bCap").innerHTML=cap;
+    renderMatrix();
+  }
+  function renderMatrix(){
+    let h=`<div class="h">트리</div>`;for(let i=0;i<n;i++)h+=`<div class="h">${i+1}</div>`;h+=`<div class="h">뽑힌 행</div>`;
+    const oobCnt=new Array(n).fill(0);let uSum=0;
+    for(let t=1;t<=MT;t++){
+      const c=new Array(n).fill(0);SAMPLES[t-1].forEach(r=>c[r]++);const u=c.filter(v=>v>0).length;uSum+=u;
+      h+=`<button type="button" class="t${t===st.tree?" on":""}" data-t="${t}" aria-label="트리 ${t} 보기">#${t}</button>`;
+      for(let i=0;i<n;i++){if(!c[i])oobCnt[i]++;h+=`<div class="c ${c[i]?(c[i]>=3?"n3":"n"+c[i]):"o"}${t===st.tree?" cur":""}" title="트리 #${t}, ${i+1}번 행: ${c[i]?c[i]+"번 뽑힘":"OOB"}">${c[i]||"·"}</div>`;}
+      h+=`<div class="r">${u} (${Math.round(u/n*100)}%)</div>`;
+    }
+    h+=`<div class="h" style="align-self:center">OOB 트리 수</div>`;for(let i=0;i<n;i++)h+=`<div class="f">${oobCnt[i]}</div>`;h+=`<div class="r">평균 ${pct(uSum/(MT*n),1)}</div>`;
+    $("bMatrix").innerHTML=h;
+    $("bMatrix").querySelectorAll("button.t").forEach(b=>b.addEventListener("click",()=>{stop();st.tree=+b.dataset.t;st.step=n;render();}));
+    const tot=oobCnt.reduce((a,b)=>a+b,0);
+    $("bMxNote").innerHTML=`청록 칸(OOB)이 각 열마다 평균 ${fmt(tot/n,1)}그루 = 10그루의 ${pct(tot/(n*MT),0)} 입니다. 각 행은 자기를 못 본 트리들에게 채점받습니다.`;
+  }
+  function stop(){st.playing=false;clearTimeout(st.timer);$("bPlay").textContent="재생";}
+  function go(k){st.step=clamp(k,0,n);render();}
+  function tick(){if(!st.playing)return;if(st.step>=n){stop();return;}st.step++;render();if(st.step>=n){stop();return;}st.timer=setTimeout(tick,650/parseFloat($("bSpeed").value));}
+  function play(){if(st.playing){stop();return;}if(st.step>=n)st.step=0;st.playing=true;$("bPlay").textContent="멈춤";render();st.timer=setTimeout(tick,reduceMotion?50:350/parseFloat($("bSpeed").value));}
+  function setTree(t){stop();st.tree=((t-1+MT)%MT)+1;st.step=0;render();if(!reduceMotion)play();else{st.step=n;render();}}
+  /* 63.2% 카운터 */
+  const C={n:20,r:mulberry32(777),hist:[],sum:0,last:null};
+  function cRun(k){for(let q=0;q<k;q++){const seen=new Uint8Array(C.n);let u=0;for(let i=0;i<C.n;i++){const j=Math.floor(C.r()*C.n);if(!seen[j]){seen[j]=1;u++;}}C.last=u;C.sum+=u/C.n;C.hist.push(C.sum/(C.hist.length+1));}cRender();}
+  function cReset(){C.r=mulberry32(777+C.n);C.hist=[];C.sum=0;C.last=null;cRender();}
+  function cRender(){
+    const th=1-Math.pow(1-1/C.n,C.n),lim=1-Math.exp(-1),m=C.hist.length,emp=m?C.hist[m-1]:NaN;
+    $("cStats").innerHTML=
+      `<div class="sk-stat"><b>${m.toLocaleString("en-US")}</b><span>반복 횟수</span></div>`+
+      `<div class="sk-stat"><b class="rf-bagt">${isFinite(emp)?fmt(emp,4):"–"}</b><span>경험적 평균 (뽑힌 비율)</span></div>`+
+      `<div class="sk-stat"><b class="rf-tunet">${fmt(th,4)}</b><span>이론 1 − (1 − 1/n)ⁿ</span></div>`+
+      `<div class="sk-stat"><b>${fmt(lim,4)}</b><span>극한 1 − 1/e</span></div>`+
+      `<div class="sk-stat"><b>${C.last==null?"–":C.last+" / "+C.n}</b><span>방금 뽑은 표본</span></div>`;
+    const host=$("cChart");if(host.offsetParent===null)return;
+    const xMax=Math.max(10,m);
+    lineChart(host,{h:220,xMin:1,xMax,yMin:0.45,yMax:0.85,yTicks:[0.5,0.6,0.7,0.8],yFmt:v=>fmt(v,1),xTicks:niceTicks(0,xMax,5).filter(v=>v>=1||v===0).map(v=>v||1),xLabel:"반복 횟수",
+      refs:[{v:th,label:`이론 ${fmt(th,4)}`,color:"var(--tune)",right:true,below:th<lim-0.004},{v:lim,label:`1 − 1/e = ${fmt(lim,4)}`,color:"var(--faint)",right:true,below:th>=lim-0.004}],
+      series:[{vals:C.hist,x0:1,color:"var(--bag)",dotAt:m?m-1:null}]});
+    $("cFormula").innerHTML=
+      `한 번 뽑을 때 특정 행이 안 나올 확률 = 1 − 1/n\nn번 모두 안 나올 확률 = (1 − 1/n)ⁿ\n\n`+
+      `n = 20  : (1 − 1/20)²⁰ = 0.95²⁰ = ${fmt(Math.pow(0.95,20),4)}  → 뽑힘 ${fmt(1-Math.pow(0.95,20),4)}\n`+
+      `n = 100 : 0.99¹⁰⁰ = ${fmt(Math.pow(0.99,100),4)}  → 뽑힘 ${fmt(1-Math.pow(0.99,100),4)}\n`+
+      `n = 1000: 0.999¹⁰⁰⁰ = ${fmt(Math.pow(0.999,1000),4)}  → 뽑힘 ${fmt(1-Math.pow(0.999,1000),4)}\n`+
+      `n → ∞   : 1/e = ${fmt(Math.exp(-1),4)}  → 뽑힘 1 − 1/e = ${fmt(1-Math.exp(-1),4)}`;
+  }
+  function init(){
+    $("bFirst").onclick=()=>{stop();go(0);};$("bPrev").onclick=()=>{stop();go(st.step-1);};$("bNext").onclick=()=>{stop();go(st.step+1);};
+    $("bPlay").onclick=play;$("bAll").onclick=()=>{stop();go(n);};
+    $("bSpeed").addEventListener("input",e=>{$("bSpeedV").textContent=e.target.value+"×";});
+    $("bTreePrev").onclick=()=>setTree(st.tree-1);$("bTreeNext").onclick=()=>setTree(st.tree+1);
+    $("bFormula").innerHTML=`특정 행이 20번 중 한 번도 안 뽑힐 확률\n= (1 − 1/20)²⁰ = 0.95²⁰ = ${fmt(pNot,4)}\n→ 한 번 이상 뽑힐 확률 = ${fmt(1-pNot,4)}\n   (n이 크면 1 − 1/e = ${fmt(1-Math.exp(-1),4)})`;
+    segInit($("cN"),v=>{C.n=+v;cReset();});
+    $("c1").onclick=()=>cRun(1);$("c100").onclick=()=>cRun(100);$("c1000").onclick=()=>cRun(1000);$("cReset").onclick=cReset;
+    cReset();cRun(200);render();
+  }
+  return{init,render,cRender,stop,go,step:()=>st.step,st,C,SAMPLES,cRun,cReset};
+})();
+
+/* ================= 2. 특성 무작위 선택 ================= */
+const FEAT=(function(){
+  const st={mf:"sqrt",depth:3,seed:1,sel:{t:0,i:0},div:null};
+  let trees=[];const job=Job();
+  const K=()=>mfK(st.mf,8);
+  function build(){
+    trees=[];
+    for(let t=0;t<3;t++){const r=mulberry32(st.seed*1000+t*31+7);const b=bootstrap(NTR,r);const tr=buildTree(PTR,b.idx,{maxDepth:st.depth,k:K()},r,true);tr.boot=b;trees.push(tr);}
+    if(!trees[st.sel.t]||!trees[st.sel.t].nodes[st.sel.i]||trees[st.sel.t].nodes[st.sel.i].f<0)st.sel={t:0,i:0};
+  }
+  function treeHTML(tr,ti){
+    let h="";
+    (function rec(i,label){
+      const d=tr.nodes[i];
+      if(d.f<0){const p=d.n1/d.n,c=p>0.5?1:0;
+        h+=`<li style="--d:${d.depth}"><span class="rf-br">${label}</span><span class="rf-lf c${c}">잎 → ${c?"질환 있음":"없음"}</span><span class="rf-n">n=${d.n} · 있음 ${pct(p,0)}</span></li>`;return;}
+      const on=st.sel.t===ti&&st.sel.i===i;
+      const chips=d.seen.map(f=>`<span class="rf-chip${f===d.f?" win":""}">${PS[f]}</span>`).join("");
+      h+=`<li style="--d:${d.depth}"><span class="rf-br">${label}</span><button type="button" class="rf-split${on?" on":""}" data-t="${ti}" data-i="${i}" aria-pressed="${on}">${PN[d.f]} ≤ ${thrTxt(d.thr)}</button><span class="rf-n">n=${d.n} · 지니 ${fmt(d.g,3)}</span><span class="rf-chips"><i>본 특성</i>${chips}</span></li>`;
+      rec(d.L,"예");rec(d.R,"아니오");
+    })(0,"뿌리");
+    return `<ul class="rf-tree">${h}</ul>`;
+  }
+  function render(){
+    const k=K();
+    $("fKv").textContent=k;$("fK").value=k;$("fDepthV").textContent=st.depth;
+    $("fFormula").innerHTML=`p = 8 특성 → sqrt: ⌊√8⌋ = ⌊2.83⌋ = 2 · log2: ⌊log₂8⌋ = 3 · 전체(None): 8 · 지금 k = <b>${k}</b>  (노드마다 8개 중 ${k}개를 새로 뽑음)`;
+    $("fTrees").innerHTML=trees.map((tr,ti)=>{const u=Array.from(tr.boot.c).filter(v=>v>0).length;
+      return `<div class="sk-card rf-tcard"><h3>트리 #${ti+1}<small>부트스트랩 ${NTR}행 → 서로 다른 행 ${u}개 (${pct(u/NTR,1)})</small></h3><div class="sk-scroll">${treeHTML(tr,ti)}</div></div>`;}).join("");
+    $("fTrees").querySelectorAll(".rf-split").forEach(b=>b.addEventListener("click",()=>{st.sel={t:+b.dataset.t,i:+b.dataset.i};render();}));
+    renderGini();renderDiv();
+  }
+  function renderGini(){
+    const tr=trees[st.sel.t],d=tr.nodes[st.sel.i],sp=d.sp;
+    $("fGiniTitle").textContent=`선택한 노드의 지니 계산 · 트리 #${st.sel.t+1}, 깊이 ${d.depth}`;
+    const g=(a,b,n)=>`1 − (${a}/${n})² − (${b}/${n})² = ${fmt(giniOf(a,b),4)}`;
+    $("fGini").innerHTML=
+      `부모 노드   n=${d.n} (없음 ${d.n0}, 있음 ${d.n1})   지니 = ${g(d.n0,d.n1,d.n)}\n`+
+      `왼쪽  (${PN[d.f]} ≤ ${thrTxt(d.thr)})  n=${sp.nl} (없음 ${sp.l0}, 있음 ${sp.l1})   지니 = ${g(sp.l0,sp.l1,sp.nl)}\n`+
+      `오른쪽 (${PN[d.f]} > ${thrTxt(d.thr)})  n=${sp.nr} (없음 ${sp.r0}, 있음 ${sp.r1})   지니 = ${g(sp.r0,sp.r1,sp.nr)}\n`+
+      `가중 평균 = ${sp.nl}/${d.n} × ${fmt(sp.gl,4)} + ${sp.nr}/${d.n} × ${fmt(sp.gr,4)} = <b>${fmt(sp.w,4)}</b>\n`+
+      `불순도 감소 = ${fmt(d.g,4)} − ${fmt(sp.w,4)} = <b class="rf-tunet">${fmt(r4(d.g)-r4(sp.w),4)}</b>`;
+    const all=[];for(let f=0;f<8;f++){const s=bestSplitOn(PTR.cols,PTR.y,d.ids,f);all.push({f,s,seen:d.seen.includes(f)});}
+    let bestAll=null;all.forEach(a=>{if(a.s&&(!bestAll||a.s.w<bestAll.s.w-1e-12))bestAll=a;});
+    let h=`<thead><tr><th>특성</th><th>이번에 봤나</th><th>최선 기준</th><th>가중 지니</th><th>감소</th><th>비고</th></tr></thead><tbody>`;
+    const order=all.slice().sort((a,b)=>(a.s?a.s.w:9)-(b.s?b.s.w:9));
+    order.forEach(a=>{
+      const win=a.f===d.f,flag=!a.seen&&a.s&&a.s.w<sp.w-1e-12?"더 좋지만 후보가 아니었음":(win?"선택됨":"");
+      h+=`<tr class="${win?"win":(a.seen?"":"unseen")}"><td>${PN[a.f]}</td><td>${a.seen?"봄":"안 봄"}</td><td class="n">${a.s?"≤ "+thrTxt(a.s.thr):"–"}</td><td class="n">${a.s?fmt(a.s.w,4):"–"}</td><td class="n">${a.s?fmt(d.g-a.s.w,4):"–"}</td><td class="${!a.seen&&flag?"flag":""}">${flag}</td></tr>`;
+    });
+    $("fGTable").innerHTML=h+"</tbody>";
+    const k=K();
+    $("fGNote").innerHTML=bestAll&&bestAll.f!==d.f
+      ?`이 노드에서 8개를 다 봤다면 <b>${PN[bestAll.f]}</b>(가중 지니 ${fmt(bestAll.s.w,4)})를 골랐을 것입니다. 하지만 이번 후보(${d.seen.map(f=>PS[f]).join(", ")})에 없어서 <b>${PN[d.f]}</b>를 골랐습니다. 이런 "차선의 선택"이 트리마다 다른 모양을 만듭니다.`
+      :(k>=8?`max_features = 전체이므로 모든 특성을 보고 가장 좋은 분할(<b>${PN[d.f]}</b>)을 골랐습니다. 트리마다 달라지는 것은 부트스트랩 표본뿐입니다.`
+        :`이번 후보(${d.seen.map(f=>PS[f]).join(", ")}) 안에 전체 최선인 <b>${PN[d.f]}</b>가 들어 있어 전체를 본 것과 같은 선택을 했습니다. 다른 노드를 눌러 보세요.`);
+  }
+  /* max_features별 다양성: 깊이 제한 없는 트리 40그루씩 */
+  function runDiv(){
+    job.cancel();st.div=null;const seed=st.seed;
+    const res=[];$("fDivProg").textContent="계산 중…";
+    job.run(function*(){
+      for(let k=1;k<=8;k++){
+        const r=mulberry32(seed*7331+k*101),root=new Array(8).fill(0),M=[],acc=[];const sum=new Float64Array(PVA.n);
+        for(let t=0;t<40;t++){
+          const b=bootstrap(NTR,r),tr=buildTree(PTR,b.idx,{maxDepth:Infinity,k},r);
+          if(tr.nodes[0].f>=0)root[tr.nodes[0].f]++;
+          const v=new Float64Array(PVA.n);let ok=0;for(let j=0;j<PVA.n;j++){v[j]=predCol(tr,PVA.cols,j);sum[j]+=v[j];if((v[j]>0.5?1:0)===PVA.y[j])ok++;}
+          M.push(v);acc.push(ok/PVA.n);
+          $("fDivProg").textContent=`계산 중… k=${k}, ${t+1}/40`;
+          yield;
+        }
+        let ok=0;for(let j=0;j<PVA.n;j++)if((sum[j]/40>0.5?1:0)===PVA.y[j])ok++;
+        res.push({k,root,rho:meanPairCorr(M),acc1:acc.reduce((a,b)=>a+b,0)/acc.length,accF:ok/PVA.n,kinds:root.filter(v=>v>0).length});
+      }
+      return res;
+    },r=>{st.div=r;$("fDivProg").textContent="";renderDiv();CODE.renderCmp();});
+  }
+  function renderDiv(){
+    const k=K();
+    if(!st.div){$("fDiv").innerHTML="";$("fRoot").innerHTML=`<span class="sk-hint" style="grid-column:1/-1">계산 중입니다…</span>`;$("fRootNote").textContent="";$("fDivNote").textContent="";return;}
+    const tag=kk=>kk===2?"sqrt":kk===3?"log2":kk===8?"전체 (= 배깅)":"";
+    let h=`<thead><tr><th>k</th><th>표기</th><th>뿌리 종류</th><th>최다 뿌리</th><th>상관 ρ</th><th>1그루 정확도</th><th>숲 정확도</th></tr></thead><tbody>`;
+    st.div.forEach(d=>{const mx=Math.max(...d.root),mf=d.root.indexOf(mx);
+      h+=`<tr class="${d.k===k?"cur":""}"><td class="n">${d.k}</td><td>${tag(d.k)}</td><td class="n">${d.kinds}</td><td>${PS[mf]} ${pct(mx/40,0)}</td><td class="n">${fmt(d.rho,3)}</td><td class="n">${pct(d.acc1,1)}</td><td class="n">${pct(d.accF,1)}</td></tr>`;});
+    $("fDiv").innerHTML=h+"</tbody>";
+    const cur=st.div[k-1],all=st.div[7],best=st.div.reduce((a,b)=>b.accF>a.accF?b:a);
+    const mx=Math.max(...cur.root,1);
+    $("fRootHint").textContent=`k = ${k}, 깊이 제한 없음`;
+    $("fRoot").innerHTML=cur.root.map((v,f)=>({v,f})).sort((a,b)=>b.v-a.v).map(o=>`<span class="lb">${PN[o.f]}</span><span class="tr"><span class="fl" style="left:0;width:${o.v/mx*100}%;background:var(--tune)"></span></span><span class="vv">${o.v}그루</span>`).join("");
+    const top=cur.root.indexOf(Math.max(...cur.root));
+    $("fRootNote").innerHTML=k>=8
+      ?`모든 특성을 보면 40그루 중 <b>${cur.root[top]}그루</b>가 같은 특성(<b>${PN[top]}</b>)으로 시작합니다. 트리들이 서로 비슷해집니다.`
+      :`k = ${k}이면 뿌리 특성이 <b>${cur.kinds}종류</b>로 나뉩니다 (전체를 보면 ${all.kinds}종류). 가장 강한 특성이 후보에 없을 때 다른 특성으로 시작하기 때문입니다.`;
+    $("fDivNote").innerHTML=`k를 줄이면 ρ가 ${fmt(all.rho,2)}(전체) → ${fmt(st.div[0].rho,2)}(k=1)로 낮아집니다. 트리 한 그루는 약해지지만 서로 덜 닮아서, 평균을 내면 오차가 더 잘 상쇄됩니다. 이번 데이터에서 숲 정확도가 가장 높은 k는 <b>${best.k}</b> (${pct(best.accF,1)}) 입니다. 너무 작은 k는 개별 트리가 지나치게 약해질 수 있어 조율이 필요합니다.`;
+  }
+  function setMf(v){st.mf=v;segSet($("fMf"),v);build();render();}
+  function init(){
+    segInit($("fMf"),v=>setMf(v));
+    $("fK").addEventListener("input",e=>{const k=+e.target.value;const v=k===2?"sqrt":k===3?"log2":k===8?"all":k;st.mf=v;segSet($("fMf"),typeof v==="string"?v:"-");build();render();});
+    $("fDepth").addEventListener("input",e=>{st.depth=+e.target.value;build();render();});
+    $("fReseed").onclick=()=>{st.seed++;st.sel={t:0,i:0};build();render();runDiv();};
+    build();
+  }
+  let started=false;
+  function onShowF(){if(!started){started=true;runDiv();}render();}
+  return{init,render,onShow:onShowF,st,trees:()=>trees,K};
+})();
+
+/* ================= 3·4. 숲 (2차원) ================= */
+const F=(function(){
+  const G=120,NT=100,DOM=3;
+  const cfg={depth:Infinity,mf:"sqrt"};
+  const data={shape:"moons",n:240,spread:0.2,flip:5,seed:1,pts:[]};
+  const st={K:20,heat:"vote",cmp:false,edit:"probe",probe:null,probeUser:false,playing:false,timer:null,oView:"err",ghost:true,exRow:0};
+  let trees=[],single=null,Dtr=null,Dva=null,trIdx=[],vaIdx=[];
+  let curve={oob:[],val:[],cover:[],tv:[]},ghosts=[];
+  let oobS,oobC,vaS;
+  const job=Job();
+  function gen(){
+    const r=mulberry32(data.seed*9973+17),pts=[];const s=data.spread;
+    for(let i=0;i<data.n;i++){
+      let c=i%2,x,y;
+      if(data.shape==="moons"){const t=Math.PI*r();if(c===0){x=Math.cos(t);y=Math.sin(t);}else{x=1-Math.cos(t);y=0.5-Math.sin(t);}x=(x-0.5+gauss(r)*s)*1.65;y=(y-0.25+gauss(r)*s)*2.2;}
+      else if(data.shape==="blobs"){x=(c?0.8:-0.8)+gauss(r)*s*3;y=(c?0.5:-0.5)+gauss(r)*s*3;}
+      else{const qx=r()<0.5?-1:1,qy=c===0?qx:-qx;x=qx*1.25+gauss(r)*s*2.4;y=qy*1.25+gauss(r)*s*2.4;}
+      if(r()*100<data.flip)c=1-c;
+      pts.push({x:clamp(x,-2.9,2.9),y:clamp(y,-2.9,2.9),c,val:false});
+    }
+    const ord=pts.map((_,i)=>i);for(let i=ord.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[ord[i],ord[j]]=[ord[j],ord[i]];}
+    const nv=Math.round(pts.length*0.3);for(let q=0;q<nv;q++)pts[ord[q]].val=true;
+    data.pts=pts;st.probeUser=false;
+  }
+  function splitData(){
+    trIdx=[];vaIdx=[];data.pts.forEach((p,i)=>(p.val?vaIdx:trIdx).push(i));
+    const mk=ix=>mkD(ix.map(i=>[data.pts[i].x,data.pts[i].y]),ix.map(i=>data.pts[i].c),2);
+    Dtr=mk(trIdx);Dva=mk(vaIdx);
+  }
+  function gridOf(t){const g=new Float32Array(G*G);for(let gy=0;gy<G;gy++){const y=DOM-(gy+0.5)*2*DOM/G;for(let gx=0;gx<G;gx++){const x=-DOM+(gx+0.5)*2*DOM/G;g[gy*G+gx]=predXY(t,x,y);}}return g;}
+  function accOn(t,D){let ok=0;for(let j=0;j<D.n;j++)if((predCol(t,D.cols,j)>0.5?1:0)===D.y[j])ok++;return D.n?ok/D.n:NaN;}
+  function rebuild(keepGhost){
+    job.cancel();
+    if(keepGhost&&st.ghost&&curve.oob.length>=NT){ghosts=[{oob:curve.oob.slice(),val:curve.val.slice(),label:ghostLabel}];}
+    else if(!keepGhost)ghosts=[];
+    ghostLabel=`max_depth=${depthTxt(cfg.depth)}, max_features=${cfg.mf==="all"?"None":cfg.mf}`;
+    splitData();trees=[];curve={oob:[],val:[],cover:[],tv:[]};
+    oobS=new Float64Array(Dtr.n);oobC=new Uint16Array(Dtr.n);vaS=new Float64Array(Dva.n);
+    const all=[];for(let i=0;i<Dtr.n;i++)all.push(i);
+    single=buildTree(Dtr,all,{maxDepth:Infinity,k:2},mulberry32(data.seed*31+5));single.grid=gridOf(single);
+    const k=mfK(cfg.mf,2),r=mulberry32(data.seed*104729+(cfg.mf==="all"?7:3)+(isFinite(cfg.depth)?cfg.depth*13:0));
+    job.run(function*(){
+      for(let t=0;t<NT;t++){
+        const b=bootstrap(Dtr.n,r),tr=buildTree(Dtr,b.idx,{maxDepth:cfg.depth,k},r);
+        tr.inb=b.c;tr.grid=gridOf(tr);
+        tr.trP=new Float32Array(Dtr.n);for(let i=0;i<Dtr.n;i++)tr.trP[i]=predCol(tr,Dtr.cols,i);
+        tr.vaP=new Float32Array(Dva.n);let okv=0;for(let j=0;j<Dva.n;j++){tr.vaP[j]=predCol(tr,Dva.cols,j);if((tr.vaP[j]>0.5?1:0)===Dva.y[j])okv++;}
+        for(let i=0;i<Dtr.n;i++)if(!tr.inb[i]){oobS[i]+=tr.trP[i];oobC[i]++;}
+        let e=0,cv=0;for(let i=0;i<Dtr.n;i++)if(oobC[i]){cv++;if((oobS[i]/oobC[i]>0.5?1:0)!==Dtr.y[i])e++;}
+        let ev=0;for(let j=0;j<Dva.n;j++){vaS[j]+=tr.vaP[j];if((vaS[j]/(t+1)>0.5?1:0)!==Dva.y[j])ev++;}
+        curve.oob.push(cv?e/cv:NaN);curve.cover.push(cv);curve.val.push(Dva.n?ev/Dva.n:NaN);curve.tv.push(Dva.n?1-okv/Dva.n:NaN);
+        trees.push(tr);
+        if(t+1===st.K||t%10===9||t===NT-1)schedule();
+        yield;
+      }
+    },()=>{if(!st.probeUser)autoProbe();schedule();});
+    schedule();
+  }
+  let ghostLabel="";
+  function autoProbe(){let best=null,bd=9;for(let j=0;j<Dva.n;j++){let s=0;for(let t=0;t<trees.length;t++)s+=trees[t].vaP[j];const p=s/trees.length,d=Math.abs(p-0.62);if(d<bd&&Dva.cols[0][j]>-2&&Dva.cols[0][j]<2){bd=d;best=j;}}if(best!=null)st.probe={x:Dva.cols[0][best],y:Dva.cols[1][best]};}
+  let raf=0;function schedule(){if(raf)return;raf=requestAnimationFrame(()=>{raf=0;draw();});}
+  const Kb=()=>Math.min(st.K,trees.length);
+  function meanGrid(k,mode){const g=new Float32Array(G*G);if(!k)return g;for(let t=0;t<k;t++){const a=trees[t].grid;if(mode==="vote"){for(let j=0;j<a.length;j++)if(a[j]>0.5)g[j]+=1;}else for(let j=0;j<a.length;j++)g[j]+=a[j];}for(let j=0;j<g.length;j++)g[j]/=k;return g;}
+  const offc=document.createElement("canvas");offc.width=G;offc.height=G;const offx=offc.getContext("2d");
+  function drawField(cv,grid,o){
+    const {ctx,w}=fitCanvas(cv);
+    const c0=hexRgb(css("--c0")),c1=hexRgb(css("--c1")),bg=hexRgb(css("--surface")),ink=css("--ink"),sf=css("--surface");
+    const A=o.alpha||0.62;
+    ctx.fillStyle=sf;ctx.fillRect(0,0,w,w);
+    if(grid){
+      const im=offx.createImageData(G,G);
+      for(let j=0;j<G*G;j++){const p=grid[j];const col=p>0.5?mix(bg,c1,Math.min(1,(p-0.5)*2)*A):mix(bg,c0,Math.min(1,(0.5-p)*2)*A);im.data[4*j]=col[0];im.data[4*j+1]=col[1];im.data[4*j+2]=col[2];im.data[4*j+3]=255;}
+      offx.putImageData(im,0,0);ctx.imageSmoothingEnabled=false;ctx.drawImage(offc,0,0,w,w);
+      const cs=w/G;ctx.strokeStyle=ink;ctx.lineWidth=o.lw||1.8;ctx.lineCap="round";ctx.beginPath();
+      for(let gy=0;gy<G;gy++)for(let gx=0;gx<G;gx++){const a=grid[gy*G+gx]>0.5;
+        if(gx<G-1&&a!==(grid[gy*G+gx+1]>0.5)){ctx.moveTo((gx+1)*cs,gy*cs);ctx.lineTo((gx+1)*cs,(gy+1)*cs);}
+        if(gy<G-1&&a!==(grid[(gy+1)*G+gx]>0.5)){ctx.moveTo(gx*cs,(gy+1)*cs);ctx.lineTo((gx+1)*cs,(gy+1)*cs);}}
+      ctx.stroke();
+    }
+    const P=(x,y)=>[(x+DOM)/(2*DOM)*w,(DOM-y)/(2*DOM)*w];
+    const cc=[css("--c0"),css("--c1")],R=o.r||4.2;
+    (o.pts||[]).forEach(p=>{const [px,py]=P(p.x,p.y);ctx.beginPath();ctx.arc(px,py,p.val?R*0.9:R,0,Math.PI*2);
+      if(p.val){ctx.fillStyle=sf;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=cc[p.c];ctx.stroke();}
+      else{ctx.fillStyle=cc[p.c];ctx.fill();ctx.lineWidth=1.2;ctx.strokeStyle=sf;ctx.stroke();}});
+    if(o.probe){const [px,py]=P(o.probe.x,o.probe.y);ctx.lineWidth=2.5;ctx.strokeStyle=sf;ctx.beginPath();ctx.arc(px,py,10,0,Math.PI*2);ctx.stroke();ctx.lineWidth=2;ctx.strokeStyle=ink;ctx.beginPath();ctx.arc(px,py,10,0,Math.PI*2);ctx.moveTo(px-15,py);ctx.lineTo(px-5,py);ctx.moveTo(px+5,py);ctx.lineTo(px+15,py);ctx.moveTo(px,py-15);ctx.lineTo(px,py-5);ctx.moveTo(px,py+5);ctx.lineTo(px,py+15);ctx.stroke();}
+  }
+  function forestAcc(k,D,key){let ok=0;for(let j=0;j<D.n;j++){let s=0;for(let t=0;t<k;t++)s+=trees[t][key][j];if((s/k>0.5?1:0)===D.y[j])ok++;}return D.n?ok/D.n:NaN;}
+  function oobAt(k){const S=new Float64Array(Dtr.n),C=new Uint16Array(Dtr.n);for(let t=0;t<k;t++){const tr=trees[t];for(let i=0;i<Dtr.n;i++)if(!tr.inb[i]){S[i]+=tr.trP[i];C[i]++;}}let e=0,cv=0;for(let i=0;i<Dtr.n;i++)if(C[i]){cv++;if((S[i]/C[i]>0.5?1:0)!==Dtr.y[i])e++;}return{S,C,e,cv,err:cv?e/cv:NaN};}
+  function draw(){
+    syncK();
+    if(curTab==="forest")drawForestTab();
+    if(curTab==="oob")drawOobTab();
+    if(curTab==="code")CODE.render();
+  }
+  function drawForestTab(){
+    const k=Kb(),built=trees.length;
+    $("gProg").textContent=built<NT?`트리 학습 중 ${built}/${NT}`:"";
+    $("gForestTitle").textContent=`숲: 트리 ${k}그루 (${st.heat==="vote"?"투표 비율":"확률 평균"})`;
+    $("stage").classList.toggle("cmp",st.cmp);$("boxSingle").hidden=!st.cmp;
+    const grid=k?meanGrid(k,st.heat):null;
+    drawField($("cvForest"),grid,{pts:data.pts,probe:st.probe});
+    if(k){const tra=forestAcc(k,Dtr,"trP"),vaa=forestAcc(k,Dva,"vaP"),oo=oobAt(k);
+      $("gStats").innerHTML=`<div class="sk-stat"><b>${pct(tra)}</b><span>훈련 정확도</span></div><div class="sk-stat"><b class="rf-c1">${pct(vaa)}</b><span>검증 정확도</span></div><div class="sk-stat"><b class="rf-oobt">${pct(1-oo.err)}</b><span>OOB 정확도 (${oo.cv}/${Dtr.n}행)</span></div>`;}
+    if(st.cmp&&single){drawField($("cvSingle"),single.grid,{pts:data.pts,probe:st.probe});
+      $("gSStats").innerHTML=`<div class="sk-stat"><b>${pct(accOn(single,Dtr))}</b><span>훈련 정확도</span></div><div class="sk-stat"><b class="rf-c1">${pct(accOn(single,Dva))}</b><span>검증 정확도</span></div><div class="sk-stat"><b>${single.leaves}</b><span>잎 수 (깊이 ${single.depth})</span></div>`;}
+    drawVotes();drawThumbs();
+  }
+  function drawVotes(){
+    const k=Kb(),host=$("gVotes");
+    if(!st.probe||!k){host.innerHTML="";$("gVbar").innerHTML="";$("gVoteF").textContent="캔버스를 클릭하면 그 위치에서 트리마다 어떻게 투표했는지 봅니다.";$("gVerdict").textContent="";$("gNote").textContent="";return;}
+    const ps=[];for(let t=0;t<k;t++)ps.push(predXY(trees[t],st.probe.x,st.probe.y));
+    const v1=ps.filter(p=>p>0.5).length,v0=k-v1,mean=ps.reduce((a,b)=>a+b,0)/k;
+    const W=Math.max(280,Math.round(host.clientWidth||500)),H=170,mL=58,mR=10,mT=10,mB=24,pw=W-mL-mR,ph=H-mT-mB,Y=v=>mT+ph*(1-v),bw=pw/k;
+    let s=`<line class="gl" x1="${mL}" x2="${mL+pw}" y1="${Y(1)}" y2="${Y(1)}"/><line class="gl" x1="${mL}" x2="${mL+pw}" y1="${Y(0)}" y2="${Y(0)}"/>`;
+    s+=`<text class="ax" x="${mL-6}" y="${Y(1)+4}" text-anchor="end">p=1</text><text class="ax" x="${mL-6}" y="${Y(0.5)+4}" text-anchor="end">0.5</text><text class="ax" x="${mL-6}" y="${Y(0)+4}" text-anchor="end">p=0</text>`;
+    ps.forEach((p,t)=>{const up=p>0.5,y0=Y(0.5),y1=Y(p),x=mL+t*bw+Math.min(1,bw*0.12);s+=`<rect x="${x}" y="${Math.min(y0,y1)}" width="${Math.max(1,bw-2*Math.min(1,bw*0.12))}" height="${Math.max(1,Math.abs(y1-y0))}" style="fill:var(${up?"--c1":"--c0"})"><title>트리 #${t+1}: p(주황) = ${fmt(p,2)}</title></rect>`;});
+    s+=`<line class="gl0" x1="${mL}" x2="${mL+pw}" y1="${Y(0.5)}" y2="${Y(0.5)}"/>`;
+    s+=`<line x1="${mL}" x2="${mL+pw}" y1="${Y(mean)}" y2="${Y(mean)}" style="stroke:var(--ink);stroke-width:2;stroke-dasharray:6 4"/><text class="mkt" x="${mL+pw-4}" y="${Y(mean)+(mean>0.8?14:-5)}" text-anchor="end">확률 평균 ${fmt(mean,3)}</text>`;
+    s+=`<text class="axl" x="${mL+pw/2}" y="${H-4}" text-anchor="middle">트리 #1 → #${k}</text>`;
+    host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" aria-hidden="true">${s}</svg>`;
+    $("gVbar").innerHTML=`<span style="width:${v0/k*100}%;background:var(--c0)">${v0?"파랑 "+v0:""}</span><span style="width:${v1/k*100}%;background:var(--c1)">${v1?"주황 "+v1:""}</span>`;
+    const hard=v1>v0?1:0,soft=mean>0.5?1:0,sum=ps.reduce((a,b)=>a+b,0);
+    $("gVoteF").innerHTML=`위치 (${fmt(st.probe.x,2)}, ${fmt(st.probe.y,2)})\n다수결:   주황 ${v1}표 vs 파랑 ${v0}표 → 투표 비율 ${fmt(v1/k,3)} → <b class="rf-c${hard}">${hard?"주황":"파랑"}</b>${v1===v0?" (동률은 클래스 0)":""}\n확률 평균: (p₁ + … + p${k>1?"_"+k:""}) / ${k} = ${fmt(sum,2)} / ${k} = ${fmt(mean,3)} → <b class="rf-c${soft}">${soft?"주황":"파랑"}</b>  (scikit-learn predict_proba 방식)`;
+    $("gVerdict").innerHTML=`최종 예측: <span class="rf-c${soft}">${soft?"클래스 1 (주황)":"클래스 0 (파랑)"}</span>`;
+    const unan=v1===k||v0===k;
+    $("gNote").innerHTML=unan?`트리 ${k}그루가 모두 같은 쪽에 투표했습니다. 경계에서 먼 위치입니다. 경계 근처를 눌러 보세요.`
+      :`트리마다 본 데이터와 특성 후보가 달라 의견이 갈립니다. 한 그루의 실수는 다른 트리들이 표로 덮어 줍니다. 깊은 트리는 잎이 순수해서 확률이 0 또는 1이 많고, 그러면 다수결과 확률 평균이 거의 같습니다.`;
+  }
+  function drawThumbs(){
+    const host=$("gThumbs");
+    if(!host.children.length){let h="";for(let i=0;i<16;i++)h+=`<div class="rf-th" id="th${i}"><canvas aria-label="트리 ${i+1}의 결정 경계"></canvas><span></span></div>`;host.innerHTML=h;}
+    for(let i=0;i<16;i++){const box=$("th"+i),cv=box.querySelector("canvas"),tr=trees[i],on=i<Kb()&&!!tr;box.classList.toggle("off",!on);
+      if(tr){const pts=[];trIdx.forEach((pi,ii)=>{if(tr.inb[ii])pts.push({x:data.pts[pi].x,y:data.pts[pi].y,c:data.pts[pi].c,val:false});});
+        drawField(cv,tr.grid,{pts,r:1.9,alpha:0.5,lw:1.1});box.querySelector("span").textContent=`#${i+1} · ${pct(1-curve.tv[i],0)}`;}
+      else{drawField(cv,null,{});box.querySelector("span").textContent=`#${i+1} · 학습 전`;}}
+  }
+  /* ---- 4번 탭 ---- */
+  function drawOobTab(){
+    const k=Kb(),n=curve.oob.length,acc=st.oView==="acc",tf=v=>acc?1-v:v;
+    const mx=Math.max(0.1,...curve.oob.filter(isFinite),...curve.val.filter(isFinite),...ghosts.flatMap(g=>g.oob.concat(g.val)).filter(isFinite));
+    const top=Math.min(1,Math.ceil(mx*20)/20+0.05);
+    const yMin=acc?1-top:0,yMax=acc?1:top;
+    const singleVal=single?1-accOn(single,Dva):NaN;
+    const series=[];
+    ghosts.forEach(g=>{series.push({vals:g.oob.map(tf),x0:1,color:"var(--oob)",dash:"4 5",w:1.6,op:0.55});series.push({vals:g.val.map(tf),x0:1,color:"var(--c1)",dash:"4 5",w:1.6,op:0.55});});
+    series.push({vals:curve.val.map(tf),x0:1,color:"var(--c1)",dotAt:k>0&&k<=n?k-1:null});
+    series.push({vals:curve.oob.map(tf),x0:1,color:"var(--oob)",dotAt:k>0&&k<=n?k-1:null});
+    lineChart($("oChart"),{h:300,xMin:1,xMax:NT,yMin,yMax,yTicks:niceTicks(yMin,yMax,5),yFmt:v=>pct(v,0),xTicks:[1,20,40,60,80,100],xLabel:"트리 수 (n_estimators)",
+      refs:isFinite(singleVal)?[{v:tf(singleVal),label:`단일 깊은 트리 검증 ${acc?"정확도":"오차"} ${pct(tf(singleVal))}`,color:"var(--faint)",right:true,below:acc}]:[],
+      marker:k,markerLabel:`B = ${k}`,series});
+    $("oLegend").innerHTML=`<span><i style="background:var(--oob)"></i>OOB ${acc?"정확도":"오차"}</span><span><i style="background:var(--c1)"></i>검증 ${acc?"정확도":"오차"} (따로 떼어 둔 30%)</span>`+(ghosts.length?`<span><i style="background:var(--faint)"></i>점선 = 이전 설정 (${esc(ghosts[0].label)})</span>`:"")+`<span>지금: max_depth=${depthTxt(cfg.depth)}, max_features=${cfg.mf==="all"?"None":cfg.mf}</span>`;
+    if(!k){$("oStats").innerHTML="";return;}
+    const tv=curve.tv.slice(0,k),tvm=tv.reduce((a,b)=>a+b,0)/k,tmin=Math.min(...tv),tmax=Math.max(...tv);
+    $("oStats").innerHTML=
+      `<div class="sk-stat"><b class="rf-oobt">${pct(curve.oob[k-1])}</b><span>OOB 오차 (B=${k})</span></div>`+
+      `<div class="sk-stat"><b class="rf-c1">${pct(curve.val[k-1])}</b><span>검증 오차 (B=${k})</span></div>`+
+      `<div class="sk-stat"><b>${curve.cover[k-1]} / ${Dtr.n}</b><span>OOB 예측이 가능한 행</span></div>`+
+      `<div class="sk-stat"><b>${pct(tvm)}</b><span>트리 1그루 검증 오차 평균 (${pct(tmin,0)}~${pct(tmax,0)})</span></div>`;
+    const last=n>=NT?curve.val[NT-1]:NaN;
+    $("oNote").innerHTML=`트리 한 그루는 검증 오차가 평균 <b>${pct(tvm)}</b>이고 그루마다 ${pct(tmin,0)}~${pct(tmax,0)}로 들쭉날쭉합니다. 여러 그루의 표를 모으면 우연한 실수가 서로 상쇄되어 곡선이 내려가다 평평해집니다${isFinite(last)?` (100그루 검증 오차 ${pct(last)})`:""}. 트리를 더 심어도 과적합이 늘지는 않고, 계산 시간만 늘어납니다. OOB 곡선은 검증 데이터 없이 이 추세를 따라갑니다.`;
+    drawOobCalc(k);drawVar(k);
+  }
+  function drawOobCalc(k){
+    const oo=oobAt(k);
+    const cand=[];for(let i=0;i<Dtr.n;i++)if(oo.C[i])cand.push(i);
+    if(!cand.length){$("oCalc").textContent=`B = ${k}: 아직 OOB 트리가 있는 행이 없습니다.`;return;}
+    const i=cand[st.exRow%cand.length],list=[];for(let t=0;t<k;t++)if(!trees[t].inb[i])list.push(t);
+    const m=oo.S[i]/oo.C[i],pr=m>0.5?1:0;
+    const shown=list.slice(0,8).map(t=>`#${t+1}:${fmt(trees[t].trP[i],2)}`).join("  ");
+    $("oCalc").innerHTML=
+      `훈련 행 ${i+1} (${fmt(Dtr.cols[0][i],2)}, ${fmt(Dtr.cols[1][i],2)}), 정답 = <b class="rf-c${Dtr.y[i]}">${Dtr.y[i]}</b>\n`+
+      `트리 ${k}그루 중 이 행이 OOB인 트리: ${list.length}그루 (${pct(list.length/k,0)})\n`+
+      `  ${shown}${list.length>8?"  …":""}\n`+
+      `OOB 확률 = ${fmt(oo.S[i],2)} / ${list.length} = ${fmt(m,3)} → 예측 ${pr}  ${pr===Dtr.y[i]?"맞음":"틀림"}\n\n`+
+      `OOB 오차 = 틀린 행 / OOB 예측 가능한 행\n         = ${oo.e} / ${oo.cv} = <b class="rf-oobt">${fmt(oo.err,4)}</b>`+(oo.cv<Dtr.n?`   (OOB 트리가 없는 ${Dtr.n-oo.cv}행 제외)`:"");
+  }
+  function drawVar(k){
+    const n=Math.min(trees.length,NT);if(n<2){$("oVar").innerHTML="";return;}
+    const M=trees.slice(0,n).map(t=>t.vaP);const rho=meanPairCorr(M);
+    let s2=0;for(let j=0;j<Dva.n;j++){let a=0;for(let t=0;t<n;t++)a+=M[t][j];a/=n;let q=0;for(let t=0;t<n;t++)q+=(M[t][j]-a)**2;s2+=q/n;}s2/=Dva.n;
+    const f=B=>rho+(1-rho)/B;
+    $("oVarF").innerHTML=`트리 B그루 평균의 분산 = ρσ² + (1 − ρ)σ² / B\n\n지금 숲: 트리 간 상관 ρ = <b>${fmt(rho,3)}</b>, 트리 한 그루 예측 분산 σ² = ${fmt(s2,3)}\nB = 1   → ${fmt(f(1),3)} σ²\nB = ${String(k).padEnd(3)} → ${fmt(f(k),3)} σ²\nB → ∞  → ρσ² = ${fmt(rho,3)} σ²  (트리를 늘려도 이 아래로는 안 내려감)`;
+    const vals=[],v1=[],v0=[];for(let B=1;B<=NT;B++){vals.push(f(B));v1.push(1);v0.push(1/B);}
+    lineChart($("oVar"),{h:200,xMin:1,xMax:NT,yMin:0,yMax:1.05,yTicks:[0,0.25,0.5,0.75,1],yFmt:v=>fmt(v,2),xTicks:[1,20,40,60,80,100],xLabel:"트리 수 B (세로: 분산 / σ²)",marker:k,markerLabel:`B = ${k}`,
+      series:[{vals:v1,x0:1,color:"var(--faint)",dash:"5 4",w:1.6},{vals:v0,x0:1,color:"var(--use)",dash:"2 4",w:1.8},{vals,x0:1,color:"var(--tune)",dotAt:k-1}]});
+    $("oVarNote").innerHTML=`<span class="rf-tunet"><b>보라</b></span> = 지금 숲(ρ = ${fmt(rho,2)}), 회색 점선 = 트리가 모두 같을 때(ρ = 1, 줄지 않음), <span style="color:var(--use)"><b>초록 점선</b></span> = 완전히 독립일 때(ρ = 0). 트리 수 B는 뒤쪽 항만 줄입니다. 앞쪽 ρσ²를 줄이려면 max_features로 <b>트리끼리 덜 닮게</b> 해야 합니다. 설정을 전체(None)로 바꿔 ρ가 어떻게 되는지 보세요.`;
+  }
+  /* ---- 조작 ---- */
+  function syncK(){document.querySelectorAll("[data-k]").forEach(el=>{el.value=st.K;});$("gKv").textContent=st.K;$("oKv").textContent=st.K;}
+  function syncCfg(){document.querySelectorAll("[data-depth]").forEach(el=>el.value=isFinite(cfg.depth)?cfg.depth:16);document.querySelectorAll("[data-depth-v]").forEach(el=>el.textContent=depthTxt(cfg.depth));document.querySelectorAll("[data-mf]").forEach(el=>segSet(el,cfg.mf));}
+  function setK(k){st.K=clamp(k,1,NT);syncK();schedule();}
+  function stopPlay(){st.playing=false;clearTimeout(st.timer);$("gPlay").textContent="재생";}
+  function tick(){if(!st.playing)return;if(st.K>=NT){stopPlay();return;}if(st.K<trees.length){st.K++;schedule();}st.timer=setTimeout(tick,(reduceMotion?250:320)/parseFloat($("gSpeed").value));}
+  function play(){if(st.playing){stopPlay();return;}if(st.K>=NT)st.K=1;st.playing=true;$("gPlay").textContent="멈춤";schedule();st.timer=setTimeout(tick,300);}
+  let rbT=0;function rebuildSoon(g){clearTimeout(rbT);rbT=setTimeout(()=>rebuild(g),120);}
+  function canvasXY(e,cv){const r=cv.getBoundingClientRect();return{x:-DOM+(e.clientX-r.left)/r.width*2*DOM,y:DOM-(e.clientY-r.top)/r.height*2*DOM};}
+  function onCanvas(e){
+    const p=canvasXY(e,e.currentTarget);
+    if(st.edit==="probe"){st.probe=p;st.probeUser=true;schedule();return;}
+    if(st.edit==="add0"||st.edit==="add1"){data.pts.push({x:clamp(p.x,-2.9,2.9),y:clamp(p.y,-2.9,2.9),c:st.edit==="add1"?1:0,val:false});rebuild(false);return;}
+    if(st.edit==="del"){let bi=-1,bd=0.3*0.3;data.pts.forEach((q,i)=>{const d=(q.x-p.x)**2+(q.y-p.y)**2;if(d<bd){bd=d;bi=i;}});if(bi>=0){data.pts.splice(bi,1);rebuild(false);}}
+  }
+  function init(){
+    $("gFirst").onclick=()=>{stopPlay();setK(1);};$("gPrev").onclick=()=>{stopPlay();setK(st.K-1);};
+    $("gAdd").onclick=()=>{stopPlay();setK(st.K+1);};$("gAdd10").onclick=()=>{stopPlay();setK(st.K+10);};$("gPlay").onclick=play;
+    document.querySelectorAll("[data-k]").forEach(el=>el.addEventListener("input",e=>{stopPlay();setK(+e.target.value);}));
+    $("gSpeed").addEventListener("input",e=>{$("gSpeedV").textContent=e.target.value+"×";});
+    document.querySelectorAll("[data-depth]").forEach(el=>el.addEventListener("input",e=>{cfg.depth=depthVal(+e.target.value);syncCfg();rebuildSoon(true);}));
+    document.querySelectorAll("[data-mf]").forEach(el=>segInit(el,v=>{cfg.mf=v;syncCfg();rebuild(true);}));
+    segInit($("gHeat"),v=>{st.heat=v;schedule();});
+    $("gCmp").addEventListener("change",e=>{st.cmp=e.target.checked;schedule();});
+    segInit($("gShape"),v=>{data.shape=v;gen();rebuild(false);});
+    $("gN").addEventListener("input",e=>{data.n=+e.target.value;$("gNv").textContent=data.n;gen();rebuildSoon(false);});
+    $("gSp").addEventListener("input",e=>{data.spread=+e.target.value;$("gSpv").textContent=fmt(data.spread,2);gen();rebuildSoon(false);});
+    $("gFlip").addEventListener("input",e=>{data.flip=+e.target.value;$("gFlipv").textContent=data.flip+"%";gen();rebuildSoon(false);});
+    $("gSeed").onclick=()=>{data.seed++;gen();rebuild(false);};
+    segInit($("gEdit"),v=>{st.edit=v;});
+    $("cvForest").addEventListener("click",onCanvas);$("cvSingle").addEventListener("click",onCanvas);
+    segInit($("oView"),v=>{st.oView=v;schedule();});
+    $("oGhost").addEventListener("change",e=>{st.ghost=e.target.checked;if(!st.ghost)ghosts=[];schedule();});
+    $("oRow").onclick=()=>{st.exRow++;schedule();};
+    syncCfg();gen();rebuild(false);
+  }
+  return{init,draw:schedule,setK,stopPlay,K:()=>st.K,st,cfg,data,trees:()=>trees,single:()=>single,curve:()=>curve,oobAt,D:()=>({Dtr,Dva}),NT};
+})();
+
+/* ================= 5. 특성 중요도 ================= */
+const IMP=(function(){
+  const st={depth:Infinity,noiseC:true,noiseB:false,on:"val",seed:1,res:null};
+  const job=Job();
+  function data(){
+    const r=mulberry32(900+st.seed*17),names=PN.slice(),noise=[];
+    const extra=PAT.rows.map(()=>[]);
+    if(st.noiseC){names.push("무작위 번호");noise.push(names.length-1);extra.forEach(e=>e.push(Math.round(r()*10000)/100));}
+    if(st.noiseB){names.push("동전 (0/1)");noise.push(names.length-1);extra.forEach(e=>e.push(r()<0.5?1:0));}
+    const rows=PAT.rows.map((R,i)=>R.concat(extra[i])),p=names.length;
+    return{names,noise,p,tr:mkD(rows.slice(0,NTR),PAT.y.slice(0,NTR),p),va:mkD(rows.slice(NTR),PAT.y.slice(NTR),p)};
+  }
+  function run(){
+    job.cancel();st.res=null;render();
+    const d=data(),seed=st.seed,depth=st.depth,on=st.on;
+    job.run(function*(){
+      const r=mulberry32(31337+seed*7),k=mfK("sqrt",d.p),trees=[];
+      const oS=new Float64Array(NTR),oC=new Uint16Array(NTR);
+      for(let t=0;t<100;t++){const b=bootstrap(NTR,r),tr=buildTree(d.tr,b.idx,{maxDepth:depth,k},r);tr.inb=b.c;trees.push(tr);
+        for(let i=0;i<NTR;i++)if(!b.c[i]){oS[i]+=predCol(tr,d.tr.cols,i);oC[i]++;}
+        if(t%5===4)$("iProg").textContent=`트리 학습 ${t+1}/100`;yield;}
+      const used=trees.filter(t=>t.nodes.length>1),mdi=new Float64Array(d.p);used.forEach(t=>t.impN.forEach((v,f)=>mdi[f]+=v/used.length));
+      let s=0;mdi.forEach(v=>s+=v);for(let f=0;f<d.p;f++)mdi[f]/=s;
+      const D=on==="val"?d.va:d.tr;
+      const acc=cols=>{let ok=0;for(let j=0;j<D.n;j++){let q=0;for(const t of trees)q+=predCol(t,cols,j);if((q/trees.length>0.5?1:0)===D.y[j])ok++;}return ok/D.n;};
+      const base=acc(D.cols),pr=mulberry32(4242+seed),perm=[];
+      for(let f=0;f<d.p;f++){const drops=[];
+        for(let rep=0;rep<5;rep++){const col=Float64Array.from(D.cols[f]);for(let i=col.length-1;i>0;i--){const j=Math.floor(pr()*(i+1));const tmp=col[i];col[i]=col[j];col[j]=tmp;}
+          const cols=D.cols.slice();cols[f]=col;drops.push(base-acc(cols));yield;}
+        const m=drops.reduce((a,b)=>a+b,0)/5,sd=Math.sqrt(drops.reduce((a,b)=>a+(b-m)**2,0)/5);perm.push({m,sd,drops});
+        $("iProg").textContent=`순열 중요도 ${f+1}/${d.p}`;}
+      let oe=0,oc=0;for(let i=0;i<NTR;i++)if(oC[i]){oc++;if((oS[i]/oC[i]>0.5?1:0)===d.tr.y[i])oe++;}
+      let vok=0;for(let j=0;j<d.va.n;j++){let q=0;for(const t of trees)q+=predCol(t,d.va.cols,j);if((q/100>0.5?1:0)===d.va.y[j])vok++;}
+      return{d,trees,mdi:Array.from(mdi),perm,base,oob:oe/oc,val:vok/d.va.n,on};
+    },res=>{st.res=res;$("iProg").textContent="";render();});
+  }
+  function bars(host,items,o){
+    const lo=Math.min(0,...items.map(it=>it.v-(it.sd||0))),hi=Math.max(...items.map(it=>it.v+(it.sd||0)),1e-9),X=v=>(v-lo)/(hi-lo)*100;
+    host.innerHTML=items.map(it=>{const a=X(Math.min(0,it.v)),b=X(Math.max(0,it.v));
+      return `<span class="lb${it.noise?" noise":""}">${esc(it.name)}</span><span class="tr">${lo<0?`<span class="z" style="left:${X(0)}%"></span>`:""}<span class="fl" style="left:${a}%;width:${Math.max(0.4,b-a)}%;background:${it.noise?"var(--leak)":o.color}"></span>${it.sd?`<span class="eb" style="left:${X(it.v-it.sd)}%;width:${X(it.v+it.sd)-X(it.v-it.sd)}%"></span>`:""}</span><span class="vv">${o.fmt(it.v)}</span>`;}).join("");
+  }
+  function render(){
+    $("iDepthV").textContent=depthTxt(st.depth);
+    const R=st.res;
+    if(!R){$("iMdi").innerHTML=$("iPerm").innerHTML=`<span class="sk-hint" style="grid-column:1/-1">계산 중입니다…</span>`;return;}
+    const {d}=R,order=R.mdi.map((v,f)=>f).sort((a,b)=>R.mdi[b]-R.mdi[a]);
+    bars($("iMdi"),order.map(f=>({name:d.names[f],v:R.mdi[f],noise:d.noise.includes(f)})),{color:"var(--tune)",fmt:v=>fmt(v,3)});
+    bars($("iPerm"),order.map(f=>({name:d.names[f],v:R.perm[f].m,sd:R.perm[f].sd,noise:d.noise.includes(f)})),{color:"var(--c1)",fmt:v=>sgn(v,3)});
+    $("iPermHint").textContent=R.on==="val"?`검증 90명, 기준 정확도 ${pct(R.base)}`:`훈련 210명, 기준 정확도 ${pct(R.base)}`;
+    $("iStats").innerHTML=`<div class="sk-stat"><b class="rf-oobt">${pct(R.oob)}</b><span>OOB 정확도</span></div><div class="sk-stat"><b class="rf-c1">${pct(R.val)}</b><span>검증 정확도</span></div><div class="sk-stat"><b>${d.p}</b><span>특성 수 (노드마다 ${mfK("sqrt",d.p)}개 봄)</span></div><div class="sk-stat"><b>${Math.round(R.trees.reduce((a,t)=>a+t.leaves,0)/R.trees.length)}</b><span>트리당 평균 잎 수</span></div>`;
+    // 계산 예시: 트리 #1 뿌리
+    const t0=R.trees[0],n0=t0.nodes[0];
+    let calc=`[MDI] 분할 노드 하나의 기여 = (n_t / N) × (지니_t − 가중 자식 지니)\n`;
+    if(n0.f>=0){const l=t0.nodes[n0.L],r=t0.nodes[n0.R],w=(l.n*l.g+r.n*r.g)/n0.n;
+      calc+=`예) 트리 #1 뿌리: ${d.names[n0.f]} ≤ ${thrTxt(n0.thr)}\n    (${n0.n}/${n0.n}) × (${fmt(n0.g,4)} − ${fmt(w,4)}) = ${fmt(r4(n0.g)-r4(w),4)}\n`+
+        `    지니_t = 1 − (${n0.n0}/${n0.n})² − (${n0.n1}/${n0.n})² = ${fmt(n0.g,4)}\n`+
+        `    가중 자식 = ${l.n}/${n0.n}×${fmt(l.g,4)} + ${r.n}/${n0.n}×${fmt(r.g,4)} = ${fmt(w,4)}\n`;}
+    calc+=`→ 트리마다 특성별로 더한 뒤 합이 1이 되게 나누고, 100그루 평균\n\n[순열] 중요도 = 기준 정확도 − (그 열만 섞은 뒤 정확도)\n`;
+    const top=order[0];calc+=`예) ${d.names[top]} 섞기 5회: ${R.perm[top].drops.map(v=>sgn(v,3)).join(", ")}\n    평균 ${sgn(R.perm[top].m,3)} ± ${fmt(R.perm[top].sd,3)}`;
+    $("iCalc").innerHTML=calc;
+    // 표
+    const rankM=f=>order.indexOf(f)+1,po=R.perm.map((p,f)=>f).sort((a,b)=>R.perm[b].m-R.perm[a].m),rankP=f=>po.indexOf(f)+1;
+    let h=`<thead><tr><th>특성</th><th>MDI</th><th>MDI 순위</th><th>순열</th><th>순열 순위</th></tr></thead><tbody>`;
+    order.forEach(f=>{h+=`<tr><td class="${d.noise.includes(f)?"rf-leakt":""}">${esc(d.names[f])}</td><td class="n">${fmt(R.mdi[f],3)}</td><td class="n">${rankM(f)}</td><td class="n">${sgn(R.perm[f].m,3)}</td><td class="n">${rankP(f)}</td></tr>`;});
+    $("iTable").innerHTML=h+"</tbody>";
+    let note="";
+    if(d.noise.length){note+=d.noise.map(f=>`<b class="rf-leakt">${esc(d.names[f])}</b>은(는) 정답과 무관한데도 MDI ${fmt(R.mdi[f],3)} (${rankM(f)}위 / ${d.p}), 순열 중요도는 ${sgn(R.perm[f].m,3)} (${rankP(f)}위).`).join(" ")+" ";
+      note+=`MDI는 <b>훈련 중 분할에 얼마나 자주·많이 쓰였나</b>를 셉니다. 값 종류가 많은 연속 잡음은 깊은 트리에서 우연히 잘 나누는 기준을 찾기 쉬워 MDI가 부풀려집니다. 순열 중요도는 <b>섞어도 성능이 안 떨어지면 0 근처</b>라 잡음을 가려냅니다.`;
+      if(R.on==="train")note+=` 다만 훈련 데이터로 계산하면 외워 둔 잡음까지 중요해 보일 수 있어 검증 데이터로 계산하는 것이 안전합니다.`;}
+    else note=`잡음 열을 추가해 보세요. 두 중요도 모두 혈당이 가장 크게 나오지만, 잡음 특성을 대하는 태도가 다릅니다.`;
+    note+=` 혈당·BMI·나이처럼 서로 상관된 특성은 중요도를 나눠 가질 수 있다는 점도 기억하세요.`;
+    $("iNote").innerHTML=note;
+  }
+  function init(){
+    $("iNoiseC").addEventListener("change",e=>{st.noiseC=e.target.checked;run();});
+    $("iNoiseB").addEventListener("change",e=>{st.noiseB=e.target.checked;run();});
+    let t=0;$("iDepth").addEventListener("input",e=>{st.depth=depthVal(+e.target.value);$("iDepthV").textContent=depthTxt(st.depth);clearTimeout(t);t=setTimeout(run,200);});
+    segInit($("iOn"),v=>{st.on=v;run();});
+    $("iSeed").onclick=()=>{st.seed++;run();};
+  }
+  let started=false;
+  return{init,onShow:()=>{if(!started){started=true;run();}else render();},st};
+})();
+
+/* ================= 6. 코드 ================= */
+const CODE=(function(){
+  const st={n:100,depth:Infinity,mf:"sqrt",mfInt:3,rs:42,oob:true,perm:true,curve:false,bag:false,imported:false};
+  let code="";
+  function importCfg(){st.depth=F.cfg.depth;st.mf=F.cfg.mf;st.n=F.K();st.imported=true;syncUI();render();}
+  function syncUI(){$("kN").value=st.n;$("kDepth").value=isFinite(st.depth)?st.depth:16;$("kDepthV").textContent=depthTxt(st.depth);segSet($("kMf"),st.mf);$("kMfInt").disabled=st.mf!=="int";$("kMfInt").value=st.mfInt;$("kRs").value=st.rs;}
+  function hlCode(code){let out="",last=0;code.replace(/"[^"]*"|\b(?:import|from|for|in|print|range|round|True|False|None|as)\b/g,(m,off)=>{out+=esc(code.slice(last,off))+(m[0]==='"'?`<span class="st">${esc(m)}</span>`:`<span class="kw">${m}</span>`);last=off+m.length;return m;});return out+esc(code.slice(last));}
+  const hl=src=>src.split("\n").map(line=>{let inS=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"')inS=!inS;else if(ch==="#"&&!inS)return hlCode(line.slice(0,i))+`<span class="cm">${esc(line.slice(i))}</span>`;}return hlCode(line);}).join("\n");
+  function render(){
+    const md=isFinite(st.depth)?String(st.depth):"None";
+    const mf=st.mf==="int"?String(st.mfInt):st.mf==="all"?"None":`"${st.mf}"`;
+    const mfNote=st.mf==="sqrt"?"노드마다 ⌊√p⌋개 특성만 후보":st.mf==="log2"?"노드마다 ⌊log₂p⌋개 특성만 후보":st.mf==="all"?"모든 특성 = 배깅과 같음":`노드마다 ${st.mfInt}개 특성만 후보`;
+    const pl=(t,cm)=>"    "+t+" ".repeat(Math.max(1,24-t.length))+"# "+cm;
+    let c=`import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+
+# 환자 표: 나이, BMI, 혈당, 수축기혈압, 콜레스테롤, 흡연, 운동시간, 가족력, 질환여부(0/1)
+df = pd.read_csv("patients.csv")
+X = df.drop(columns=["질환여부"])
+y = df["질환여부"]
+X_train, X_val, y_train, y_val = train_test_split(
+    X, y, test_size=0.3, stratify=y, random_state=${st.rs})
+
+rf = RandomForestClassifier(
+${pl(`n_estimators=${st.n},`,"트리 수")}
+${pl(`criterion="gini",`,"분할 기준: 지니 불순도")}
+${pl(`max_depth=${md},`,md==="None"?"깊이 제한 없음 (잎이 순수해질 때까지)":"트리 깊이 제한")}
+${pl(`max_features=${mf},`,mfNote)}
+${pl(`bootstrap=True,`,"트리마다 복원추출")}
+${pl(`oob_score=${st.oob?"True":"False"},`,st.oob?"OOB 행으로 성능 추정":"OOB 평가 안 함")}
+${pl(`n_jobs=-1,`,"CPU 코어 모두 사용")}
+${pl(`random_state=${st.rs},`,"재현용 난수 고정")}
+)
+rf.fit(X_train, y_train)
+`;
+    if(st.oob)c+=`print("OOB 정확도 :", round(rf.oob_score_, 3))\n`;
+    c+=`print("검증 정확도:", round(rf.score(X_val, y_val), 3))
+
+# 불순도 감소 중요도 (MDI, 합 = 1)
+mdi = pd.Series(rf.feature_importances_, index=X.columns)
+print(mdi.sort_values(ascending=False))
+`;
+    if(st.perm)c+=`
+# 순열 중요도 (검증 데이터에서 열을 섞었을 때 정확도 감소)
+from sklearn.inspection import permutation_importance
+pi = permutation_importance(rf, X_val, y_val, n_repeats=5, random_state=${st.rs}, n_jobs=-1)
+print(pd.Series(pi.importances_mean, index=X.columns).sort_values(ascending=False))
+`;
+    if(st.curve)c+=`
+# 트리 수에 따른 OOB 오차 (warm_start: 기존 트리를 두고 새 트리만 추가)
+curve = RandomForestClassifier(max_depth=${md}, max_features=${mf}, oob_score=True,
+                               warm_start=True, n_jobs=-1, random_state=${st.rs})
+oob_err = []
+for n in range(15, ${Math.max(20,st.n)+1}, 5):
+    curve.set_params(n_estimators=n)
+    curve.fit(X_train, y_train)
+    oob_err.append((n, 1 - curve.oob_score_))
+print(oob_err[-5:])
+`;
+    if(st.bag)c+=`
+# 비교: 배깅 (행 샘플링만, 노드마다 모든 특성)
+from sklearn.ensemble import BaggingClassifier
+from sklearn.tree import DecisionTreeClassifier
+bag = BaggingClassifier(
+    estimator=DecisionTreeClassifier(max_depth=${md}),
+    n_estimators=${st.n}, bootstrap=True, oob_score=True, n_jobs=-1, random_state=${st.rs})
+bag.fit(X_train, y_train)
+print("배깅 OOB:", round(bag.oob_score_, 3), " 검증:", round(bag.score(X_val, y_val), 3))
+# RandomForestClassifier(max_features=None) 도 같은 방식입니다.
+`;
+    code=c;$("kCode").innerHTML=hl(c);
+  }
+  function renderCmp(){
+    const dv=FEAT.st.div;const a=dv?dv[7]:null,b=dv?dv[1]:null;
+    const rows=[
+      ["행 샘플링","없음 (훈련 데이터 전체)","트리마다 부트스트랩 (복원추출 n행)","트리마다 부트스트랩 (복원추출 n행)"],
+      ["특성 샘플링","없음","없음 (노드마다 전체 특성)","노드마다 max_features개 무작위"],
+      ["트리끼리","한 그루","비슷함 (강한 특성이 늘 뿌리)","덜 닮음 (상관 ↓)"],
+      ["분산 / 과적합","큼 (깊으면 들쭉날쭉)","줄어듦","더 줄어듦"],
+      ["OOB 평가","불가","가능","가능"],
+      ["scikit-learn","<code>DecisionTreeClassifier()</code>","<code>BaggingClassifier(estimator=DecisionTreeClassifier())</code><br>또는 <code>RandomForestClassifier(max_features=None)</code>",'<code>RandomForestClassifier(max_features="sqrt")</code>'],
+      ["이 페이지 실험값",dv?`검증 정확도 ${pct(a.acc1,1)} (1그루 평균)`:"계산 전 (2번 탭을 열면 계산)",dv?`ρ = ${fmt(a.rho,3)}, 숲 정확도 ${pct(a.accF,1)}`:"–",dv?`ρ = ${fmt(b.rho,3)}, 숲 정확도 ${pct(b.accF,1)} (sqrt = 2)`:"–"]
+    ];
+    $("kCmp").innerHTML=`<thead><tr><th></th><th>결정 트리 1그루</th><th>배깅 (Bagging)</th><th>랜덤포레스트</th></tr></thead><tbody>`+rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")+"</tbody>";
+  }
+  function init(){
+    $("kN").addEventListener("input",e=>{st.n=clamp(parseInt(e.target.value)||1,1,5000);render();});
+    $("kDepth").addEventListener("input",e=>{st.depth=depthVal(+e.target.value);$("kDepthV").textContent=depthTxt(st.depth);render();});
+    segInit($("kMf"),v=>{st.mf=v;$("kMfInt").disabled=v!=="int";render();});
+    $("kMfInt").addEventListener("input",e=>{st.mfInt=Math.max(1,parseInt(e.target.value)||1);render();});
+    $("kRs").addEventListener("input",e=>{st.rs=parseInt(e.target.value)||0;render();});
+    [["kOob","oob"],["kPerm","perm"],["kCurve","curve"],["kBag","bag"]].forEach(([id,k])=>$(id).addEventListener("change",e=>{st[k]=e.target.checked;render();}));
+    $("kImport").onclick=importCfg;
+    $("kCopy").onclick=async()=>{try{await navigator.clipboard.writeText(code);$("kCopy").textContent="복사됨";}catch(e){const r=document.createRange();r.selectNodeContents($("kCode"));const s=getSelection();s.removeAllRanges();s.addRange(r);$("kCopy").textContent="선택됨";}setTimeout(()=>$("kCopy").textContent="복사",1400);};
+    syncUI();render();renderCmp();
+  }
+  return{init,render,renderCmp,onShow:()=>{if(!st.imported)importCfg();renderCmp();},st,code:()=>code};
+})();
+
+/* ================= 키보드 · 테마 · 시작 ================= */
+document.addEventListener("keydown",e=>{
+  if(e.altKey||e.ctrlKey||e.metaKey||e.shiftKey)return;
+  if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;
+  const t=e.target;if(t&&t.closest&&(t.closest(".sk-tabs")||t.closest("input,select,textarea,[contenteditable]")))return;
+  const d=e.key==="ArrowRight"?1:-1;
+  if(curTab==="boot"){BOOT.stop();BOOT.go(BOOT.step()+d);e.preventDefault();}
+  else if(curTab==="forest"){F.stopPlay();F.setK(F.K()+d);e.preventDefault();}
+});
+onShow.boot=()=>{BOOT.render();BOOT.cRender();};
+onShow.feat=()=>FEAT.onShow();
+onShow.forest=()=>F.draw();
+onShow.oob=()=>F.draw();
+onShow.imp=()=>IMP.onShow();
+onShow.code=()=>CODE.onShow();
+onHide.boot=()=>BOOT.stop();
+onHide.forest=()=>F.stopPlay();
+BOOT.init();FEAT.init();F.init();IMP.init();CODE.init();
+const start=(location.hash||"").slice(1);
+showTab(TABS.includes(start)?start:"boot");
+function redraw(){
+  if(curTab==="boot")BOOT.cRender();
+  if(curTab==="forest"||curTab==="oob")F.draw();
+}
+new MutationObserver(redraw).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",redraw);}catch(e){}
+let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(redraw,150);});
+})();
+</script>
+</body>
+</html>

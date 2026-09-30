@@ -1,0 +1,1495 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>의사결정나무 시뮬레이터 (분류 · 회귀) | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20260930c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20260930c">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 클래스 0 정상 파랑 · 클래스 1 질환 주황 · 학습 파랑 · 검증 청록 · 선형회귀 보라 · 과적합 빨강 · 최적 초록 · 예측선 주황 */
+:root{ --sk-accent: var(--cat-ml);
+  --c0:#2563EB; --c1:#EA580C; --tr:#2563EB; --va:#0D9488; --pur:#7C3AED; --bad:#DC2626; --ok:#16A34A; --pred:#EA580C; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --c0:#6AA5FF; --c1:#FF914D; --tr:#6AA5FF; --va:#33D1BD; --pur:#B294FF; --bad:#F87171; --ok:#4ADE80; --pred:#FF914D; } }
+:root[data-theme="dark"]{ --c0:#6AA5FF; --c1:#FF914D; --tr:#6AA5FF; --va:#33D1BD; --pur:#B294FF; --bad:#F87171; --ok:#4ADE80; --pred:#FF914D; }
+
+/* 파트 선택 (분류 / 회귀) */
+.dt-partbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px}
+.dt-part.sk-seg{border-width:1.5px;border-radius:12px}
+.dt-part.sk-seg button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:10px 22px;font-size:17px;white-space:normal;text-align:left;min-width:190px}
+.dt-part.sk-seg button b{font-weight:700;color:inherit}
+.dt-part.sk-seg button small{font-size:12.5px;font-weight:600;opacity:.8}
+.dt-partnote{margin:0;font-size:14px;color:var(--muted);max-width:60ch}
+.dt-part-wrap{display:flex;flex-direction:column;gap:16px}
+.dt-pane{display:flex;flex-direction:column;gap:16px}
+
+/* 역할 색 글자 */
+.t-c0{color:var(--c0)} .t-c1{color:var(--c1)} .t-tr{color:var(--tr)} .t-va{color:var(--va)} .t-ok{color:var(--ok)} .t-bad{color:var(--bad)} .t-pur{color:var(--pur)} .t-pred{color:var(--pred)} .t-faint{color:var(--faint)}
+.dt-sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.dt-sw.ln{height:3px;border-radius:2px;vertical-align:3px;width:16px}
+.dt-sw.dash{height:0;border-top:2.5px dashed currentColor;background:none!important;width:16px;vertical-align:3px;border-radius:0}
+.dt-sw.ring{background:none!important;border:2px solid currentColor;border-radius:50%}
+.dt-sw.dia{transform:rotate(45deg) scale(.85);border-radius:1px}
+.dt-sw.circ{border-radius:50%}
+
+/* 레이아웃 */
+.dt-two{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:900px){.dt-two{grid-template-columns:minmax(0,1fr)}}
+.dt-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.dt-cv{width:100%;aspect-ratio:4/3;display:block;border:1px solid var(--line);border-radius:10px;touch-action:manipulation}
+.dt-cv.edit{cursor:crosshair} .dt-cv.pick{cursor:pointer}
+.dt-sub{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:13px;color:var(--muted)}
+.dt-sub .sk-slider{min-width:150px}
+
+/* 좌·우 노드 상자 */
+.dt-sides{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.dt-box{border:1.5px solid var(--line);border-top:4px solid var(--bc,var(--line-strong));border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;min-width:0;background:var(--surface)}
+.dt-box h3{font-size:14px;margin:0;display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline}
+.dt-cond{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--muted)}
+.dt-box .sk-kv{font-size:13px}
+.dt-bar{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--surface-2)}
+.dt-bar span{display:block;height:100%}
+.dt-fl{display:block;white-space:nowrap}
+.dt-fl + .dt-fl{margin-top:2px}
+.dt-fl.hd{color:var(--muted);font-family:var(--sans);font-size:12.5px;font-weight:700;margin-top:6px}
+.dt-fl.hd:first-child{margin-top:0}
+.dt-fl b{font-weight:700}
+
+/* 차트 (SVG) */
+.dt-chart{width:100%;min-width:0}
+.dt-chart svg{display:block;width:100%;height:auto}
+.dt-chart svg.click{cursor:pointer}
+.dt-chart .gl{stroke:var(--line);stroke-width:1}
+.dt-chart .fr{fill:none;stroke:var(--line-strong);stroke-width:1}
+.dt-chart .ax{fill:var(--muted);font-size:11px;font-family:var(--mono)}
+.dt-chart .axl{fill:var(--muted);font-size:12px;font-family:var(--sans);font-weight:600}
+.dt-chart .lb{font-size:11.5px;font-family:var(--sans);font-weight:700;paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round}
+
+/* 트리 도식 */
+.dt-tree{min-width:0}
+.dt-tree svg{display:block;height:auto;margin:0 auto}
+.dt-tree .ed{fill:none;stroke:var(--line-strong);stroke-width:1.6}
+.dt-tree .el{font-size:11px;font-weight:700;fill:var(--muted);font-family:var(--sans);paint-order:stroke;stroke:var(--surface);stroke-width:3px}
+.dt-tree g.nd{cursor:pointer}
+.dt-tree g.nd .bx{fill:var(--surface);stroke:var(--line-strong);stroke-width:1.5}
+.dt-tree g.nd.leaf.c0 .bx{fill:color-mix(in srgb,var(--c0) 11%,var(--surface));stroke:color-mix(in srgb,var(--c0) 55%,var(--line-strong))}
+.dt-tree g.nd.leaf.c1 .bx{fill:color-mix(in srgb,var(--c1) 12%,var(--surface));stroke:color-mix(in srgb,var(--c1) 55%,var(--line-strong))}
+.dt-tree g.nd.leaf.rg .bx{fill:color-mix(in srgb,var(--pred) 9%,var(--surface));stroke:color-mix(in srgb,var(--pred) 50%,var(--line-strong))}
+.dt-tree g.nd.next .bx{stroke:var(--sk-accent);stroke-width:2.2;stroke-dasharray:6 4}
+.dt-tree g.nd.sel .bx{stroke:var(--ink);stroke-width:3;stroke-dasharray:none}
+.dt-tree g.nd:hover .bx{stroke-width:2.4}
+.dt-tree g.nd:focus{outline:none}
+.dt-tree g.nd:focus-visible .bx{stroke:var(--focus);stroke-width:3.2;stroke-dasharray:none}
+.dt-tree .h{font-size:12.5px;font-weight:700;fill:var(--ink);font-family:var(--sans)}
+.dt-tree .h.c0{fill:var(--c0)} .dt-tree .h.c1{fill:var(--c1)} .dt-tree .h.rg{fill:var(--pred)}
+.dt-tree .t{font-size:11.5px;fill:var(--text);font-family:var(--mono)}
+.dt-tree .nx{font-size:11px;font-weight:700;fill:var(--sk-accent);font-family:var(--sans)}
+.dt-tree .id{font-size:10px;fill:var(--faint);font-family:var(--mono)}
+.dt-treewrap{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:6px 4px}
+
+/* 노드 설명 */
+.dt-detail{display:flex;flex-direction:column;gap:8px;font-size:14px;min-width:0}
+.dt-detail h3{margin:0;font-size:15px}
+.dt-detail p{margin:0}
+.dt-path{font-family:var(--mono);font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+
+/* 특성 중요도 */
+.dt-imp{display:grid;grid-template-columns:70px minmax(0,1fr) 64px;gap:8px 10px;align-items:center;font-size:14px}
+.dt-imp .tr{height:20px;background:var(--surface-2);border-radius:6px;overflow:hidden}
+.dt-imp .fl{height:100%;border-radius:6px;background:var(--sk-accent)}
+.dt-imp .v{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+
+/* 표·코드 */
+.dt-cmp th:first-child,.dt-cmp td:first-child{color:var(--muted);font-weight:700}
+.dt-cmp td{white-space:normal;min-width:150px;vertical-align:top}
+.dt-cmp td.on,.dt-cmp th.on{background:color-mix(in srgb,var(--sk-accent) 9%,var(--surface))}
+.dt-cmp code{font-family:var(--mono);font-size:12.5px}
+.dt-code{margin:0;white-space:pre;max-height:460px;overflow:auto;font-size:12.5px;line-height:1.6}
+.dt-kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--ink)}
+.dt-prog{font-family:var(--mono);font-size:13.5px;color:var(--ink);font-weight:600}
+.sk-note.dt-warn{border-left-color:var(--bad);background:color-mix(in srgb,var(--bad) 7%,var(--surface))}
+
+@media (max-width:760px){
+  .dt-part{width:100%} .dt-part.sk-seg button{flex:1 1 0;min-width:0;padding:9px 12px;font-size:15.5px}
+}
+@media (max-width:520px){
+  .sk-slider{min-width:0;width:100%} .dt-sub .sk-slider{min-width:0;width:100%}
+  .dt-sides{grid-template-columns:minmax(0,1fr)}
+  .dt-imp{grid-template-columns:54px minmax(0,1fr) 54px}
+  .dt-fl{white-space:normal;overflow-wrap:anywhere}
+}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)" aria-current="page">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">의사결정나무 시뮬레이터 (분류 · 회귀)</h1>
+      <p class="ds-hero__lede">질문 하나로 데이터를 두 쪽으로 나누고, 나뉜 쪽을 또 나누는 모델이 의사결정나무입니다. 분류 트리는 지니·엔트로피 불순도를, 회귀 트리는 MSE를 가장 많이 줄이는 기준값을 고릅니다. 기준값을 직접 움직여 보고, 나무가 자라는 과정과 깊어질수록 생기는 과적합을 확인합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <div class="dt-partbar">
+    <div class="sk-seg dt-part" id="partSeg" role="group" aria-label="파트 선택">
+      <button type="button" data-part="clf" aria-pressed="true"><b>분류 트리</b><small>질환 여부 (0 / 1) 맞히기</small></button>
+      <button type="button" data-part="reg" aria-pressed="false"><b>회귀 트리</b><small>혈압 · 의료비 숫자 맞히기</small></button>
+    </div>
+    <p class="dt-partnote" id="partNote"></p>
+  </div>
+
+  <!-- ================================ 분류 트리 ================================ -->
+  <div class="dt-part-wrap" id="part-clf">
+    <nav class="sk-tabs" role="tablist" aria-label="분류 트리 실험 화면">
+      <button type="button" class="sk-tab" role="tab" id="tab-clf-split" aria-controls="pane-clf-split" aria-selected="true"><span class="sk-num">1</span>분할 하나 고르기</button>
+      <button type="button" class="sk-tab" role="tab" id="tab-clf-grow" aria-controls="pane-clf-grow" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>나무 키우기</button>
+      <button type="button" class="sk-tab" role="tab" id="tab-clf-prune" aria-controls="pane-clf-prune" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>과적합과 가지치기</button>
+    </nav>
+
+    <!-- ---------- 분류 1. 분할 하나 ---------- -->
+    <section class="dt-pane" id="pane-clf-split" role="tabpanel" aria-labelledby="tab-clf-split">
+      <div class="sk-card">
+        <div class="sk-head"><h2>기준값 하나로 나누면 얼마나 깨끗해질까</h2>
+          <div class="sk-legend"><span><i class="dt-sw circ" style="background:var(--c0)"></i>정상 (0)</span><span><i class="dt-sw dia" style="background:var(--c1)"></i>질환 (1)</span></div>
+        </div>
+        <p class="sk-lead">특성 하나와 기준값 하나를 골라 데이터를 두 쪽으로 나눕니다. 각 쪽이 한 클래스로 몰릴수록 불순도가 낮고, 부모 노드보다 줄어든 만큼이 <b>정보 이득</b>입니다. 트리는 모든 후보 기준값 중 이득이 가장 큰 것을 고릅니다.</p>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">특성</span>
+            <div class="sk-seg" id="csFeat" role="group" aria-label="나눌 특성">
+              <button type="button" data-v="0" aria-pressed="true">나이</button>
+              <button type="button" data-v="1" aria-pressed="false">BMI</button>
+            </div>
+          </div>
+          <div class="sk-group"><span class="sk-label">불순도</span>
+            <div class="sk-seg dt-crit" role="group" aria-label="불순도 기준">
+              <button type="button" data-v="gini" aria-pressed="true">지니</button>
+              <button type="button" data-v="entropy" aria-pressed="false">엔트로피</button>
+            </div>
+          </div>
+          <div class="sk-slider" style="min-width:240px">
+            <div class="sk-sl-head"><label for="csThr">기준값 (왼쪽 = 기준값 이하)</label><b id="csThrV">45</b></div>
+            <input type="range" id="csThr" min="20" max="85" step="0.5" value="45">
+          </div>
+          <button type="button" class="sk-btn sk-btn--primary" id="csBest">최적 기준값으로</button>
+        </div>
+        <div class="dt-two">
+          <div class="dt-col">
+            <canvas class="dt-cv edit" id="csCv" aria-label="나이와 BMI 산점도. 점선이 현재 기준값이고, 점을 누르면 지워지고 빈 곳을 누르면 점이 추가됩니다"></canvas>
+            <div class="dt-sub">
+              <div class="sk-group"><span class="sk-label">빈 곳을 누르면 추가</span>
+                <div class="sk-seg" id="csAdd" role="group" aria-label="추가할 점의 클래스">
+                  <button type="button" data-v="0" aria-pressed="false">정상 (0)</button>
+                  <button type="button" data-v="1" aria-pressed="true">질환 (1)</button>
+                </div>
+              </div>
+              <span>점을 누르면 삭제</span>
+            </div>
+            <div class="dt-sub">
+              <div class="sk-slider"><div class="sk-sl-head"><label for="csN">환자 수</label><b id="csNV">50</b></div><input type="range" id="csN" min="16" max="120" step="2" value="50"></div>
+              <button type="button" class="sk-btn sk-btn--sm" id="csNew">다른 데이터</button>
+              <button type="button" class="sk-btn sk-btn--sm" id="csReset">처음 데이터</button>
+              <span class="sk-mono" id="csSeed">seed 1</span>
+            </div>
+          </div>
+          <div class="dt-col">
+            <div class="dt-sides" id="csSides"></div>
+            <div class="sk-formula" id="csFormula"></div>
+            <div class="sk-stats" id="csStats"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>모든 후보 기준값의 불순도 곡선</h2><span class="sk-hint">그래프를 누르면 그 기준값으로 이동합니다</span></div>
+        <p class="sk-lead">후보 기준값은 정렬한 값들의 <b>가운데 지점</b>입니다(scikit-learn과 같음). 곡선이 가장 낮은 곳이 가중 불순도가 가장 작은, 즉 정보 이득이 가장 큰 분할입니다.</p>
+        <div class="sk-legend"><span><i class="dt-sw ln" style="background:var(--c0)"></i>가중 평균 불순도</span><span class="t-faint"><i class="dt-sw dash" style="color:var(--faint)"></i>부모 불순도</span><span><i class="dt-sw circ" style="background:var(--ok)"></i>최적 기준값</span><span><i class="dt-sw ln" style="background:var(--ink)"></i>현재 기준값</span></div>
+        <div class="dt-chart" id="csChart"></div>
+        <p class="sk-note" id="csNote"></p>
+      </div>
+    </section>
+
+    <!-- ---------- 분류 2. 나무 키우기 ---------- -->
+    <section class="dt-pane" id="pane-clf-grow" role="tabpanel" aria-labelledby="tab-clf-grow" hidden>
+      <div class="sk-card">
+        <div class="sk-head"><h2>한 번에 한 노드씩 나누며 나무 키우기</h2><span class="sk-hint">키보드 <span class="dt-kbd">→</span> 다음 분할 · <span class="dt-kbd">←</span> 이전</span></div>
+        <p class="sk-lead">1번 화면의 방법(모든 특성 × 모든 기준값 중 최적)을 잎마다 다시 적용합니다. 영역이 사각형으로 쪼개지고, 멈춤 조건(최대 깊이, 최소 샘플 수, 순수한 노드)에 걸리면 더 나누지 않습니다. 데이터는 1번 화면과 같습니다.</p>
+        <div class="sk-controls">
+          <div class="sk-group">
+            <button type="button" class="sk-btn sk-btn--sm" id="cgFirst">처음</button>
+            <button type="button" class="sk-btn sk-btn--sm" id="cgPrev">이전</button>
+            <button type="button" class="sk-btn sk-btn--sm" id="cgNext">다음 분할</button>
+            <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="cgPlay">재생</button>
+            <span class="dt-prog" id="cgProg">분할 0 / 0</span>
+          </div>
+          <div class="sk-slider" style="min-width:140px"><div class="sk-sl-head"><label for="cgSpeed">속도</label><b id="cgSpeedV">1×</b></div><input type="range" id="cgSpeed" min="0" max="3" step="1" value="1"></div>
+          <div class="sk-group"><span class="sk-label">불순도</span>
+            <div class="sk-seg dt-crit" role="group" aria-label="불순도 기준">
+              <button type="button" data-v="gini" aria-pressed="true">지니</button>
+              <button type="button" data-v="entropy" aria-pressed="false">엔트로피</button>
+            </div>
+          </div>
+        </div>
+        <div class="sk-controls">
+          <div class="sk-slider"><div class="sk-sl-head"><label for="cgDepth">max_depth</label><b id="cgDepthV">3</b></div><input type="range" id="cgDepth" min="1" max="8" step="1" value="3"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><label for="cgMinSplit">min_samples_split</label><b id="cgMinSplitV">2</b></div><input type="range" id="cgMinSplit" min="2" max="40" step="1" value="2"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><label for="cgMinLeaf">min_samples_leaf</label><b id="cgMinLeafV">1</b></div><input type="range" id="cgMinLeaf" min="1" max="20" step="1" value="1"></div>
+        </div>
+        <div class="dt-two">
+          <div class="dt-col">
+            <canvas class="dt-cv pick" id="cgCv" aria-label="트리가 나눈 사각형 영역과 환자 점. 영역을 누르면 그 잎 노드를 선택합니다"></canvas>
+            <div class="sk-legend"><span><i class="dt-sw" style="background:color-mix(in srgb,var(--c0) 30%,var(--surface))"></i>정상으로 예측하는 영역</span><span><i class="dt-sw" style="background:color-mix(in srgb,var(--c1) 30%,var(--surface))"></i>질환으로 예측하는 영역</span><span style="color:var(--sk-accent)"><i class="dt-sw dash"></i>다음 분할 위치</span></div>
+          </div>
+          <div class="dt-col">
+            <div class="sk-stats" id="cgStats"></div>
+            <div class="sk-card sk-card--sunk dt-detail" id="cgDetail"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>트리 도식</h2><span class="sk-hint">노드를 누르면 그 노드의 영역이 강조됩니다 · 왼쪽 가지 = 조건 참(예)</span></div>
+        <div class="sk-scroll dt-treewrap"><div class="dt-tree" id="cgTree"></div></div>
+      </div>
+    </section>
+
+    <!-- ---------- 분류 3. 과적합과 가지치기 ---------- -->
+    <section class="dt-pane" id="pane-clf-prune" role="tabpanel" aria-labelledby="tab-clf-prune" hidden>
+      <div class="sk-card">
+        <div class="sk-head"><h2>깊이를 키우면 학습 정확도는 오르지만 검증 정확도는?</h2>
+          <div class="sk-legend"><span class="t-tr"><i class="dt-sw ln" style="background:var(--tr)"></i>학습</span><span class="t-va"><i class="dt-sw ln" style="background:var(--va)"></i>검증</span><span class="t-ok"><i class="dt-sw circ" style="background:var(--ok)"></i>검증 최고</span></div>
+        </div>
+        <p class="sk-lead">라벨 잡음이 섞인 환자 데이터를 학습 70% · 검증 30%로 나누고 max_depth 1~12마다 트리를 새로 학습합니다. 깊이 제한(max_depth)과 잎 최소 샘플(min_samples_leaf)은 나무가 너무 자라기 전에 멈추게 하는 <b>사전 가지치기</b>입니다.</p>
+        <div class="sk-controls">
+          <div class="sk-slider"><div class="sk-sl-head"><label for="cpDepth">보고 있는 깊이 (max_depth)</label><b id="cpDepthV">4</b></div><input type="range" id="cpDepth" min="1" max="12" step="1" value="4"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><label for="cpMinLeaf">min_samples_leaf</label><b id="cpMinLeafV">1</b></div><input type="range" id="cpMinLeaf" min="1" max="20" step="1" value="1"></div>
+          <div class="sk-group"><span class="sk-label">불순도</span>
+            <div class="sk-seg dt-crit" role="group" aria-label="불순도 기준">
+              <button type="button" data-v="gini" aria-pressed="true">지니</button>
+              <button type="button" data-v="entropy" aria-pressed="false">엔트로피</button>
+            </div>
+          </div>
+          <button type="button" class="sk-btn sk-btn--sm" id="cpBest">검증 최고 깊이로</button>
+        </div>
+        <div class="sk-controls">
+          <div class="sk-slider"><div class="sk-sl-head"><label for="cpN">환자 수</label><b id="cpNV">160</b></div><input type="range" id="cpN" min="60" max="300" step="10" value="160"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><label for="cpNoise">라벨 잡음</label><b id="cpNoiseV">12%</b></div><input type="range" id="cpNoise" min="0" max="30" step="1" value="12"></div>
+          <button type="button" class="sk-btn sk-btn--sm" id="cpNew">다른 데이터</button>
+          <span class="sk-mono" id="cpSeed">seed 3</span>
+          <label class="sk-check"><input type="checkbox" id="cpShowVa" checked>검증 점 보기</label>
+        </div>
+        <div class="dt-two">
+          <div class="dt-col">
+            <h3>max_depth에 따른 정확도</h3>
+            <div class="dt-chart" id="cpChart"></div>
+            <div class="sk-stats" id="cpStats"></div>
+          </div>
+          <div class="dt-col">
+            <h3 id="cpCvTitle">깊이 4 트리의 결정 경계</h3>
+            <canvas class="dt-cv" id="cpCv" aria-label="선택한 깊이의 트리가 만든 결정 경계와 학습·검증 점"></canvas>
+            <div class="sk-legend"><span><i class="dt-sw circ" style="background:var(--c0)"></i>정상 · 학습</span><span><i class="dt-sw dia" style="background:var(--c1)"></i>질환 · 학습</span><span><i class="dt-sw ring" style="color:var(--muted)"></i>테두리만 = 검증</span></div>
+          </div>
+        </div>
+        <p class="sk-note" id="cpNote"></p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>특성 중요도 (불순도 감소의 합)</h2><span class="sk-hint" id="cpImpHint">깊이 4 트리 기준</span></div>
+        <div class="sk-formula">중요도(특성) = Σ<sub>그 특성으로 나눈 노드 t</sub> (N<sub>t</sub>/N) × [ I(t) − (N<sub>L</sub>/N<sub>t</sub>)·I(L) − (N<sub>R</sub>/N<sub>t</sub>)·I(R) ]  → 합이 1이 되도록 나눔</div>
+        <div class="dt-two">
+          <div class="dt-imp" id="cpImp"></div>
+          <div class="sk-scroll"><table class="sk-table" id="cpImpTable"></table></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================================ 회귀 트리 ================================ -->
+  <div class="dt-part-wrap" id="part-reg" hidden>
+    <nav class="sk-tabs" role="tablist" aria-label="회귀 트리 실험 화면">
+      <button type="button" class="sk-tab" role="tab" id="tab-reg-split" aria-controls="pane-reg-split" aria-selected="true"><span class="sk-num">1</span>분할 하나 고르기</button>
+      <button type="button" class="sk-tab" role="tab" id="tab-reg-grow" aria-controls="pane-reg-grow" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>나무 키우기</button>
+      <button type="button" class="sk-tab" role="tab" id="tab-reg-over" aria-controls="pane-reg-over" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>과적합</button>
+    </nav>
+
+    <!-- ---------- 회귀 1. 분할 하나 ---------- -->
+    <section class="dt-pane" id="pane-reg-split" role="tabpanel" aria-labelledby="tab-reg-split">
+      <div class="sk-card">
+        <div class="sk-head"><h2>기준값으로 나누고 양쪽 평균으로 예측하기</h2>
+          <div class="sk-legend"><span><i class="dt-sw circ" style="background:var(--c0)"></i>환자</span><span class="t-pred"><i class="dt-sw ln" style="background:var(--pred)"></i>양쪽 평균 = 예측값</span><span><i class="dt-sw dash" style="color:var(--faint)"></i>부모 평균</span></div>
+        </div>
+        <p class="sk-lead">회귀 트리는 잎에 든 값의 <b>평균</b>으로 예측합니다. 좋은 분할은 양쪽 평균 주변으로 점이 모이는 분할, 즉 <b>MSE(분산)를 가장 많이 줄이는</b> 분할입니다.</p>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">예측할 값</span>
+            <div class="sk-seg dt-target" role="group" aria-label="목표 변수">
+              <button type="button" data-v="sbp" aria-pressed="true">수축기 혈압</button>
+              <button type="button" data-v="cost" aria-pressed="false">연간 의료비</button>
+            </div>
+          </div>
+          <div class="sk-slider" style="min-width:240px">
+            <div class="sk-sl-head"><label for="rsThr">나이 기준값 (왼쪽 = 이하)</label><b id="rsThrV">40</b></div>
+            <input type="range" id="rsThr" min="18" max="82" step="0.5" value="40">
+          </div>
+          <button type="button" class="sk-btn sk-btn--primary" id="rsBest">최적 기준값으로</button>
+          <label class="sk-check"><input type="checkbox" id="rsRes" checked>잔차(오차) 선 보기</label>
+        </div>
+        <div class="dt-two">
+          <div class="dt-col">
+            <canvas class="dt-cv edit" id="rsCv" aria-label="나이에 따른 목표값 산점도와 양쪽 평균선. 점을 누르면 지워지고 빈 곳을 누르면 추가됩니다"></canvas>
+            <div class="dt-sub"><span>빈 곳을 누르면 점 추가 · 점을 누르면 삭제</span></div>
+            <div class="dt-sub">
+              <div class="sk-slider"><div class="sk-sl-head"><label for="rsN">환자 수</label><b id="rsNV">40</b></div><input type="range" id="rsN" min="12" max="100" step="2" value="40"></div>
+              <button type="button" class="sk-btn sk-btn--sm" id="rsNew">다른 데이터</button>
+              <button type="button" class="sk-btn sk-btn--sm" id="rsReset">처음 데이터</button>
+              <span class="sk-mono" id="rsSeed">seed 5</span>
+            </div>
+          </div>
+          <div class="dt-col">
+            <div class="dt-sides" id="rsSides"></div>
+            <div class="sk-formula" id="rsFormula"></div>
+            <div class="sk-stats" id="rsStats"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>모든 후보 기준값의 가중 MSE 곡선</h2><span class="sk-hint">그래프를 누르면 그 기준값으로 이동합니다</span></div>
+        <div class="sk-legend"><span><i class="dt-sw ln" style="background:var(--pred)"></i>가중 평균 MSE</span><span><i class="dt-sw dash" style="color:var(--faint)"></i>부모 MSE</span><span><i class="dt-sw circ" style="background:var(--ok)"></i>최적 기준값</span><span><i class="dt-sw ln" style="background:var(--ink)"></i>현재 기준값</span></div>
+        <div class="dt-chart" id="rsChart"></div>
+        <p class="sk-note" id="rsNote"></p>
+      </div>
+    </section>
+
+    <!-- ---------- 회귀 2. 나무 키우기 ---------- -->
+    <section class="dt-pane" id="pane-reg-grow" role="tabpanel" aria-labelledby="tab-reg-grow" hidden>
+      <div class="sk-card">
+        <div class="sk-head"><h2>분할이 늘수록 예측선이 계단이 된다</h2><span class="sk-hint">키보드 <span class="dt-kbd">→</span> 다음 분할 · <span class="dt-kbd">←</span> 이전</span></div>
+        <p class="sk-lead">잎마다 가중 MSE가 가장 작아지는 기준값을 찾아 나눕니다. 잎 하나가 구간 하나, 잎의 평균이 그 구간의 예측값이므로 예측선은 <b>계단 함수</b>가 됩니다. 데이터는 1번 화면과 같습니다.</p>
+        <div class="sk-controls">
+          <div class="sk-group">
+            <button type="button" class="sk-btn sk-btn--sm" id="rgFirst">처음</button>
+            <button type="button" class="sk-btn sk-btn--sm" id="rgPrev">이전</button>
+            <button type="button" class="sk-btn sk-btn--sm" id="rgNext">다음 분할</button>
+            <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="rgPlay">재생</button>
+            <span class="dt-prog" id="rgProg">분할 0 / 0</span>
+          </div>
+          <div class="sk-slider" style="min-width:140px"><div class="sk-sl-head"><label for="rgSpeed">속도</label><b id="rgSpeedV">1×</b></div><input type="range" id="rgSpeed" min="0" max="3" step="1" value="1"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><label for="rgDepth">max_depth</label><b id="rgDepthV">3</b></div><input type="range" id="rgDepth" min="1" max="8" step="1" value="3"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><label for="rgMinLeaf">min_samples_leaf</label><b id="rgMinLeafV">1</b></div><input type="range" id="rgMinLeaf" min="1" max="15" step="1" value="1"></div>
+        </div>
+        <div class="dt-two">
+          <div class="dt-col">
+            <canvas class="dt-cv pick" id="rgCv" aria-label="회귀 트리의 계단 모양 예측선과 환자 점. 구간을 누르면 그 잎 노드를 선택합니다"></canvas>
+            <div class="sk-legend"><span class="t-pred"><i class="dt-sw ln" style="background:var(--pred)"></i>예측선 (잎의 평균)</span><span style="color:var(--sk-accent)"><i class="dt-sw dash"></i>다음 분할 위치</span></div>
+          </div>
+          <div class="dt-col">
+            <div class="sk-stats" id="rgStats"></div>
+            <div class="sk-card sk-card--sunk dt-detail" id="rgDetail"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>트리 도식</h2><span class="sk-hint">노드를 누르면 그 구간이 강조됩니다 · 왼쪽 가지 = 조건 참(예)</span></div>
+        <div class="sk-scroll dt-treewrap"><div class="dt-tree" id="rgTree"></div></div>
+      </div>
+    </section>
+
+    <!-- ---------- 회귀 3. 과적합 ---------- -->
+    <section class="dt-pane" id="pane-reg-over" role="tabpanel" aria-labelledby="tab-reg-over" hidden>
+      <div class="sk-card">
+        <div class="sk-head"><h2>깊을수록 점 하나하나를 따라가는 계단</h2>
+          <div class="sk-legend"><span class="t-tr"><i class="dt-sw ln" style="background:var(--tr)"></i>학습</span><span class="t-va"><i class="dt-sw ln" style="background:var(--va)"></i>검증</span><span class="t-ok"><i class="dt-sw circ" style="background:var(--ok)"></i>검증 최저</span><span class="t-pur"><i class="dt-sw dash"></i>선형회귀 (굵은 점선 검증 · 가는 점선 학습)</span></div>
+        </div>
+        <p class="sk-lead">환자 데이터를 학습 70% · 검증 30%로 나누고 max_depth 1~12마다 회귀 트리를 학습합니다. 깊어질수록 학습 MSE는 0을 향해 가지만 검증 MSE는 어느 순간부터 다시 커집니다. 직선 하나로 맞춘 선형회귀와도 비교해 보세요.</p>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">예측할 값</span>
+            <div class="sk-seg dt-target" role="group" aria-label="목표 변수">
+              <button type="button" data-v="sbp" aria-pressed="true">수축기 혈압</button>
+              <button type="button" data-v="cost" aria-pressed="false">연간 의료비</button>
+            </div>
+          </div>
+          <div class="sk-slider"><div class="sk-sl-head"><label for="roDepth">보고 있는 깊이 (max_depth)</label><b id="roDepthV">3</b></div><input type="range" id="roDepth" min="1" max="12" step="1" value="3"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><label for="roMinLeaf">min_samples_leaf</label><b id="roMinLeafV">1</b></div><input type="range" id="roMinLeaf" min="1" max="20" step="1" value="1"></div>
+          <button type="button" class="sk-btn sk-btn--sm" id="roBest">검증 최저 깊이로</button>
+          <label class="sk-check"><input type="checkbox" id="roLin" checked>선형회귀와 비교</label>
+        </div>
+        <div class="sk-controls">
+          <div class="sk-slider"><div class="sk-sl-head"><label for="roN">환자 수</label><b id="roNV">120</b></div><input type="range" id="roN" min="40" max="300" step="10" value="120"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><label for="roNoise">잡음 크기</label><b id="roNoiseV">1.0×</b></div><input type="range" id="roNoise" min="0.2" max="2.5" step="0.1" value="1"></div>
+          <button type="button" class="sk-btn sk-btn--sm" id="roNew">다른 데이터</button>
+          <span class="sk-mono" id="roSeed">seed 11</span>
+        </div>
+        <div class="dt-two">
+          <div class="dt-col">
+            <h3>max_depth에 따른 MSE</h3>
+            <div class="dt-chart" id="roChart"></div>
+            <div class="sk-stats" id="roStats"></div>
+          </div>
+          <div class="dt-col">
+            <h3 id="roCvTitle">깊이 3 트리의 예측선</h3>
+            <canvas class="dt-cv" id="roCv" aria-label="선택한 깊이의 회귀 트리 예측선, 선형회귀선, 학습·검증 점"></canvas>
+            <div class="sk-legend"><span><i class="dt-sw circ" style="background:var(--tr)"></i>학습 점</span><span class="t-va"><i class="dt-sw ring"></i>검증 점</span><span class="t-pred"><i class="dt-sw ln" style="background:var(--pred)"></i>트리 예측</span><span class="t-pur"><i class="dt-sw dash"></i>선형회귀</span></div>
+          </div>
+        </div>
+        <p class="sk-note" id="roNote"></p>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================================ 공통 ================================ -->
+  <div class="sk-card">
+    <div class="sk-head"><h2>분류 트리 vs 회귀 트리</h2><span class="sk-hint">나누는 방법(이진 분할, 탐욕적 탐색)은 같고, 잎의 예측값과 분할 기준만 다릅니다</span></div>
+    <div class="sk-scroll">
+      <table class="sk-table dt-cmp" id="cmpTable">
+        <thead><tr><th>구분</th><th data-col="clf">분류 트리</th><th data-col="reg">회귀 트리</th></tr></thead>
+        <tbody>
+          <tr><td>맞히는 값</td><td data-col="clf">범주 (질환 여부 0 / 1)</td><td data-col="reg">숫자 (수축기 혈압, 연간 의료비)</td></tr>
+          <tr><td>잎의 예측값</td><td data-col="clf">잎에 든 샘플의 <b>다수 클래스</b> (확률 = 클래스 비율)</td><td data-col="reg">잎에 든 샘플의 <b>평균</b></td></tr>
+          <tr><td>분할 기준</td><td data-col="clf">지니 <code>1 − Σp²</code> 또는 엔트로피 <code>−Σp·log₂p</code></td><td data-col="reg">MSE(분산) <code>(1/n)·Σ(y − ȳ)²</code></td></tr>
+          <tr><td>좋은 분할</td><td data-col="clf">정보 이득 = 부모 불순도 − 가중 자식 불순도 가 최대</td><td data-col="reg">MSE 감소 = 부모 MSE − 가중 자식 MSE 가 최대</td></tr>
+          <tr><td>예측의 모양</td><td data-col="clf">축에 평행한 사각형 영역</td><td data-col="reg">계단 함수</td></tr>
+          <tr><td>평가 지표</td><td data-col="clf">정확도 (정밀도 · 재현율 · F1)</td><td data-col="reg">MSE · RMSE · R²</td></tr>
+          <tr><td>과적합 신호</td><td data-col="clf">학습 정확도 1.0, 검증 정확도 하락</td><td data-col="reg">학습 MSE → 0, 검증 MSE 상승</td></tr>
+          <tr><td>scikit-learn</td><td data-col="clf"><code>DecisionTreeClassifier(criterion="gini" | "entropy")</code></td><td data-col="reg"><code>DecisionTreeRegressor(criterion="squared_error")</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="sk-card">
+    <div class="sk-head"><h2 id="codeTitle">scikit-learn 코드</h2>
+      <div class="sk-group">
+        <label class="sk-check"><input type="checkbox" id="codeData" checked>현재 데이터 포함</label>
+        <button type="button" class="sk-btn sk-btn--sm" id="codeCopy">복사</button>
+      </div>
+    </div>
+    <p class="sk-lead" id="codeLead">지금 보고 있는 화면의 설정(criterion, max_depth, min_samples_split, min_samples_leaf)을 그대로 반영합니다. 데이터를 포함하면 화면과 같은 숫자가 나옵니다.</p>
+    <pre class="sk-formula dt-code" id="codePre"></pre>
+  </div>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20260930c"></script>
+<script>
+(function () {
+"use strict";
+const $ = id => document.getElementById(id);
+const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ------------------------------------------------------------------ 공통 도구 */
+function css(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function colors(){
+  const C = {};
+  [["surface","--surface"],["surface2","--surface-2"],["bg","--bg"],["ink","--ink"],["text","--text"],["muted","--muted"],["faint","--faint"],
+   ["line","--line"],["lineStrong","--line-strong"],["c0","--c0"],["c1","--c1"],["tr","--tr"],["va","--va"],["pur","--pur"],["bad","--bad"],
+   ["ok","--ok"],["pred","--pred"],["accent","--cat-ml"]].forEach(([k,v]) => C[k] = css(v));
+  C.mono = css("--mono"); C.sans = css("--sans");
+  return C;
+}
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function gauss(r){ let u=0; while(!u) u=r(); const v=r(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+function fx(v,d){ if(!Number.isFinite(v)) return "–"; let s=v.toFixed(d); if(/^-0\.?0*$/.test(s)) s=s.slice(1); return s.replace("-","−"); }
+const f1=v=>fx(v,1), f2=v=>fx(v,2), f3=v=>fx(v,3), f4=v=>fx(v,4);
+const fT = t => String(+t.toFixed(2));
+const pct = v => (v*100).toFixed(1)+"%";
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+function niceTicks(lo,hi,n){
+  const span=hi-lo; if(span<=0) return [lo];
+  const s0=span/n, mag=Math.pow(10,Math.floor(Math.log10(s0))), e=s0/mag;
+  const step=(e<1.5?1:e<3?2:e<7?5:10)*mag, out=[];
+  for(let v=Math.ceil(lo/step-1e-9)*step; v<=hi+1e-9; v+=step) out.push(+v.toFixed(10));
+  return out;
+}
+const tickTxt = v => Math.abs(v) >= 1000 ? String(Math.round(v)) : String(+v.toFixed(3));
+function fitCanvas(cv){
+  const dpr=window.devicePixelRatio||1, w=Math.max(40,cv.clientWidth), h=Math.max(40,cv.clientHeight||w*0.75);
+  cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr);
+  const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); return {ctx,w,h};
+}
+
+/* ------------------------------------------------------------------ 데이터 */
+const FEAT = [
+  {name:"나이", unit:"세", lo:20, hi:85, step:0.5, py:"나이"},
+  {name:"BMI",  unit:"kg/m²", lo:15, hi:40, step:0.05, py:"BMI"}
+];
+const CLF_BOX = [[20,85],[15,40]];
+const TGT = {
+  sbp:  {name:"수축기 혈압", unit:"mmHg", short:"혈압", dec:1},
+  cost: {name:"연간 의료비", unit:"만원", short:"의료비", dec:0}
+};
+const REG_XR = [18,82];
+
+function genClf(seed,n,noise){
+  const r=mulberry32(seed*7919+13), X=[], y=[];
+  for(let i=0;i<n;i++){
+    const age=Math.round(25+r()*54);
+    const bmi=Math.round(clamp(26+gauss(r)*4.4,17,38)*10)/10;
+    let lab=((age>=52&&bmi>=25.5)||bmi>=31.5)?1:0;
+    if(r()<noise) lab=1-lab;
+    X.push([age,bmi]); y.push(lab);
+  }
+  return {X,y};
+}
+function regTrue(age,tg){
+  if(tg==="sbp"){ const b=age<35?112:age<50?121:age<65?134:147; return b+0.12*(age-50); }
+  return age<40?45:age<55?95:age<68?170:290;
+}
+function genReg(seed,n,tg,noise){
+  const r=mulberry32(seed*104729+(tg==="sbp"?3:71)), X=[], y=[];
+  for(let i=0;i<n;i++){
+    const age=Math.round(20+r()*60); let v;
+    if(tg==="sbp") v=Math.round((regTrue(age,tg)+gauss(r)*5*noise)*10)/10;
+    else v=Math.max(5,Math.round(regTrue(age,tg)*(1+0.2*noise*gauss(r))+8*noise*gauss(r)));
+    X.push([age]); y.push(v);
+  }
+  return {X,y};
+}
+function splitTV(n,seed){
+  const r=mulberry32(seed*31+7), idx=[...Array(n).keys()];
+  for(let i=n-1;i>0;i--){ const j=Math.floor(r()*(i+1)); [idx[i],idx[j]]=[idx[j],idx[i]]; }
+  const nv=Math.round(n*0.3);
+  return {va:idx.slice(0,nv).sort((a,b)=>a-b), tr:idx.slice(nv).sort((a,b)=>a-b)};
+}
+function regYR(tg,ys){
+  const mn=Math.min(...ys), mx=Math.max(...ys);
+  if(tg==="sbp") return [Math.min(95,Math.floor(mn/5)*5-5), Math.max(170,Math.ceil(mx/5)*5+5)];
+  return [0, Math.max(450,Math.ceil(mx/50)*50+50)];
+}
+
+/* ------------------------------------------------------------------ 트리 계산 (CART) */
+function impC(c0,c1,crit){
+  const n=c0+c1; if(!n) return 0;
+  const p0=c0/n, p1=c1/n;
+  if(crit==="gini") return 1-p0*p0-p1*p1;
+  let s=0; if(p0>0) s-=p0*Math.log2(p0); if(p1>0) s-=p1*Math.log2(p1); return s;
+}
+function stats(task,crit,y,idx){
+  const n=idx.length;
+  if(task==="clf"){ let c1=0; for(const i of idx) c1+=y[i]; const c0=n-c1; return {n,c:[c0,c1],imp:impC(c0,c1,crit),pred:c1>c0?1:0}; }
+  let m=0; for(const i of idx) m+=y[i]; m=n?m/n:0;
+  let q=0; for(const i of idx) q+=(y[i]-m)*(y[i]-m);
+  return {n,mean:m,sse:q,imp:n?q/n:0,pred:m};
+}
+function mid(a,b){ let t=(a+b)/2; if(t===b) t=a; return t; }
+/* 한 특성의 모든 후보 기준값(정렬된 서로 다른 값의 가운데)을 훑으며 가중 불순도 계산 */
+function scan(task,crit,X,y,idx,f,minLeaf){
+  const n=idx.length, s=idx.slice().sort((a,b)=>X[a][f]-X[b][f]||a-b), out=[];
+  if(task==="clf"){
+    let T1=0; for(const i of s) T1+=y[i]; const T0=n-T1; let L0=0,L1=0;
+    for(let k=0;k<n-1;k++){
+      if(y[s[k]]) L1++; else L0++;
+      const xa=X[s[k]][f], xb=X[s[k+1]][f]; if(xb-xa<=1e-7) continue;
+      const nL=k+1, nR=n-nL, iL=impC(L0,L1,crit), iR=impC(T0-L0,T1-L1,crit);
+      out.push({f,t:mid(xa,xb),xa,xb,nL,nR,iL,iR,w:(nL*iL+nR*iR)/n,ok:nL>=minLeaf&&nR>=minLeaf});
+    }
+  } else {
+    let T=0,TQ=0; for(const i of s){ T+=y[i]; TQ+=y[i]*y[i]; } let sL=0,qL=0;
+    for(let k=0;k<n-1;k++){
+      const v=y[s[k]]; sL+=v; qL+=v*v;
+      const xa=X[s[k]][f], xb=X[s[k+1]][f]; if(xb-xa<=1e-7) continue;
+      const nL=k+1, nR=n-nL, mL=sL/nL, mR=(T-sL)/nR;
+      const iL=Math.max(0,qL/nL-mL*mL), iR=Math.max(0,(TQ-qL)/nR-mR*mR);
+      out.push({f,t:mid(xa,xb),xa,xb,nL,nR,iL,iR,w:(nL*iL+nR*iR)/n,ok:nL>=minLeaf&&nR>=minLeaf});
+    }
+  }
+  return out;
+}
+function bestSplit(task,crit,X,y,idx,minLeaf,feats){
+  let best=null;
+  for(const f of feats) for(const c of scan(task,crit,X,y,idx,f,minLeaf)) if(c.ok&&(!best||c.w<best.w-1e-12)) best=c;
+  return best;
+}
+function partition(task,crit,X,y,idx,f,t){
+  const L=[],R=[]; idx.forEach(i=>(X[i][f]<=t?L:R).push(i));
+  const P=stats(task,crit,y,idx), SL=stats(task,crit,y,L), SR=stats(task,crit,y,R);
+  const n=idx.length, w=n?(SL.n*SL.imp+SR.n*SR.imp)/n:0;
+  return {P,L:SL,R:SR,Li:L,Ri:R,w,gain:P.imp-w};
+}
+/* 너비 우선으로 키움: order = 몇 번째 분할인지 */
+function grow(task,crit,X,y,idx,o){
+  const nodes=[];
+  const mk=(ix,depth,parent,box,side)=>{ const nd=Object.assign({id:nodes.length,idx:ix,depth,parent,box,side,left:null,right:null,order:Infinity},stats(task,crit,y,ix)); nodes.push(nd); return nd; };
+  const q=[mk(idx,0,null,o.box,null)]; let order=0;
+  while(q.length){
+    const nd=q.shift();
+    if(nd.depth>=o.maxDepth){ nd.stop="최대 깊이(max_depth)에 도달"; continue; }
+    if(nd.imp<=1e-12){ nd.stop=task==="clf"?"한 클래스만 남은 순수한 노드":"값이 모두 같아 MSE가 0"; continue; }
+    if(nd.n<o.minSplit){ nd.stop=`샘플 ${nd.n}개 < min_samples_split ${o.minSplit}`; continue; }
+    if(nd.n<2*o.minLeaf){ nd.stop=`샘플 ${nd.n}개 < 2 × min_samples_leaf ${o.minLeaf}`; continue; }
+    const sp=bestSplit(task,crit,X,y,nd.idx,o.minLeaf,o.feats);
+    if(!sp){ nd.stop="조건을 만족하는 기준값이 없음"; continue; }
+    nd.f=sp.f; nd.t=sp.t; nd.w=sp.w; nd.order=order++;
+    const L=[],R=[]; nd.idx.forEach(i=>(X[i][sp.f]<=sp.t?L:R).push(i));
+    const bl=nd.box.map(a=>a.slice()), br=nd.box.map(a=>a.slice()); bl[sp.f][1]=sp.t; br[sp.f][0]=sp.t;
+    const l=mk(L,nd.depth+1,nd.id,bl,"L"), r=mk(R,nd.depth+1,nd.id,br,"R");
+    nd.left=l.id; nd.right=r.id; q.push(l,r);
+  }
+  nodes.splits=order; nodes.N=idx.length;
+  return nodes;
+}
+const isLeafAt = (nd,k) => nd.left==null || nd.order>=k;
+function leafOf(T,x,k){ let nd=T[0]; while(!isLeafAt(nd,k)) nd=T[x[nd.f]<=nd.t?nd.left:nd.right]; return nd; }
+function visibleNodes(T,k){ const out=[]; (function w(id){ const nd=T[id]; out.push(nd); if(!isLeafAt(nd,k)){ w(nd.left); w(nd.right); } })(0); return out; }
+function maxDepthAt(T,k){ return Math.max(...visibleNodes(T,k).map(n=>n.depth)); }
+function accuracy(T,X,y,idx,k){ if(!idx.length) return NaN; let ok=0; for(const i of idx) if(leafOf(T,X[i],k).pred===y[i]) ok++; return ok/idx.length; }
+function mseOn(T,X,y,idx,k){ let s=0; for(const i of idx){ const d=y[i]-leafOf(T,X[i],k).pred; s+=d*d; } return s/idx.length; }
+function r2(ssePerN,y,idx){ let m=0; for(const i of idx) m+=y[i]; m/=idx.length; let q=0; for(const i of idx) q+=(y[i]-m)*(y[i]-m); q/=idx.length; return q>0?1-ssePerN/q:NaN; }
+function importances(T){
+  const imp=[0,0], rows=[];
+  T.forEach(nd=>{ if(nd.left==null) return; const L=T[nd.left],R=T[nd.right];
+    const c=(nd.n*nd.imp-L.n*L.imp-R.n*R.imp)/T.N; imp[nd.f]+=c; rows.push({nd,L,R,c}); });
+  const tot=imp[0]+imp[1];
+  return {raw:imp, norm:tot>0?imp.map(v=>v/tot):[0,0], rows};
+}
+function ols(X,y,idx){
+  let mx=0,my=0; for(const i of idx){ mx+=X[i][0]; my+=y[i]; } mx/=idx.length; my/=idx.length;
+  let sxy=0,sxx=0; for(const i of idx){ sxy+=(X[i][0]-mx)*(y[i]-my); sxx+=(X[i][0]-mx)**2; }
+  const b=sxx>0?sxy/sxx:0; return {b, a:my-b*mx};
+}
+
+/* ------------------------------------------------------------------ 상태 */
+const CLF_DEF={seed:1,n:50}, REG_DEF={seed:5,n:40};
+const S = {
+  part:"clf", tab:{clf:"split",reg:"split"}, crit:"gini",
+  cd:{seed:CLF_DEF.seed,n:CLF_DEF.n,X:[],y:[],add:1,feat:0,thr:[45,27]},
+  cg:{maxDepth:3,minSplit:2,minLeaf:1,step:1,sel:null},
+  cp:{seed:3,n:160,noise:0.12,minLeaf:1,depth:4,showVa:true},
+  rd:{target:"sbp",seed:REG_DEF.seed,n:REG_DEF.n,X:[],y:[],thr:40,showRes:true},
+  rg:{maxDepth:3,minLeaf:1,step:1,sel:null},
+  ro:{seed:11,n:120,noise:1,minLeaf:1,depth:3,showLin:true},
+  codeData:true
+};
+function loadClf(){ const d=genClf(S.cd.seed,S.cd.n,0.1); S.cd.X=d.X; S.cd.y=d.y; }
+function loadReg(){ const d=genReg(S.rd.seed,S.rd.n,S.rd.target,1); S.rd.X=d.X; S.rd.y=d.y; }
+loadClf(); loadReg();
+
+let cacheCP=null, cacheRO=null;
+function cpData(){
+  const key=[S.cp.seed,S.cp.n,S.cp.noise,S.crit,S.cp.minLeaf].join("|");
+  if(cacheCP&&cacheCP.key===key) return cacheCP;
+  const d=genClf(S.cp.seed*13+1,S.cp.n,S.cp.noise), sp=splitTV(S.cp.n,S.cp.seed);
+  const res=[];
+  for(let dep=1;dep<=12;dep++){
+    const T=grow("clf",S.crit,d.X,d.y,sp.tr,{maxDepth:dep,minSplit:2,minLeaf:S.cp.minLeaf,feats:[0,1],box:CLF_BOX});
+    res.push({dep,T,tr:accuracy(T,d.X,d.y,sp.tr,Infinity),va:accuracy(T,d.X,d.y,sp.va,Infinity),leaves:T.filter(n=>n.left==null).length,real:maxDepthAt(T,Infinity)});
+  }
+  let best=0; res.forEach((r,i)=>{ if(r.va>res[best].va+1e-12) best=i; });
+  cacheCP={key,X:d.X,y:d.y,tr:sp.tr,va:sp.va,res,best:best+1};
+  return cacheCP;
+}
+function roData(){
+  const key=[S.ro.seed,S.ro.n,S.ro.noise,S.rd.target,S.ro.minLeaf].join("|");
+  if(cacheRO&&cacheRO.key===key) return cacheRO;
+  const d=genReg(S.ro.seed*17+5,S.ro.n,S.rd.target,S.ro.noise), sp=splitTV(S.ro.n,S.ro.seed);
+  const res=[];
+  for(let dep=1;dep<=12;dep++){
+    const T=grow("reg","mse",d.X,d.y,sp.tr,{maxDepth:dep,minSplit:2,minLeaf:S.ro.minLeaf,feats:[0],box:[REG_XR]});
+    const tr=mseOn(T,d.X,d.y,sp.tr,Infinity), va=mseOn(T,d.X,d.y,sp.va,Infinity);
+    res.push({dep,T,tr,va,trR2:r2(tr,d.y,sp.tr),vaR2:r2(va,d.y,sp.va),leaves:T.filter(n=>n.left==null).length,real:maxDepthAt(T,Infinity)});
+  }
+  let best=0; res.forEach((r,i)=>{ if(r.va<res[best].va-1e-9) best=i; });
+  const L=ols(d.X,d.y,sp.tr);
+  const lmse=idx=>{ let s=0; for(const i of idx){ const e=d.y[i]-(L.a+L.b*d.X[i][0]); s+=e*e; } return s/idx.length; };
+  const lin={...L,tr:lmse(sp.tr),va:lmse(sp.va)}; lin.trR2=r2(lin.tr,d.y,sp.tr); lin.vaR2=r2(lin.va,d.y,sp.va);
+  cacheRO={key,X:d.X,y:d.y,tr:sp.tr,va:sp.va,res,best:best+1,lin,yr:regYR(S.rd.target,d.y)};
+  return cacheRO;
+}
+let cacheCG=null, cacheRG=null;
+function cgTree(){
+  const d=S.cd, key=[S.crit,S.cg.maxDepth,S.cg.minSplit,S.cg.minLeaf,d.X.length,JSON.stringify(d.X),d.y.join("")].join("|");
+  if(cacheCG&&cacheCG.key===key) return cacheCG.T;
+  const T=grow("clf",S.crit,d.X,d.y,d.X.map((_,i)=>i),{maxDepth:S.cg.maxDepth,minSplit:S.cg.minSplit,minLeaf:S.cg.minLeaf,feats:[0,1],box:CLF_BOX});
+  cacheCG={key,T}; return T;
+}
+function rgTree(){
+  const d=S.rd, key=[S.rg.maxDepth,S.rg.minLeaf,JSON.stringify(d.X),d.y.join(",")].join("|");
+  if(cacheRG&&cacheRG.key===key) return cacheRG.T;
+  const T=grow("reg","mse",d.X,d.y,d.X.map((_,i)=>i),{maxDepth:S.rg.maxDepth,minSplit:2,minLeaf:S.rg.minLeaf,feats:[0],box:[REG_XR]});
+  cacheRG={key,T}; return T;
+}
+
+/* ------------------------------------------------------------------ 캔버스 그리기 */
+function view(cv,xr,yr){
+  const {ctx,w,h}=fitCanvas(cv), pad={l:w<420?42:50,r:12,t:12,b:40}, pw=w-pad.l-pad.r, ph=h-pad.t-pad.b;
+  return {cv,ctx,w,h,pad,pw,ph,xr,yr,
+    px:x=>pad.l+(x-xr[0])/(xr[1]-xr[0])*pw, py:v=>pad.t+(1-(v-yr[0])/(yr[1]-yr[0]))*ph,
+    ix:X=>xr[0]+(X-pad.l)/pw*(xr[1]-xr[0]), iy:Y=>yr[0]+(1-(Y-pad.t)/ph)*(yr[1]-yr[0])};
+}
+function axes(V,C,xl,yl){
+  const {ctx,w,h,pad,pw,ph}=V;
+  ctx.fillStyle=C.surface; ctx.fillRect(0,0,w,h);
+  ctx.lineWidth=1; ctx.strokeStyle=C.line; ctx.font="11px "+C.mono; ctx.fillStyle=C.muted;
+  niceTicks(V.xr[0],V.xr[1],w<420?5:8).forEach(v=>{ const x=Math.round(V.px(v))+.5; ctx.beginPath(); ctx.moveTo(x,pad.t); ctx.lineTo(x,pad.t+ph); ctx.stroke(); ctx.textAlign="center"; ctx.textBaseline="top"; ctx.fillText(tickTxt(v),x,pad.t+ph+5); });
+  niceTicks(V.yr[0],V.yr[1],h<300?5:6).forEach(v=>{ const y=Math.round(V.py(v))+.5; ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+pw,y); ctx.stroke(); ctx.textAlign="right"; ctx.textBaseline="middle"; ctx.fillText(tickTxt(v),pad.l-5,y); });
+  ctx.strokeStyle=C.lineStrong; ctx.strokeRect(pad.l+.5,pad.t+.5,pw-1,ph-1);
+  ctx.font="600 12px "+C.sans; ctx.fillStyle=C.muted; ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+  ctx.fillText(xl,pad.l+pw/2,h-6);
+  ctx.save(); ctx.translate(12,pad.t+ph/2); ctx.rotate(-Math.PI/2); ctx.textBaseline="middle"; ctx.fillText(yl,0,0); ctx.restore();
+}
+function clipPlot(V){ V.ctx.save(); V.ctx.beginPath(); V.ctx.rect(V.pad.l,V.pad.t,V.pw,V.ph); V.ctx.clip(); }
+function point(ctx,x,y,cls,C,o){
+  o=o||{}; const r=o.r||4.6;
+  ctx.beginPath();
+  if(cls===1){ const q=r*1.25; ctx.moveTo(x,y-q); ctx.lineTo(x+q,y); ctx.lineTo(x,y+q); ctx.lineTo(x-q,y); ctx.closePath(); }
+  else ctx.arc(x,y,r,0,Math.PI*2);
+  const col=o.color||(cls===1?C.c1:C.c0);
+  if(o.ring){ ctx.lineWidth=2; ctx.strokeStyle=col; ctx.stroke(); }
+  else { ctx.fillStyle=col; ctx.fill(); ctx.lineWidth=1.2; ctx.strokeStyle=C.surface; ctx.stroke(); }
+}
+function label(ctx,C,txt,x,y,color,align,weight){
+  ctx.font=(weight||700)+" 12px "+C.sans; ctx.textAlign=align||"left"; ctx.textBaseline="alphabetic";
+  ctx.lineWidth=4; ctx.lineJoin="round"; ctx.strokeStyle=C.surface; ctx.strokeText(txt,x,y); ctx.fillStyle=color||C.ink; ctx.fillText(txt,x,y);
+}
+function dimOutside(V,C,x0,y0,x1,y1){
+  const {ctx,pad,pw,ph}=V;
+  ctx.save(); ctx.beginPath(); ctx.rect(pad.l,pad.t,pw,ph); ctx.rect(x0,y0,x1-x0,y1-y0);
+  ctx.globalAlpha=0.62; ctx.fillStyle=C.surface; ctx.fill("evenodd"); ctx.restore();
+  ctx.lineWidth=2.5; ctx.strokeStyle=C.ink; ctx.setLineDash([]); ctx.strokeRect(x0,y0,x1-x0,y1-y0);
+}
+function nearestPoint(V,X,y,mx,my,fx0,fy0){
+  let best=-1,bd=10*10;
+  X.forEach((p,i)=>{ const dx=V.px(fx0(p,i))-mx, dy=V.py(fy0(p,i))-my, d=dx*dx+dy*dy; if(d<bd){ bd=d; best=i; } });
+  return best;
+}
+
+/* ------------------------------------------------------------------ SVG 차트 */
+function chart(el,cfg){
+  const W=Math.max(240,Math.floor(el.clientWidth||600)), H=cfg.h||(W<520?230:260);
+  const pad={l:cfg.padL||52,r:16,t:18,b:42}, pw=W-pad.l-pad.r, ph=H-pad.t-pad.b;
+  const X=v=>pad.l+(v-cfg.xr[0])/(cfg.xr[1]-cfg.xr[0])*pw, Y=v=>pad.t+(1-(v-cfg.yr[0])/(cfg.yr[1]-cfg.yr[0]))*ph;
+  const cy=v=>clamp(Y(v),pad.t,pad.t+ph);
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${cfg.aria}">`;
+  (cfg.bands||[]).forEach(b=>{ const x0=X(b.x0),x1=X(b.x1); if(x1<=x0) return; s+=`<rect x="${x0}" y="${pad.t}" width="${x1-x0}" height="${ph}" style="fill:${b.color};opacity:${b.op||0.08}"/>`;
+    if(b.label) s+=`<text class="lb" x="${x1-6}" y="${pad.t+14}" text-anchor="end" style="fill:${b.color}">${b.label}</text>`; });
+  (cfg.yt||niceTicks(cfg.yr[0],cfg.yr[1],5)).forEach(v=>{ const y=Y(v); s+=`<line class="gl" x1="${pad.l}" x2="${pad.l+pw}" y1="${y}" y2="${y}"/><text class="ax" x="${pad.l-6}" y="${y+4}" text-anchor="end">${cfg.yfmt?cfg.yfmt(v):tickTxt(v)}</text>`; });
+  (cfg.xt||niceTicks(cfg.xr[0],cfg.xr[1],W<520?5:9)).forEach(v=>{ const x=X(v); s+=`<line class="gl" x1="${x}" x2="${x}" y1="${pad.t}" y2="${pad.t+ph}"/><text class="ax" x="${x}" y="${pad.t+ph+15}" text-anchor="middle">${tickTxt(v)}</text>`; });
+  s+=`<rect class="fr" x="${pad.l}" y="${pad.t}" width="${pw}" height="${ph}"/>`;
+  (cfg.hlines||[]).forEach(l=>{ const y=cy(l.y); s+=`<line x1="${pad.l}" x2="${pad.l+pw}" y1="${y}" y2="${y}" style="stroke:${l.color};stroke-width:${l.w||1.5};stroke-dasharray:${l.dash||"5 4"}"/>`;
+    if(l.label) s+=`<text class="lb" x="${l.lx==="left"?pad.l+6:pad.l+pw-6}" y="${y-5}" text-anchor="${l.lx==="left"?"start":"end"}" style="fill:${l.color}">${l.label}</text>`; });
+  (cfg.series||[]).forEach(sr=>{ if(!sr.pts.length) return; const d=sr.pts.map((p,i)=>(i?"L":"M")+X(p[0]).toFixed(1)+","+cy(p[1]).toFixed(1)).join("");
+    if(sr.w!==0) s+=`<path d="${d}" style="fill:none;stroke:${sr.color};stroke-width:${sr.w||2.4};stroke-linejoin:round;stroke-linecap:round;${sr.dash?"stroke-dasharray:"+sr.dash:""}"/>`;
+    if(sr.dots) sr.pts.forEach(p=>{ s+=`<circle cx="${X(p[0])}" cy="${cy(p[1])}" r="${sr.dots}" style="fill:${sr.color};stroke:var(--surface);stroke-width:1.2"/>`; }); });
+  (cfg.vlines||[]).forEach(l=>{ const x=X(l.x); s+=`<line x1="${x}" x2="${x}" y1="${pad.t}" y2="${pad.t+ph}" style="stroke:${l.color};stroke-width:${l.w||1.8};${l.dash?"stroke-dasharray:"+l.dash:""}"/>`;
+    if(l.label){ const right=x>pad.l+pw*0.7; s+=`<text class="lb" x="${right?x-5:x+5}" y="${pad.t+ph-7}" text-anchor="${right?"end":"start"}" style="fill:${l.color}">${l.label}</text>`; } });
+  (cfg.points||[]).forEach(p=>{ const x=X(p.x), y=cy(p.y);
+    s+=`<circle cx="${x}" cy="${y}" r="${p.r||5}" style="fill:${p.ring?"var(--surface)":p.color};stroke:${p.ring?p.color:"var(--surface)"};stroke-width:${p.ring?2.5:1.5}"/>`;
+    if(p.label){ const right=x>pad.l+pw*0.62; s+=`<text class="lb" x="${right?x-9:x+9}" y="${p.below?y+17:y-9}" text-anchor="${right?"end":"start"}" style="fill:${p.color}">${p.label}</text>`; } });
+  s+=`<text class="axl" x="${pad.l+pw/2}" y="${H-6}" text-anchor="middle">${cfg.xl}</text>`;
+  s+=`<text class="axl" transform="translate(13 ${pad.t+ph/2}) rotate(-90)" text-anchor="middle">${cfg.yl}</text>`;
+  s+="</svg>";
+  el.innerHTML=s;
+  if(cfg.onX){ const svg=el.querySelector("svg"); svg.classList.add("click");
+    svg.addEventListener("click",e=>{ const r=svg.getBoundingClientRect(), x=(e.clientX-r.left)*W/r.width; cfg.onX(clamp(cfg.xr[0]+(x-pad.l)/pw*(cfg.xr[1]-cfg.xr[0]),cfg.xr[0],cfg.xr[1])); }); }
+}
+
+/* ------------------------------------------------------------------ 트리 도식 (SVG) */
+function fmtY(v){ return f1(v); }
+function treeSVG(el,T,k,task,sel,onSel){
+  const crit=task==="clf"?S.crit:"mse";
+  const vis=visibleNodes(T,k);
+  let slot=0; const P={};
+  (function lay(id){ const nd=T[id]; if(isLeafAt(nd,k)){ P[id]=slot++; return P[id]; } const a=lay(nd.left), b=lay(nd.right); P[id]=(a+b)/2; return P[id]; })(0);
+  const NW=138, NH=task==="clf"?92:78, GX=150, GY=NH+46, top=26;
+  const maxD=Math.max(...vis.map(n=>n.depth));
+  const avail=Math.max(300,(el.parentElement.clientWidth||600)-10);
+  const W=Math.max(avail,slot*GX+16), H=top+maxD*GY+NH+12, off=(W-slot*GX)/2;
+  const cx=id=>off+(P[id]+0.5)*GX, cy=nd=>top+nd.depth*GY;
+  const cname=crit==="gini"?"gini":crit==="entropy"?"entropy":"MSE";
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="group" aria-label="트리 도식: 노드 ${vis.length}개, 잎 ${slot}개">`;
+  vis.forEach(nd=>{ if(isLeafAt(nd,k)) return; [nd.left,nd.right].forEach((cid,j)=>{ const c=T[cid];
+    const x0=cx(nd.id), y0=cy(nd)+NH, x1=cx(cid), y1=cy(c), ym=(y0+y1)/2;
+    s+=`<path class="ed" d="M${x0},${y0} C${x0},${ym} ${x1},${ym} ${x1},${y1}"/>`;
+    s+=`<text class="el" x="${x0+(x1-x0)*0.22+(j?8:-8)}" y="${y0+14}" text-anchor="${j?"start":"end"}">${j?"아니오":"예"}</text>`; }); });
+  vis.forEach(nd=>{
+    const leaf=isLeafAt(nd,k), x=cx(nd.id)-NW/2, y=cy(nd);
+    const cls=["nd"]; if(leaf) cls.push("leaf", task==="clf"?"c"+nd.pred:"rg"); if(nd.order===k&&nd.left!=null) cls.push("next"); if(sel===nd.id) cls.push("sel");
+    let head, hcls="h", lines;
+    if(!leaf) head=`${FEAT[nd.f].name} ≤ ${fT(nd.t)}`;
+    else if(task==="clf"){ head=`잎 → ${nd.pred?"질환":"정상"}`; hcls+=" c"+nd.pred; }
+    else { head=`잎 → ${fmtY(nd.mean)}`; hcls+=" rg"; }
+    if(task==="clf") lines=[`샘플 ${nd.n}`,`값 [${nd.c[0]}, ${nd.c[1]}]`,`${cname} ${f3(nd.imp)}`];
+    else lines=[`샘플 ${nd.n}`,`평균 ${fmtY(nd.mean)}`,`MSE ${f1(nd.imp)}`];
+    const aria=`노드 ${nd.id}: ${leaf?head:"조건 "+head}, ${lines.join(", ")}`;
+    s+=`<g class="${cls.join(" ")}" data-id="${nd.id}" tabindex="0" role="button" aria-pressed="${sel===nd.id}" aria-label="${aria}">`;
+    s+=`<rect class="bx" x="${x}" y="${y}" width="${NW}" height="${NH}" rx="9"/>`;
+    s+=`<text class="${hcls}" x="${x+NW/2}" y="${y+19}" text-anchor="middle">${head}</text>`;
+    lines.forEach((t,i)=>{ s+=`<text class="t" x="${x+10}" y="${y+37+i*15}">${t}</text>`; });
+    s+=`<text class="id" x="${x+NW-7}" y="${y+37}" text-anchor="end">#${nd.id}</text>`;
+    if(task==="clf"){ const p1=nd.n?nd.c[1]/nd.n:0, bw=NW-20, by=y+NH-12;
+      s+=`<rect x="${x+10}" y="${by}" width="${bw*(1-p1)}" height="6" rx="2" style="fill:var(--c0)"/><rect x="${x+10+bw*(1-p1)}" y="${by}" width="${bw*p1}" height="6" rx="2" style="fill:var(--c1)"/>`; }
+    if(nd.order===k&&nd.left!=null) s+=`<text class="nx" x="${x+NW/2}" y="${y-7}" text-anchor="middle">다음 분할</text>`;
+    s+=`</g>`;
+  });
+  s+="</svg>";
+  el.innerHTML=s;
+  el.querySelectorAll("g.nd").forEach(g=>{
+    const id=+g.dataset.id;
+    g.addEventListener("click",()=>onSel(id));
+    g.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); onSel(id); } });
+  });
+}
+function pathRules(T,id){
+  const out=[]; let nd=T[id];
+  while(nd.parent!=null){ const p=T[nd.parent]; out.unshift(`${FEAT[p.f].name} ${nd.side==="L"?"≤":">"} ${fT(p.t)}`); nd=p; }
+  return out;
+}
+
+/* ------------------------------------------------------------------ 식 문자열 */
+const critName = c => c==="gini"?"지니":"엔트로피";
+function impExpr(c,crit){
+  const n=c[0]+c[1]; if(!n) return "샘플 없음";
+  if(crit==="gini") return `1 − (${c[0]}/${n})² − (${c[1]}/${n})² = 1 − ${f4((c[0]/n)**2)} − ${f4((c[1]/n)**2)} = <b>${f3(impC(c[0],c[1],"gini"))}</b>`;
+  const term=k=>c[k]===0?"0":`(${c[k]}/${n})·log₂(${c[k]}/${n})`;
+  const val=k=>{ const p=c[k]/n; return p>0?-p*Math.log2(p):0; };
+  return `−${term(0)} − ${term(1)} = ${f3(val(0))} + ${f3(val(1))} = <b>${f3(impC(c[0],c[1],"entropy"))}</b>`;
+}
+const fl = (txt,cls) => `<span class="dt-fl${cls?" "+cls:""}">${txt}</span>`;
+function statBox(v,l){ return `<div class="sk-stat"><b>${v}</b><span>${l}</span></div>`; }
+
+/* ================================================================== 분류 1. 분할 하나 */
+function renderCS(){
+  const d=S.cd, f=d.feat, crit=S.crit, C=colors(), all=d.X.map((_,i)=>i), F=FEAT[f];
+  const sl=$("csThr"); sl.min=F.lo; sl.max=F.hi; sl.step=F.step; sl.value=d.thr[f];
+  const t=d.thr[f]; $("csThrV").textContent=fT(t);
+  const P=partition("clf",crit,d.X,d.y,all,f,t);
+  /* 산점도 */
+  const V=view($("csCv"),CLF_BOX[0],CLF_BOX[1]); axes(V,C,"나이 (세)","BMI (kg/m²)");
+  const ctx=V.ctx; clipPlot(V);
+  const L0=V.pad.l, T0=V.pad.t, R0=V.pad.l+V.pw, B0=V.pad.t+V.ph;
+  const rects = f===0 ? {L:[L0,T0,V.px(t)-L0,V.ph], R:[V.px(t),T0,R0-V.px(t),V.ph]} : {L:[L0,V.py(t),V.pw,B0-V.py(t)], R:[L0,T0,V.pw,V.py(t)-T0]};
+  [["L",P.L],["R",P.R]].forEach(([k,st])=>{ if(!st.n) return; ctx.globalAlpha=0.11; ctx.fillStyle=st.pred?C.c1:C.c0; ctx.fillRect(...rects[k]); });
+  ctx.globalAlpha=1; ctx.setLineDash([7,5]); ctx.strokeStyle=C.ink; ctx.lineWidth=2; ctx.beginPath();
+  if(f===0){ ctx.moveTo(V.px(t),T0); ctx.lineTo(V.px(t),B0); } else { ctx.moveTo(L0,V.py(t)); ctx.lineTo(R0,V.py(t)); }
+  ctx.stroke(); ctx.setLineDash([]);
+  d.X.forEach((p,i)=>point(ctx,V.px(p[0]),V.py(p[1]),d.y[i],C));
+  if(f===0){ const x=V.px(t);
+    label(ctx,C,`왼쪽 (≤ ${fT(t)})`,clamp(x-6,L0+90,R0),T0+16,C.ink,"right");
+    label(ctx,C,`오른쪽 (> ${fT(t)})`,clamp(x+6,L0,R0-100),T0+16,C.ink,"left"); }
+  else { const y=V.py(t);
+    label(ctx,C,`오른쪽 (BMI > ${fT(t)})`,R0-6,clamp(y-8,T0+14,B0),C.ink,"right");
+    label(ctx,C,`왼쪽 (BMI ≤ ${fT(t)})`,R0-6,clamp(y+18,T0,B0-6),C.ink,"right"); }
+  ctx.restore();
+  /* 좌·우 상자 */
+  const cn=critName(crit);
+  const box=(title,cond,st)=>{
+    if(!st.n) return `<div class="dt-box"><h3>${title} <span class="dt-cond">${cond}</span></h3><p class="sk-hint" style="margin:0">샘플이 없습니다 (나눈 것이 아님)</p></div>`;
+    const p1=st.c[1]/st.n;
+    return `<div class="dt-box" style="--bc:var(${st.pred?"--c1":"--c0"})"><h3>${title} <span class="dt-cond">${cond}</span></h3>
+      <div class="dt-bar" role="img" aria-label="정상 ${st.c[0]}명, 질환 ${st.c[1]}명"><span style="width:${(1-p1)*100}%;background:var(--c0)"></span><span style="width:${p1*100}%;background:var(--c1)"></span></div>
+      <dl class="sk-kv"><dt>샘플</dt><dd>${st.n}</dd><dt>정상 / 질환</dt><dd><span class="t-c0">${st.c[0]}</span> / <span class="t-c1">${st.c[1]}</span></dd><dt>${cn}</dt><dd>${f3(st.imp)}</dd><dt>예측 (다수)</dt><dd>${st.pred?"질환":"정상"}</dd></dl></div>`;
+  };
+  $("csSides").innerHTML=box("왼쪽 노드",`${F.name} ≤ ${fT(t)}`,P.L)+box("오른쪽 노드",`${F.name} > ${fT(t)}`,P.R);
+  const n=all.length;
+  $("csFormula").innerHTML=
+    fl(`부모 (${n}명)`,"hd")+fl(`${cn} = ${impExpr(P.P.c,crit)}`)+
+    fl(`왼쪽 (${P.L.n}명)`,"hd")+fl(`${cn} = ${impExpr(P.L.c,crit)}`)+
+    fl(`오른쪽 (${P.R.n}명)`,"hd")+fl(`${cn} = ${impExpr(P.R.c,crit)}`)+
+    fl("가중 평균과 정보 이득","hd")+
+    fl(`가중 ${cn} = ${P.L.n}/${n} × ${f3(P.L.imp)} + ${P.R.n}/${n} × ${f3(P.R.imp)} = <b>${f3(P.w)}</b>`)+
+    fl(`정보 이득 = ${f3(P.P.imp)} − ${f3(P.w)} = <b class="t-ok">${f3(P.gain)}</b>`);
+  const bF=bestSplit("clf",crit,d.X,d.y,all,1,[f]);
+  $("csStats").innerHTML=statBox(f3(P.w),`가중 ${cn}`)+statBox(f3(P.gain),"정보 이득")+
+    statBox(bF?fT(bF.t):"–",`최적 ${F.name} 기준값`)+statBox(bF?f3(P.P.imp-bF.w):"–","최적 정보 이득");
+  /* 곡선 */
+  const cands=scan("clf",crit,d.X,d.y,all,f,1), par=P.P.imp, pts=[];
+  if(cands.length){ pts.push([F.lo,par],[cands[0].xa,par]); cands.forEach(c=>{ pts.push([c.xa,c.w],[c.xb,c.w]); }); pts.push([cands[cands.length-1].xb,par],[F.hi,par]); }
+  const yMax=Math.min(crit==="gini"?0.5:1,Math.ceil(par*1.3*10)/10||0.1);
+  const bestPts=bF?[{x:bF.t,y:bF.w,color:"var(--ok)",r:6.5,label:`최적 ${fT(bF.t)} → ${f3(bF.w)}`,below:true}]:[];
+  chart($("csChart"),{xr:[F.lo,F.hi],yr:[0,yMax],xl:`${F.name} 기준값`,yl:`가중 ${cn}`,h:250,
+    aria:`${F.name} 기준값에 따른 가중 ${cn} 곡선`,
+    hlines:[{y:par,color:"var(--faint)",label:`부모 ${cn} ${f3(par)}`}],
+    series:[{pts,color:"var(--c0)",w:2.2},{pts:cands.map(c=>[c.t,c.w]),color:"var(--c0)",w:0,dots:2.4}],
+    vlines:[{x:t,color:"var(--ink)",w:1.6,label:`현재 ${fT(t)}`}],
+    points:[{x:t,y:P.w,color:"var(--ink)",r:4.5},...bestPts],
+    onX:v=>{ d.thr[f]=Math.round(v/F.step)*F.step; renderCS(); }});
+  /* 두 특성 비교 */
+  const b0=bestSplit("clf",crit,d.X,d.y,all,1,[0]), b1=bestSplit("clf",crit,d.X,d.y,all,1,[1]), bb=bestSplit("clf",crit,d.X,d.y,all,1,[0,1]);
+  const g=b=>b?f3(par-b.w):"–";
+  $("csNote").innerHTML = bb ? `두 특성의 최적 분할: <b>나이 ≤ ${b0?fT(b0.t):"–"}</b> (이득 ${g(b0)}) · <b>BMI ≤ ${b1?fT(b1.t):"–"}</b> (이득 ${g(b1)}). 트리의 첫 분할(뿌리)은 이득이 더 큰 <b>${FEAT[bb.f].name} ≤ ${fT(bb.t)}</b>입니다. 2번 화면에서 이 분할부터 나무가 자랍니다.` : "나눌 수 있는 기준값이 없습니다.";
+  $("csSeed").textContent=`seed ${d.seed} · ${n}명`;
+}
+
+/* ================================================================== 분류 2. 나무 키우기 */
+function detailClf(T,k,id){
+  const nd=T[id], cn=critName(S.crit), rules=pathRules(T,id);
+  let h=`<h3>노드 #${id}${id===0?" (뿌리)":""} · 깊이 ${nd.depth}</h3>`;
+  h+=`<p class="dt-path">${rules.length?rules.join("  그리고  "):"조건 없음: 전체 데이터"}</p>`;
+  h+=`<p>샘플 ${nd.n}명 = <span class="t-c0">정상 ${nd.c[0]}</span> + <span class="t-c1">질환 ${nd.c[1]}</span></p>`;
+  let fm=fl(`${cn} = ${impExpr(nd.c,S.crit)}`);
+  if(nd.left!=null){
+    const L=T[nd.left], R=T[nd.right], done=nd.order<k;
+    h+=`<p>${done?"이 노드는":nd.order===k?"다음 분할에서 이 노드를":"더 뒤의 분할에서 이 노드를"} <b>${FEAT[nd.f].name} ≤ ${fT(nd.t)}</b>${done?"로 나뉘었습니다.":"로 나눕니다."}</p>`;
+    fm+=fl(`가중 ${cn} = ${L.n}/${nd.n} × ${f3(L.imp)} + ${R.n}/${nd.n} × ${f3(R.imp)} = ${f3(nd.w)}`)+fl(`정보 이득 = ${f3(nd.imp)} − ${f3(nd.w)} = <b class="t-ok">${f3(nd.imp-nd.w)}</b>`);
+  } else {
+    h+=`<p>잎 노드 (${nd.stop}). 예측 = <b class="${nd.pred?"t-c1":"t-c0"}">${nd.pred?"질환":"정상"}</b>, 질환 확률 ${f2(nd.c[1]/nd.n)}</p>`;
+  }
+  return h+`<div class="sk-formula">${fm}</div>`;
+}
+function renderCG(){
+  const d=S.cd, T=cgTree(), K=T.splits, C=colors();
+  S.cg.step=clamp(S.cg.step,0,K); const k=S.cg.step;
+  if(S.cg.sel!=null&&(!T[S.cg.sel]||!visibleNodes(T,k).includes(T[S.cg.sel]))) S.cg.sel=null;
+  $("cgProg").textContent=`분할 ${k} / ${K}`;
+  $("cgPrev").disabled=$("cgFirst").disabled=k===0; $("cgNext").disabled=k>=K;
+  const V=view($("cgCv"),CLF_BOX[0],CLF_BOX[1]); axes(V,C,"나이 (세)","BMI (kg/m²)");
+  const ctx=V.ctx; clipPlot(V);
+  const rectOf=b=>[V.px(b[0][0]),V.py(b[1][1]),V.px(b[0][1]),V.py(b[1][0])];
+  const vis=visibleNodes(T,k);
+  vis.forEach(nd=>{ if(!isLeafAt(nd,k)) return; const [x0,y0,x1,y1]=rectOf(nd.box), pur=Math.max(...nd.c)/nd.n;
+    ctx.globalAlpha=0.07+0.26*(pur-0.5)*2; ctx.fillStyle=nd.pred?C.c1:C.c0; ctx.fillRect(x0,y0,x1-x0,y1-y0); });
+  ctx.globalAlpha=1;
+  vis.forEach(nd=>{ if(isLeafAt(nd,k)) return; const [x0,y0,x1,y1]=rectOf(nd.box); const last=nd.order===k-1;
+    ctx.strokeStyle=last?C.accent:C.ink; ctx.lineWidth=last?3:1.6; ctx.beginPath();
+    if(nd.f===0){ ctx.moveTo(V.px(nd.t),y0); ctx.lineTo(V.px(nd.t),y1); } else { ctx.moveTo(x0,V.py(nd.t)); ctx.lineTo(x1,V.py(nd.t)); } ctx.stroke(); });
+  const nx=T.find(nd=>nd.order===k);
+  if(nx){ const [x0,y0,x1,y1]=rectOf(nx.box); ctx.setLineDash([6,5]); ctx.strokeStyle=C.accent; ctx.lineWidth=2; ctx.beginPath();
+    if(nx.f===0){ ctx.moveTo(V.px(nx.t),y0); ctx.lineTo(V.px(nx.t),y1); } else { ctx.moveTo(x0,V.py(nx.t)); ctx.lineTo(x1,V.py(nx.t)); } ctx.stroke(); ctx.setLineDash([]); }
+  d.X.forEach((p,i)=>point(ctx,V.px(p[0]),V.py(p[1]),d.y[i],C,{r:4.2}));
+  if(S.cg.sel!=null){ const [x0,y0,x1,y1]=rectOf(T[S.cg.sel].box); dimOutside(V,C,x0,y0,x1,y1); }
+  ctx.restore();
+  V.cv._view=V;
+  const all=d.X.map((_,i)=>i), leaves=vis.filter(n=>isLeafAt(n,k)).length;
+  $("cgStats").innerHTML=statBox(maxDepthAt(T,k),"현재 깊이")+statBox(leaves,"잎 수")+statBox(f3(accuracy(T,d.X,d.y,all,k)),"학습 정확도")+statBox(K,"전체 분할 수");
+  let det;
+  if(S.cg.sel!=null) det=detailClf(T,k,S.cg.sel);
+  else if(nx) det=`<p class="sk-hint">노드나 영역을 누르면 자세히 봅니다. 지금은 <b>다음에 나눌 노드</b>입니다.</p>`+detailClf(T,k,nx.id);
+  else { const why={}; T.filter(n=>n.left==null).forEach(n=>{ why[n.stop]=(why[n.stop]||0)+1; });
+    det=`<h3>나무가 다 자랐습니다</h3><p>잎 ${leaves}개가 모두 멈춤 조건에 걸렸습니다.</p><ul style="margin:0;padding-left:18px">${Object.entries(why).map(([w,c])=>`<li>${w}: 잎 ${c}개</li>`).join("")}</ul><p class="sk-hint">노드나 영역을 누르면 자세히 봅니다.</p>`; }
+  $("cgDetail").innerHTML=det;
+  treeSVG($("cgTree"),T,k,"clf",S.cg.sel,id=>{ S.cg.sel=S.cg.sel===id?null:id; renderCG(); refocus("cgTree",id); });
+}
+function refocus(elId,id){ const g=$(elId).querySelector(`g.nd[data-id="${id}"]`); if(g) g.focus({preventScroll:true}); }
+
+/* ================================================================== 분류 3. 과적합 */
+function renderCP(){
+  const D=cpData(), C=colors(), sel=S.cp.depth, R=D.res[sel-1];
+  $("cpDepthV").textContent=sel; $("cpMinLeafV").textContent=S.cp.minLeaf; $("cpNV").textContent=S.cp.n; $("cpNoiseV").textContent=Math.round(S.cp.noise*100)+"%";
+  $("cpSeed").textContent=`seed ${S.cp.seed} · 학습 ${D.tr.length} / 검증 ${D.va.length}`;
+  const vals=D.res.flatMap(r=>[r.tr,r.va]), lo=Math.max(0,Math.floor((Math.min(...vals)-0.03)*20)/20);
+  const bR=D.res[D.best-1];
+  chart($("cpChart"),{xr:[0.5,12.5],yr:[lo,1.0],xt:[1,2,3,4,5,6,7,8,9,10,11,12],xl:"max_depth",yl:"정확도",
+    aria:"max_depth에 따른 학습·검증 정확도", yfmt:v=>v.toFixed(2),
+    bands:D.best<12?[{x0:D.best+0.5,x1:12.5,color:"var(--bad)",op:0.07,label:"검증이 더 좋아지지 않음"}]:[],
+    series:[{pts:D.res.map(r=>[r.dep,r.tr]),color:"var(--tr)",dots:3.4},{pts:D.res.map(r=>[r.dep,r.va]),color:"var(--va)",dots:3.4}],
+    vlines:[{x:sel,color:"var(--ink)",dash:"5 4",label:`깊이 ${sel}`}],
+    points:[{x:D.best,y:bR.va,color:"var(--ok)",r:7,ring:true,label:`검증 최고 ${f3(bR.va)}`,below:true}],
+    onX:v=>{ S.cp.depth=clamp(Math.round(v),1,12); $("cpDepth").value=S.cp.depth; renderCP(); }});
+  $("cpStats").innerHTML=statBox(f3(R.tr),"학습 정확도")+statBox(f3(R.va),"검증 정확도")+statBox(f3(R.tr-R.va),"차이 (학습 − 검증)")+statBox(R.leaves,"잎 수")+statBox(R.real,"실제 깊이");
+  $("cpCvTitle").textContent=`깊이 ${sel} 트리의 결정 경계`;
+  /* 결정 경계 */
+  const V=view($("cpCv"),CLF_BOX[0],CLF_BOX[1]); axes(V,C,"나이 (세)","BMI (kg/m²)");
+  const ctx=V.ctx; clipPlot(V); const cell=3;
+  ctx.globalAlpha=0.24;
+  for(let px=V.pad.l;px<V.pad.l+V.pw;px+=cell) for(let py=V.pad.t;py<V.pad.t+V.ph;py+=cell){
+    const lf=leafOf(R.T,[V.ix(px+cell/2),V.iy(py+cell/2)],Infinity); ctx.fillStyle=lf.pred?C.c1:C.c0; ctx.fillRect(px,py,cell,cell); }
+  ctx.globalAlpha=1;
+  D.tr.forEach(i=>point(ctx,V.px(D.X[i][0]),V.py(D.X[i][1]),D.y[i],C,{r:3.8}));
+  if(S.cp.showVa) D.va.forEach(i=>point(ctx,V.px(D.X[i][0]),V.py(D.X[i][1]),D.y[i],C,{r:4.4,ring:true}));
+  ctx.restore();
+  /* 중요도 */
+  const I=importances(R.T);
+  $("cpImpHint").textContent=`깊이 ${sel} 트리 기준 · 분할 ${I.rows.length}개`;
+  $("cpImp").innerHTML=[0,1].map(f=>`<span>${FEAT[f].name}</span><div class="tr"><div class="fl" style="width:${(I.norm[f]*100).toFixed(1)}%"></div></div><span class="v">${f3(I.norm[f])}</span>`).join("")+
+    `<span></span><span class="sk-hint" style="grid-column:2 / 4">정규화 전 합: 나이 ${f4(I.raw[0])} · BMI ${f4(I.raw[1])}</span>`;
+  const cn=S.crit==="gini"?"gini":"엔트로피";
+  const rows=I.rows.slice().sort((a,b)=>b.c-a.c);
+  $("cpImpTable").innerHTML=`<thead><tr><th>노드</th><th>조건</th><th>N<sub>t</sub></th><th>${cn} I(t)</th><th>자식 가중 I</th><th>기여 (N<sub>t</sub>/N)·감소</th></tr></thead><tbody>`+
+    rows.slice(0,40).map(r=>`<tr><td class="n">#${r.nd.id}</td><td>${FEAT[r.nd.f].name} ≤ ${fT(r.nd.t)}</td><td class="n">${r.nd.n}</td><td class="n">${f3(r.nd.imp)}</td><td class="n">${f3(r.nd.w)}</td><td class="n">${f4(r.c)}</td></tr>`).join("")+
+    (rows.length>40?`<tr><td colspan="6" class="sk-hint">… 외 ${rows.length-40}개</td></tr>`:"")+`</tbody>`;
+  const last=D.res[11];
+  $("cpNote").innerHTML=`깊이 ${D.best}에서 검증 정확도가 가장 높습니다(${f3(bR.va)}). 깊이 12에서는 학습 정확도 ${f3(last.tr)}, 검증 정확도 ${f3(last.va)}로, 잡음 점까지 외우려고 작은 사각형이 늘어나 경계가 들쭉날쭉해집니다. 곡선이 어느 깊이부터 평평하면 잎이 모두 순수해져 더 나눌 것이 없다는 뜻입니다(실제 깊이 ${last.real}). 다 키운 뒤 잘라 내는 <b>사후 가지치기</b>는 scikit-learn의 <code>ccp_alpha</code>(비용 복잡도 가지치기)로 합니다.`;
+}
+
+/* ================================================================== 회귀 1. 분할 하나 */
+function renderRS(){
+  const d=S.rd, tg=TGT[d.target], C=colors(), all=d.X.map((_,i)=>i), t=d.thr;
+  $("rsThr").value=t; $("rsThrV").textContent=fT(t);
+  const P=partition("reg","mse",d.X,d.y,all,0,t), yr=regYR(d.target,d.y);
+  const V=view($("rsCv"),REG_XR,yr); axes(V,C,"나이 (세)",`${tg.name} (${tg.unit})`);
+  const ctx=V.ctx; clipPlot(V); const T0=V.pad.t, B0=V.pad.t+V.ph, L0=V.pad.l, R0=V.pad.l+V.pw, xt=V.px(t);
+  ctx.setLineDash([5,5]); ctx.strokeStyle=C.faint; ctx.lineWidth=1.6; ctx.beginPath(); ctx.moveTo(L0,V.py(P.P.mean)); ctx.lineTo(R0,V.py(P.P.mean)); ctx.stroke();
+  ctx.setLineDash([7,5]); ctx.strokeStyle=C.ink; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(xt,T0); ctx.lineTo(xt,B0); ctx.stroke(); ctx.setLineDash([]);
+  if(d.showRes){ ctx.strokeStyle=C.muted; ctx.lineWidth=1; ctx.globalAlpha=0.7;
+    all.forEach(i=>{ const m=d.X[i][0]<=t?P.L.mean:P.R.mean, x=V.px(d.X[i][0]); ctx.beginPath(); ctx.moveTo(x,V.py(d.y[i])); ctx.lineTo(x,V.py(m)); ctx.stroke(); }); ctx.globalAlpha=1; }
+  ctx.strokeStyle=C.pred; ctx.lineWidth=3.2;
+  if(P.L.n){ ctx.beginPath(); ctx.moveTo(L0,V.py(P.L.mean)); ctx.lineTo(xt,V.py(P.L.mean)); ctx.stroke(); }
+  if(P.R.n){ ctx.beginPath(); ctx.moveTo(xt,V.py(P.R.mean)); ctx.lineTo(R0,V.py(P.R.mean)); ctx.stroke(); }
+  all.forEach(i=>point(ctx,V.px(d.X[i][0]),V.py(d.y[i]),0,C,{r:4.4}));
+  if(P.L.n) label(ctx,C,`왼쪽 평균 ${fmtY(P.L.mean)}`,clamp(xt-6,L0+110,R0),clamp(V.py(P.L.mean)-8,T0+14,B0-4),C.pred,"right");
+  if(P.R.n) label(ctx,C,`오른쪽 평균 ${fmtY(P.R.mean)}`,clamp(xt+6,L0,R0-120),clamp(V.py(P.R.mean)-8,T0+14,B0-4),C.pred,"left");
+  ctx.restore();
+  const box=(title,cond,st)=>!st.n?`<div class="dt-box"><h3>${title} <span class="dt-cond">${cond}</span></h3><p class="sk-hint" style="margin:0">샘플이 없습니다</p></div>`:
+    `<div class="dt-box" style="--bc:var(--pred)"><h3>${title} <span class="dt-cond">${cond}</span></h3><dl class="sk-kv"><dt>샘플</dt><dd>${st.n}</dd><dt>평균 = 예측값</dt><dd>${fmtY(st.mean)}</dd><dt>MSE</dt><dd>${f1(st.imp)}</dd></dl></div>`;
+  $("rsSides").innerHTML=box("왼쪽 노드",`나이 ≤ ${fT(t)}`,P.L)+box("오른쪽 노드",`나이 > ${fT(t)}`,P.R);
+  const n=all.length;
+  const mseLine=(nm,st)=>st.n?fl(`${nm} MSE = (1/${st.n})·Σ(y − ${fmtY(st.mean)})² = ${f1(st.sse)} / ${st.n} = <b>${f1(st.imp)}</b>`):fl(`${nm}: 샘플 없음`);
+  $("rsFormula").innerHTML=fl("각 노드의 MSE (평균에서 떨어진 정도)","hd")+mseLine("부모",P.P)+mseLine("왼쪽",P.L)+mseLine("오른쪽",P.R)+
+    fl("가중 평균과 MSE 감소","hd")+fl(`가중 MSE = ${P.L.n}/${n} × ${f1(P.L.imp)} + ${P.R.n}/${n} × ${f1(P.R.imp)} = <b>${f1(P.w)}</b>`)+
+    fl(`MSE 감소 = ${f1(P.P.imp)} − ${f1(P.w)} = <b class="t-ok">${f1(P.gain)}</b> (부모의 ${P.P.imp>0?(P.gain/P.P.imp*100).toFixed(1):"0"}%)`);
+  const b=bestSplit("reg","mse",d.X,d.y,all,1,[0]);
+  $("rsStats").innerHTML=statBox(f1(P.w),"가중 MSE")+statBox(f1(P.gain),"MSE 감소")+statBox(b?fT(b.t):"–","최적 기준값")+statBox(b?f1(P.P.imp-b.w):"–","최적 MSE 감소");
+  const cands=scan("reg","mse",d.X,d.y,all,0,1), par=P.P.imp, pts=[];
+  if(cands.length){ pts.push([REG_XR[0],par],[cands[0].xa,par]); cands.forEach(c=>{ pts.push([c.xa,c.w],[c.xb,c.w]); }); pts.push([cands[cands.length-1].xb,par],[REG_XR[1],par]); }
+  chart($("rsChart"),{xr:REG_XR,yr:[0,par*1.12||1],xl:"나이 기준값",yl:"가중 MSE",h:250,aria:"나이 기준값에 따른 가중 MSE 곡선",padL:58,
+    hlines:[{y:par,color:"var(--faint)",label:`부모 MSE ${f1(par)}`}],
+    series:[{pts,color:"var(--pred)",w:2.2},{pts:cands.map(c=>[c.t,c.w]),color:"var(--pred)",w:0,dots:2.4}],
+    vlines:[{x:t,color:"var(--ink)",w:1.6,label:`현재 ${fT(t)}`}],
+    points:[{x:t,y:P.w,color:"var(--ink)",r:4.5},...(b?[{x:b.t,y:b.w,color:"var(--ok)",r:6.5,label:`최적 ${fT(b.t)} → ${f1(b.w)}`,below:true}]:[])],
+    onX:v=>{ d.thr=Math.round(v*2)/2; renderRS(); }});
+  $("rsNote").innerHTML=`가중 MSE × ${n} = 왼쪽 오차 제곱합 + 오른쪽 오차 제곱합 이므로, MSE를 가장 많이 줄이는 분할은 <b>양쪽 평균선으로 그은 잔차의 제곱합이 가장 작은</b> 분할입니다. 최적 기준값 <b>나이 ≤ ${b?fT(b.t):"–"}</b>이 2번 화면의 첫 분할이 됩니다.`;
+  $("rsSeed").textContent=`seed ${d.seed} · ${n}명`;
+}
+
+/* ================================================================== 회귀 2. 나무 키우기 */
+function detailReg(T,k,id){
+  const nd=T[id], rules=pathRules(T,id);
+  let h=`<h3>노드 #${id}${id===0?" (뿌리)":""} · 깊이 ${nd.depth}</h3><p class="dt-path">${rules.length?rules.join("  그리고  "):"조건 없음: 전체 데이터"}</p>`;
+  h+=`<p>샘플 ${nd.n}명 · 평균 <b class="t-pred">${fmtY(nd.mean)}</b> ${TGT[S.rd.target].unit}</p>`;
+  let fm=fl(`MSE = (1/${nd.n})·Σ(y − ${fmtY(nd.mean)})² = <b>${f1(nd.imp)}</b>`);
+  if(nd.left!=null){ const L=T[nd.left], R=T[nd.right], done=nd.order<k;
+    h+=`<p>${done?"이 노드는":nd.order===k?"다음 분할에서 이 노드를":"더 뒤의 분할에서 이 노드를"} <b>나이 ≤ ${fT(nd.t)}</b>${done?"로 나뉘었습니다.":"로 나눕니다."}</p>`;
+    fm+=fl(`가중 MSE = ${L.n}/${nd.n} × ${f1(L.imp)} + ${R.n}/${nd.n} × ${f1(R.imp)} = ${f1(nd.w)}`)+fl(`MSE 감소 = ${f1(nd.imp)} − ${f1(nd.w)} = <b class="t-ok">${f1(nd.imp-nd.w)}</b>`);
+  } else h+=`<p>잎 노드 (${nd.stop}). 이 구간의 예측값 = 평균 <b>${fmtY(nd.mean)}</b></p>`;
+  return h+`<div class="sk-formula">${fm}</div>`;
+}
+function renderRG(){
+  const d=S.rd, T=rgTree(), K=T.splits, C=colors(), tg=TGT[d.target];
+  S.rg.step=clamp(S.rg.step,0,K); const k=S.rg.step;
+  if(S.rg.sel!=null&&(!T[S.rg.sel]||!visibleNodes(T,k).includes(T[S.rg.sel]))) S.rg.sel=null;
+  $("rgProg").textContent=`분할 ${k} / ${K}`;
+  $("rgPrev").disabled=$("rgFirst").disabled=k===0; $("rgNext").disabled=k>=K;
+  const yr=regYR(d.target,d.y), V=view($("rgCv"),REG_XR,yr); axes(V,C,"나이 (세)",`${tg.name} (${tg.unit})`);
+  const ctx=V.ctx; clipPlot(V); const T0=V.pad.t,B0=V.pad.t+V.ph;
+  const vis=visibleNodes(T,k), leaves=vis.filter(n=>isLeafAt(n,k)).sort((a,b)=>a.box[0][0]-b.box[0][0]);
+  vis.forEach(nd=>{ if(isLeafAt(nd,k)) return; const last=nd.order===k-1; ctx.strokeStyle=last?C.accent:C.lineStrong; ctx.lineWidth=last?2.5:1.2; ctx.setLineDash(last?[]:[4,4]);
+    ctx.beginPath(); ctx.moveTo(V.px(nd.t),T0); ctx.lineTo(V.px(nd.t),B0); ctx.stroke(); });
+  ctx.setLineDash([]);
+  const nx=T.find(nd=>nd.order===k);
+  if(nx){ ctx.setLineDash([6,5]); ctx.strokeStyle=C.accent; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(V.px(nx.t),T0); ctx.lineTo(V.px(nx.t),B0); ctx.stroke(); ctx.setLineDash([]); }
+  d.X.forEach((p,i)=>point(ctx,V.px(p[0]),V.py(d.y[i]),0,C,{r:4.2}));
+  ctx.strokeStyle=C.pred; ctx.lineWidth=3.2; ctx.lineJoin="round"; ctx.beginPath();
+  leaves.forEach((lf,i)=>{ const x0=V.px(lf.box[0][0]), x1=V.px(lf.box[0][1]), y=V.py(lf.mean); if(i===0) ctx.moveTo(x0,y); else ctx.lineTo(x0,y); ctx.lineTo(x1,y); });
+  ctx.stroke();
+  if(S.rg.sel!=null){ const b=T[S.rg.sel].box[0]; dimOutside(V,C,V.px(b[0]),T0,V.px(b[1]),B0); }
+  ctx.restore(); V.cv._view=V;
+  const all=d.X.map((_,i)=>i), mse=mseOn(T,d.X,d.y,all,k);
+  $("rgStats").innerHTML=statBox(maxDepthAt(T,k),"현재 깊이")+statBox(leaves.length,"잎 (계단) 수")+statBox(f1(mse),"학습 MSE")+statBox(f3(r2(mse,d.y,all)),"학습 R²");
+  let det;
+  if(S.rg.sel!=null) det=detailReg(T,k,S.rg.sel);
+  else if(nx) det=`<p class="sk-hint">노드나 구간을 누르면 자세히 봅니다. 지금은 <b>다음에 나눌 노드</b>입니다.</p>`+detailReg(T,k,nx.id);
+  else { const why={}; T.filter(n=>n.left==null).forEach(n=>{ why[n.stop]=(why[n.stop]||0)+1; });
+    det=`<h3>나무가 다 자랐습니다</h3><p>계단 ${leaves.length}개가 모두 멈춤 조건에 걸렸습니다.</p><ul style="margin:0;padding-left:18px">${Object.entries(why).map(([w,c])=>`<li>${w}: 잎 ${c}개</li>`).join("")}</ul><p class="sk-hint">노드나 구간을 누르면 자세히 봅니다.</p>`; }
+  $("rgDetail").innerHTML=det;
+  treeSVG($("rgTree"),T,k,"reg",S.rg.sel,id=>{ S.rg.sel=S.rg.sel===id?null:id; renderRG(); refocus("rgTree",id); });
+}
+
+/* ================================================================== 회귀 3. 과적합 */
+function renderRO(){
+  const D=roData(), C=colors(), sel=S.ro.depth, R=D.res[sel-1], tg=TGT[S.rd.target];
+  $("roDepthV").textContent=sel; $("roMinLeafV").textContent=S.ro.minLeaf; $("roNV").textContent=S.ro.n; $("roNoiseV").textContent=S.ro.noise.toFixed(1)+"×";
+  $("roSeed").textContent=`seed ${S.ro.seed} · 학습 ${D.tr.length} / 검증 ${D.va.length}`;
+  const vals=D.res.flatMap(r=>[r.tr,r.va]).concat(S.ro.showLin?[D.lin.tr,D.lin.va]:[]), hi=Math.max(...vals)*1.1;
+  const bR=D.res[D.best-1];
+  chart($("roChart"),{xr:[0.5,12.5],yr:[0,hi],xt:[1,2,3,4,5,6,7,8,9,10,11,12],xl:"max_depth",yl:"MSE",padL:58,
+    aria:"max_depth에 따른 학습·검증 MSE",
+    bands:D.best<12?[{x0:D.best+0.5,x1:12.5,color:"var(--bad)",op:0.07,label:"검증 MSE가 더 줄지 않음"}]:[],
+    hlines:S.ro.showLin?[{y:D.lin.va,color:"var(--pur)",dash:"7 4"},{y:D.lin.tr,color:"var(--pur)",dash:"2 4",w:1.3}]:[],
+    series:[{pts:D.res.map(r=>[r.dep,r.tr]),color:"var(--tr)",dots:3.4},{pts:D.res.map(r=>[r.dep,r.va]),color:"var(--va)",dots:3.4}],
+    vlines:[{x:sel,color:"var(--ink)",dash:"5 4",label:`깊이 ${sel}`}],
+    points:[{x:D.best,y:bR.va,color:"var(--ok)",r:7,ring:true,label:`검증 최저 ${f1(bR.va)}`}],
+    onX:v=>{ S.ro.depth=clamp(Math.round(v),1,12); $("roDepth").value=S.ro.depth; renderRO(); }});
+  $("roStats").innerHTML=statBox(f1(R.tr),"학습 MSE")+statBox(f1(R.va),"검증 MSE")+statBox(f3(R.vaR2),"검증 R²")+statBox(R.leaves,"계단 수")+
+    (S.ro.showLin?statBox(f1(D.lin.tr),"선형회귀 학습 MSE")+statBox(f1(D.lin.va),"선형회귀 검증 MSE"):"");
+  $("roCvTitle").textContent=`깊이 ${sel} 트리의 예측선`;
+  const V=view($("roCv"),REG_XR,D.yr); axes(V,C,"나이 (세)",`${tg.name} (${tg.unit})`);
+  const ctx=V.ctx; clipPlot(V);
+  D.tr.forEach(i=>point(ctx,V.px(D.X[i][0]),V.py(D.y[i]),0,C,{r:3.8,color:C.tr}));
+  D.va.forEach(i=>point(ctx,V.px(D.X[i][0]),V.py(D.y[i]),0,C,{r:4.4,ring:true,color:C.va}));
+  const lvs=R.T.filter(n=>n.left==null).sort((a,b)=>a.box[0][0]-b.box[0][0]);
+  ctx.strokeStyle=C.pred; ctx.lineWidth=2.6; ctx.lineJoin="round"; ctx.beginPath();
+  lvs.forEach((lf,i)=>{ const x0=V.px(lf.box[0][0]), x1=V.px(lf.box[0][1]), y=V.py(lf.mean); if(i===0) ctx.moveTo(x0,y); else ctx.lineTo(x0,y); ctx.lineTo(x1,y); });
+  ctx.stroke();
+  if(S.ro.showLin){ ctx.setLineDash([8,5]); ctx.strokeStyle=C.pur; ctx.lineWidth=2.4; ctx.beginPath();
+    ctx.moveTo(V.px(REG_XR[0]),V.py(D.lin.a+D.lin.b*REG_XR[0])); ctx.lineTo(V.px(REG_XR[1]),V.py(D.lin.a+D.lin.b*REG_XR[1])); ctx.stroke(); ctx.setLineDash([]); }
+  ctx.restore();
+  const last=D.res[11];
+  $("roNote").innerHTML=`깊이 ${D.best}에서 검증 MSE가 가장 작습니다(${f1(bR.va)}, R² ${f3(bR.vaR2)}). 깊이 12에서는 학습 MSE ${f1(last.tr)}, 검증 MSE ${f1(last.va)}로, 계단이 ${last.leaves}개까지 잘게 쪼개져 잡음을 따라갑니다.${last.tr>1e-9?" (나이가 같은 환자끼리는 더 나눌 수 없어 학습 MSE가 0까지 내려가지는 않습니다.)":""}`+
+    (S.ro.showLin?` 선형회귀(기울기 ${f2(D.lin.b)}/세)는 검증 MSE ${f1(D.lin.va)}로, 나이에 따라 <b>계단처럼 뛰는</b> 관계는 직선이 잘 담지 못하고 얕은 트리가 더 잘 맞힐 때가 많습니다. 반대로 트리는 학습 구간 밖(외삽)에서는 끝 계단 값만 되풀이합니다.`:"");
+}
+
+/* ================================================================== 코드 생성 */
+function pyRows(X,y,perLine){
+  const rows=X.map(p=>"["+p.map(v=>String(v)).join(", ")+"]"), out=[];
+  for(let i=0;i<rows.length;i+=perLine) out.push("    "+rows.slice(i,i+perLine).join(", ")+",");
+  return out.join("\n");
+}
+function pyVec(y,perLine){ const out=[]; for(let i=0;i<y.length;i+=perLine) out.push("    "+y.slice(i,i+perLine).join(", ")+","); return out.join("\n"); }
+function genCode(){
+  const inc=S.codeData;
+  if(S.part==="clf"){
+    const crit=S.crit;
+    if(S.tab.clf==="prune"){
+      const D=cpData(), R=D.res[S.cp.depth-1], I=importances(R.T);
+      const sub=ix=>({X:ix.map(i=>D.X[i]),y:ix.map(i=>D.y[i])}), a=sub(D.tr), b=sub(D.va);
+      return `import numpy as np
+from sklearn.tree import DecisionTreeClassifier
+${inc?"":"from sklearn.model_selection import train_test_split\n"}
+# 특성: [나이, BMI]  /  타깃: 질환 여부 (0 = 정상, 1 = 질환)
+${inc?`X_tr = np.array([
+${pyRows(a.X,a.y,5)}
+])
+y_tr = np.array([
+${pyVec(a.y,20)}
+])
+X_va = np.array([
+${pyRows(b.X,b.y,5)}
+])
+y_va = np.array([
+${pyVec(b.y,20)}
+])`:`X = df[["나이", "BMI"]].values
+y = df["질환"].values
+X_tr, X_va, y_tr, y_va = train_test_split(X, y, test_size=0.3, random_state=0)`}
+
+# 참고: 불순도가 똑같은 후보 분할(동점)이 여럿이면 random_state에 따라 고르는 분할이 달라져
+#       깊은 트리의 정확도가 화면과 조금 다를 수 있습니다 (화면은 나이 → BMI 순서로 먼저 찾은 것을 고름).
+# max_depth를 1~12로 바꾸며 학습 / 검증 정확도 비교
+for d in range(1, 13):
+    m = DecisionTreeClassifier(criterion="${crit}", max_depth=d,
+                               min_samples_leaf=${S.cp.minLeaf}, random_state=0)
+    m.fit(X_tr, y_tr)
+    print(d, round(m.score(X_tr, y_tr), 3), round(m.score(X_va, y_va), 3))
+
+model = DecisionTreeClassifier(criterion="${crit}", max_depth=${S.cp.depth},
+                               min_samples_leaf=${S.cp.minLeaf}, random_state=0).fit(X_tr, y_tr)
+print("학습 정확도:", round(model.score(X_tr, y_tr), 3))${inc?`   # 화면: ${f3(R.tr)}`:""}
+print("검증 정확도:", round(model.score(X_va, y_va), 3))${inc?`   # 화면: ${f3(R.va)}`:""}
+print("특성 중요도:", model.feature_importances_.round(3))${inc?`   # 화면: [${f3(I.norm[0])} ${f3(I.norm[1])}]`:""}
+
+# 사후 가지치기(비용 복잡도): ccp_alpha가 클수록 가지를 더 많이 잘라 냄
+path = DecisionTreeClassifier(criterion="${crit}", random_state=0).cost_complexity_pruning_path(X_tr, y_tr)
+print(path.ccp_alphas)
+`;
+    }
+    const d=S.cd, g=S.cg, T=cgTree(), all=d.X.map((_,i)=>i), I=importances(T), acc=accuracy(T,d.X,d.y,all,Infinity);
+    return `import numpy as np
+from sklearn.tree import DecisionTreeClassifier, export_text
+
+# 특성: [나이, BMI]  /  타깃: 질환 여부 (0 = 정상, 1 = 질환)
+${inc?`X = np.array([
+${pyRows(d.X,d.y,5)}
+])
+y = np.array([
+${pyVec(d.y,20)}
+])`:`X = df[["나이", "BMI"]].values
+y = df["질환"].values`}
+
+model = DecisionTreeClassifier(
+    criterion="${crit}",${" ".repeat(Math.max(1,12-crit.length))}# 불순도: "gini" 또는 "entropy"
+    max_depth=${g.maxDepth},             # 최대 깊이
+    min_samples_split=${g.minSplit},${" ".repeat(Math.max(1,6-String(g.minSplit).length))}# 나누려면 노드에 필요한 최소 샘플 수
+    min_samples_leaf=${g.minLeaf},${" ".repeat(Math.max(1,7-String(g.minLeaf).length))}# 잎마다 남아야 하는 최소 샘플 수
+    random_state=0,
+)
+model.fit(X, y)
+# 동점 분할이 있으면 random_state에 따라 트리 모양이 조금 달라질 수 있습니다.
+
+print(export_text(model, feature_names=["나이", "BMI"], show_weights=True))
+print("학습 정확도:", round(model.score(X, y), 3))${inc?`          # 화면: ${f3(acc)}`:""}
+print("잎 수:", model.get_n_leaves(), " 깊이:", model.get_depth())${inc?`   # 화면: ${T.filter(n=>n.left==null).length}, ${maxDepthAt(T,Infinity)}`:""}
+print("특성 중요도:", model.feature_importances_.round(3))${inc?`   # 화면: [${f3(I.norm[0])} ${f3(I.norm[1])}]`:""}
+`;
+  }
+  const tg=S.rd.target, yname=tg==="sbp"?"수축기혈압":"연간의료비";
+  if(S.tab.reg==="over"){
+    const D=roData(), R=D.res[S.ro.depth-1];
+    const sub=ix=>({X:ix.map(i=>D.X[i]),y:ix.map(i=>D.y[i])}), a=sub(D.tr), b=sub(D.va);
+    return `import numpy as np
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score
+${inc?"":"from sklearn.model_selection import train_test_split\n"}
+# 특성: [나이]  /  타깃: ${TGT[tg].name} (${TGT[tg].unit})
+${inc?`X_tr = np.array([
+${pyVec(a.X.map(p=>p[0]),14)}
+]).reshape(-1, 1)
+y_tr = np.array([
+${pyVec(a.y,10)}
+])
+X_va = np.array([
+${pyVec(b.X.map(p=>p[0]),14)}
+]).reshape(-1, 1)
+y_va = np.array([
+${pyVec(b.y,10)}
+])`:`X = df[["나이"]].values
+y = df["${yname}"].values
+X_tr, X_va, y_tr, y_va = train_test_split(X, y, test_size=0.3, random_state=0)`}
+
+for d in range(1, 13):
+    m = DecisionTreeRegressor(criterion="squared_error", max_depth=d,
+                              min_samples_leaf=${S.ro.minLeaf}, random_state=0).fit(X_tr, y_tr)
+    print(d, round(mean_squared_error(y_tr, m.predict(X_tr)), 1),
+             round(mean_squared_error(y_va, m.predict(X_va)), 1))
+
+model = DecisionTreeRegressor(criterion="squared_error", max_depth=${S.ro.depth},
+                              min_samples_leaf=${S.ro.minLeaf}, random_state=0).fit(X_tr, y_tr)
+print("검증 MSE:", round(mean_squared_error(y_va, model.predict(X_va)), 1))${inc?`   # 화면: ${f1(R.va)}`:""}
+print("검증 R²:", round(r2_score(y_va, model.predict(X_va)), 3))${inc?`         # 화면: ${f3(R.vaR2)}`:""}
+
+lin = LinearRegression().fit(X_tr, y_tr)
+print("선형회귀 검증 MSE:", round(mean_squared_error(y_va, lin.predict(X_va)), 1))${inc?`   # 화면: ${f1(D.lin.va)}`:""}
+`;
+  }
+  const d=S.rd, T=rgTree(), all=d.X.map((_,i)=>i), mse=mseOn(T,d.X,d.y,all,Infinity);
+  return `import numpy as np
+from sklearn.tree import DecisionTreeRegressor, export_text
+from sklearn.metrics import mean_squared_error
+
+# 특성: [나이]  /  타깃: ${TGT[tg].name} (${TGT[tg].unit})
+${inc?`X = np.array([
+${pyVec(d.X.map(p=>p[0]),14)}
+]).reshape(-1, 1)
+y = np.array([
+${pyVec(d.y,10)}
+])`:`X = df[["나이"]].values
+y = df["${yname}"].values`}
+
+model = DecisionTreeRegressor(
+    criterion="squared_error",   # 분할 기준: MSE (분산) 감소
+    max_depth=${S.rg.maxDepth},
+    min_samples_leaf=${S.rg.minLeaf},
+    random_state=0,
+)
+model.fit(X, y)
+
+print(export_text(model, feature_names=["나이"]))
+print("학습 MSE:", round(mean_squared_error(y, model.predict(X)), 1))${inc?`   # 화면: ${f1(mse)}`:""}
+print("학습 R²:", round(model.score(X, y), 3))${inc?`          # 화면: ${f3(r2(mse,d.y,all))}`:""}
+print("잎(계단) 수:", model.get_n_leaves())${inc?`          # 화면: ${T.filter(n=>n.left==null).length}`:""}
+`;
+}
+function renderCode(){
+  const cls=S.part==="clf";
+  $("codeTitle").textContent=cls?"scikit-learn 코드 · DecisionTreeClassifier":"scikit-learn 코드 · DecisionTreeRegressor";
+  $("codePre").textContent=genCode();
+  document.querySelectorAll("#cmpTable [data-col]").forEach(td=>td.classList.toggle("on",td.dataset.col===S.part));
+}
+
+/* ================================================================== 파트 · 탭 */
+const TABS={clf:["split","grow","prune"], reg:["split","grow","over"]};
+const RENDER={"clf-split":renderCS,"clf-grow":renderCG,"clf-prune":renderCP,"reg-split":renderRS,"reg-grow":renderRG,"reg-over":renderRO};
+const NOTES={clf:"잎에서 다수 클래스를 예측합니다. 분할 기준은 지니 또는 엔트로피 불순도입니다.",reg:"잎에서 평균을 예측합니다. 분할 기준은 MSE(분산) 감소입니다."};
+function writeHash(){ const t=S.tab[S.part]; history.replaceState(null,"","#"+S.part+(t===TABS[S.part][0]?"":"-"+t)); }
+function redraw(){ stopPlay(); const key=S.part+"-"+S.tab[S.part]; RENDER[key](); renderCode(); }
+function redrawKeep(){ const key=S.part+"-"+S.tab[S.part]; RENDER[key](); renderCode(); }
+function setPart(p,write){
+  S.part=p;
+  document.querySelectorAll("#partSeg button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.part===p));
+  $("part-clf").hidden=p!=="clf"; $("part-reg").hidden=p!=="reg";
+  $("partNote").textContent=NOTES[p];
+  showTab(p,S.tab[p],write);
+}
+function showTab(p,t,write){
+  S.tab[p]=t;
+  TABS[p].forEach(x=>{ const b=$(`tab-${p}-${x}`), on=x===t; b.setAttribute("aria-selected",on); b.tabIndex=on?0:-1; $(`pane-${p}-${x}`).hidden=!on; });
+  if(write!==false) writeHash();
+  if(S.part===p) redraw();
+}
+document.querySelectorAll("#partSeg button").forEach((b,i,arr)=>{
+  b.addEventListener("click",()=>setPart(b.dataset.part));
+  b.addEventListener("keydown",e=>{ const d=e.key==="ArrowRight"?1:e.key==="ArrowLeft"?-1:0; if(!d) return; const n=arr[(i+d+arr.length)%arr.length]; setPart(n.dataset.part); n.focus(); e.preventDefault(); });
+});
+Object.keys(TABS).forEach(p=>{
+  const btns=TABS[p].map(t=>$(`tab-${p}-${t}`));
+  btns.forEach((b,i)=>{
+    b.addEventListener("click",()=>showTab(p,TABS[p][i]));
+    b.addEventListener("keydown",e=>{ const d=e.key==="ArrowRight"?1:e.key==="ArrowLeft"?-1:0; if(!d) return; const j=(i+d+btns.length)%btns.length; showTab(p,TABS[p][j]); btns[j].focus(); e.preventDefault(); });
+  });
+});
+function readHash(){
+  const h=location.hash.slice(1), [p,t]=h.split("-");
+  const part=TABS[p]?p:"clf", tab=(TABS[part].includes(t)?t:TABS[part][0]);
+  S.tab[part]=tab; setPart(part,false);
+}
+window.addEventListener("hashchange",readHash);
+
+/* ================================================================== 조작 연결 */
+function seg(el,cb){ el.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b)); cb(b.dataset.v); })); }
+function syncSeg(sel,v){ document.querySelectorAll(sel).forEach(el=>el.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===v))); }
+document.querySelectorAll(".dt-crit").forEach(el=>seg(el,v=>{ S.crit=v; syncSeg(".dt-crit",v); redrawKeep(); }));
+document.querySelectorAll(".dt-target").forEach(el=>seg(el,v=>{ S.rd.target=v; syncSeg(".dt-target",v); loadReg(); S.rg.sel=null; redrawKeep(); }));
+function slider(id,cb,fmt){ const el=$(id), out=$(id+"V"); el.addEventListener("input",()=>{ const v=+el.value; if(out) out.textContent=fmt?fmt(v):v; cb(v); }); }
+
+/* 분류 1 */
+seg($("csFeat"),v=>{ S.cd.feat=+v; renderCS(); });
+seg($("csAdd"),v=>{ S.cd.add=+v; });
+slider("csThr",v=>{ S.cd.thr[S.cd.feat]=v; renderCS(); },fT);
+$("csBest").onclick=()=>{ const d=S.cd, b=bestSplit("clf",S.crit,d.X,d.y,d.X.map((_,i)=>i),1,[d.feat]); if(b){ d.thr[d.feat]=b.t; renderCS(); } };
+slider("csN",v=>{ S.cd.n=v; loadClf(); S.cg.sel=null; redrawKeep(); });
+$("csNew").onclick=()=>{ S.cd.seed++; loadClf(); S.cg.sel=null; redrawKeep(); };
+$("csReset").onclick=()=>{ S.cd.seed=CLF_DEF.seed; S.cd.n=CLF_DEF.n; $("csN").value=CLF_DEF.n; $("csNV").textContent=CLF_DEF.n; loadClf(); S.cg.sel=null; redrawKeep(); };
+$("csCv").addEventListener("click",e=>{
+  const cv=$("csCv"), r=cv.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top, d=S.cd;
+  const W=view0(cv);
+  const i=nearestPoint(W,d.X,d.y,mx,my,p=>p[0],p=>p[1]);
+  if(i>=0){ d.X.splice(i,1); d.y.splice(i,1); }
+  else { if(mx<W.pad.l||mx>W.pad.l+W.pw||my<W.pad.t||my>W.pad.t+W.ph) return;
+    d.X.push([Math.round(clamp(W.ix(mx),20,85)),Math.round(clamp(W.iy(my),15,40)*10)/10]); d.y.push(d.add); }
+  S.cg.sel=null; renderCS(); renderCode();
+});
+/* 캔버스 크기를 다시 재지 않고 좌표 변환만 계산 */
+function view0(cv){ const w=cv.clientWidth, h=cv.clientHeight, pad={l:w<420?42:50,r:12,t:12,b:40}, pw=w-pad.l-pad.r, ph=h-pad.t-pad.b;
+  const xr=cv._xr||CLF_BOX[0], yr=cv._yr||CLF_BOX[1];
+  return {pad,pw,ph,px:x=>pad.l+(x-xr[0])/(xr[1]-xr[0])*pw,py:v=>pad.t+(1-(v-yr[0])/(yr[1]-yr[0]))*ph,ix:X=>xr[0]+(X-pad.l)/pw*(xr[1]-xr[0]),iy:Y=>yr[0]+(1-(Y-pad.t)/ph)*(yr[1]-yr[0])}; }
+
+/* 분류 2 */
+let timer=null;
+const SPEEDS=[0.5,1,2,3];
+function stopPlay(){ if(timer){ clearInterval(timer); timer=null; } ["cgPlay","rgPlay"].forEach(id=>$(id).textContent="재생"); }
+function play(which){
+  if(timer){ stopPlay(); return; }
+  const st=which==="cg"?S.cg:S.rg, T=which==="cg"?cgTree():rgTree(), rend=which==="cg"?renderCG:renderRG;
+  if(st.step>=T.splits) st.step=0;
+  st.sel=null; rend(); renderCode();
+  $(which+"Play").textContent="멈춤";
+  const sp=SPEEDS[+$(which+"Speed").value];
+  timer=setInterval(()=>{ const TT=which==="cg"?cgTree():rgTree(); if(st.step>=TT.splits){ stopPlay(); return; } st.step++; rend(); if(st.step>=TT.splits) stopPlay(); }, 1100/sp);
+}
+function stepper(pre,st,rend,getT){
+  $(pre+"First").onclick=()=>{ stopPlay(); st.step=0; st.sel=null; rend(); };
+  $(pre+"Prev").onclick=()=>{ stopPlay(); st.step=Math.max(0,st.step-1); rend(); };
+  $(pre+"Next").onclick=()=>{ stopPlay(); st.step=Math.min(getT().splits,st.step+1); rend(); };
+  $(pre+"Play").onclick=()=>play(pre);
+  slider(pre+"Speed",()=>{},v=>SPEEDS[v]+"×");
+}
+stepper("cg",S.cg,renderCG,cgTree);
+stepper("rg",S.rg,renderRG,rgTree);
+const reGrowC=()=>{ stopPlay(); S.cg.sel=null; S.cg.step=cgTree().splits; renderCG(); renderCode(); };
+slider("cgDepth",v=>{ S.cg.maxDepth=v; reGrowC(); });
+slider("cgMinSplit",v=>{ S.cg.minSplit=v; reGrowC(); });
+slider("cgMinLeaf",v=>{ S.cg.minLeaf=v; reGrowC(); });
+$("cgCv").addEventListener("click",e=>{
+  const cv=$("cgCv"), V=cv._view; if(!V) return; const r=cv.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+  if(mx<V.pad.l||mx>V.pad.l+V.pw||my<V.pad.t||my>V.pad.t+V.ph) return;
+  const lf=leafOf(cgTree(),[V.ix(mx),V.iy(my)],S.cg.step); S.cg.sel=S.cg.sel===lf.id?null:lf.id; renderCG();
+});
+
+/* 분류 3 */
+slider("cpDepth",v=>{ S.cp.depth=v; renderCP(); renderCode(); });
+slider("cpMinLeaf",v=>{ S.cp.minLeaf=v; renderCP(); renderCode(); });
+slider("cpN",v=>{ S.cp.n=v; renderCP(); renderCode(); });
+slider("cpNoise",v=>{ S.cp.noise=v/100; renderCP(); renderCode(); },v=>v+"%");
+$("cpNew").onclick=()=>{ S.cp.seed++; renderCP(); renderCode(); };
+$("cpBest").onclick=()=>{ S.cp.depth=cpData().best; $("cpDepth").value=S.cp.depth; renderCP(); renderCode(); };
+$("cpShowVa").addEventListener("change",e=>{ S.cp.showVa=e.target.checked; renderCP(); });
+
+/* 회귀 1 */
+slider("rsThr",v=>{ S.rd.thr=v; renderRS(); },fT);
+$("rsBest").onclick=()=>{ const d=S.rd, b=bestSplit("reg","mse",d.X,d.y,d.X.map((_,i)=>i),1,[0]); if(b){ d.thr=b.t; renderRS(); } };
+$("rsRes").addEventListener("change",e=>{ S.rd.showRes=e.target.checked; renderRS(); });
+slider("rsN",v=>{ S.rd.n=v; loadReg(); S.rg.sel=null; redrawKeep(); });
+$("rsNew").onclick=()=>{ S.rd.seed++; loadReg(); S.rg.sel=null; redrawKeep(); };
+$("rsReset").onclick=()=>{ S.rd.seed=REG_DEF.seed; S.rd.n=REG_DEF.n; $("rsN").value=REG_DEF.n; $("rsNV").textContent=REG_DEF.n; loadReg(); S.rg.sel=null; redrawKeep(); };
+$("rsCv").addEventListener("click",e=>{
+  const cv=$("rsCv"), r=cv.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top, d=S.rd;
+  cv._xr=REG_XR; cv._yr=regYR(d.target,d.y); const W=view0(cv);
+  const i=nearestPoint(W,d.X,d.y,mx,my,p=>p[0],(p,j)=>d.y[j]);
+  if(i>=0){ if(d.X.length<=3) return; d.X.splice(i,1); d.y.splice(i,1); }
+  else { if(mx<W.pad.l||mx>W.pad.l+W.pw||my<W.pad.t||my>W.pad.t+W.ph) return;
+    d.X.push([Math.round(clamp(W.ix(mx),20,80))]); const v=W.iy(my); d.y.push(TGT[d.target].dec===0?Math.round(v):Math.round(v*10)/10); }
+  S.rg.sel=null; renderRS(); renderCode();
+});
+
+/* 회귀 2 */
+const reGrowR=()=>{ stopPlay(); S.rg.sel=null; S.rg.step=rgTree().splits; renderRG(); renderCode(); };
+slider("rgDepth",v=>{ S.rg.maxDepth=v; reGrowR(); });
+slider("rgMinLeaf",v=>{ S.rg.minLeaf=v; reGrowR(); });
+$("rgCv").addEventListener("click",e=>{
+  const cv=$("rgCv"), V=cv._view; if(!V) return; const r=cv.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+  if(mx<V.pad.l||mx>V.pad.l+V.pw||my<V.pad.t||my>V.pad.t+V.ph) return;
+  const lf=leafOf(rgTree(),[V.ix(mx)],S.rg.step); S.rg.sel=S.rg.sel===lf.id?null:lf.id; renderRG();
+});
+
+/* 회귀 3 */
+slider("roDepth",v=>{ S.ro.depth=v; renderRO(); renderCode(); });
+slider("roMinLeaf",v=>{ S.ro.minLeaf=v; renderRO(); renderCode(); });
+slider("roN",v=>{ S.ro.n=v; renderRO(); renderCode(); });
+slider("roNoise",v=>{ S.ro.noise=v; renderRO(); renderCode(); },v=>v.toFixed(1)+"×");
+$("roNew").onclick=()=>{ S.ro.seed++; renderRO(); renderCode(); };
+$("roBest").onclick=()=>{ S.ro.depth=roData().best; $("roDepth").value=S.ro.depth; renderRO(); renderCode(); };
+$("roLin").addEventListener("change",e=>{ S.ro.showLin=e.target.checked; renderRO(); });
+
+/* 코드 */
+$("codeData").addEventListener("change",e=>{ S.codeData=e.target.checked; renderCode(); });
+$("codeCopy").onclick=()=>{
+  const txt=$("codePre").textContent, btn=$("codeCopy");
+  const done=()=>{ btn.textContent="복사됨"; setTimeout(()=>btn.textContent="복사",1400); };
+  const fallback=()=>{ const ta=document.createElement("textarea"); ta.value=txt; ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta); ta.select(); try{ document.execCommand("copy"); }catch(_){} ta.remove(); done(); };
+  if(navigator.clipboard&&window.isSecureContext) navigator.clipboard.writeText(txt).then(done,fallback); else fallback();
+};
+
+/* 키보드: 나무 키우기 화면에서 → 다음, ← 이전 */
+document.addEventListener("keydown",e=>{
+  if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft") return;
+  if(S.tab[S.part]!=="grow") return;
+  if(e.target.closest&&e.target.closest("input,select,textarea,.sk-tabs,.sk-seg")) return;
+  if(e.altKey||e.ctrlKey||e.metaKey) return;
+  const pre=S.part==="clf"?"cg":"rg"; $(pre+(e.key==="ArrowRight"?"Next":"Prev")).click(); e.preventDefault();
+});
+
+/* 테마 · 크기 변화 → 다시 그리기 */
+let raf=0; const later=()=>{ cancelAnimationFrame(raf); raf=requestAnimationFrame(redrawKeep); };
+new MutationObserver(later).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+try{ matchMedia("(prefers-color-scheme: dark)").addEventListener("change",later); }catch(_){}
+let lastW=window.innerWidth; window.addEventListener("resize",()=>{ if(window.innerWidth!==lastW){ lastW=window.innerWidth; later(); } });
+
+/* 검산용 접근 (강의 중 콘솔에서 확인 가능) */
+
+readHash();
+})();
+</script>
+</body>
+</html>

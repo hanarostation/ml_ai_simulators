@@ -1,0 +1,1297 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>선형회귀 시뮬레이터 (최소제곱법 · 경사하강법) | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20260930c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20260930c">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 파랑 = 데이터 · 보라 = 학습(내 직선, 경사하강 경로) · 초록 = 최소제곱 해(답)
+   주황 = 잔차·평가 · 빨강 = 이상값·발산 · 청록 = 손실 곡면 */
+:root{ --sk-accent: var(--cat-ml);
+  --c-data:#2563EB; --c-fit:#7C3AED; --c-ols:#15803D; --c-res:#EA580C; --c-out:#DC2626; --c-hm:#0E7490;
+  --ramp0:#E3EEFF; --ramp1:#1E3A8A; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --c-data:#6AA5FF; --c-fit:#B294FF; --c-ols:#4ADE80; --c-res:#FF914D; --c-out:#F87171; --c-hm:#22D3EE;
+  --ramp0:#1B2A45; --ramp1:#A5C8FF; } }
+:root[data-theme="dark"]{
+  --c-data:#6AA5FF; --c-fit:#B294FF; --c-ols:#4ADE80; --c-res:#FF914D; --c-out:#F87171; --c-hm:#22D3EE;
+  --ramp0:#1B2A45; --ramp1:#A5C8FF; }
+
+.lr-pane{display:flex;flex-direction:column;gap:16px}
+.lr-dot, .sk-legend i.lr-dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.lr-ln, .sk-legend i.lr-ln{display:inline-block;width:20px;height:0;border-radius:0;border-top:3px solid;margin-right:5px;vertical-align:3px;background:none}
+.lr-ln.dash, .sk-legend i.lr-ln.dash{border-top-style:dashed}
+.sk-legend i.lr-sq{border-radius:0}
+.lr-sq{display:inline-block;width:11px;height:11px;margin-right:5px;vertical-align:-1px;border:1.5px solid var(--c-res);background:color-mix(in srgb,var(--c-res) 22%,transparent)}
+.c-data{color:var(--c-data)} .c-fit{color:var(--c-fit)} .c-ols{color:var(--c-ols)} .c-res{color:var(--c-res)} .c-out{color:var(--c-out)}
+
+.lr-cv{display:block;width:100%;border-radius:10px;border:1px solid var(--line);background:var(--surface)}
+#cvOls{aspect-ratio:16/11;cursor:crosshair;touch-action:none}
+#cvCont{aspect-ratio:4/3;cursor:crosshair}
+#cvGdLine{aspect-ratio:4/3}
+#cvLoss{aspect-ratio:16/9}
+#cvPlane{aspect-ratio:4/3}
+#cvPred{aspect-ratio:4/3}
+
+.lr-main{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(290px,1fr);gap:20px;align-items:start}
+@media (max-width:980px){.lr-main{grid-template-columns:minmax(0,1fr)}}
+.lr-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.lr-panel{display:flex;flex-direction:column;gap:12px;min-width:0}
+.lr-panel .sk-slider{min-width:0}
+.lr-info{font-size:13px;color:var(--muted);margin:0;min-height:1.5em;font-family:var(--mono)}
+
+.lr-sse{display:grid;gap:5px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.lr-sse .row{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted)}
+.lr-sse .row b{font-family:var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
+.lr-bar{height:12px;border-radius:6px;background:var(--surface);border:1px solid var(--line);overflow:hidden}
+.lr-bar i{display:block;height:100%;border-radius:6px;transition:width .2s}
+.lr-gap{font-size:13.5px;margin:2px 0 0;color:var(--text)}
+.lr-gap b{color:var(--ink)}
+
+.lr-formula{white-space:pre;margin:0}
+.lr-eq{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-family:var(--mono);font-size:13px;color:var(--ink)}
+.lr-mx{display:inline-grid;grid-auto-flow:row;column-gap:12px;row-gap:1px;padding:3px 8px;border-left:2px solid var(--ink);border-right:2px solid var(--ink);border-radius:7px;font-variant-numeric:tabular-nums;text-align:right;background:var(--surface)}
+.lr-mx span{white-space:nowrap}
+.lr-eqblock{display:flex;flex-direction:column;gap:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto}
+.lr-ok{color:var(--c-ols);font-weight:700}
+.lr-bad{color:var(--c-out);font-weight:700}
+.lr-mut{color:var(--muted)}
+
+details.lr-more{font-size:13.5px;color:var(--muted)}
+details.lr-more summary{cursor:pointer;font-weight:600;color:var(--ink)}
+details.lr-more summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+details.lr-more[open] summary{margin-bottom:8px}
+.lr-tablewrap{max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.lr-table td.big, .lr-table th.big{font-weight:700;color:var(--ink)}
+.lr-table tr.out td{color:var(--c-out)}
+.lr-table tfoot td{font-weight:700;background:var(--surface-2)}
+.lr-cmp td{white-space:normal;vertical-align:top;line-height:1.5}
+.lr-cmp th:first-child,.lr-cmp td:first-child{white-space:nowrap;color:var(--muted);font-weight:600}
+.lr-cmp code, .lr-code-inline{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:0 4px;color:var(--ink)}
+
+.lr-ta{width:100%;min-height:120px;font-family:var(--mono);font-size:13px;resize:vertical}
+.lr-code{white-space:pre;margin:0;max-height:520px;overflow:auto;font-size:12.5px;line-height:1.6}
+.lr-copyrow{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.lr-flash{font-size:13px;color:var(--c-ols);font-weight:600}
+
+.lr-status{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;border-radius:999px;padding:2px 10px;border:1px solid currentColor}
+.lr-status.run{color:var(--c-fit)} .lr-status.ok{color:var(--c-ols)} .lr-status.bad{color:var(--c-out)} .lr-status.idle{color:var(--muted)}
+.lr-big{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.lr-rampbar{width:160px;max-width:40vw;height:10px;border-radius:5px;border:1px solid var(--line);display:inline-block;vertical-align:-1px}
+.lr-sub{font-size:12.5px;color:var(--muted);margin:0}
+.lr-kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--ink)}
+.lr-crit{font-size:12.5px;color:var(--muted);font-family:var(--mono)}
+.lr-calc{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:760px){.lr-calc{grid-template-columns:minmax(0,1fr)}}
+.lr-verdict{font-size:15px;font-weight:700;margin:0;color:var(--ink)}
+
+@media (max-width:520px){
+  #cvOls, #cvCont{aspect-ratio:1/1}
+  .lr-rampbar{width:90px}
+  .sk-slider{min-width:0;width:100%}
+  .sk-controls{gap:10px 12px}
+  .lr-eq{font-size:12px}
+  .lr-mx{column-gap:8px;padding:2px 5px}
+}
+@media (prefers-reduced-motion: reduce){ .lr-bar i{transition:none} }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)" aria-current="page">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">선형회귀 시뮬레이터 (최소제곱법 · 경사하강법)</h1>
+      <p class="ds-hero__lede">나이로 수축기 혈압을 예측하는 직선을 두 가지 방법으로 찾습니다. 최소제곱법은 잔차 제곱합이 가장 작은 직선을 한 번에 계산하고, 경사하강법은 손실 곡면을 따라 조금씩 내려가 같은 답에 도달합니다. 점을 옮기고 학습률과 스케일링을 바꿔 가며 차이를 직접 확인합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button type="button" class="sk-tab" role="tab" id="tab-ols" aria-controls="pane-ols" aria-selected="true"><span class="sk-num">1</span>최소제곱법(OLS)</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-gd" aria-controls="pane-gd" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>경사하강법(GD)</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-cmp" aria-controls="pane-cmp" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>두 방법 비교</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-multi" aria-controls="pane-multi" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>다중 회귀 맛보기</button>
+  </nav>
+
+  <!-- ================= 1. 최소제곱법 ================= -->
+  <section id="pane-ols" class="lr-pane" role="tabpanel" aria-labelledby="tab-ols">
+    <div class="sk-card">
+      <div class="lr-main">
+        <div class="lr-col">
+          <div class="sk-head"><h2>잔차와 잔차 제곱: 넓이의 합이 가장 작은 직선</h2>
+            <div class="sk-legend"><span><i class="lr-dot" style="background:var(--c-data)"></i>환자</span><span><i class="lr-dot" style="background:var(--c-out)"></i>이상값</span><span><i class="lr-ln" style="border-color:var(--c-fit)"></i>내 직선</span><span><i class="lr-ln dash" style="border-color:var(--c-ols)"></i>최소제곱 직선</span><span><i class="lr-sq"></i>잔차 제곱</span></div>
+          </div>
+          <div class="sk-controls">
+            <div class="sk-group"><span class="sk-label">데이터</span>
+              <div class="sk-seg" id="presetSeg" role="group" aria-label="프리셋 데이터">
+                <button type="button" data-v="linear" aria-pressed="true">선형</button>
+                <button type="button" data-v="noisy" aria-pressed="false">잡음 큼</button>
+                <button type="button" data-v="outlier" aria-pressed="false">이상값 포함</button>
+              </div>
+            </div>
+            <div class="sk-group">
+              <button type="button" class="sk-btn sk-btn--sm" id="btnOut">이상값 넣기</button>
+              <button type="button" class="sk-btn sk-btn--sm" id="btnSeed">다른 난수</button>
+              <button type="button" class="sk-btn sk-btn--sm" id="btnClear">모두 지우기</button>
+            </div>
+          </div>
+          <canvas id="cvOls" class="lr-cv" role="img" aria-label="나이와 수축기 혈압 산점도. 내 직선과 최소제곱 직선, 잔차 선분과 잔차 제곱 정사각형이 그려져 있다. 빈 곳을 누르면 점 추가, 끌면 이동, 우클릭이나 길게 누르면 삭제"></canvas>
+          <p class="sk-hint" style="margin:0">빈 곳 클릭 = 점 추가 · 점 끌기 = 이동 · 우클릭 또는 길게 누르기 = 삭제 · 정사각형 한 변 = 잔차(화면에서 넓이 ∝ 잔차²)</p>
+          <p class="lr-info" id="ptInfo" aria-live="polite"></p>
+        </div>
+        <div class="lr-panel">
+          <h3>내 직선 &nbsp;<span class="sk-mono">ŷ = b0 + b1·x</span></h3>
+          <div class="sk-slider"><div class="sk-sl-head"><label for="sB1">기울기 b1 (나이 1세당 혈압 변화)</label><b id="vB1"></b></div><input type="range" id="sB1" min="-2" max="4" step="0.005"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><label for="sB0">절편 b0 (나이 0세에서의 값)</label><b id="vB0"></b></div><input type="range" id="sB0" min="-60" max="240" step="0.1"></div>
+          <div class="sk-controls">
+            <button type="button" class="sk-btn sk-btn--primary" id="btnFit">최소제곱 해로 맞추기</button>
+            <label class="sk-check"><input type="checkbox" id="chkFollow">데이터가 바뀌면 따라가기</label>
+          </div>
+          <div class="lr-sse" aria-live="polite">
+            <div class="row"><span><i class="lr-dot" style="background:var(--c-fit)"></i>내 직선 SSE</span><b id="sseCur"></b></div>
+            <div class="lr-bar"><i id="barCur" style="background:var(--c-fit)"></i></div>
+            <div class="row"><span><i class="lr-dot" style="background:var(--c-ols)"></i>최소 SSE (최소제곱 직선)</span><b id="sseMin"></b></div>
+            <div class="lr-bar"><i id="barMin" style="background:var(--c-ols)"></i></div>
+            <p class="lr-gap" id="sseGap"></p>
+          </div>
+          <div class="sk-scroll">
+            <table class="sk-table lr-table" aria-label="적합 지표 비교">
+              <thead><tr><th>지표</th><th class="c-fit">내 직선</th><th class="c-ols">최소제곱</th></tr></thead>
+              <tbody id="fitStats"></tbody>
+            </table>
+          </div>
+          <div class="sk-controls" style="gap:8px 16px">
+            <label class="sk-check"><input type="checkbox" id="chkRes" checked>잔차 선분</label>
+            <label class="sk-check"><input type="checkbox" id="chkSq" checked>잔차 제곱</label>
+            <label class="sk-check"><input type="checkbox" id="chkOls" checked>최소제곱 직선</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>최소제곱 해를 현재 숫자로 계산하기</h2><span class="sk-hint">점을 옮기면 모든 숫자가 바로 다시 계산됩니다</span></div>
+      <div class="sk-grid2">
+        <div class="lr-col">
+          <h3>① 단순회귀 공식</h3>
+          <div class="sk-formula lr-formula" id="fSimple"></div>
+        </div>
+        <div class="lr-col">
+          <h3>② 정규방정식 &nbsp;<span class="sk-mono">β = (XᵀX)⁻¹Xᵀy</span></h3>
+          <div class="lr-eqblock" id="fNormal"></div>
+        </div>
+      </div>
+      <p class="sk-note" id="fCheck"></p>
+      <div class="sk-formula lr-formula" id="fR2"></div>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <h2>큰 잔차 하나가 직선을 끌어당긴다</h2>
+        <p class="sk-lead">잔차를 <b>제곱</b>해서 더하기 때문에, 멀리 떨어진 점 하나의 정사각형이 전체 SSE의 큰 몫을 차지합니다. 최소제곱 직선은 그 넓이를 줄이려고 그 점 쪽으로 기울어집니다.</p>
+        <div class="sk-stats" id="outStats"></div>
+        <p class="sk-note" id="outNote"></p>
+      </div>
+      <div class="sk-card">
+        <h2>데이터 표 · CSV</h2>
+        <details class="lr-more" id="resDetails"><summary>잔차 표 (내 직선 기준, 합계 = SSE)</summary>
+          <div class="lr-tablewrap"><table class="sk-table lr-table" aria-label="점별 잔차 표"><thead><tr><th>#</th><th>나이 x</th><th>혈압 y</th><th>ŷ</th><th>잔차 e = y − ŷ</th><th>e²</th></tr></thead><tbody id="resBody"></tbody><tfoot id="resFoot"></tfoot></table></div>
+        </details>
+        <details class="lr-more"><summary>CSV 붙여 넣기 (나이, 혈압)</summary>
+          <p class="lr-sub">한 줄에 한 명씩 <span class="lr-code-inline">나이,혈압</span>. 첫 줄 제목은 건너뜁니다. 나이 0~90, 혈압 60~220 범위로 맞춥니다.</p>
+          <textarea class="sk-input lr-ta" id="csvIn" aria-label="CSV 입력" spellcheck="false"></textarea>
+          <div class="lr-copyrow" style="margin-top:8px">
+            <button type="button" class="sk-btn sk-btn--sm sk-btn--primary" id="csvApply">적용</button>
+            <button type="button" class="sk-btn sk-btn--sm" id="csvFill">현재 데이터 가져오기</button>
+            <span class="lr-flash" id="csvMsg" aria-live="polite"></span>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 2. 경사하강법 ================= -->
+  <section id="pane-gd" class="lr-pane" role="tabpanel" aria-labelledby="tab-gd" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>손실 곡면을 따라 내려가기</h2><span class="sk-hint">손실 L = MSE = (1/n)Σ(ŷᵢ − yᵢ)² · 데이터는 1번 화면과 같음 · 키보드 <span class="lr-kbd">→</span> 한 스텝</span></div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">방식</span>
+          <div class="sk-seg" id="modeSeg" role="group" aria-label="경사하강 방식">
+            <button type="button" data-v="batch" aria-pressed="true">배치 GD</button>
+            <button type="button" data-v="mini" aria-pressed="false">미니배치</button>
+            <button type="button" data-v="sgd" aria-pressed="false">SGD</button>
+          </div>
+        </div>
+        <div class="sk-slider" id="mWrap" style="min-width:170px" hidden><div class="sk-sl-head"><label for="sM">미니배치 크기 m</label><b id="vM">8</b></div><input type="range" id="sM" min="2" max="29" step="1" value="8"></div>
+        <label class="sk-check"><input type="checkbox" id="chkScale" checked>특성 스케일링 (표준화 z = (x − x̄)/s)</label>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-slider" style="min-width:240px"><div class="sk-sl-head"><label for="sLr">학습률 η (로그 눈금)</label><b id="vLr"></b></div><input type="range" id="sLr" min="-6" max="0.4" step="0.01"></div>
+        <div class="sk-group"><span class="sk-label">프리셋</span>
+          <div class="sk-seg" id="lrSeg" role="group" aria-label="학습률 프리셋">
+            <button type="button" data-v="small" aria-pressed="false">너무 작음</button>
+            <button type="button" data-v="good" aria-pressed="true">적당</button>
+            <button type="button" data-v="big" aria-pressed="false">발산</button>
+          </div>
+        </div>
+        <span class="lr-crit" id="lrCrit"></span>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-slider" style="min-width:170px"><div class="sk-sl-head"><label for="sI0" id="lI0">초기 b0</label><b id="vI0"></b></div><input type="range" id="sI0" min="-100" max="300" step="1" value="0"></div>
+        <div class="sk-slider" style="min-width:170px"><div class="sk-sl-head"><label for="sI1" id="lI1">초기 b1</label><b id="vI1"></b></div><input type="range" id="sI1" min="-60" max="80" step="0.5" value="0"></div>
+        <div class="sk-slider" style="min-width:170px"><div class="sk-sl-head"><label for="sIter">최대 반복 수</label><b id="vIter"></b></div><input type="range" id="sIter" min="10" max="3000" step="10" value="200"></div>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button type="button" class="sk-btn" id="gdStep">한 스텝</button>
+          <button type="button" class="sk-btn sk-btn--primary" id="gdPlay">재생</button>
+          <button type="button" class="sk-btn" id="gdRun">끝까지</button>
+          <button type="button" class="sk-btn" id="gdReset">초기화</button>
+        </div>
+        <div class="sk-slider" style="min-width:160px"><div class="sk-sl-head"><label for="sSpd">재생 속도</label><b id="vSpd"></b></div><input type="range" id="sSpd" min="0" max="6" step="1" value="2"></div>
+      </div>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h3 id="contTitle">손실 곡면 등고선 (b0, b1)</h3>
+          <div class="sk-legend"><span><i class="lr-ln" style="border-color:var(--c-fit)"></i>GD 경로</span><span><i class="lr-dot" style="background:var(--c-ols)"></i>최소제곱 해</span></div></div>
+        <canvas id="cvCont" class="lr-cv" role="img" aria-label="절편과 기울기에 대한 손실 곡면 등고선 히트맵과 경사하강 경로. 누르면 그 위치를 시작점으로 정한다"></canvas>
+        <div class="sk-controls" style="gap:8px 16px">
+          <label class="sk-check"><input type="checkbox" id="chkAspect" checked>축 비율 1:1 (실제 모양)</label>
+          <span class="sk-hint">등고선을 누르면 그 점에서 다시 시작합니다</span>
+        </div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h3>현재 직선 (원래 단위)</h3>
+          <div class="sk-legend"><span><i class="lr-ln" style="border-color:var(--c-fit)"></i>GD 직선</span><span><i class="lr-ln dash" style="border-color:var(--c-ols)"></i>최소제곱 직선</span><span><i class="lr-dot" style="background:transparent;border:2px solid var(--c-res)"></i>이번 배치</span></div></div>
+        <canvas id="cvGdLine" class="lr-cv" role="img" aria-label="데이터 산점도 위의 현재 경사하강 직선과 최소제곱 직선"></canvas>
+        <div class="sk-stats" id="gdStats"></div>
+      </div>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h3>손실 곡선</h3><label class="sk-check"><input type="checkbox" id="chkLog">로그 축 (L − L*)</label></div>
+        <canvas id="cvLoss" class="lr-cv" role="img" aria-label="반복에 따른 손실 곡선"></canvas>
+        <p class="lr-sub" id="lossSub"></p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h3>이번 스텝의 기울기 계산</h3><span id="gdBadge" class="lr-status idle">준비</span></div>
+        <div class="sk-formula lr-formula" id="gdFormula"></div>
+        <p class="sk-note" id="gdNote"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 3. 비교 ================= -->
+  <section id="pane-cmp" class="lr-pane" role="tabpanel" aria-labelledby="tab-cmp" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>지금 데이터에서 두 방법의 답</h2><span class="sk-hint">경사하강법 값은 2번 화면의 현재 상태</span></div>
+      <div class="sk-scroll"><table class="sk-table lr-table" aria-label="두 방법의 계수 비교"><thead><tr><th>방법</th><th>b0 (절편)</th><th>b1 (기울기)</th><th>MSE</th><th>계산</th></tr></thead><tbody id="cmpNow"></tbody></table></div>
+      <p class="sk-note" id="cmpNote"></p>
+    </div>
+    <div class="sk-card">
+      <h2>최소제곱법(정규방정식) vs 경사하강법</h2>
+      <div class="sk-scroll">
+        <table class="sk-table lr-cmp" aria-label="두 방법 비교표">
+          <thead><tr><th>항목</th><th>최소제곱법 (정규방정식)</th><th>경사하강법</th></tr></thead>
+          <tbody>
+            <tr><td>계산 방식</td><td>미분 = 0 을 한 번에 풀어 닫힌 해 β = (XᵀX)⁻¹Xᵀy</td><td>기울기 반대 방향으로 조금씩 반복 갱신 β ← β − η∇L</td></tr>
+            <tr><td>계산량</td><td>XᵀX 만들기 O(np²) + 풀기 O(p³) = <b>O(np² + p³)</b></td><td>반복 1번 O(np) (미니배치는 O(mp)) × 반복 수 k = <b>O(k·n·p)</b></td></tr>
+            <tr><td>메모리</td><td>p×p 행렬 XᵀX 필요 (p가 크면 부담)</td><td>파라미터 p개 + 배치만 있으면 됨 (데이터를 나눠 읽기 가능)</td></tr>
+            <tr><td>하이퍼파라미터</td><td>없음</td><td>학습률 η, 반복 수, 배치 크기 (잘못 고르면 느리거나 발산)</td></tr>
+            <tr><td>특성 스케일링</td><td>필요 없음 (스케일을 바꿔도 같은 직선)</td><td>사실상 필수 (조건수가 작아져 빨리 수렴)</td></tr>
+            <tr><td>답의 정확도</td><td>정확한 해 (부동소수점 오차 수준)</td><td>근사 해 (멈춘 시점까지). SGD는 해 주변에서 흔들림</td></tr>
+            <tr><td>잘 맞는 상황</td><td>n·p가 적당할 때 (특성 수천 개 이하)</td><td>데이터가 아주 크거나(n), 특성이 많거나(p), 계속 들어오는 데이터(온라인 학습)</td></tr>
+            <tr><td>XᵀX가 특이할 때</td><td>역행렬 불가 → 유사역행렬(lstsq, SVD)이나 릿지</td><td>계속 움직이지만 수렴이 느리거나 해가 하나로 정해지지 않음</td></tr>
+            <tr><td>scikit-learn</td><td><code>LinearRegression</code> (내부적으로 lstsq 계열 풀이)</td><td><code>SGDRegressor</code> (한 샘플씩 갱신, 스케일링과 함께 사용)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>규모가 커지면: 대략 연산량 비교</h2><span class="sk-hint">상수는 무시한 크기 비교입니다</span></div>
+      <div class="lr-calc">
+        <div class="sk-slider"><div class="sk-sl-head"><label for="cN">표본 수 n</label><b id="vCN"></b></div><input type="range" id="cN" min="2" max="8" step="0.5" value="4"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="cP">특성 수 p</label><b id="vCP"></b></div><input type="range" id="cP" min="0" max="5" step="0.5" value="1"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="cK">에폭 수 k (GD 전체 반복)</label><b id="vCK"></b></div><input type="range" id="cK" min="1" max="3" step="0.5" value="2"></div>
+      </div>
+      <div class="sk-stats" id="calcStats"></div>
+      <p class="lr-verdict" id="calcVerdict"></p>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>현재 설정으로 만든 파이썬 코드</h2><span class="sk-hint">scikit-learn · NumPy · 1·2번 화면의 데이터와 설정 반영</span></div>
+      <div class="lr-copyrow"><button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="btnCopy">코드 복사</button><span class="lr-flash" id="copyMsg" aria-live="polite"></span></div>
+      <pre class="sk-formula lr-code" id="pyCode" tabindex="0" aria-label="파이썬 코드"></pre>
+    </div>
+  </section>
+
+  <!-- ================= 4. 다중 회귀 ================= -->
+  <section id="pane-multi" class="lr-pane" role="tabpanel" aria-labelledby="tab-multi" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>특성 2개: 직선 대신 평면 ŷ = b0 + b1·나이 + b2·BMI</h2><span class="sk-hint">가상 환자 데이터 · 난수 고정</span></div>
+      <p class="sk-lead">특성이 둘이면 회귀식은 평면이 됩니다. 왼쪽 그림의 배경색이 평면의 높이(예측 혈압)이고, 같은 색의 띠가 예측값이 같은 등고선입니다. 나이와 BMI가 서로 얽혀 있을수록 한 변수만 쓴 단순회귀의 기울기가 다른 변수의 효과까지 떠안습니다.</p>
+      <div class="sk-controls">
+        <div class="sk-slider"><div class="sk-sl-head"><label for="mRho">나이–BMI 상관 ρ</label><b id="vRho"></b></div><input type="range" id="mRho" min="0" max="0.9" step="0.05" value="0.6"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="mSig">잡음 표준편차 σ (mmHg)</label><b id="vSig"></b></div><input type="range" id="mSig" min="2" max="20" step="1" value="8"></div>
+        <button type="button" class="sk-btn sk-btn--sm" id="mSeed">다른 난수</button>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h3>회귀 평면을 위에서 본 모습</h3><span class="sk-legend" style="flex-wrap:nowrap;align-items:center"><span>혈압 낮음</span><span class="lr-rampbar" id="rampBar"></span><span>높음</span></span></div>
+        <canvas id="cvPlane" class="lr-cv" role="img" aria-label="가로 나이, 세로 BMI 평면 위에 예측 혈압을 색으로 칠한 회귀 평면과 환자 점"></canvas>
+        <p class="lr-sub">점 색 = 실제 혈압, 배경 색 = 예측 혈압. 점과 배경 색이 비슷할수록 잘 맞는 것입니다. 띠 경계는 10 mmHg 간격.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h3>실제 vs 예측</h3><span class="sk-hint">대각선에 가까울수록 정확</span></div>
+        <canvas id="cvPred" class="lr-cv" role="img" aria-label="실제 혈압과 다중회귀 예측 혈압 산점도"></canvas>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <h2>계수 비교</h2>
+        <div class="sk-scroll"><table class="sk-table lr-table" aria-label="단순회귀와 다중회귀 계수 비교"><thead><tr><th>모형</th><th>b0</th><th>b(나이)</th><th>b(BMI)</th><th>R²</th></tr></thead><tbody id="mTable"></tbody></table></div>
+        <p class="sk-note" id="mNote"></p>
+      </div>
+      <div class="sk-card">
+        <h2>정규방정식 (3×3)</h2>
+        <div class="lr-eqblock" id="mNormal"></div>
+        <div class="sk-formula lr-formula" id="mCode"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20260930c"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const reduceMotion = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+  /* ---------------- 공통 도구 ---------------- */
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  function parseColor(s) {
+    s = (s || "").trim();
+    if (s[0] === "#") { let h = s.slice(1); if (h.length === 3) h = h.split("").map(c => c + c).join("");
+      const n = parseInt(h.slice(0, 6), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+    const m = s.match(/[\d.]+/g); return m ? [+m[0], +m[1], +m[2]] : [128, 128, 128];
+  }
+  const rgba = (c, a) => { const [r, g, b] = parseColor(c); return `rgba(${r},${g},${b},${a})`; };
+  const mix = (a, b, t) => [0, 1, 2].map(i => Math.round(a[i] + (b[i] - a[i]) * t));
+  function colors() {
+    const k = ["--bg", "--surface", "--surface-2", "--ink", "--text", "--muted", "--faint", "--line", "--line-strong",
+      "--c-data", "--c-fit", "--c-ols", "--c-res", "--c-out", "--c-hm", "--ramp0", "--ramp1"];
+    const o = {}; k.forEach(n => o[n.replace(/^--/, "").replace(/-/g, "_")] = css(n)); return o;
+  }
+  function fitCanvas(cv) {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const w = Math.max(60, cv.clientWidth), h = Math.max(60, cv.clientHeight);
+    const W = Math.round(w * dpr), H = Math.round(h * dpr);
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+    return { ctx, w, h };
+  }
+  function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function gauss(r) { let u = 0; while (u === 0) u = r(); const v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+  const r1 = v => Math.round(v * 10) / 10;
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const minus = s => s.replace(/-/g, "−");
+  function fmt(v, d = 2) {
+    if (v === null || v === undefined || Number.isNaN(v)) return "—";
+    if (!isFinite(v)) return v > 0 ? "∞" : "−∞";
+    if (Math.abs(v) < 0.5 * Math.pow(10, -d)) v = 0;
+    return minus(v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }));
+  }
+  function fmtS(v, s = 4) { // 유효숫자
+    if (!isFinite(v)) return fmt(v);
+    if (v === 0) return "0";
+    const a = Math.abs(v);
+    if (a >= 1e-3 && a < 1e6) { const d = Math.max(0, s - 1 - Math.floor(Math.log10(a))); return fmt(v, Math.min(d, 8)); }
+    const [m, e] = v.toExponential(s - 1).split("e"); return minus(m) + "×10" + sup(+e);
+  }
+  function sup(n) { const m = { "-": "⁻", "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹" };
+    return String(n).split("").map(c => m[c] || c).join(""); }
+  const pyNum = (v, d) => { let s = (+v).toFixed(d); if (/^-0\.?0*$/.test(s)) s = s.slice(1); return s; };
+  function niceStep(range, n) { const raw = range / Math.max(1, n); const p = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / p;
+    return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p; }
+  function ticks(a, b, n) { const s = niceStep(b - a, n); const out = []; for (let v = Math.ceil(a / s) * s; v <= b + s * 1e-9; v += s) out.push(Math.abs(v) < s * 1e-9 ? 0 : v); return { list: out, step: s }; }
+  const tickFmt = (v, step) => { const d = Math.max(0, -Math.floor(Math.log10(step) + 1e-9)); return fmt(v, Math.min(d, 6)); };
+
+  /* 선형대수 */
+  function solve(A, b) { // 가우스 소거 (부분 피벗)
+    const n = b.length, M = A.map((r, i) => [...r, b[i]]);
+    for (let c = 0; c < n; c++) {
+      let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+      if (Math.abs(M[p][c]) < 1e-12 * (1 + Math.abs(M[c][c]))) return null;
+      [M[c], M[p]] = [M[p], M[c]];
+      for (let r = 0; r < n; r++) { if (r === c) continue; const f = M[r][c] / M[c][c]; for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k]; }
+    }
+    return M.map((r, i) => r[n] / r[i]);
+  }
+  function inverse(A) { const n = A.length; const cols = []; for (let j = 0; j < n; j++) { const e = Array(n).fill(0); e[j] = 1; const c = solve(A, e); if (!c) return null; cols.push(c); }
+    return A.map((_, i) => cols.map(c => c[i])); }
+
+  /* 공통 플롯 틀 */
+  function frame(ctx, w, h, xr, yr, C, lab, opt = {}) {
+    const small = w < 420;
+    const pad = { l: small ? 42 : 52, r: 12, t: 12, b: small ? 36 : 40 };
+    const pw = w - pad.l - pad.r, ph = h - pad.t - pad.b;
+    const sx = v => pad.l + (v - xr[0]) / (xr[1] - xr[0]) * pw;
+    const sy = v => pad.t + (1 - (v - yr[0]) / (yr[1] - yr[0])) * ph;
+    const ix = px => xr[0] + (px - pad.l) / pw * (xr[1] - xr[0]);
+    const iy = py => yr[0] + (1 - (py - pad.t) / ph) * (yr[1] - yr[0]);
+    if (!opt.noBg) { ctx.fillStyle = C.surface; ctx.fillRect(pad.l, pad.t, pw, ph); }
+    ctx.font = `${small ? 10 : 11}px ${css("--mono") || "monospace"}`;
+    const tx = ticks(xr[0], xr[1], small ? 5 : 8), ty = opt.yTicks || ticks(yr[0], yr[1], small ? 5 : 7);
+    ctx.lineWidth = 1;
+    tx.list.forEach(v => { const x = Math.round(sx(v)) + .5; if (!opt.noGrid) { ctx.strokeStyle = opt.gridOnTop ? rgba(C.ink, .12) : C.line; ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t + ph); ctx.stroke(); }
+      ctx.fillStyle = C.muted; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(opt.xFmt ? opt.xFmt(v) : tickFmt(v, tx.step), x, pad.t + ph + 5); });
+    ty.list.forEach(v => { const y = Math.round(sy(v)) + .5; if (!opt.noGrid) { ctx.strokeStyle = opt.gridOnTop ? rgba(C.ink, .12) : C.line; ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + pw, y); ctx.stroke(); }
+      ctx.fillStyle = C.muted; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(opt.yFmt ? opt.yFmt(v) : tickFmt(v, ty.step), pad.l - 5, y); });
+    ctx.strokeStyle = C.line_strong; ctx.strokeRect(pad.l + .5, pad.t + .5, pw - 1, ph - 1);
+    ctx.fillStyle = C.muted; ctx.font = `600 ${small ? 11 : 12}px ${css("--sans") || "sans-serif"}`;
+    ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText(lab[0], pad.l + pw / 2, h - 1);
+    ctx.save(); ctx.translate(11, pad.t + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText(lab[1], 0, -8); ctx.restore();
+    return { sx, sy, ix, iy, pad, pw, ph };
+  }
+  function clipRect(ctx, F) { ctx.save(); ctx.beginPath(); ctx.rect(F.pad.l, F.pad.t, F.pw, F.ph); ctx.clip(); }
+  function drawLine(ctx, F, xr, b0, b1, color, width, dash) {
+    clipRect(ctx, F); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []);
+    ctx.beginPath(); ctx.moveTo(F.sx(xr[0]), F.sy(b0 + b1 * xr[0])); ctx.lineTo(F.sx(xr[1]), F.sy(b0 + b1 * xr[1])); ctx.stroke();
+    ctx.setLineDash([]); ctx.restore();
+  }
+
+  /* ================================================================
+     데이터 (1·2·3번 화면 공통): x = 나이, y = 수축기 혈압
+     ================================================================ */
+  const XR = [0, 90], YR = [60, 220];
+  const OUTLIER = { x: 38, y: 192 };
+  const S = { preset: "linear", seed: 7, pts: [], b0: 110, b1: 0.35, follow: false, showRes: true, showSq: true, showOls: true, sel: -1 };
+
+  function genData(preset, seed) {
+    const r = mulberry32(seed * 7919 + 13), sigma = preset === "noisy" ? 20 : 7, out = [];
+    for (let i = 0; i < 30; i++) {
+      const x = Math.round(30 + r() * 45);
+      out.push({ x, y: clamp(r1(92 + 0.8 * x + sigma * gauss(r)), YR[0], YR[1]), out: false });
+    }
+    if (preset === "outlier") out.push({ x: OUTLIER.x, y: OUTLIER.y, out: true });
+    return out;
+  }
+
+  function ols(P) { // 단순회귀 공식
+    const n = P.length; if (n < 2) return null;
+    let sx = 0, sy = 0; P.forEach(p => { sx += p.x; sy += p.y; });
+    const xb = sx / n, yb = sy / n; let sxx = 0, sxy = 0, syy = 0, sx2 = 0, sxyr = 0;
+    P.forEach(p => { const dx = p.x - xb, dy = p.y - yb; sxx += dx * dx; sxy += dx * dy; syy += dy * dy; sx2 += p.x * p.x; sxyr += p.x * p.y; });
+    if (sxx < 1e-12) return null;
+    const b1 = sxy / sxx, b0 = yb - b1 * xb;
+    return { n, sx, sy, xb, yb, sxx, sxy, syy, sx2, sxyr, b0, b1 };
+  }
+  function normalEq(P) { // 정규방정식 (행렬, 가우스 소거로 독립 계산)
+    const n = P.length; if (n < 2) return null;
+    let sx = 0, sy = 0, sxx = 0, sxy = 0; P.forEach(p => { sx += p.x; sy += p.y; sxx += p.x * p.x; sxy += p.x * p.y; });
+    const A = [[n, sx], [sx, sxx]], b = [sy, sxy];
+    const beta = solve(A, b); if (!beta) return null;
+    const inv = inverse(A); const det = n * sxx - sx * sx;
+    return { A, b, beta, inv, det };
+  }
+  function fitStats(P, b0, b1) {
+    const n = P.length; let sse = 0, sy = 0; P.forEach(p => { const e = p.y - (b0 + b1 * p.x); sse += e * e; sy += p.y; });
+    const yb = sy / Math.max(1, n); let sst = 0; P.forEach(p => sst += (p.y - yb) * (p.y - yb));
+    return { sse, mse: sse / Math.max(1, n), rmse: Math.sqrt(sse / Math.max(1, n)), sst, r2: sst > 0 ? 1 - sse / sst : NaN };
+  }
+
+  let O = null, NE = null; // 현재 OLS 결과
+  function recompute() { O = ols(S.pts); NE = normalEq(S.pts); }
+
+  /* ================================================================
+     1. 최소제곱법 화면
+     ================================================================ */
+  const cvOls = $("cvOls");
+  let olsF = null;
+  function syncSliders() {
+    const s1 = $("sB1"), s0 = $("sB0");
+    if (O) { s1.min = Math.min(-2, Math.floor(O.b1 - 1)); s1.max = Math.max(4, Math.ceil(O.b1 + 1)); s0.min = Math.min(-60, Math.floor(O.b0 - 20)); s0.max = Math.max(240, Math.ceil(O.b0 + 20)); }
+    s1.value = S.b1; s0.value = S.b0;
+    $("vB1").textContent = fmt(S.b1, 3); $("vB0").textContent = fmt(S.b0, 1);
+  }
+  function drawOls() {
+    if ($("pane-ols").hidden) return;
+    const C = colors(); const { ctx, w, h } = fitCanvas(cvOls);
+    const F = frame(ctx, w, h, XR, YR, C, ["나이 x (세)", "수축기 혈압 y (mmHg)"]); olsF = F;
+    const P = S.pts;
+    // 잔차 제곱 정사각형
+    clipRect(ctx, F);
+    if (S.showSq) P.forEach(p => {
+      const yh = S.b0 + S.b1 * p.x, py = F.sy(p.y), pl = F.sy(yh), side = Math.abs(py - pl), px = F.sx(p.x);
+      const x0 = px + side <= F.pad.l + F.pw ? px : px - side, y0 = Math.min(py, pl);
+      ctx.fillStyle = rgba(p.out ? C.c_out : C.c_res, .13); ctx.fillRect(x0, y0, side, side);
+      ctx.strokeStyle = rgba(p.out ? C.c_out : C.c_res, .55); ctx.lineWidth = 1; ctx.strokeRect(x0 + .5, y0 + .5, side, side);
+    });
+    if (S.showRes) P.forEach(p => {
+      const yh = S.b0 + S.b1 * p.x; ctx.strokeStyle = p.out ? C.c_out : C.c_res; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(F.sx(p.x), F.sy(p.y)); ctx.lineTo(F.sx(p.x), F.sy(yh)); ctx.stroke();
+    });
+    ctx.restore();
+    // 이상값을 뺀 최소제곱 직선 (이상값이 있을 때)
+    const hasOut = P.some(p => p.out);
+    if (hasOut && S.showOls) { const O2 = ols(P.filter(p => !p.out)); if (O2) drawLine(ctx, F, XR, O2.b0, O2.b1, rgba(C.c_ols, .45), 1.5, [2, 5]); }
+    if (O && S.showOls) drawLine(ctx, F, XR, O.b0, O.b1, C.c_ols, 2.2, [8, 6]);
+    drawLine(ctx, F, XR, S.b0, S.b1, C.c_fit, 2.6);
+    // 절편 표시 (x = 0)
+    const yi = S.b0; if (yi >= YR[0] && yi <= YR[1]) {
+      ctx.fillStyle = C.c_fit; ctx.beginPath(); ctx.arc(F.sx(0), F.sy(yi), 4.5, 0, 7); ctx.fill();
+      ctx.font = `600 11px ${css("--mono")}`; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.fillText("b0 = " + fmt(yi, 1), F.sx(0) + 7, F.sy(yi) - 4);
+    }
+    // 평균점
+    if (O) { const mx = F.sx(O.xb), my = F.sy(O.yb); ctx.strokeStyle = C.ink; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(mx - 7, my); ctx.lineTo(mx + 7, my); ctx.moveTo(mx, my - 7); ctx.lineTo(mx, my + 7); ctx.stroke();
+      ctx.fillStyle = C.muted; ctx.font = `600 11px ${css("--sans")}`; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText("(x̄, ȳ)", mx + 6, my + 5); }
+    // 점
+    P.forEach((p, i) => { const x = F.sx(p.x), y = F.sy(p.y);
+      ctx.fillStyle = p.out ? C.c_out : C.c_data; ctx.strokeStyle = C.surface; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(x, y, p.out ? 6 : 5, 0, 7); ctx.fill(); ctx.stroke();
+      if (i === S.sel) { ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.stroke(); } });
+    if (P.length < 2 || !O) { ctx.fillStyle = C.muted; ctx.font = `600 13px ${css("--sans")}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("점을 2개 이상 (나이가 서로 다르게) 찍어 주세요", F.pad.l + F.pw / 2, F.pad.t + 24); }
+  }
+
+  function updateOlsText() {
+    const P = S.pts, cur = fitStats(P, S.b0, S.b1), best = O ? fitStats(P, O.b0, O.b1) : null;
+    $("sseCur").textContent = fmt(cur.sse, 1); $("sseMin").textContent = best ? fmt(best.sse, 1) : "—";
+    const mx = Math.max(cur.sse, best ? best.sse : 0, 1e-9);
+    $("barCur").style.width = (cur.sse / mx * 100) + "%"; $("barMin").style.width = best ? (best.sse / mx * 100) + "%" : "0%";
+    if (best) { const r = best.sse > 0 ? (cur.sse / best.sse - 1) * 100 : 0;
+      $("sseGap").innerHTML = r < 0.005 ? '<b class="lr-ok">최소입니다.</b> 어느 방향으로 움직여도 SSE가 커집니다.' : `내 직선의 SSE가 최소보다 <b>${fmt(r, r < 10 ? 2 : 1)}%</b> 큽니다.`; }
+    else $("sseGap").textContent = "";
+    const rows = [["SSE = Σe²", cur.sse, best && best.sse, 1], ["MSE = SSE/n", cur.mse, best && best.mse, 2], ["RMSE = √MSE", cur.rmse, best && best.rmse, 2], ["R²", cur.r2, best && best.r2, 4]];
+    $("fitStats").innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td class="n">${fmt(r[1], r[3])}</td><td class="n">${r[2] === null || r[2] === undefined ? "—" : fmt(r[2], r[3])}</td></tr>`).join("");
+
+    // 공식 전개
+    if (!O) { $("fSimple").textContent = "점이 2개 이상이고 나이가 서로 달라야 계산할 수 있습니다."; $("fNormal").innerHTML = ""; $("fCheck").textContent = ""; $("fR2").textContent = ""; }
+    else {
+      $("fSimple").textContent =
+`n = ${O.n}
+x̄ = Σx / n = ${fmt(O.sx, 1)} / ${O.n} = ${fmt(O.xb, 4)}
+ȳ = Σy / n = ${fmt(O.sy, 1)} / ${O.n} = ${fmt(O.yb, 4)}
+
+Sxy = Σ(x − x̄)(y − ȳ) = ${fmt(O.sxy, 4)}
+Sxx = Σ(x − x̄)²       = ${fmt(O.sxx, 4)}
+
+b1 = Sxy / Sxx = ${fmt(O.sxy, 4)} / ${fmt(O.sxx, 4)}
+   = ${fmt(O.b1, 6)}
+b0 = ȳ − b1·x̄ = ${fmt(O.yb, 4)} − ${fmt(O.b1, 6)} × ${fmt(O.xb, 4)}
+   = ${fmt(O.b0, 6)}`;
+      const m2 = (M, d) => `<span class="lr-mx" style="grid-template-columns:repeat(${M[0].length},auto)">${M.map(r => r.map(v => `<span>${d === "s" ? fmtS(v, 4) : fmt(v, Math.abs(v - Math.round(v)) < 1e-9 ? 0 : d)}</span>`).join("")).join("")}</span>`;
+      const v2 = (V, d) => m2(V.map(v => [v]), d);
+      const sym = M => `<span class="lr-mx" style="grid-template-columns:repeat(${M[0].length},auto)">${M.map(r => r.map(v => `<span>${v}</span>`).join("")).join("")}</span>`;
+      if (NE) {
+        $("fNormal").innerHTML =
+          `<div class="lr-eq"><span>X = [1, x] (${O.n}×2)</span></div>
+           <div class="lr-eq"><span>XᵀX =</span>${sym([["n", "Σx"], ["Σx", "Σx²"]])}<span>=</span>${m2(NE.A, 1)}<span>Xᵀy =</span>${v2(NE.b, 1)}</div>
+           <div class="lr-eq"><span>det(XᵀX) = n·Σx² − (Σx)² = ${fmt(NE.det, 1)}</span></div>
+           <div class="lr-eq"><span>(XᵀX)⁻¹ =</span>${m2(NE.inv, "s")}</div>
+           <div class="lr-eq"><span>β = (XᵀX)⁻¹Xᵀy =</span>${v2(NE.beta, 6)}<span class="lr-mut">← [b0, b1]</span></div>`;
+        const d0 = Math.abs(NE.beta[0] - O.b0), d1 = Math.abs(NE.beta[1] - O.b1), dm = Math.max(d0, d1);
+        $("fCheck").innerHTML = `<b>검산</b> 공식 ①과 정규방정식 ②(가우스 소거로 따로 계산)의 차이: |Δb0| = ${fmtS(d0, 2)}, |Δb1| = ${fmtS(d1, 2)} → ${dm < 1e-8 ? '<span class="lr-ok">같은 해</span>' : '<span class="lr-bad">차이 있음</span>'}. 단순회귀 공식은 정규방정식 2×2를 손으로 푼 결과입니다.`;
+      }
+      const bs = fitStats(P, O.b0, O.b1);
+      $("fR2").textContent =
+`SST = Σ(y − ȳ)² = ${fmt(bs.sst, 2)}          (평균선 ȳ만 쓸 때의 제곱합)
+SSE = Σ(y − ŷ)² = ${fmt(bs.sse, 2)}          (최소제곱 직선의 잔차 제곱합)
+R²  = 1 − SSE/SST = 1 − ${fmt(bs.sse, 2)} / ${fmt(bs.sst, 2)} = ${fmt(bs.r2, 4)}
+MSE = SSE/n = ${fmt(bs.mse, 4)},   RMSE = √MSE = ${fmt(bs.rmse, 4)} mmHg`;
+    }
+
+    // 이상값 · SSE 몫
+    if (O && P.length) {
+      const es = P.map(p => { const e = p.y - (O.b0 + O.b1 * p.x); return e * e; }); const tot = es.reduce((a, b) => a + b, 0);
+      let im = 0; es.forEach((e, i) => { if (e > es[im]) im = i; });
+      const share = tot > 0 ? es[im] / tot * 100 : 0;
+      const outIdx = P.findIndex(p => p.out); const O2 = outIdx >= 0 ? ols(P.filter(p => !p.out)) : null;
+      const st = [[fmt(share, 1) + "%", "가장 큰 e² 1개의 SSE 몫"], [fmt(100 / P.length, 1) + "%", "점 1개의 평균 몫 (1/n)"]];
+      if (O2) st.push([fmt(O2.b1, 3) + " → " + fmt(O.b1, 3), "b1 (이상값 제외 → 포함)"]);
+      $("outStats").innerHTML = st.map(s => `<div class="sk-stat"><b>${s[0]}</b><span>${s[1]}</span></div>`).join("");
+      $("outNote").innerHTML = O2 ? `이상값 1개(나이 ${fmt(P[outIdx].x, 0)}, 혈압 ${fmt(P[outIdx].y, 1)})가 들어오자 기울기가 <b>${fmt(O2.b1, 3)} → ${fmt(O.b1, 3)}</b>로 바뀌었습니다. 흐린 점선이 이상값을 뺀 직선입니다. 점을 끌어 보거나 [이상값 빼기]를 눌러 보세요.`
+        : `지금은 이상값이 없습니다. [이상값 넣기]를 누르거나 점 하나를 멀리 끌어 보세요. 가장 큰 잔차 제곱 하나가 SSE의 ${fmt(share, 1)}%를 차지합니다.`;
+    } else { $("outStats").innerHTML = ""; $("outNote").textContent = "점이 2개 이상 있어야 합니다."; }
+    $("btnOut").textContent = P.some(p => p.out) ? "이상값 빼기" : "이상값 넣기";
+
+    if ($("resDetails").open) fillResTable();
+  }
+  function fillResTable() {
+    let tot = 0; $("resBody").innerHTML = S.pts.map((p, i) => { const yh = S.b0 + S.b1 * p.x, e = p.y - yh; tot += e * e;
+      return `<tr class="${p.out ? "out" : ""}"><td>${i + 1}</td><td class="n">${fmt(p.x, 1)}</td><td class="n">${fmt(p.y, 1)}</td><td class="n">${fmt(yh, 2)}</td><td class="n">${fmt(e, 2)}</td><td class="n">${fmt(e * e, 2)}</td></tr>`; }).join("");
+    $("resFoot").innerHTML = `<tr><td colspan="5">합계 SSE</td><td class="n">${fmt(tot, 2)}</td></tr>`;
+  }
+  $("resDetails").addEventListener("toggle", () => { if ($("resDetails").open) fillResTable(); });
+
+  function renderOls() { syncSliders(); updateOlsText(); drawOls(); }
+  function onData(fromDrag) {
+    recompute();
+    if (S.follow && O) { S.b0 = O.b0; S.b1 = O.b1; }
+    gdInvalidate();
+    renderOls();
+    if (!fromDrag) { renderCmp(); }
+  }
+
+  $("sB1").addEventListener("input", e => { S.b1 = +e.target.value; S.follow = false; $("chkFollow").checked = false; stopFit(); renderOls(); });
+  $("sB0").addEventListener("input", e => { S.b0 = +e.target.value; S.follow = false; $("chkFollow").checked = false; stopFit(); renderOls(); });
+  let fitAnim = 0;
+  function stopFit() { if (fitAnim) cancelAnimationFrame(fitAnim); fitAnim = 0; }
+  $("btnFit").onclick = () => {
+    if (!O) return; stopFit();
+    const a0 = S.b0, a1 = S.b1, t0 = performance.now(), D = reduceMotion ? 0 : 700;
+    const tick = now => { const t = D ? Math.min(1, (now - t0) / D) : 1, e = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      S.b0 = a0 + (O.b0 - a0) * e; S.b1 = a1 + (O.b1 - a1) * e; renderOls(); fitAnim = t < 1 ? requestAnimationFrame(tick) : 0; };
+    fitAnim = requestAnimationFrame(tick);
+  };
+  $("chkFollow").addEventListener("change", e => { S.follow = e.target.checked; if (S.follow && O) { stopFit(); S.b0 = O.b0; S.b1 = O.b1; } renderOls(); });
+  $("chkRes").addEventListener("change", e => { S.showRes = e.target.checked; drawOls(); });
+  $("chkSq").addEventListener("change", e => { S.showSq = e.target.checked; drawOls(); });
+  $("chkOls").addEventListener("change", e => { S.showOls = e.target.checked; drawOls(); });
+
+  function setPreset(p, keepSeed) {
+    S.preset = p; if (!keepSeed) S.seed = 7; S.pts = genData(p, S.seed); S.sel = -1;
+    document.querySelectorAll("#presetSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === p));
+    $("ptInfo").textContent = ""; onData();
+  }
+  document.querySelectorAll("#presetSeg button").forEach(b => b.onclick = () => setPreset(b.dataset.v));
+  $("btnSeed").onclick = () => { S.seed = (S.seed * 31 + 17) % 9973 + 1; setPreset(S.preset, true); };
+  $("btnClear").onclick = () => { S.pts = []; S.sel = -1; $("ptInfo").textContent = "빈 곳을 눌러 점을 찍어 보세요."; onData(); };
+  $("btnOut").onclick = () => {
+    const i = S.pts.findIndex(p => p.out);
+    if (i >= 0) S.pts.splice(i, 1); else S.pts.push({ x: OUTLIER.x, y: OUTLIER.y, out: true });
+    S.sel = -1; onData();
+  };
+
+  // 점 조작 (클릭 추가, 끌기, 우클릭/길게 눌러 삭제)
+  let drag = null, lpTimer = 0;
+  function evPos(e) { const r = cvOls.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+  function hit(px, py, rad) { if (!olsF) return -1; let best = -1, bd = rad * rad;
+    S.pts.forEach((p, i) => { const dx = olsF.sx(p.x) - px, dy = olsF.sy(p.y) - py, d = dx * dx + dy * dy; if (d <= bd) { bd = d; best = i; } }); return best; }
+  function ptText(i) { const p = S.pts[i]; if (!p) return ""; const e = p.y - (S.b0 + S.b1 * p.x);
+    return `#${i + 1}${p.out ? " (이상값)" : ""}  나이 ${fmt(p.x, 1)}세, 혈압 ${fmt(p.y, 1)}  → 잔차 e = ${fmt(e, 2)}, e² = ${fmt(e * e, 1)}`; }
+  function removePoint(i) { const p = S.pts[i]; S.pts.splice(i, 1); S.sel = -1; $("ptInfo").textContent = `점을 지웠습니다 (나이 ${fmt(p.x, 1)}, 혈압 ${fmt(p.y, 1)}). 남은 점 ${S.pts.length}개`; onData(); }
+  cvOls.addEventListener("contextmenu", e => e.preventDefault());
+  cvOls.addEventListener("pointerdown", e => {
+    if (!olsF) return; const [px, py] = evPos(e), rad = e.pointerType === "touch" ? 18 : 11, h = hit(px, py, rad);
+    if (e.button === 2) { if (h >= 0) removePoint(h); e.preventDefault(); return; }
+    if (e.button !== 0) return;
+    const inside = px >= olsF.pad.l && px <= olsF.pad.l + olsF.pw && py >= olsF.pad.t && py <= olsF.pad.t + olsF.ph;
+    let i = h;
+    if (i < 0) { if (!inside) return; if (S.pts.length >= 80) { $("ptInfo").textContent = "점은 80개까지 찍을 수 있습니다."; return; }
+      S.pts.push({ x: clamp(r1(olsF.ix(px)), XR[0], XR[1]), y: clamp(r1(olsF.iy(py)), YR[0], YR[1]), out: false }); i = S.pts.length - 1; S.sel = i; onData(); $("ptInfo").textContent = "추가: " + ptText(i); }
+    else { S.sel = i; $("ptInfo").textContent = ptText(i); drawOls();
+      clearTimeout(lpTimer); lpTimer = setTimeout(() => { if (drag && !drag.moved && drag.i === i) { const k = drag.i; drag = null; removePoint(k); } }, 600); }
+    drag = { i, x0: px, y0: py, moved: false };
+    try { cvOls.setPointerCapture(e.pointerId); } catch (_) {}
+    e.preventDefault();
+  });
+  cvOls.addEventListener("pointermove", e => {
+    const [px, py] = evPos(e);
+    if (!drag) { if (olsF) cvOls.style.cursor = hit(px, py, 11) >= 0 ? "grab" : "crosshair"; return; }
+    if (!drag.moved && Math.hypot(px - drag.x0, py - drag.y0) < 5) return;
+    drag.moved = true; clearTimeout(lpTimer); cvOls.style.cursor = "grabbing";
+    const p = S.pts[drag.i]; if (!p) return;
+    p.x = clamp(r1(olsF.ix(px)), XR[0], XR[1]); p.y = clamp(r1(olsF.iy(py)), YR[0], YR[1]);
+    $("ptInfo").textContent = ptText(drag.i); onData(true);
+  });
+  const endDrag = () => { if (drag && drag.moved) renderCmp(); drag = null; clearTimeout(lpTimer); cvOls.style.cursor = "crosshair"; };
+  cvOls.addEventListener("pointerup", endDrag); cvOls.addEventListener("pointercancel", endDrag);
+
+  // CSV
+  $("csvFill").onclick = () => { $("csvIn").value = "나이,혈압\n" + S.pts.map(p => `${p.x},${p.y}`).join("\n"); $("csvMsg").textContent = `${S.pts.length}줄을 가져왔습니다.`; };
+  $("csvApply").onclick = () => {
+    const lines = $("csvIn").value.split(/\r?\n/), out = [];
+    lines.forEach(l => { const t = l.trim().split(/[,\t; ]+/).map(Number); if (t.length >= 2 && isFinite(t[0]) && isFinite(t[1]) && l.trim() !== "") out.push({ x: clamp(r1(t[0]), XR[0], XR[1]), y: clamp(r1(t[1]), YR[0], YR[1]), out: false }); });
+    if (out.length < 2) { $("csvMsg").textContent = "숫자 두 개가 있는 줄이 2줄 이상 필요합니다."; return; }
+    S.pts = out.slice(0, 200); S.sel = -1; document.querySelectorAll("#presetSeg button").forEach(b => b.setAttribute("aria-pressed", "false"));
+    $("csvMsg").textContent = `${S.pts.length}개 점을 적용했습니다.`; onData();
+  };
+
+  /* ================================================================
+     2. 경사하강법 화면
+     ================================================================ */
+  const SPEEDS = [0.25, 0.5, 1, 2, 5, 20, 60];
+  const G = { mode: "batch", m: 8, scale: true, lrLog: -1, preset: "good", init: [0, 0], maxIter: 200, speed: 2, aspect: true, log: false,
+    w: [0, 0], t: 0, path: [], loss: [], last: null, status: "ready", order: [], pos: 0, rng: null, playing: false, raf: 0, acc: 0, view: null, base: null, heat: null, heatKey: "", Fd: null, convT: null };
+
+  function gdFeatures() { // 현재 데이터 → 특성 f, 통계, OLS 해(파라미터 공간)
+    const P = S.pts, n = P.length; if (n < 2 || !O) return null;
+    const mu = O.xb, sd = Math.sqrt(O.sxx / n);
+    const f = P.map(p => G.scale ? (p.x - mu) / sd : p.x), y = P.map(p => p.y);
+    let mf = 0, mff = 0, my = 0, mfy = 0; for (let i = 0; i < n; i++) { mf += f[i]; mff += f[i] * f[i]; my += y[i]; mfy += f[i] * y[i]; }
+    mf /= n; mff /= n; my /= n; mfy /= n;
+    const vf = mff - mf * mf, w1 = (mfy - mf * my) / vf, w0 = my - w1 * mf;
+    // 헤세 행렬 H = 2[[1, mf],[mf, mff]] 의 고윳값
+    const tr = 1 + mff, det = mff - mf * mf, disc = Math.sqrt(Math.max(0, tr * tr / 4 - det));
+    const lmax = 2 * (tr / 2 + disc), lmin = 2 * (tr / 2 - disc);
+    const Lstar = fitStats(P, O.b0, O.b1).mse;
+    return { n, mu, sd, f, y, mf, mff, my, ws: [w0, w1], lmax, lmin, kappa: lmax / Math.max(lmin, 1e-300), crit: 2 / lmax, Lstar };
+  }
+  const toOrig = (w, Fd) => G.scale ? [w[0] - w[1] * Fd.mu / Fd.sd, w[1] / Fd.sd] : [w[0], w[1]];
+  const gapW = (w0, w1, Fd) => { const d0 = w0 - Fd.ws[0], d1 = w1 - Fd.ws[1]; return d0 * d0 + 2 * d0 * d1 * Fd.mf + d1 * d1 * Fd.mff; };
+  const lossW = (w0, w1, Fd) => Fd.Lstar + gapW(w0, w1, Fd);
+  function distOrig(w, Fd) { const b = toOrig(w, Fd); return Math.hypot(b[0] - O.b0, b[1] - O.b1); }
+
+  function presetLr(p, Fd) {
+    if (!Fd) return 0.1;
+    if (p === "small") return 0.01 * Fd.crit;
+    if (p === "big") return 1.05 * Fd.crit;
+    return G.scale ? 0.1 * Fd.crit : 0.9 * Fd.crit;
+  }
+  function lrVal() { return Math.pow(10, G.lrLog); }
+  function setLr(v) { G.lrLog = clamp(Math.log10(v), -6, 0.4); $("sLr").value = G.lrLog; }
+
+  function initRanges() {
+    const s0 = $("sI0"), s1 = $("sI1");
+    if (G.scale) { s1.min = -60; s1.max = 80; s1.step = 0.5; } else { s1.min = -4; s1.max = 6; s1.step = 0.02; }
+    s0.value = G.init[0]; s1.value = G.init[1]; G.init = [+s0.value, +s1.value];
+    const p = G.scale ? "w" : "b"; $("lI0").textContent = `초기 ${p}0`; $("lI1").textContent = `초기 ${p}1`;
+    $("contTitle").textContent = G.scale ? "손실 곡면 등고선 (w0, w1) · 표준화된 z 기준" : "손실 곡면 등고선 (b0, b1) · 원래 나이 기준";
+  }
+
+  function gdReset() {
+    gdPause(); G.Fd = gdFeatures(); G.w = [G.init[0], G.init[1]]; G.t = 0; G.last = null; G.convT = null;
+    G.path = [[G.w[0], G.w[1]]]; G.loss = G.Fd ? [lossW(G.w[0], G.w[1], G.Fd)] : []; G.status = G.Fd ? "ready" : "nodata";
+    G.rng = mulberry32(12345); G.order = []; G.pos = 0; G.view = null; G.base = null; G.heatKey = "";
+    renderGd();
+  }
+  let gdDirty = false;
+  function gdInvalidate() { gdDirty = true; if (!$("pane-gd").hidden) { gdDirty = false; gdReset(); } }
+
+  function shuffle(n) { const a = [...Array(n).keys()]; for (let i = n - 1; i > 0; i--) { const j = Math.floor(G.rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+  function gdStep() {
+    const Fd = G.Fd; if (!Fd || G.status === "diverged" || G.status === "nodata") return false;
+    const n = Fd.n; let idx;
+    if (G.mode === "batch") idx = [...Array(n).keys()];
+    else { const m = G.mode === "sgd" ? 1 : Math.min(G.m, n); idx = [];
+      while (idx.length < m) { if (G.pos >= G.order.length) { G.order = shuffle(n); G.pos = 0; } idx.push(G.order[G.pos++]); } }
+    const m = idx.length, [w0, w1] = G.w, lr = lrVal(); let se = 0, sef = 0;
+    for (const i of idx) { const e = w0 + w1 * Fd.f[i] - Fd.y[i]; se += e; sef += e * Fd.f[i]; }
+    const g0 = 2 * se / m, g1 = 2 * sef / m, n0 = w0 - lr * g0, n1 = w1 - lr * g1;
+    G.last = { t: G.t + 1, idx, m, se, sef, g0, g1, w0, w1, n0, n1, lr };
+    G.w = [n0, n1]; G.t++; G.path.push([n0, n1]);
+    const L = lossW(n0, n1, Fd); G.loss.push(L);
+    if (!isFinite(n0) || !isFinite(n1) || Math.abs(n0) > 1e7 || Math.abs(n1) > 1e7 || !isFinite(L)) { G.status = "diverged"; return false; }
+    const d = distOrig(G.w, Fd);
+    if (d < 1e-3) { if (G.convT === null) G.convT = G.t; G.status = "converged"; return false; }
+    if (G.t >= G.maxIter) { G.status = "maxed"; return false; }
+    G.status = "running"; return true;
+  }
+  function gdPause() { G.playing = false; if (G.raf) cancelAnimationFrame(G.raf); G.raf = 0; $("gdPlay").textContent = "재생"; }
+  function gdPlay() {
+    if (!G.Fd) return;
+    if (G.status === "diverged" || G.status === "converged" || G.status === "maxed") { gdReset(); }
+    G.playing = true; $("gdPlay").textContent = "멈춤"; G.acc = 0;
+    const loop = () => { if (!G.playing) return; G.acc += SPEEDS[G.speed]; let go = true;
+      while (G.acc >= 1 && go) { G.acc -= 1; go = gdStep(); }
+      renderGd(); if (!go) { gdPause(); renderGd(); return; } G.raf = requestAnimationFrame(loop); };
+    G.raf = requestAnimationFrame(loop);
+  }
+  $("gdStep").onclick = () => { gdPause(); if (G.status === "converged" || G.status === "maxed") { if (G.t >= G.maxIter) return; G.status = "running"; } gdStep(); renderGd(); };
+  $("gdPlay").onclick = () => G.playing ? gdPause() : gdPlay();
+  $("gdRun").onclick = () => { gdPause(); if (G.status === "diverged" || G.status === "converged" || G.status === "maxed") gdReset(); let k = 0; while (gdStep() && k++ < 20000); renderGd(); };
+  $("gdReset").onclick = () => gdReset();
+
+  function setMode(v) { G.mode = v; document.querySelectorAll("#modeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === v)); $("mWrap").hidden = v !== "mini"; gdReset(); }
+  document.querySelectorAll("#modeSeg button").forEach(b => b.onclick = () => setMode(b.dataset.v));
+  $("sM").addEventListener("input", e => { G.m = +e.target.value; $("vM").textContent = G.m; gdReset(); });
+  $("chkScale").addEventListener("change", e => { G.scale = e.target.checked; G.init = [0, 0]; initRanges(); G.Fd = gdFeatures(); applyPreset(G.preset || "good"); });
+  function applyPreset(p) { G.preset = p; document.querySelectorAll("#lrSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === p)); G.Fd = gdFeatures(); setLr(presetLr(p, G.Fd)); showLr(); gdReset(); }
+  document.querySelectorAll("#lrSeg button").forEach(b => b.onclick = () => applyPreset(b.dataset.v));
+  function showLr() { $("vLr").textContent = fmtS(lrVal(), 3); const Fd = G.Fd || gdFeatures();
+    $("lrCrit").textContent = Fd ? `발산 경계 2/λmax = ${fmtS(Fd.crit, 3)} · 조건수 κ = ${fmtS(Fd.kappa, 3)}` : ""; }
+  $("sLr").addEventListener("input", e => { G.lrLog = +e.target.value; G.preset = null; document.querySelectorAll("#lrSeg button").forEach(b => b.setAttribute("aria-pressed", "false")); showLr(); gdReset(); });
+  $("sI0").addEventListener("input", e => { G.init[0] = +e.target.value; $("vI0").textContent = fmt(G.init[0], 1); gdReset(); });
+  $("sI1").addEventListener("input", e => { G.init[1] = +e.target.value; $("vI1").textContent = fmt(G.init[1], 2); gdReset(); });
+  $("sIter").addEventListener("input", e => { G.maxIter = +e.target.value; $("vIter").textContent = G.maxIter; if (G.status === "maxed" && G.t < G.maxIter) G.status = "running"; renderGd(); });
+  $("sSpd").addEventListener("input", e => { G.speed = +e.target.value; $("vSpd").textContent = SPEEDS[G.speed] < 1 ? `${SPEEDS[G.speed]} 스텝/프레임` : `${SPEEDS[G.speed]} 스텝/프레임`; });
+  $("chkAspect").addEventListener("change", e => { G.aspect = e.target.checked; G.view = null; G.base = null; G.heatKey = ""; renderGd(); });
+  $("chkLog").addEventListener("change", e => { G.log = e.target.checked; drawLoss(); });
+
+  // 등고선 보기 범위
+  function computeView(pw, ph) {
+    const Fd = G.Fd, c = Fd.ws; // 최소제곱 해를 가운데에 두고 시작점이 보이도록
+    const hx = Math.max(Math.abs(G.init[0] - c[0]) * 1.25, 5), hy = Math.max(Math.abs(G.init[1] - c[1]) * 1.25, G.scale ? 3 : 0.4);
+    let v = { x0: c[0] - hx, x1: c[0] + hx, y0: c[1] - hy, y1: c[1] + hy };
+    if (G.aspect) v = aspectFix(v, pw, ph);
+    return v;
+  }
+  function aspectFix(v, pw, ph) { const u = Math.max((v.x1 - v.x0) / pw, (v.y1 - v.y0) / ph), cx = (v.x0 + v.x1) / 2, cy = (v.y0 + v.y1) / 2;
+    return { x0: cx - u * pw / 2, x1: cx + u * pw / 2, y0: cy - u * ph / 2, y1: cy + u * ph / 2 }; }
+  function extendView(pw, ph) { // 경로가 밖으로 나가면 넓힘 (기본 범위의 4배까지)
+    const v = G.view, b = G.base; let ch = false;
+    const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2, W = (b.x1 - b.x0) * 3, H = (b.y1 - b.y0) * 3;
+    const lim = { x0: cx - W, x1: cx + W, y0: cy - H, y1: cy + H };
+    let nv = { ...v };
+    for (const p of G.path) { if (!isFinite(p[0]) || !isFinite(p[1])) continue;
+      const px = clamp(p[0], lim.x0, lim.x1), py = clamp(p[1], lim.y0, lim.y1);
+      if (px < nv.x0) { nv.x0 = px - (nv.x1 - px) * .08; ch = true; } if (px > nv.x1) { nv.x1 = px + (px - nv.x0) * .08; ch = true; }
+      if (py < nv.y0) { nv.y0 = py - (nv.y1 - py) * .08; ch = true; } if (py > nv.y1) { nv.y1 = py + (py - nv.y0) * .08; ch = true; } }
+    if (ch) { if (G.aspect) nv = aspectFix(nv, pw, ph); G.view = nv; G.heatKey = ""; }
+  }
+  function buildHeat(pw, ph, C) {
+    const Fd = G.Fd, v = G.view, off = document.createElement("canvas"); off.width = pw; off.height = ph;
+    const octx = off.getContext("2d"), img = octx.createImageData(pw, ph), D = img.data;
+    const band = new Int32Array(pw * ph), val = new Float32Array(pw * ph); const Ls = Fd.Lstar > 1e-9 ? Fd.Lstar : 1;
+    let vmax = 0;
+    for (let j = 0; j < ph; j++) { const w1 = v.y1 - (j + .5) / ph * (v.y1 - v.y0);
+      for (let i = 0; i < pw; i++) { const w0 = v.x0 + (i + .5) / pw * (v.x1 - v.x0); const g = Math.log10(1 + gapW(w0, w1, Fd) / Ls);
+        const k = j * pw + i; val[k] = g; band[k] = Math.floor(g * 3); if (g > vmax) vmax = g; } }
+    const sf = parseColor(C.surface), hm = parseColor(C.c_hm), ln = parseColor(C.ink);
+    for (let j = 0; j < ph; j++) for (let i = 0; i < pw; i++) {
+      const k = j * pw + i, s = 1 - Math.min(1, val[k] / Math.max(vmax, 1e-9)); let c = mix(sf, hm, .06 + .62 * Math.pow(s, 1.6));
+      const edge = (i + 1 < pw && band[k + 1] !== band[k]) || (j + 1 < ph && band[k + pw] !== band[k]);
+      if (edge) c = mix(c, ln, .28);
+      D[k * 4] = c[0]; D[k * 4 + 1] = c[1]; D[k * 4 + 2] = c[2]; D[k * 4 + 3] = 255; }
+    octx.putImageData(img, 0, 0); return off;
+  }
+  let contF = null;
+  function drawCont() {
+    const cv = $("cvCont"), C = colors(), { ctx, w, h } = fitCanvas(cv); const Fd = G.Fd;
+    if (!Fd) { ctx.fillStyle = C.muted; ctx.font = `600 13px ${css("--sans")}`; ctx.textAlign = "center"; ctx.fillText("1번 화면에서 점을 2개 이상 찍어 주세요", w / 2, h / 2); return; }
+    const small = w < 420, pad = { l: small ? 42 : 52, r: 12, t: 12, b: small ? 36 : 40 }, pw = Math.max(20, Math.round(w - pad.l - pad.r)), ph = Math.max(20, Math.round(h - pad.t - pad.b));
+    if (!G.base || G.base.pw !== pw || G.base.ph !== ph) { const v = computeView(pw, ph); G.base = { ...v, pw, ph }; G.view = v; G.heatKey = ""; }
+    extendView(pw, ph);
+    const v = G.view, key = [pw, ph, v.x0, v.x1, v.y0, v.y1, C.surface, C.c_hm].join("|");
+    if (G.heatKey !== key) { G.heat = buildHeat(pw, ph, C); G.heatKey = key; }
+    const p = G.scale ? "w" : "b";
+    const F = frame(ctx, w, h, [v.x0, v.x1], [v.y0, v.y1], C, [`${p}0 (절편)`, `${p}1 (기울기)`], { noBg: true, gridOnTop: true, noGrid: true });
+    ctx.drawImage(G.heat, F.pad.l, F.pad.t, F.pw, F.ph); ctx.strokeStyle = C.line_strong; ctx.lineWidth = 1; ctx.strokeRect(F.pad.l + .5, F.pad.t + .5, F.pw - 1, F.ph - 1);
+    contF = F;
+    clipRect(ctx, F);
+    // 최소제곱 해
+    const sx = F.sx(Fd.ws[0]), sy = F.sy(Fd.ws[1]);
+    ctx.fillStyle = C.c_ols; ctx.strokeStyle = C.surface; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, sy, 7, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = C.ink; ctx.font = `600 11.5px ${css("--sans")}`; const lft = sx > F.pad.l + F.pw - 80; ctx.textAlign = lft ? "right" : "left"; ctx.textBaseline = "bottom"; ctx.fillText("최소제곱 해", lft ? sx - 9 : sx + 9, sy - 4);
+    // 경로
+    const path = G.path.filter(q => isFinite(q[0]) && isFinite(q[1]));
+    const CL = 1e6; const P2 = path.map(q => [clamp(F.sx(q[0]), -CL, CL), clamp(F.sy(q[1]), -CL, CL)]);
+    if (P2.length > 1) {
+      ctx.lineJoin = "round"; ctx.lineCap = "round";
+      ctx.strokeStyle = rgba(C.surface, .9); ctx.lineWidth = 4.5; ctx.beginPath(); P2.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.stroke();
+      ctx.strokeStyle = C.c_fit; ctx.lineWidth = 2; ctx.beginPath(); P2.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.stroke();
+      const every = Math.max(1, Math.ceil(P2.length / 250)); ctx.fillStyle = C.c_fit;
+      P2.forEach((q, i) => { if (i % every === 0) { ctx.beginPath(); ctx.arc(q[0], q[1], 2.3, 0, 7); ctx.fill(); } });
+    }
+    const q0 = P2[0]; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(q0[0], q0[1], 5.5, 0, 7); ctx.stroke();
+    ctx.fillStyle = C.ink; ctx.textBaseline = "top"; ctx.fillText("시작", q0[0] + 8, q0[1] + 4);
+    const ql = P2[P2.length - 1]; ctx.fillStyle = G.status === "diverged" ? C.c_out : C.c_fit; ctx.strokeStyle = C.surface; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ql[0], ql[1], 6, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    if (G.status === "diverged") { ctx.fillStyle = C.c_out; ctx.font = `700 13px ${css("--sans")}`; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("발산: 경로가 곡면 밖으로 튀어 나감", F.pad.l + F.pw / 2, F.pad.t + 8); }
+  }
+  const cvCont = $("cvCont");
+  cvCont.addEventListener("click", e => {
+    if (!contF || !G.Fd) return; const r = cvCont.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+    if (px < contF.pad.l || px > contF.pad.l + contF.pw || py < contF.pad.t || py > contF.pad.t + contF.ph) return;
+    const s0 = $("sI0"), s1 = $("sI1");
+    s0.value = contF.ix(px); s1.value = contF.iy(py); G.init = [+s0.value, +s1.value];
+    $("vI0").textContent = fmt(G.init[0], 1); $("vI1").textContent = fmt(G.init[1], 2);
+    const keep = G.view, kb = G.base; gdReset(); G.view = keep; G.base = kb; G.heatKey = ""; renderGd();
+  });
+
+  function drawScatterSmall(cv, b0, b1, hl) {
+    const C = colors(), { ctx, w, h } = fitCanvas(cv);
+    const F = frame(ctx, w, h, XR, YR, C, ["나이 x (세)", "수축기 혈압 (mmHg)"]);
+    if (O) drawLine(ctx, F, XR, O.b0, O.b1, C.c_ols, 2, [8, 6]);
+    if (isFinite(b0) && isFinite(b1)) drawLine(ctx, F, XR, b0, b1, C.c_fit, 2.6);
+    const hs = new Set(hl || []);
+    S.pts.forEach((p, i) => { const x = F.sx(p.x), y = F.sy(p.y);
+      ctx.fillStyle = p.out ? C.c_out : C.c_data; ctx.strokeStyle = C.surface; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, 4.5, 0, 7); ctx.fill(); ctx.stroke();
+      if (hs.has(i)) { ctx.strokeStyle = C.c_res; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 8, 0, 7); ctx.stroke(); } });
+  }
+  function drawLoss() {
+    const cv = $("cvLoss"), C = colors(), { ctx, w, h } = fitCanvas(cv); const Fd = G.Fd; if (!Fd || !G.loss.length) return;
+    const T = Math.max(20, G.t), xr = [0, T];
+    if (!G.log) {
+      const L0 = G.loss[0], cap = L0 * 1.5; let mx = 0; G.loss.forEach(v => { if (isFinite(v)) mx = Math.max(mx, Math.min(v, cap)); });
+      const yr = [0, Math.max(mx, Fd.Lstar * 2) * 1.05];
+      const yk = v => Math.abs(v) >= 1e6 ? fmtS(v, 2) : Math.abs(v) >= 1000 ? fmt(v / 1000, Math.abs(v % 1000) > 1e-9 ? 1 : 0) + "k" : fmtS(v, 3);
+      const F = frame(ctx, w, h, xr, yr, C, ["반복 t", "MSE"], { yFmt: yk });
+      clipRect(ctx, F);
+      ctx.strokeStyle = C.c_ols; ctx.setLineDash([6, 5]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(F.pad.l, F.sy(Fd.Lstar)); ctx.lineTo(F.pad.l + F.pw, F.sy(Fd.Lstar)); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = C.c_fit; ctx.lineWidth = 2; ctx.beginPath(); G.loss.forEach((v, i) => { const y = F.sy(Math.min(isFinite(v) ? v : cap * 10, cap * 10)); i ? ctx.lineTo(F.sx(i), y) : ctx.moveTo(F.sx(i), y); }); ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle = C.c_ols; ctx.font = `600 11px ${css("--sans")}`; ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText("최소 MSE (OLS) = " + fmt(Fd.Lstar, 2), F.pad.l + F.pw - 6, F.sy(Fd.Lstar) - 3);
+      $("lossSub").textContent = "보라 = 전체 데이터 MSE, 초록 점선 = 최소제곱 직선의 MSE. 미니배치·SGD도 곡선은 전체 데이터로 계산합니다.";
+    } else {
+      const gaps = G.loss.map((v, i) => Math.max(gapW(G.path[i][0], G.path[i][1], Fd), 1e-14));
+      let lo = Infinity, hi = -Infinity; gaps.forEach(g => { if (isFinite(g)) { lo = Math.min(lo, Math.log10(g)); hi = Math.max(hi, Math.log10(g)); } });
+      lo = Math.floor(Math.min(lo, -4)); hi = Math.ceil(Math.max(hi, lo + 1));
+      const step = Math.max(1, Math.ceil((hi - lo) / 6)); const tl = []; for (let v = lo; v <= hi; v += step) tl.push(v);
+      const F = frame(ctx, w, h, xr, [lo, hi], C, ["반복 t", "L − L* (로그)"], { yTicks: { list: tl, step: 1 }, yFmt: v => "10" + sup(v) });
+      clipRect(ctx, F);
+      ctx.strokeStyle = C.c_fit; ctx.lineWidth = 2; ctx.beginPath(); gaps.forEach((g, i) => { const y = F.sy(isFinite(g) ? Math.log10(g) : hi + 5); i ? ctx.lineTo(F.sx(i), y) : ctx.moveTo(F.sx(i), y); }); ctx.stroke();
+      ctx.restore();
+      $("lossSub").textContent = "로그 축: 최소값과의 차이 L − L*. 배치 GD는 직선으로 떨어지면(선형 수렴) 정상입니다. 기울기가 완만할수록 느립니다.";
+    }
+  }
+
+  function renderGd() {
+    if ($("pane-gd").hidden) return;
+    const Fd = G.Fd;
+    $("vLr").textContent = fmtS(lrVal(), 3); $("vI0").textContent = fmt(G.init[0], 1); $("vI1").textContent = fmt(G.init[1], 2); $("vIter").textContent = G.maxIter;
+    $("sM").max = Math.max(2, (Fd ? Fd.n : 30) - 1); if (G.m > +$("sM").max) { G.m = +$("sM").max; $("sM").value = G.m; $("vM").textContent = G.m; }
+    showLr();
+    drawCont();
+    const b = Fd ? toOrig(G.w, Fd) : [NaN, NaN];
+    drawScatterSmall($("cvGdLine"), b[0], b[1], G.last && G.mode !== "batch" ? G.last.idx : null);
+    drawLoss();
+    if (!Fd) { $("gdFormula").textContent = "데이터가 부족합니다."; $("gdStats").innerHTML = ""; $("gdNote").textContent = ""; return; }
+    const d = distOrig(G.w, Fd), L = lossW(G.w[0], G.w[1], Fd), ep = G.mode === "batch" ? G.t : G.t * (G.mode === "sgd" ? 1 : Math.min(G.m, Fd.n)) / Fd.n;
+    $("gdStats").innerHTML = [[G.t, "반복 t"], [fmt(ep, ep < 10 ? 2 : 1), "에폭"], [isFinite(L) && L < 1e9 ? fmt(L, 2) : fmtS(L, 3), "MSE"], [isFinite(d) ? (d < 1e-3 ? fmtS(d, 2) : fmtS(d, 3)) : "∞", "OLS 해와의 거리"]]
+      .map(s => `<div class="sk-stat"><b>${s[0]}</b><span>${s[1]}</span></div>`).join("") +
+      `<div class="sk-stat"><b class="c-fit">${fmt(b[0], 3)}, ${fmt(b[1], 4)}</b><span>GD (b0, b1)</span></div><div class="sk-stat"><b class="c-ols">${fmt(O.b0, 3)}, ${fmt(O.b1, 4)}</b><span>OLS (b0, b1)</span></div>`;
+    const badge = $("gdBadge"), st = G.status;
+    const map = { ready: ["idle", "준비"], running: ["run", "진행 중"], converged: ["ok", "수렴 (거리 < 0.001)"], diverged: ["bad", "발산"], maxed: ["idle", "최대 반복 도달"] };
+    const bm = map[st] || map.ready; badge.className = "lr-status " + bm[0]; badge.textContent = bm[1];
+    // 식 대입
+    const p = G.scale ? "w" : "b", xn = G.scale ? "zᵢ" : "xᵢ";
+    let head = G.scale ? `스케일링 켬: zᵢ = (xᵢ − ${fmt(Fd.mu, 3)}) / ${fmt(Fd.sd, 3)},  모델 ŷ = w0 + w1·z\n원래 단위로:  b1 = w1 / s,  b0 = w0 − w1·x̄ / s\n` : `스케일링 끔: 모델 ŷ = b0 + b1·x  (x = 나이 그대로)\n`;
+    const Ls = G.last;
+    if (!Ls) {
+      let se = 0, sef = 0; for (let i = 0; i < Fd.n; i++) { const e = G.w[0] + G.w[1] * Fd.f[i] - Fd.y[i]; se += e; sef += e * Fd.f[i]; }
+      const g0 = 2 * se / Fd.n, g1 = 2 * sef / Fd.n;
+      $("gdFormula").textContent = head +
+`\n시작점 (${p}0, ${p}1) = (${fmt(G.w[0], 4)}, ${fmt(G.w[1], 4)}),  η = ${fmtS(lrVal(), 3)}
+오차 eᵢ = (${p}0 + ${p}1·${xn}) − yᵢ
+
+전체 데이터 기준 첫 기울기:
+∂L/∂${p}0 = (2/n) Σ eᵢ     = (2/${Fd.n}) × ${fmtS(se, 5)} = ${fmtS(g0, 4)}
+∂L/∂${p}1 = (2/n) Σ eᵢ·${xn} = (2/${Fd.n}) × ${fmtS(sef, 5)} = ${fmtS(g1, 4)}
+
+[한 스텝]을 누르면  ${p} ← ${p} − η·∂L/∂${p}  를 계산합니다.`;
+    } else {
+      const bt = G.mode === "batch" ? `배치 = 전체 ${Ls.m}개` : G.mode === "sgd" ? `SGD: 샘플 #${Ls.idx[0] + 1} 한 개` : `미니배치 m = ${Ls.m}개 (#${Ls.idx.slice(0, 6).map(i => i + 1).join(", ")}${Ls.m > 6 ? ", …" : ""})`;
+      $("gdFormula").textContent = head +
+`\n스텝 t = ${Ls.t}   (${bt}),  η = ${fmtS(Ls.lr, 3)}
+오차 eᵢ = (${p}0 + ${p}1·${xn}) − yᵢ
+
+∂L/∂${p}0 = (2/m) Σ eᵢ     = (2/${Ls.m}) × ${fmtS(Ls.se, 5)} = ${fmtS(Ls.g0, 4)}
+∂L/∂${p}1 = (2/m) Σ eᵢ·${xn} = (2/${Ls.m}) × ${fmtS(Ls.sef, 5)} = ${fmtS(Ls.g1, 4)}
+
+${p}0 ← ${fmt(Ls.w0, 5)} − ${fmtS(Ls.lr, 3)} × (${fmtS(Ls.g0, 4)}) = ${fmt(Ls.n0, 5)}
+${p}1 ← ${fmt(Ls.w1, 5)} − ${fmtS(Ls.lr, 3)} × (${fmtS(Ls.g1, 4)}) = ${fmt(Ls.n1, 5)}` +
+(G.scale ? `\n\n원래 단위: b1 = ${fmt(Ls.n1, 4)} / ${fmt(Fd.sd, 3)} = ${fmt(b[1], 5)},  b0 = ${fmt(b[0], 4)}` : "");
+    }
+    // 강의 포인트
+    let note;
+    if (st === "diverged") note = `<b>발산.</b> 학습률 η = ${fmtS(lrVal(), 3)} 이 발산 경계 2/λmax = ${fmtS(Fd.crit, 3)} 보다 커서, 한 스텝마다 골짜기 반대편으로 더 멀리 튀어 손실이 커집니다.`;
+    else if (st === "converged") note = `<b>t = ${G.convT}번 만에 OLS 해와의 거리 &lt; 0.001.</b> 경사하강법이 최소제곱법과 같은 답 (b0 = ${fmt(b[0], 3)}, b1 = ${fmt(b[1], 4)}) 에 도달했습니다.` + (G.scale ? " 스케일링을 끄고 다시 해 보세요." : "");
+    else if (!G.scale) note = `<b>스케일링 끔:</b> 나이(평균 ${fmt(Fd.mu, 1)})가 1보다 훨씬 커서 조건수 κ ≈ ${fmtS(Fd.kappa, 2)}. 등고선이 아주 길쭉한 골짜기가 되어, 발산하지 않는 가장 큰 학습률로도 절편 방향으로는 한 스텝에 거의 움직이지 못합니다. 축 비율 1:1을 끄면 골짜기 안의 지그재그가 보입니다.`;
+    else if (G.mode !== "batch") note = `<b>${G.mode === "sgd" ? "SGD" : "미니배치"}:</b> 일부 데이터로 구한 기울기라 방향이 흔들립니다. 학습률이 고정이면 해 근처에서 계속 맴돌아 거리가 0으로 가지 않습니다. 학습률을 줄이거나 배치를 키우면 흔들림이 줄어듭니다.`;
+    else if (G.preset === "small") note = `<b>학습률이 너무 작음:</b> 방향은 맞지만 한 걸음이 짧아 ${G.maxIter}번으로는 도착하지 못할 수 있습니다.`;
+    else note = `스케일링 켬 → 조건수 κ = ${fmtS(Fd.kappa, 3)} (1에 가까움). 등고선이 원에 가까워 기울기 방향이 곧장 최소점을 가리킵니다. [재생]을 눌러 보세요.`;
+    $("gdNote").innerHTML = note;
+    renderCmpNow();
+  }
+
+  document.addEventListener("keydown", e => {
+    if ($("pane-gd").hidden || e.defaultPrevented) return;
+    const t = e.target, tag = (t.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "select" || tag === "textarea" || (t.getAttribute && t.getAttribute("role") === "tab")) return;
+    if (e.key === "ArrowRight") { e.preventDefault(); $("gdStep").click(); }
+  });
+
+  /* ================================================================
+     3. 비교 화면
+     ================================================================ */
+  function renderCmpNow() {
+    if (!O) { $("cmpNow").innerHTML = `<tr><td colspan="5">점이 2개 이상 필요합니다.</td></tr>`; $("cmpNote").textContent = ""; return; }
+    const Fd = G.Fd || gdFeatures(); const bo = fitStats(S.pts, O.b0, O.b1);
+    const b = Fd ? toOrig(G.w, Fd) : [NaN, NaN], bs = fitStats(S.pts, b[0], b[1]);
+    const mode = { batch: "배치 GD", mini: `미니배치 (m = ${G.m})`, sgd: "SGD" }[G.mode];
+    $("cmpNow").innerHTML =
+      `<tr><td class="c-ols"><b>최소제곱법</b></td><td class="n">${fmt(O.b0, 6)}</td><td class="n">${fmt(O.b1, 6)}</td><td class="n">${fmt(bo.mse, 4)}</td><td>정규방정식 1번</td></tr>` +
+      `<tr><td class="c-fit"><b>경사하강법</b></td><td class="n">${fmt(b[0], 6)}</td><td class="n">${fmt(b[1], 6)}</td><td class="n">${isFinite(bs.mse) && bs.mse < 1e9 ? fmt(bs.mse, 4) : fmtS(bs.mse, 3)}</td><td>${mode}, η = ${fmtS(lrVal(), 3)}, ${G.t}번 반복, 스케일링 ${G.scale ? "켬" : "끔"}</td></tr>`;
+    const d = Fd ? distOrig(G.w, Fd) : NaN;
+    $("cmpNote").innerHTML = G.t === 0 ? "2번 화면에서 경사하강법을 실행하면 여기에 결과가 나옵니다."
+      : isFinite(d) && d < 1e-3 ? `두 답의 거리 = ${fmtS(d, 2)} &lt; 0.001 → <b>같은 직선</b>입니다. 한 번에 푸느냐, 반복해서 다가가느냐의 차이일 뿐 목표(MSE 최소)는 같습니다.`
+      : `두 답의 거리 = ${isFinite(d) ? fmtS(d, 3) : "∞"}. 아직 수렴하지 않았습니다${G.status === "diverged" ? " (발산)" : ""}. 2번 화면에서 반복을 늘리거나 학습률·스케일링을 바꿔 보세요.`;
+  }
+  function renderCalc() {
+    const n = Math.pow(10, +$("cN").value), p = Math.round(Math.pow(10, +$("cP").value)), k = Math.round(Math.pow(10, +$("cK").value));
+    $("vCN").textContent = fmtS(n, 2); $("vCP").textContent = p.toLocaleString("en-US"); $("vCK").textContent = k.toLocaleString("en-US");
+    const a = n * p * p + p * p * p, g = k * n * p, mem = p * p * 8;
+    const mb = v => v >= 1e9 ? fmt(v / 1e9, 1) + " GB" : v >= 1e6 ? fmt(v / 1e6, 1) + " MB" : fmt(v / 1e3, 1) + " KB";
+    $("calcStats").innerHTML = [[fmtS(a, 2), "OLS ≈ np² + p³"], [fmtS(g, 2), "GD ≈ k·n·p"], [mb(mem), "XᵀX 메모리 (p²×8바이트)"]].map(s => `<div class="sk-stat"><b>${s[0]}</b><span>${s[1]}</span></div>`).join("");
+    const r = a / g; $("calcVerdict").textContent = r > 1.5 ? `이 규모에서는 경사하강법이 약 ${fmtS(r, 2)}배 적은 연산 → 특성이 많을수록 GD가 유리` : r < 1 / 1.5 ? `이 규모에서는 정규방정식이 약 ${fmtS(1 / r, 2)}배 적은 연산 → 특성이 적으면 한 번에 푸는 편이 빠름` : "두 방법의 연산량이 비슷한 규모";
+  }
+  ["cN", "cP", "cK"].forEach(id => $(id).addEventListener("input", renderCalc));
+
+  function pyCode() {
+    const P = S.pts, n = P.length; if (n < 2) return "# 점이 2개 이상 필요합니다.";
+    const xs = P.map(p => pyNum(p.x, 1)), ys = P.map(p => pyNum(p.y, 1));
+    const wrap = (arr, ind) => { const lines = []; for (let i = 0; i < arr.length; i += 10) lines.push(ind + arr.slice(i, i + 10).join(", ")); return lines.join(",\n"); };
+    const lr = lrVal(), mb = G.mode === "batch" ? n : G.mode === "sgd" ? 1 : Math.min(G.m, n);
+    const lrs = lr >= 1e-3 ? pyNum(lr, 6).replace(/0+$/, "").replace(/\.$/, ".0") : lr.toExponential(4);
+    const modeName = { batch: "배치 GD", mini: `미니배치 (m=${mb})`, sgd: "SGD (m=1)" }[G.mode];
+    return `import numpy as np
+from sklearn.linear_model import LinearRegression, SGDRegressor
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+
+# 데이터: 나이(x) → 수축기 혈압(y), 시뮬레이터 현재 데이터 ${n}명
+x = np.array([
+${wrap(xs, "    ")}
+])
+y = np.array([
+${wrap(ys, "    ")}
+])
+X = x.reshape(-1, 1)
+
+# 1) 최소제곱법: 정규방정식 beta = (X^T X)^-1 X^T y
+X1 = np.column_stack([np.ones_like(x), x])
+beta = np.linalg.solve(X1.T @ X1, X1.T @ y)
+print("정규방정식    b0, b1 =", beta)
+
+ols = LinearRegression().fit(X, y)
+b0_ols, b1_ols = ols.intercept_, ols.coef_[0]
+print("LinearRegression b0, b1 =", b0_ols, b1_ols)
+print("R^2 =", ols.score(X, y))
+
+# 2) 경사하강법 직접 구현: ${modeName}, 학습률 ${lrs}, 최대 ${G.maxIter}번
+#    손실 L = MSE = mean((y_hat - y)^2)
+scale = ${G.scale ? "True" : "False"}
+mu, sd = x.mean(), x.std()              # 모집단 표준편차 (ddof=0)
+f = (x - mu) / sd if scale else x
+lr, n_iter, batch = ${lrs}, ${G.maxIter}, ${mb}
+w0, w1 = ${pyNum(G.init[0], 4)}, ${pyNum(G.init[1], 4)}   # 초기값
+rng = np.random.default_rng(0)
+order, pos = rng.permutation(len(x)), 0
+for t in range(1, n_iter + 1):
+    if batch >= len(x):
+        idx = np.arange(len(x))
+    else:                               # 섞은 순서대로 batch개씩, 한 바퀴 돌면 다시 섞기
+        idx = []
+        while len(idx) < batch:
+            if pos >= len(x):
+                order, pos = rng.permutation(len(x)), 0
+            idx.append(order[pos]); pos += 1
+        idx = np.array(idx)
+    e = (w0 + w1 * f[idx]) - y[idx]     # 오차
+    g0 = 2 * e.mean()                   # dL/dw0
+    g1 = 2 * (e * f[idx]).mean()        # dL/dw1
+    w0, w1 = w0 - lr * g0, w1 - lr * g1
+    b1 = w1 / sd if scale else w1       # 원래 단위로 되돌리기
+    b0 = w0 - w1 * mu / sd if scale else w0
+    if np.hypot(b0 - b0_ols, b1 - b1_ols) < 1e-3:
+        break
+print(f"GD  t={t}  b0={b0:.6f}  b1={b1:.6f}")
+print("OLS 해와의 거리 =", np.hypot(b0 - b0_ols, b1 - b1_ols))
+
+# 3) scikit-learn SGDRegressor (한 샘플씩 갱신 = 위의 batch=1)
+#    한 샘플 기울기는 흔들림이 커서 작은 학습률에서 시작해 점점 줄인다 (invscaling).
+#    sklearn 손실은 (1/2)(y - y_hat)^2 → eta0=0.01 은 이 페이지의 η=0.005 와 같은 크기
+sgd = SGDRegressor(loss="squared_error", penalty=None, learning_rate="invscaling",
+                   eta0=0.01, max_iter=1000, tol=1e-6, random_state=0)
+model = make_pipeline(StandardScaler(), sgd) if scale else sgd
+model.fit(X, y)
+if scale:
+    sc = model[0]
+    b1_sgd = sgd.coef_[0] / sc.scale_[0]
+    b0_sgd = sgd.intercept_[0] - sgd.coef_[0] * sc.mean_[0] / sc.scale_[0]
+else:
+    b1_sgd, b0_sgd = sgd.coef_[0], sgd.intercept_[0]
+print(f"SGDRegressor b0={b0_sgd:.4f}  b1={b1_sgd:.4f}  (에폭 {sgd.n_iter_})")
+print("OLS 해와의 거리 =", np.hypot(b0_sgd - b0_ols, b1_sgd - b1_ols))   # 근사해
+`;
+  }
+  function renderCmp() { if ($("pane-cmp").hidden) return; renderCmpNow(); renderCalc(); $("pyCode").textContent = pyCode(); }
+  $("btnCopy").onclick = () => {
+    const t = $("pyCode").textContent, done = () => { $("copyMsg").textContent = "복사했습니다."; setTimeout(() => $("copyMsg").textContent = "", 1800); };
+    const fb = () => { const ta = document.createElement("textarea"); ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); done(); } catch (_) { $("copyMsg").textContent = "복사하지 못했습니다. 직접 선택해 복사하세요."; } ta.remove(); };
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(t).then(done, fb); else fb();
+  };
+
+  /* ================================================================
+     4. 다중 회귀
+     ================================================================ */
+  const M = { rho: 0.6, sigma: 8, seed: 629, pts: [], fit: null };
+  const AR = [25, 80], BR = [15, 37];
+  function genMulti() {
+    const r = mulberry32(M.seed * 104729 + 5), out = [];
+    for (let i = 0; i < 60; i++) {
+      const age = Math.round(30 + r() * 45), za = (age - 52.5) / 13;
+      const bmi = clamp(r1(25 + 3.5 * (M.rho * za + Math.sqrt(1 - M.rho * M.rho) * gauss(r))), BR[0] + .5, BR[1] - .5);
+      const bp = r1(60 + 0.55 * age + 1.6 * bmi + M.sigma * gauss(r));
+      out.push({ a: age, b: bmi, y: bp });
+    }
+    M.pts = out;
+  }
+  function r2of(pred, ys) { const yb = ys.reduce((a, b) => a + b, 0) / ys.length; let sse = 0, sst = 0; ys.forEach((y, i) => { sse += (y - pred[i]) ** 2; sst += (y - yb) ** 2; }); return 1 - sse / sst; }
+  function fitMulti() {
+    const P = M.pts, n = P.length; const A = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], b = [0, 0, 0];
+    P.forEach(p => { const r = [1, p.a, p.b]; for (let i = 0; i < 3; i++) { b[i] += r[i] * p.y; for (let j = 0; j < 3; j++) A[i][j] += r[i] * r[j]; } });
+    const beta = solve(A, b), inv = inverse(A);
+    const ys = P.map(p => p.y), pm = P.map(p => beta[0] + beta[1] * p.a + beta[2] * p.b);
+    const oa = ols(P.map(p => ({ x: p.a, y: p.y }))), ob = ols(P.map(p => ({ x: p.b, y: p.y })));
+    let sa = 0, sb = 0; P.forEach(p => { sa += p.a; sb += p.b; }); sa /= n; sb /= n; let cab = 0, caa = 0, cbb = 0;
+    P.forEach(p => { cab += (p.a - sa) * (p.b - sb); caa += (p.a - sa) ** 2; cbb += (p.b - sb) ** 2; });
+    M.fit = { A, b, beta, inv, pm, r2: r2of(pm, ys), oa, ob, r2a: r2of(P.map(p => oa.b0 + oa.b1 * p.a), ys), r2b: r2of(P.map(p => ob.b0 + ob.b1 * p.b), ys), corr: cab / Math.sqrt(caa * cbb) };
+  }
+  function ramp(t, C) { const a = parseColor(C.ramp0), b = parseColor(C.ramp1); return mix(a, b, clamp(t, 0, 1)); }
+  function drawMulti() {
+    if ($("pane-multi").hidden) return;
+    const C = colors(), fit = M.fit, P = M.pts; const ys = P.map(p => p.y); const lo = Math.min(...ys), hi = Math.max(...ys);
+    $("rampBar").style.background = `linear-gradient(90deg, ${C.ramp0}, ${C.ramp1})`;
+    { const { ctx, w, h } = fitCanvas($("cvPlane"));
+      const F = frame(ctx, w, h, AR, BR, C, ["나이 (세)", "BMI (kg/m²)"], { noBg: true, noGrid: true });
+      const pw = Math.max(10, Math.round(F.pw)), ph = Math.max(10, Math.round(F.ph));
+      const off = document.createElement("canvas"); off.width = pw; off.height = ph; const oc = off.getContext("2d"), img = oc.createImageData(pw, ph), D = img.data;
+      const band = new Int32Array(pw * ph), cols = [];
+      for (let j = 0; j < ph; j++) { const bm = BR[1] - (j + .5) / ph * (BR[1] - BR[0]); for (let i = 0; i < pw; i++) { const ag = AR[0] + (i + .5) / pw * (AR[1] - AR[0]);
+        const v = fit.beta[0] + fit.beta[1] * ag + fit.beta[2] * bm; band[j * pw + i] = Math.floor(v / 10); cols[j * pw + i] = v; } }
+      const ln = parseColor(C.ink), sf = parseColor(C.surface);
+      for (let k = 0; k < pw * ph; k++) { const i = k % pw, j = (k / pw) | 0; let c = mix(sf, ramp((cols[k] - lo) / (hi - lo), C), .8);
+        if ((i + 1 < pw && band[k + 1] !== band[k]) || (j + 1 < ph && band[k + pw] !== band[k])) c = mix(c, ln, .35);
+        D[k * 4] = c[0]; D[k * 4 + 1] = c[1]; D[k * 4 + 2] = c[2]; D[k * 4 + 3] = 255; }
+      oc.putImageData(img, 0, 0); ctx.drawImage(off, F.pad.l, F.pad.t, F.pw, F.ph);
+      ctx.strokeStyle = C.line_strong; ctx.strokeRect(F.pad.l + .5, F.pad.t + .5, F.pw - 1, F.ph - 1);
+      // 등고선 라벨 (BMI 위쪽 가장자리에서)
+      ctx.font = `600 10.5px ${css("--mono")}`; ctx.fillStyle = C.ink; ctx.textAlign = "center"; ctx.textBaseline = "top";
+      if (Math.abs(fit.beta[1]) > 1e-6) for (let v = Math.ceil((fit.beta[0] + fit.beta[1] * AR[0] + fit.beta[2] * BR[1]) / 10) * 10; v <= fit.beta[0] + fit.beta[1] * AR[1] + fit.beta[2] * BR[1]; v += 10) {
+        const ag = (v - fit.beta[0] - fit.beta[2] * (BR[1] - 0.6)) / fit.beta[1]; if (ag > AR[0] + 2 && ag < AR[1] - 2) ctx.fillText(String(v), F.sx(ag), F.pad.t + 3); }
+      P.forEach(p => { const c = ramp((p.y - lo) / (hi - lo), C); ctx.fillStyle = `rgb(${c})`; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.3;
+        ctx.beginPath(); ctx.arc(F.sx(p.a), F.sy(p.b), 4.8, 0, 7); ctx.fill(); ctx.stroke(); });
+    }
+    { const { ctx, w, h } = fitCanvas($("cvPred"));
+      const lo2 = Math.floor(Math.min(lo, ...fit.pm) / 10) * 10 - 5, hi2 = Math.ceil(Math.max(hi, ...fit.pm) / 10) * 10 + 5;
+      const F = frame(ctx, w, h, [lo2, hi2], [lo2, hi2], C, ["실제 혈압 (mmHg)", "예측 혈압 ŷ"]);
+      drawLine(ctx, F, [lo2, hi2], 0, 1, C.c_ols, 2, [8, 6]);
+      clipRect(ctx, F); P.forEach((p, i) => { ctx.strokeStyle = rgba(C.c_res, .6); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(F.sx(p.y), F.sy(fit.pm[i])); ctx.lineTo(F.sx(p.y), F.sy(p.y)); ctx.stroke(); }); ctx.restore();
+      P.forEach((p, i) => { ctx.fillStyle = C.c_data; ctx.strokeStyle = C.surface; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.arc(F.sx(p.y), F.sy(fit.pm[i]), 4.3, 0, 7); ctx.fill(); ctx.stroke(); });
+      ctx.fillStyle = C.ink; ctx.font = `600 12px ${css("--mono")}`; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(`R² = ${fmt(fit.r2, 3)}`, F.pad.l + 8, F.pad.t + 6);
+    }
+  }
+  function renderMulti() {
+    $("vRho").textContent = fmt(M.rho, 2); $("vSig").textContent = M.sigma;
+    genMulti(); fitMulti(); const f = M.fit;
+    $("mTable").innerHTML =
+      `<tr><td>단순: 나이만</td><td class="n">${fmt(f.oa.b0, 2)}</td><td class="n big">${fmt(f.oa.b1, 3)}</td><td class="n">—</td><td class="n">${fmt(f.r2a, 3)}</td></tr>` +
+      `<tr><td>단순: BMI만</td><td class="n">${fmt(f.ob.b0, 2)}</td><td class="n">—</td><td class="n big">${fmt(f.ob.b1, 3)}</td><td class="n">${fmt(f.r2b, 3)}</td></tr>` +
+      `<tr><td><b>다중: 나이 + BMI</b></td><td class="n">${fmt(f.beta[0], 2)}</td><td class="n big">${fmt(f.beta[1], 3)}</td><td class="n big">${fmt(f.beta[2], 3)}</td><td class="n">${fmt(f.r2, 3)}</td></tr>` +
+      `<tr><td class="lr-mut">데이터를 만든 참값</td><td class="n lr-mut">60.00</td><td class="n lr-mut">0.550</td><td class="n lr-mut">1.600</td><td class="n lr-mut">—</td></tr>`;
+    $("mNote").innerHTML = `표본 상관 r(나이, BMI) = <b>${fmt(f.corr, 2)}</b>. 나이만 넣으면 나이 기울기가 <b>${fmt(f.oa.b1, 3)}</b>로, BMI의 효과까지 떠안습니다. BMI를 함께 넣으면 <b>${fmt(f.beta[1], 3)}</b> (BMI를 고정했을 때 나이 1세당 효과)` + (Math.abs(f.beta[1] - 0.55) < Math.abs(f.oa.b1 - 0.55) ? "로 참값 0.55에 가까워집니다." : "입니다. 이번 난수에서는 표본 잡음 때문에 참값 0.55와 차이가 남아 있습니다 (표본이 60명뿐).") + " ρ를 0으로 내리면 두 기울기가 비슷해집니다.";
+    const m3 = (Mx, d) => `<span class="lr-mx" style="grid-template-columns:repeat(${Mx[0].length},auto)">${Mx.map(r => r.map(v => `<span>${d === "s" ? fmtS(v, 3) : fmt(v, Math.abs(v - Math.round(v)) < 1e-9 ? 0 : d)}</span>`).join("")).join("")}</span>`;
+    $("mNormal").innerHTML = `<div class="lr-eq"><span>X = [1, 나이, BMI] (${M.pts.length}×3)</span></div>
+      <div class="lr-eq"><span>XᵀX =</span>${m3(f.A, 1)}</div>
+      <div class="lr-eq"><span>Xᵀy =</span>${m3(f.b.map(v => [v]), 1)}</div>
+      <div class="lr-eq"><span>β = (XᵀX)⁻¹Xᵀy =</span>${m3(f.beta.map(v => [v]), 4)}<span class="lr-mut">← [b0, b나이, bBMI]</span></div>`;
+    $("mCode").textContent =
+`# scikit-learn
+from sklearn.linear_model import LinearRegression
+X = df[["나이", "BMI"]]; y = df["수축기혈압"]
+m = LinearRegression().fit(X, y)
+m.intercept_  # ${fmt(f.beta[0], 4).replace(/,/g, "").replace("−", "-")}
+m.coef_       # [${fmt(f.beta[1], 4).replace("−", "-")}, ${fmt(f.beta[2], 4).replace("−", "-")}]`;
+    drawMulti();
+  }
+  $("mRho").addEventListener("input", e => { M.rho = +e.target.value; renderMulti(); });
+  $("mSig").addEventListener("input", e => { M.sigma = +e.target.value; renderMulti(); });
+  $("mSeed").onclick = () => { M.seed = (M.seed * 17 + 5) % 997 + 1; renderMulti(); };
+
+  /* ================================================================
+     탭 · 다시 그리기
+     ================================================================ */
+  const tabs = [...document.querySelectorAll(".sk-tab")];
+  function renderPane(id) {
+    if (id === "pane-ols") renderOls();
+    else if (id === "pane-gd") { if (gdDirty || !G.Fd) { gdDirty = false; gdReset(); } else renderGd(); }
+    else if (id === "pane-cmp") renderCmp();
+    else if (id === "pane-multi") renderMulti();
+  }
+  function show(t) {
+    tabs.forEach(b => { const on = b === t; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1;
+      $(b.getAttribute("aria-controls")).hidden = !on; });
+    if (!t.id.endsWith("gd")) gdPause();
+    history.replaceState(null, "", "#" + t.id.replace("tab-", ""));
+    renderPane(t.getAttribute("aria-controls"));
+  }
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => show(b));
+    b.addEventListener("keydown", e => {
+      const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return;
+      const n = tabs[(i + d + tabs.length) % tabs.length]; show(n); n.focus(); e.preventDefault();
+    });
+  });
+  function current() { return tabs.find(b => b.getAttribute("aria-selected") === "true"); }
+  function redraw() {
+    G.heatKey = ""; const t = current(); if (!t) return; const id = t.getAttribute("aria-controls");
+    if (id === "pane-ols") drawOls(); else if (id === "pane-gd") renderGd(); else if (id === "pane-multi") drawMulti();
+  }
+  new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  if (window.matchMedia) { const mq = matchMedia("(prefers-color-scheme: dark)"); if (mq.addEventListener) mq.addEventListener("change", redraw); }
+  let rzT = 0; const onResize = () => { cancelAnimationFrame(rzT); rzT = requestAnimationFrame(() => { G.base = null; redraw(); }); };
+  if (window.ResizeObserver) { const ro = new ResizeObserver(onResize); ["cvOls", "cvCont", "cvGdLine", "cvLoss", "cvPlane", "cvPred"].forEach(id => ro.observe($(id))); }
+  else window.addEventListener("resize", onResize);
+
+
+  /* 시작 */
+  $("vM").textContent = G.m; $("vIter").textContent = G.maxIter; $("vSpd").textContent = `${SPEEDS[G.speed]} 스텝/프레임`;
+  S.pts = genData("linear", S.seed); recompute();
+  initRanges(); G.Fd = gdFeatures(); setLr(presetLr("good", G.Fd)); showLr(); gdDirty = true;
+  renderCalc();
+  const start = $("tab-" + location.hash.slice(1)); show(start || tabs[0]);
+})();
+</script>
+</body>
+</html>

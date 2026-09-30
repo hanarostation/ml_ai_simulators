@@ -1,0 +1,1034 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>불균형 데이터 샘플링 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20260930c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20260930c">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 정상(다수)=파랑 · 질환(소수)=주황(샘플링) · 검증=청록 · 교차검증/이웃=보라 · 누수/위험=빨강 · 안전/활용=초록 */
+:root{ --sk-accent: var(--cat-ml);
+  --c0:#2563EB; --c1:#EA580C; --teal:#0D9488; --pur:#7C3AED; --red:#DC2626; --grn:#16A34A; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --c0:#6AA5FF; --c1:#FF914D; --teal:#33D1BD; --pur:#B294FF; --red:#F87171; --grn:#4ADE80; } }
+:root[data-theme="dark"]{ --c0:#6AA5FF; --c1:#FF914D; --teal:#33D1BD; --pur:#B294FF; --red:#F87171; --grn:#4ADE80; }
+
+.im-c0{color:var(--c0)} .im-c1{color:var(--c1)} .im-red{color:var(--red)} .im-grn{color:var(--grn)} .im-pur{color:var(--pur)} .im-teal{color:var(--teal)}
+
+/* 상단 큰 방식 선택 */
+.im-modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;border-radius:12px}
+.im-modes button{padding:12px 10px;font-size:16.5px;font-weight:700;line-height:1.3;white-space:normal;text-align:center}
+.im-modes button .sub{display:block;font-size:12.5px;font-weight:500;opacity:.85;margin-top:2px}
+.im-modes button[aria-selected="true"]{background:var(--ink);color:var(--on-ink)}
+.im-modes button:focus-visible{outline:2px solid var(--focus);outline-offset:-3px}
+
+/* 기법 선택 칩 */
+.im-chips{display:flex;flex-wrap:wrap;gap:6px}
+.im-chips button{appearance:none;font:inherit;font-family:var(--mono);font-size:13.5px;font-weight:600;border:1px solid var(--line-strong);background:var(--surface);color:var(--muted);border-radius:999px;padding:6px 13px;cursor:pointer}
+.im-chips button:hover{color:var(--ink);background:var(--surface-2)}
+.im-chips button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
+.im-chips button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.im-chips button .opt{font-family:var(--sans);font-weight:500;font-size:11.5px;opacity:.8;margin-left:4px}
+.im-sep{border:0;border-top:1px solid var(--line);margin:2px 0}
+.im-desc{margin:0;font-size:14.5px;line-height:1.65;color:var(--text);max-width:100ch}
+.im-desc b{color:var(--ink)}
+.im-params .sk-slider{min-width:190px}
+
+/* 산점도 */
+.im-plot{display:flex;flex-direction:column;gap:8px;min-width:0}
+.im-plot canvas{display:block;width:100%;aspect-ratio:1.1/1;border:1px solid var(--line);border-radius:10px;background:var(--surface);touch-action:manipulation}
+#cvOrig{cursor:crosshair}
+.im-shape{display:inline-block;width:11px;height:11px;margin-right:5px;vertical-align:-1px}
+.im-shape.dot{border-radius:50%}
+.im-shape.dia{transform:rotate(45deg) scale(.82);outline:1.5px solid var(--ink);outline-offset:0}
+.im-shape.x{position:relative;width:11px}
+.im-shape.x::before,.im-shape.x::after{content:"";position:absolute;left:5px;top:-1px;width:1.8px;height:13px;background:var(--faint);transform:rotate(45deg)}
+.im-shape.x::after{transform:rotate(-45deg)}
+.im-shape.ring{border-radius:50%;border:2px solid currentColor}
+
+/* 진행 */
+.im-cap{min-height:3em;margin:0;font-size:14.5px;line-height:1.6}
+.im-cap b{color:var(--ink)}
+.im-frm{white-space:pre;min-height:9.2em}
+.im-pre{white-space:pre-wrap}
+.im-steprow{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.im-progress{flex:1 1 160px;height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden;min-width:120px}
+.im-progress i{display:block;height:100%;background:var(--sk-accent);width:0;transition:width .15s}
+
+/* 개수 막대 */
+.im-bars{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;gap:6px 10px;align-items:center;font-size:13.5px}
+.im-bars .g{font-weight:700;color:var(--muted);font-size:12.5px}
+.im-bars .l{color:var(--muted);white-space:nowrap}
+.im-bars .tr{height:20px;background:var(--surface-2);border-radius:5px;position:relative;min-width:0}
+.im-bars .fl{height:100%;border-radius:5px;transition:width .25s}
+.im-bars .fl.new{background-image:repeating-linear-gradient(135deg,transparent 0 5px,color-mix(in srgb,var(--surface) 55%,transparent) 5px 8px)}
+.im-bars .v{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;min-width:7ch}
+.im-ratio{font-family:var(--mono);font-size:14px;color:var(--ink)}
+
+/* 검산 */
+.im-checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:13.5px}
+.im-checks li{display:flex;gap:8px;align-items:flex-start;line-height:1.5}
+.im-checks .sk-pill{flex:none;margin-top:1px}
+.im-ok{color:var(--grn)} .im-bad{color:var(--red)} .im-info{color:var(--muted)}
+.im-checks code{font-family:var(--mono);font-size:12.5px;color:var(--ink)}
+
+/* 기법 세부 */
+.im-tbl-wrap{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.im-tbl-wrap .sk-table th{z-index:1}
+.im-tbl-wrap tr.cur td{background:color-mix(in srgb,var(--sk-accent) 12%,var(--surface))}
+.im-tag{display:inline-block;font-size:11.5px;font-weight:700;border-radius:5px;padding:0 6px;color:var(--on-ink)}
+.im-wbar{display:grid;grid-template-columns:44px minmax(0,1fr) 88px;gap:4px 8px;align-items:center;font-size:12.5px;font-family:var(--mono)}
+.im-wbar .tr{height:14px;background:var(--surface-2);border-radius:4px;overflow:hidden}
+.im-wbar .fl{height:100%;background:var(--c1);border-radius:4px}
+.im-wbar .cur{color:var(--ink);font-weight:700}
+.im-wbar span{color:var(--muted);white-space:nowrap}
+.im-rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:900px){.im-rules{grid-template-columns:minmax(0,1fr)}}
+.im-rule{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px;background:var(--surface)}
+.im-rule.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.im-rule h3{font-size:14px;margin:0 0 4px}
+.im-rule p{margin:0;color:var(--muted);line-height:1.55}
+
+/* 모형 영향 */
+.im-bnd{display:flex;flex-direction:column;gap:6px;min-width:0}
+.im-bnd h3{font-size:14.5px;margin:0}
+.im-bnd canvas{display:block;width:100%;aspect-ratio:1.1/1;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.im-met td.n.bad{color:var(--red);font-weight:700}
+.im-met td.n.good{color:var(--grn);font-weight:700}
+.im-met td.n{font-size:14px}
+.im-met th.n{text-align:right}
+.im-cms{display:flex;flex-wrap:wrap;gap:18px}
+.im-cm{display:grid;grid-template-columns:auto 76px 76px;gap:3px;font-size:12.5px;align-items:center;align-content:start;align-self:flex-start}
+.im-cm .h{white-space:nowrap}
+.im-cm .h{color:var(--muted);font-weight:700;text-align:center;padding:2px 4px}
+.im-cm .rh{color:var(--muted);font-weight:700;text-align:right;padding-right:6px}
+.im-cm .c{height:40px;display:grid;place-items:center;border-radius:6px;background:var(--surface-2);font-family:var(--mono);font-size:15px;font-weight:600;color:var(--ink);border:1.5px solid transparent}
+.im-cm .c.ok{background:color-mix(in srgb,var(--grn) 14%,var(--surface))}
+.im-cm .c.fn{background:color-mix(in srgb,var(--red) 16%,var(--surface));border-color:var(--red)}
+.im-cm .t{grid-column:1/-1;font-weight:700;font-size:13.5px;color:var(--ink);margin-bottom:2px}
+.im-alt{font-size:14px;margin:0}
+.im-alt code{font-family:var(--mono);font-size:13px;color:var(--ink);overflow-wrap:anywhere}
+
+/* 누수 도식 */
+.im-flow{display:flex;flex-direction:column;gap:12px}
+.im-lane{border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.im-lane.bad{border-color:var(--red);background:color-mix(in srgb,var(--red) 5%,var(--surface))}
+.im-lane.good{border-color:var(--grn);background:color-mix(in srgb,var(--grn) 4%,var(--surface))}
+.im-lane h3{font-size:14.5px;margin:0}
+.im-lane.bad h3{color:var(--red)} .im-lane.good h3{color:var(--grn)}
+.im-steps{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.im-box{border:1.5px solid var(--role,var(--line-strong));border-radius:8px;padding:6px 10px;font-size:13px;font-weight:600;background:color-mix(in srgb,var(--role,var(--line)) 9%,var(--surface));color:var(--ink);line-height:1.35}
+.im-box small{display:block;font-weight:500;color:var(--muted);font-size:11.5px}
+.im-arrow{color:var(--faint);font-weight:700;font-size:15px}
+.im-folds{display:grid;grid-template-columns:auto repeat(5,minmax(0,1fr));gap:4px 4px;font-size:12px;align-items:center}
+.im-folds .fl{font-weight:700;color:var(--muted);padding-right:6px;white-space:nowrap}
+.im-folds .cell{height:26px;border-radius:5px;display:grid;place-items:center;font-weight:700;font-size:11.5px;color:var(--ink);position:relative;overflow:hidden}
+.im-folds .tr{background:color-mix(in srgb,var(--c0) 20%,var(--surface));border-top:5px solid var(--c1)}
+.im-folds .va{background:color-mix(in srgb,var(--teal) 24%,var(--surface));border:1.5px dashed var(--teal)}
+.im-folds-leg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted)}
+.im-folds-leg i{display:inline-block;width:14px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+
+/* 코드 */
+.im-code{margin:0;font-family:var(--mono);font-size:13px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto;color:var(--ink);white-space:pre;max-width:100%}
+.im-code .cm{color:var(--faint)}
+.im-code .kw{color:var(--pur);font-weight:600}
+.im-code .st{color:var(--teal)}
+.im-kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--ink)}
+
+@media (max-width:760px){
+  .im-modes button{font-size:14.5px;padding:10px 4px}
+  .im-modes button .sub{font-size:11.5px}
+}
+@media (max-width:520px){
+  .sk-slider,.im-params .sk-slider{min-width:0;width:100%}
+  .im-frm{font-size:12px}
+  .im-cm{grid-template-columns:auto 66px 66px}
+  .im-wbar{grid-template-columns:40px minmax(0,1fr) 78px}
+}
+@media (prefers-reduced-motion: reduce){ .im-progress i,.im-bars .fl{transition:none} }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)" aria-current="page">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">불균형 데이터 샘플링 시뮬레이터</h1>
+      <p class="ds-hero__lede">질환 환자(소수)가 정상(다수)보다 훨씬 적으면, 모형은 전부 '정상'이라고 답해도 정확도가 높게 나옵니다. imbalanced-learn의 Over / Under / Combine 샘플링이 점을 어떻게 만들고 지우는지 한 단계씩 따라가고, 원본 분포 그대로인 검증 세트에서 재현율·F1·balanced accuracy가 어떻게 달라지는지 확인합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <div class="sk-seg im-modes" role="tablist" aria-label="샘플링 방식">
+    <button type="button" role="tab" id="tab-over" aria-controls="pane-main" aria-selected="true">Over Sampling<span class="sub">소수 클래스 늘리기</span></button>
+    <button type="button" role="tab" id="tab-under" aria-controls="pane-main" aria-selected="false" tabindex="-1">Under Sampling<span class="sub">다수 클래스 줄이기</span></button>
+    <button type="button" role="tab" id="tab-combine" aria-controls="pane-main" aria-selected="false" tabindex="-1">Combine<span class="sub">늘린 뒤 경계 청소</span></button>
+  </div>
+
+  <section id="pane-main" role="tabpanel" aria-labelledby="tab-over" style="display:flex;flex-direction:column;gap:16px">
+
+  <!-- ===== 데이터 + 기법 ===== -->
+  <div class="sk-card">
+    <div class="sk-head"><h2>데이터: 혈당·BMI로 질환 여부 분류</h2>
+      <div class="sk-legend"><span><i class="im-shape dot" style="background:var(--c0)"></i>정상 (다수, 0)</span><span><i class="im-shape dot" style="background:var(--c1)"></i>질환 (소수, 1)</span></div>
+    </div>
+    <div class="sk-controls">
+      <div class="sk-slider"><div class="sk-sl-head"><label for="ratio">불균형 비율 (질환 : 정상)</label><b id="ratioV">1 : 10</b></div><input type="range" id="ratio" min="2" max="20" step="1" value="10"></div>
+      <div class="sk-slider"><div class="sk-sl-head"><label for="ovl">두 클래스 겹침 정도</label><b id="ovlV">45%</b></div><input type="range" id="ovl" min="0" max="100" step="5" value="45"></div>
+      <div class="sk-group"><label class="sk-label" for="seed">seed</label><input class="sk-input sk-mono" type="number" id="seed" value="42" min="0" max="99999" style="width:84px"><button type="button" class="sk-btn sk-btn--sm" id="seedNew">다른 seed</button></div>
+    </div>
+    <div class="sk-controls">
+      <div class="sk-group"><span class="sk-label">원본 그림을 클릭하면</span>
+        <div class="sk-seg" id="clickSeg" role="group" aria-label="클릭해서 점 추가">
+          <button type="button" data-v="1" aria-pressed="true">질환 점 추가</button>
+          <button type="button" data-v="0" aria-pressed="false">정상 점 추가</button>
+          <button type="button" data-v="off" aria-pressed="false">끔</button>
+        </div>
+      </div>
+      <button type="button" class="sk-btn sk-btn--sm" id="clearUser">추가한 점 지우기</button>
+      <span class="sk-hint" id="dataInfo"></span>
+    </div>
+    <hr class="im-sep">
+    <div class="sk-head"><h2 id="techTitle">기법</h2><span class="sk-hint">imbalanced-learn 클래스 이름 그대로</span></div>
+    <div class="im-chips" id="techChips" role="group" aria-label="세부 기법"></div>
+    <div class="sk-controls im-params" id="params">
+      <div class="sk-slider" data-p="ss"><div class="sk-sl-head"><label for="ss" id="ssLab">sampling_strategy</label><b id="ssV">1.00</b></div><input type="range" id="ss" min="0.1" max="1" step="0.05" value="1"></div>
+      <div class="sk-slider" data-p="k"><div class="sk-sl-head"><label for="kn" id="knLab">k_neighbors</label><b id="knV">5</b></div><input type="range" id="kn" min="1" max="10" step="1" value="5"></div>
+      <div class="sk-slider" data-p="m"><div class="sk-sl-head"><label for="mn">m_neighbors (위험 판정 이웃 수)</label><b id="mnV">10</b></div><input type="range" id="mn" min="3" max="15" step="1" value="10"></div>
+      <div class="sk-group" data-p="ver"><span class="sk-label">version</span>
+        <div class="sk-seg" id="verSeg" role="group" aria-label="NearMiss 버전"><button type="button" data-v="1" aria-pressed="true">1</button><button type="button" data-v="2" aria-pressed="false">2</button><button type="button" data-v="3" aria-pressed="false">3</button></div></div>
+      <div class="sk-slider" data-p="nmk"><div class="sk-sl-head"><label for="nmk">n_neighbors</label><b id="nmkV">3</b></div><input type="range" id="nmk" min="1" max="5" step="1" value="3"></div>
+      <div class="sk-slider" data-p="ek"><div class="sk-sl-head"><label for="ek">n_neighbors</label><b id="ekV">3</b></div><input type="range" id="ek" min="1" max="7" step="1" value="3"></div>
+      <div class="sk-group" data-p="kind"><span class="sk-label">kind_sel</span>
+        <div class="sk-seg" id="kindSeg" role="group" aria-label="ENN 제거 규칙"><button type="button" data-v="mode" aria-pressed="true">'mode' 다수결</button><button type="button" data-v="all" aria-pressed="false">'all' 전원 일치</button></div></div>
+      <div class="sk-group" data-p="tss"><span class="sk-label">sampling_strategy</span>
+        <div class="sk-seg" id="tssSeg" role="group" aria-label="Tomek 제거 대상"><button type="button" data-v="auto" aria-pressed="true">'auto' 다수 쪽만</button><button type="button" data-v="all" aria-pressed="false">'all' 양쪽 모두</button></div></div>
+    </div>
+    <p class="im-desc" id="techDesc"></p>
+    <div class="sk-formula im-pre" id="techFormula"></div>
+  </div>
+
+  <!-- ===== 원본 vs 샘플링 후 ===== -->
+  <div class="sk-grid2">
+    <div class="sk-card im-plot">
+      <div class="sk-head"><h2>원본 (학습 데이터)</h2><span class="sk-hint" id="origHint">클릭: 점 추가 · 추가한 점을 다시 클릭: 삭제</span></div>
+      <canvas id="cvOrig" aria-label="원본 학습 데이터 산점도: 가로 혈당, 세로 BMI"></canvas>
+      <div class="sk-legend" id="origLegend"></div>
+    </div>
+    <div class="sk-card im-plot">
+      <div class="sk-head"><h2 id="resTitle">샘플링 후</h2><span class="sk-hint" id="resHint"></span></div>
+      <canvas id="cvRes" aria-label="샘플링 후 학습 데이터 산점도"></canvas>
+      <div class="sk-legend" id="resLegend"></div>
+    </div>
+  </div>
+
+  <!-- ===== 진행 과정 ===== -->
+  <div class="sk-grid2">
+    <div class="sk-card">
+      <div class="sk-head"><h2>한 단계씩 보기</h2><span class="sk-hint">키보드 <span class="im-kbd">←</span> <span class="im-kbd">→</span> 이전·다음</span></div>
+      <div class="im-steprow">
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--sm" id="stFirst">처음</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="stPrev">이전</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="stNext">다음 (한 개씩)</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="stLast">끝</button>
+          <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="stPlay">재생</button>
+        </div>
+        <div class="sk-slider" style="min-width:140px"><div class="sk-sl-head"><label for="spd">속도</label><b id="spdV">1×</b></div><input type="range" id="spd" min="0" max="5" step="1" value="1"></div>
+      </div>
+      <div class="im-steprow"><span class="sk-mono" id="stepNum" style="font-size:13px;color:var(--muted)"></span><div class="im-progress" aria-hidden="true"><i id="stepBar"></i></div></div>
+      <p class="im-cap" id="stepCap" aria-live="polite"></p>
+      <div class="sk-formula im-frm" id="stepFrm"></div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>클래스 개수: 전 → 후</h2><span class="im-ratio" id="ratioTxt"></span></div>
+      <div class="im-bars" id="bars"></div>
+      <div class="sk-head" style="margin-top:4px"><h3>검산</h3><span class="sk-hint">화면의 결과를 독립 계산으로 다시 확인</span></div>
+      <ul class="im-checks" id="checks"></ul>
+    </div>
+  </div>
+
+  <!-- ===== 기법 세부 ===== -->
+  <div class="sk-card" id="detailCard">
+    <div class="sk-head"><h2 id="detailTitle">기법 세부</h2><span class="sk-hint" id="detailHint"></span></div>
+    <div id="detailBody"></div>
+  </div>
+
+  <!-- ===== 모형 영향 ===== -->
+  <div class="sk-card">
+    <div class="sk-head"><h2>모형 영향: 원본 분포 그대로인 검증 세트로 평가</h2>
+      <div class="sk-group"><span class="sk-label">분류기</span>
+        <div class="sk-seg" id="clfSeg" role="group" aria-label="분류기"><button type="button" data-v="lr" aria-pressed="true">로지스틱 회귀</button><button type="button" data-v="knn" aria-pressed="false">k-NN (k=5)</button></div></div>
+    </div>
+    <p class="sk-lead" id="valInfo"></p>
+    <div class="sk-grid2">
+      <div class="im-bnd"><h3>원본 데이터로 학습</h3><canvas id="cvB0" aria-label="원본으로 학습한 분류기의 결정 경계와 검증 세트"></canvas></div>
+      <div class="im-bnd"><h3 id="b1Title">샘플링 후 데이터로 학습</h3><canvas id="cvB1" aria-label="샘플링한 데이터로 학습한 분류기의 결정 경계와 검증 세트"></canvas></div>
+    </div>
+    <div class="sk-legend"><span><i style="background:color-mix(in srgb,var(--c1) 30%,var(--surface))"></i>'질환'으로 예측하는 영역</span><span><i style="background:color-mix(in srgb,var(--c0) 18%,var(--surface))"></i>'정상'으로 예측하는 영역</span><span><i class="im-shape ring im-red"></i>놓친 질환 (FN)</span></div>
+    <div class="sk-grid2">
+      <div class="sk-scroll"><table class="sk-table im-met" id="metTbl"></table></div>
+      <div class="im-cms" id="cms"></div>
+    </div>
+    <p class="sk-note sk-note--warn" id="modelNote"></p>
+    <p class="im-alt" id="altLine"></p>
+  </div>
+
+  <!-- ===== 반드시 지킬 것 ===== -->
+  <div class="sk-card">
+    <div class="sk-head"><h2>반드시 지킬 것: 샘플링은 학습 데이터에만</h2></div>
+    <p class="sk-note sk-note--warn"><b>먼저 샘플링하고 나누면 데이터 누수입니다.</b> SMOTE가 만든 합성 점은 검증·테스트 점을 재료로 삼을 수 있고, 복제한 점은 학습과 테스트에 똑같이 들어갑니다. 점수가 부풀려져 실제 병원 데이터(원본 분포)에서는 성능이 떨어집니다. 교차검증에서도 <b>각 fold의 학습 부분에서만</b> 샘플링해야 하며, 이를 자동으로 해 주는 것이 <code class="sk-mono">imblearn.pipeline.Pipeline</code>입니다(fit 때만 샘플링, predict·score 때는 건너뜀).</p>
+    <div class="im-flow" role="img" aria-label="잘못된 순서와 올바른 순서 비교 도식">
+      <div class="im-lane bad">
+        <h3>잘못: 샘플링 → 분할 (누수)</h3>
+        <div class="im-steps">
+          <span class="im-box" style="--role:var(--c0)">전체 데이터<small>정상 + 질환</small></span><span class="im-arrow">→</span>
+          <span class="im-box" style="--role:var(--c1)">SMOTE.fit_resample(X, y)<small>테스트가 될 점까지 재료로 사용</small></span><span class="im-arrow">→</span>
+          <span class="im-box" style="--role:var(--red)">train_test_split<small>합성 점이 테스트에 섞임</small></span><span class="im-arrow">→</span>
+          <span class="im-box" style="--role:var(--red)">점수 부풀림<small>테스트 분포 ≠ 실제 분포</small></span>
+        </div>
+      </div>
+      <div class="im-lane good">
+        <h3>올바름: 분할 → (학습 부분만) 샘플링 → 원본 분포로 평가</h3>
+        <div class="im-steps">
+          <span class="im-box" style="--role:var(--c0)">전체 데이터</span><span class="im-arrow">→</span>
+          <span class="im-box" style="--role:var(--c0)">train_test_split(stratify=y)</span><span class="im-arrow">→</span>
+          <span class="im-box" style="--role:var(--pur)">Pipeline([scaler, sampler, model])<small>학습 부분에서만 fit_resample</small></span><span class="im-arrow">→</span>
+          <span class="im-box" style="--role:var(--teal)">테스트 (원본 분포 그대로)<small>샘플링 안 함 · 재현율·F1·balanced accuracy</small></span><span class="im-arrow">→</span>
+          <span class="im-box" style="--role:var(--grn)">활용</span>
+        </div>
+        <div class="im-folds" aria-hidden="true" id="folds"></div>
+        <div class="im-folds-leg"><span><i style="background:color-mix(in srgb,var(--c0) 20%,var(--surface));border-top:4px solid var(--c1)"></i>학습 fold (위 주황 띠 = 여기서만 샘플링)</span><span><i style="background:color-mix(in srgb,var(--teal) 24%,var(--surface));border:1.5px dashed var(--teal)"></i>검증 fold (원본 그대로)</span><span class="im-pur">cross_validate(pipe, ...) 가 fold마다 자동으로 처리</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 코드 ===== -->
+  <div class="sk-card">
+    <div class="sk-head"><h2>파이썬 코드 (현재 설정)</h2><button type="button" class="sk-btn sk-btn--sm" id="copyBtn">복사</button></div>
+    <pre class="im-code" id="code"></pre>
+    <p class="sk-hint" style="margin:0">브라우저의 난수는 numpy와 달라 합성 점의 정확한 위치는 파이썬 결과와 다를 수 있습니다. 개수 규칙과 판정 규칙(Tomek, NearMiss, ENN, 위험 점)은 같습니다.</p>
+  </div>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20260930c"></script>
+<script>
+(function () {
+"use strict";
+const $ = id => document.getElementById(id);
+const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function gauss(r){let u=0;while(u===0)u=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*r());}
+const f1=v=>v.toFixed(1), f2=v=>v.toFixed(2), f3=v=>v.toFixed(3);
+const pct=v=>(v*100).toFixed(1)+"%";
+const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+function rintHalfEven(x){const f=Math.floor(x),d=x-f;if(d>0.5)return f+1;if(d<0.5)return f;return f%2===0?f:f+1;}
+
+/* ---------- 좌표: 내부는 표준화 단위, 화면 표시는 혈당·BMI ---------- */
+const XMIN=-3.0,XMAX=4.6,YMIN=-2.9,YMAX=3.9;
+const toG=x=>105+16*x, toB=y=>24+3*y;
+const fromG=g=>(g-105)/16, fromB=b=>(b-24)/3;
+
+/* ---------- 상태 ---------- */
+const TECH={
+  over:["RandomOverSampler","SMOTE","BorderlineSMOTE","ADASYN"],
+  under:["RandomUnderSampler","TomekLinks","NearMiss","EditedNearestNeighbours","ClusterCentroids"],
+  combine:["SMOTETomek","SMOTEENN"]};
+const PARAMS={RandomOverSampler:["ss"],SMOTE:["ss","k"],BorderlineSMOTE:["ss","k","m"],ADASYN:["ss","k"],
+  RandomUnderSampler:["ss"],TomekLinks:["tss"],NearMiss:["ss","ver","nmk"],EditedNearestNeighbours:["ek","kind"],ClusterCentroids:["ss"],
+  SMOTETomek:["ss","k"],SMOTEENN:["ss","k"]};
+const S={mode:"over",tech:{over:"SMOTE",under:"TomekLinks",combine:"SMOTETomek"},
+  ratio:10,ovl:0.45,seed:42,user:[],clickC:1,
+  ss:{over:1,under:1,combine:1},k:5,m:10,ver:1,nmk:3,ek:3,kind:"mode",tss:"auto",clf:"lr",
+  step:0,sub:3,playing:false,timer:null,speed:1};
+let TRAIN=[],VAL=[],R=null,MODEL=null;
+const curTech=()=>S.tech[S.mode];
+
+/* ---------- 데이터 생성 ---------- */
+function genClass(r,n,mx,my,sd,rho,c,out){
+  for(let i=0;i<n;i++){let x,y,t=0;
+    do{const z1=gauss(r),z2=gauss(r);x=mx+sd*z1;y=my+sd*(rho*z1+Math.sqrt(1-rho*rho)*z2);t++;}
+    while((x<XMIN+.08||x>XMAX-.08||y<YMIN+.08||y>YMAX-.08)&&t<50);
+    out.push({x:Math.min(XMAX-.08,Math.max(XMIN+.08,x)),y:Math.min(YMAX-.08,Math.max(YMIN+.08,y)),c});}
+}
+function makeSet(seed,nMaj,nMin){
+  const r=mulberry32(seed),d=2.9*(1-S.ovl)+0.3,out=[];
+  genClass(r,nMaj,-0.5,-0.4,1.0,0.35,0,out);
+  genClass(r,nMin,-0.5+0.85*d,-0.4+0.62*d,0.72,0.2,1,out);
+  return out;
+}
+function regen(){
+  const nMaj=160,nMin=Math.max(6,Math.round(160/S.ratio));
+  TRAIN=makeSet(S.seed,nMaj,nMin).concat(S.user.map(p=>({x:p.x,y:p.y,c:p.c,user:true})));
+  TRAIN.forEach((p,i)=>p.id=i);
+  const vMaj=500,vMin=Math.max(10,Math.round(500/S.ratio));
+  VAL=makeSet(S.seed*7+1000003,vMaj,vMin);
+}
+const counts=arr=>{let a=0,b=0;arr.forEach(p=>{if(p.c)b++;else a++;});return[a,b];};
+
+/* ---------- 이웃 ---------- */
+const d2=(a,b)=>(a.x-b.x)*(a.x-b.x)+(a.y-b.y)*(a.y-b.y);
+function knn(P,q,cand,k,excl){const o=[];for(const j of cand){if(j===excl)continue;o.push([d2(P[j],q),j]);}o.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);return o.slice(0,k);}
+
+/* ---------- 샘플링 결과 구조 ----------
+   R.P  : 모든 점(원본 + 새 점). kind: orig | new | dup | cent
+   R.ev : 단계(이벤트) 목록 {add:[], del:[], d:{...}}                                  */
+function base(){return{P:TRAIN.map(p=>({x:p.x,y:p.y,c:p.c,kind:"orig",id:p.id,user:!!p.user})),ev:[],info:{},checks:[],warn:""};}
+function idxOf(P,c,alive){const o=[];P.forEach((p,i)=>{if(p.c===c&&(!alive||alive[i]))o.push(i);});return o;}
+function ssClamp(){ // sampling_strategy 가능한 최솟값(현재 비율)
+  const [a,b]=counts(TRAIN);return{nMaj:a,nMin:b,lo:Math.min(1,Math.ceil((b/a)/0.05-1e-9)*0.05)};}
+function alphaVal(){return Math.round(S.ss[S.mode]*100)/100;}
+function nGenOver(nMaj,nMin,al){return al>=1?nMaj-nMin:Math.trunc(nMaj*al-nMin);}
+function nKeepUnder(nMin,al){return al>=1?nMin:Math.trunc(nMin/al);}
+
+/* SMOTE 생성 (pool: 기준 점 후보, minIdx: 이웃 후보 = 소수 클래스) */
+function smoteGen(R,pool,minIdx,k,n,rng,label,rowsFixed){
+  const cache={};
+  const nb=i=>cache[i]||(cache[i]=knn(R.P,R.P[i],minIdx,k,i));
+  for(let s=0;s<n;s++){
+    const i=rowsFixed?rowsFixed[s]:pool[Math.floor(rng()*pool.length)];
+    const L=nb(i);const pick=L[Math.floor(rng()*L.length)];const j=pick[1];const lam=rng();
+    const a=R.P[i],b=R.P[j];
+    const np={x:a.x+lam*(b.x-a.x),y:a.y+lam*(b.y-a.y),c:1,kind:"new",base:i,nn:j,lam};
+    R.P.push(np);
+    R.ev.push({add:[R.P.length-1],del:[],d:{t:"smote",i,j,lam,nbrs:L.map(q=>q[1]),rad:Math.sqrt(L[L.length-1][0]),label}});
+  }
+}
+function tomekOn(P,L){ // L: 살아 있는 인덱스
+  const nn={};L.forEach(i=>{nn[i]=knn(P,P[i],L,1,i)[0][1];});
+  const links=[];L.forEach(i=>{const j=nn[i];if(i<j&&nn[j]===i&&P[i].c!==P[j].c)links.push([i,j]);});
+  return{links,nn};
+}
+function ennOn(P,L,k,kind,classes){ // 제거할 인덱스
+  const rem=[],why={};
+  L.forEach(i=>{if(!classes.includes(P[i].c))return;const nb=knn(P,P[i],L,k,i).map(q=>q[1]);
+    const n1=nb.filter(j=>P[j].c===1).length,n0=nb.length-n1;let keep;
+    if(kind==="mode"){const md=n1>n0?1:0;keep=md===P[i].c;}else keep=nb.every(j=>P[j].c===P[i].c);
+    if(!keep){rem.push(i);why[i]={nb,n0,n1};}});
+  return{rem,why};
+}
+function kmeans(pts,K,rng){
+  const C=[];const n=pts.length;if(K>=n)return pts.map(p=>({x:p.x,y:p.y}));
+  C.push({...pts[Math.floor(rng()*n)]});
+  while(C.length<K){const D=pts.map(p=>Math.min(...C.map(c=>d2(p,c))));const tot=D.reduce((a,b)=>a+b,0);let r=rng()*tot,i=0;for(;i<n-1;i++){r-=D[i];if(r<=0)break;}C.push({x:pts[i].x,y:pts[i].y});}
+  let it=0;
+  for(;it<100;it++){const A=pts.map(p=>{let b=0,bd=Infinity;C.forEach((c,j)=>{const d=d2(p,c);if(d<bd){bd=d;b=j;}});return b;});
+    const sx=new Array(K).fill(0),sy=new Array(K).fill(0),cn=new Array(K).fill(0);
+    A.forEach((a,i)=>{sx[a]+=pts[i].x;sy[a]+=pts[i].y;cn[a]++;});
+    let mv=0;C.forEach((c,j)=>{if(!cn[j])return;const nx=sx[j]/cn[j],ny=sy[j]/cn[j];mv=Math.max(mv,Math.abs(nx-c.x)+Math.abs(ny-c.y));c.x=nx;c.y=ny;});
+    if(mv<1e-9)break;}
+  C.iter=it+1;return C;
+}
+
+/* ---------- 기법별 실행 ---------- */
+function run(){
+  const t=curTech();const R=base();const P=R.P;
+  const [nMaj,nMin]=counts(TRAIN);const maj=idxOf(P,0),min=idxOf(P,1);
+  const al=alphaVal();const rng=mulberry32(S.seed*31+t.length*977+17);
+  R.nMaj=nMaj;R.nMin=nMin;R.al=al;
+  const kEff=Math.max(1,Math.min(S.k,nMin-1));R.kEff=kEff;
+  if(t==="RandomOverSampler"){
+    const n=nGenOver(nMaj,nMin,al);R.target={gen:n};
+    for(let s=0;s<n;s++){const i=min[Math.floor(rng()*min.length)];P.push({x:P[i].x,y:P[i].y,c:1,kind:"dup",src:i});R.ev.push({add:[P.length-1],del:[],d:{t:"dup",i}});}
+  }else if(t==="SMOTE"){
+    const n=nGenOver(nMaj,nMin,al);R.target={gen:n};smoteGen(R,min,min,kEff,n,rng,"SMOTE");
+  }else if(t==="BorderlineSMOTE"){
+    const n=nGenOver(nMaj,nMin,al);R.target={gen:n};
+    const m=Math.min(S.m,P.length-1);const all=P.map((_,i)=>i);const cat={},mc={};
+    min.forEach(i=>{const nb=knn(P,P[i],all,m,i);const mm=nb.filter(q=>P[q[1]].c===0).length;mc[i]=mm;
+      cat[i]=mm===m?"NOISE":(mm>=m/2&&mm<m?"DANGER":"SAFE");});
+    R.info={cat,mc,m};const danger=min.filter(i=>cat[i]==="DANGER");R.info.danger=danger;
+    if(danger.length)smoteGen(R,danger,min,kEff,n,rng,"BorderlineSMOTE");
+    else{R.warn="DANGER 점이 하나도 없어 새 점을 만들지 않았습니다 (imblearn도 이 경우 생성하지 않음). 겹침을 키우거나 m_neighbors를 바꿔 보세요.";R.target.gen=0;R.target.noDanger=true;}
+  }else if(t==="ADASYN"){
+    const G=nGenOver(nMaj,nMin,al);const all=P.map((_,i)=>i);const kk=Math.min(S.k,P.length-1);
+    const r=min.map(i=>knn(P,P[i],all,kk,i).filter(q=>P[q[1]].c===0).length/kk);
+    const sr=r.reduce((a,b)=>a+b,0);
+    if(!sr){R.warn="모든 소수 점의 이웃이 전부 소수 클래스라 ADASYN을 쓸 수 없습니다 (imblearn은 오류). 겹침을 키워 보세요.";R.target={gen:0,G};R.info={r,g:r.map(()=>0),min,G};}
+    else{const rh=r.map(v=>v/sr);const g=rh.map(v=>rintHalfEven(v*G));
+      const rows=[];g.forEach((c,ii)=>{for(let q=0;q<c;q++)rows.push(min[ii]);});
+      R.info={r,rh,g,min,G};R.target={gen:rows.length,G,sumG:rows.length};
+      smoteGen(R,null,min,kEff,rows.length,rng,"ADASYN",rows);}
+  }else if(t==="RandomUnderSampler"){
+    const keep=nKeepUnder(nMin,al);R.target={keep};
+    const a=maj.slice();for(let i=0;i<keep;i++){const j=i+Math.floor(rng()*(a.length-i));[a[i],a[j]]=[a[j],a[i]];}
+    const kept=new Set(a.slice(0,keep));const del=maj.filter(i=>!kept.has(i));
+    R.ev.push({add:[],del,d:{t:"bulk",what:`다수 클래스 ${nMaj}개 중 ${keep}개를 무작위로 남기고 ${del.length}개 제거`}});
+  }else if(t==="TomekLinks"){
+    const all=P.map((_,i)=>i);const {links,nn}=tomekOn(P,all);R.info={links,nn};R.target={links:links.length};
+    links.forEach(([i,j])=>{const del=S.tss==="all"?[i,j]:[P[i].c===0?i:j];R.ev.push({add:[],del,d:{t:"tomek",i,j}});});
+  }else if(t==="NearMiss"){
+    const keep=nKeepUnder(nMin,al);R.target={keep};const nk=Math.min(S.nmk,nMin);let cand=maj,score={},used={};
+    if(S.ver===3){const n3=Math.min(3,maj.length);const cs=new Set();min.forEach(i=>knn(P,P[i],maj,n3,-1).forEach(q=>cs.add(q[1])));
+      cand=maj.filter(i=>cs.has(i));R.info.cand=cand;}
+    cand.forEach(i=>{let L;if(S.ver===2){const all=knn(P,P[i],min,min.length,-1);L=all.slice(-nk);}else L=knn(P,P[i],min,nk,-1);
+      used[i]=L.map(q=>q[1]);score[i]=L.reduce((a,q)=>a+Math.sqrt(q[0]),0);});
+    const order=cand.map((i,o)=>[score[i],o,i]);
+    if(S.ver===3)order.sort((a,b)=>b[0]-a[0]||a[1]-b[1]);else order.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+    const kept=order.slice(0,keep).map(q=>q[2]);const ks=new Set(kept);
+    if(S.ver===3&&cand.length<keep)R.warn=`버전 3의 후보가 ${cand.length}개뿐이라 목표 ${keep}개보다 적게 남습니다 (imblearn도 경고 후 후보 전부를 남김).`;
+    R.info={...R.info,kept,score,used,nk};R.target.keepReal=kept.length;
+    const del=maj.filter(i=>!ks.has(i));
+    R.ev.push({add:[],del,d:{t:"bulk",what:`NearMiss-${S.ver}: 다수 ${nMaj}개 중 규칙에 맞는 ${kept.length}개만 남기고 ${del.length}개 제거`}});
+  }else if(t==="EditedNearestNeighbours"){
+    const all=P.map((_,i)=>i);const kk=Math.min(S.ek,P.length-1);const {rem,why}=ennOn(P,all,kk,S.kind,[0]);R.info={rem,why,k:kk};R.target={};
+    R.ev.push({add:[],del:rem,d:{t:"enn",what:`ENN(n_neighbors=${kk}, kind_sel='${S.kind}'): 정상 점 ${rem.length}개 제거`}});
+  }else if(t==="ClusterCentroids"){
+    const keep=nKeepUnder(nMin,al);R.target={keep};
+    const C=kmeans(maj.map(i=>P[i]),keep,rng);const adds=[];
+    C.forEach(c=>{P.push({x:c.x,y:c.y,c:0,kind:"cent"});adds.push(P.length-1);});
+    R.info={iter:C.iter,K:keep};
+    R.ev.push({add:adds,del:maj.slice(),d:{t:"bulk",what:`k-means(K=${keep})로 다수 ${nMaj}개를 ${keep}개 중심으로 대체`}});
+  }else if(t==="SMOTETomek"||t==="SMOTEENN"){
+    const n=nGenOver(nMaj,nMin,al);R.target={gen:n};smoteGen(R,min,min,kEff,n,rng,"SMOTE");R.nSmote=R.ev.length;
+    const L=P.map((_,i)=>i);
+    if(t==="SMOTETomek"){const {links}=tomekOn(P,L);const del=[];links.forEach(([i,j])=>del.push(i,j));
+      R.info={links,del};R.ev.push({add:[],del,d:{t:"clean",what:`② Tomek 링크 ${links.length}쌍의 양쪽 점 ${del.length}개 제거 (sampling_strategy='all')`,links}});}
+    else{const {rem,why}=ennOn(P,L,3,"all",[0,1]);R.info={rem,why};
+      R.ev.push({add:[],del:rem,d:{t:"clean",what:`② ENN(n_neighbors=3, kind_sel='all')으로 두 클래스에서 ${rem.length}개 제거`}});}
+  }
+  return R;
+}
+
+/* 단계 s까지 적용한 상태 */
+function stateAt(R,s){const n=R.P.length;const shown=new Array(n).fill(false),dead=new Array(n).fill(false);
+  R.P.forEach((p,i)=>{if(p.kind==="orig")shown[i]=true;});
+  for(let e=0;e<s;e++){R.ev[e].add.forEach(i=>shown[i]=true);R.ev[e].del.forEach(i=>dead[i]=true);}
+  return{shown,dead};}
+function finalSet(R){const {shown,dead}=stateAt(R,R.ev.length);return R.P.filter((p,i)=>shown[i]&&!dead[i]);}
+
+/* ---------- 검산 ---------- */
+function verify(R){
+  const C=[];const t=curTech();const fin=finalSet(R);const [a1,b1]=counts(fin);const {nMaj,nMin,al}=R;
+  const ok=(pass,html)=>C.push({pass,html});const info=html=>C.push({pass:null,html});
+  const ssTxt=al>=1?"'auto'(=1.0)":al.toFixed(2);
+  if(["RandomOverSampler","SMOTE","BorderlineSMOTE"].includes(t)){
+    if(R.target.noDanger)info(`DANGER 점 0개 → 생성 0개`);
+    else{const expMin=nMin+R.target.gen;ok(b1===expMin&&a1===nMaj,`sampling_strategy=${ssTxt}: 생성 수 = <code>int(${nMaj}×${ssTxt==="'auto'(=1.0)"?"1.0":al.toFixed(2)} − ${nMin})</code> = ${R.target.gen} → 질환 ${expMin}개 기대, 결과 ${b1}개 · 정상 ${a1}개`);}
+  }
+  if(t==="ADASYN"&&R.info.rh){const sg=R.info.g.reduce((x,y)=>x+y,0);
+    ok(b1===nMin+sg,`목표 G = ${R.info.G}개, Σ rint(r̂ᵢ·G) = ${sg}개 생성 → 질환 ${b1}개 (반올림 때문에 목표와 ${sg-R.info.G>=0?"+":""}${sg-R.info.G}개 차이 가능, imblearn도 동일)`);
+    const sr=R.info.rh.reduce((x,y)=>x+y,0);ok(Math.abs(sr-1)<1e-9,`정규화 가중치 합 Σ r̂ᵢ = ${sr.toFixed(6)}`);}
+  if(["RandomUnderSampler","NearMiss","ClusterCentroids"].includes(t)){
+    const exp=R.target.keep;const real=t==="NearMiss"?R.target.keepReal:exp;
+    ok(a1===real&&b1===nMin,`sampling_strategy=${ssTxt}: 남길 다수 = <code>int(${nMin} / ${al>=1?"1.0":al.toFixed(2)})</code> = ${exp}${real!==exp?` (후보 부족으로 ${real})`:""} → 결과 정상 ${a1}개 · 질환 ${b1}개 유지`);}
+  const gens=R.P.filter(p=>p.kind==="new");
+  if(gens.length){let maxOff=0,lamOk=true,srcOk=true;
+    gens.forEach(p=>{const a=R.P[p.base],b=R.P[p.nn];const sx=b.x-a.x,sy=b.y-a.y,L=Math.hypot(sx,sy)||1;
+      const off=Math.abs((p.x-a.x)*sy-(p.y-a.y)*sx)/L;maxOff=Math.max(maxOff,off);
+      const tt=((p.x-a.x)*sx+(p.y-a.y)*sy)/(L*L);if(tt<-1e-12||tt>1+1e-12||p.lam<0||p.lam>1)lamOk=false;
+      if(a.c!==1||b.c!==1||a.kind!=="orig"||b.kind!=="orig"||p.base===p.nn)srcOk=false;});
+    ok(maxOff<1e-9&&lamOk&&srcOk,`합성 점 ${gens.length}개 모두 두 원본 소수 점을 잇는 선분 위 (선분까지 최대 거리 ${maxOff.toExponential(1)}, 위치 비율 0 ≤ λ ≤ 1 ${lamOk?"만족":"위반"}, 양 끝 모두 원본 질환 점 ${srcOk?"확인":"위반"})`);
+    if(t==="SMOTETomek"||t==="SMOTEENN"){ok(R.nSmote===R.target.gen,`① SMOTE 단계 생성 수 = ${R.target.gen} (int(${nMaj}×${al>=1?"1.0":al.toFixed(2)} − ${nMin}))`);}
+  }
+  const tomekCheck=(links,L)=>{ // 독립 전수 계산
+    const P=R.P;const nn1=i=>{let b=-1,bd=Infinity;L.forEach(j=>{if(j===i)return;const d=d2(P[i],P[j]);if(d<bd){bd=d;b=j;}});return b;};
+    let good=true;links.forEach(([i,j])=>{if(nn1(i)!==j||nn1(j)!==i||P[i].c===P[j].c)good=false;});
+    let cnt=0;L.forEach(i=>{const j=nn1(i);if(i<j&&nn1(j)===i&&P[i].c!==P[j].c)cnt++;});
+    ok(good&&cnt===links.length,`Tomek 링크 ${links.length}쌍: 각 쌍이 서로의 최근접 이웃 · 클래스가 다름 ${good?"확인":"위반"} · 전수 조사로 찾은 쌍 ${cnt}개와 일치`);};
+  if(t==="TomekLinks"){tomekCheck(R.info.links,TRAIN.map((_,i)=>i));
+    const rem=R.ev.reduce((s,e)=>s+e.del.length,0);ok(rem===(S.tss==="all"?2:1)*R.info.links.length,`제거 ${rem}개 = 링크 ${R.info.links.length} × ${S.tss==="all"?"2 (양쪽)":"1 (다수 쪽)"}`);}
+  if(t==="SMOTETomek")tomekCheck(R.info.links,R.P.map((_,i)=>i));
+  if(t==="EditedNearestNeighbours"||t==="SMOTEENN"){const {rem,why}=R.info;const kk=t==="SMOTEENN"?3:R.info.k,kind=t==="SMOTEENN"?"all":S.kind;
+    let good=true;rem.forEach(i=>{const w=why[i];const own=R.P[i].c;const same=own?w.n1:w.n0;
+      if(kind==="all"&&same===kk)good=false;if(kind==="mode"&&((w.n1>w.n0?1:0)===own))good=false;});
+    ok(good,`제거된 ${rem.length}개 모두 규칙 충족: kind_sel='${kind}', 이웃 ${kk}개 ${kind==="all"?"중 하나라도 다른 클래스":"의 다수결(동률이면 0)이 자기 클래스와 다름"}`);}
+  if(t==="NearMiss"&&S.ver!==3){const sc=R.info.score,kept=R.info.kept;const ks=new Set(kept);
+    const mx=Math.max(...kept.map(i=>sc[i]));const mnOut=Math.min(...Object.keys(sc).map(Number).filter(i=>!ks.has(i)).map(i=>sc[i]));
+    ok(!(mnOut<mx),`남긴 점의 거리 합 최댓값 ${f3(mx)} ≤ 버린 점의 최솟값 ${isFinite(mnOut)?f3(mnOut):"-"} (가까운 순으로 골랐는지 확인)`);}
+  if(t==="BorderlineSMOTE"&&R.info.cat){const bad=R.P.filter(p=>p.kind==="new"&&R.info.cat[p.base]!=="DANGER").length;
+    const c=R.info.cat;const n=k=>Object.values(c).filter(v=>v===k).length;
+    ok(bad===0,`기준 점은 모두 DANGER (SAFE ${n("SAFE")} · DANGER ${n("DANGER")} · NOISE ${n("NOISE")}), DANGER가 아닌 기준 점 ${bad}개`);}
+  if(t==="SMOTETomek"||t==="SMOTEENN"){const rm=R.ev[R.ev.length-1].del;const syn=rm.filter(i=>R.P[i].kind==="new").length;
+    info(`최종: 정상 ${a1} · 질환 ${b1} (정리 단계에서 정상 ${rm.filter(i=>R.P[i].c===0).length}, 질환 ${rm.filter(i=>R.P[i].c===1).length}개 제거, 그중 합성 점 ${syn}개) → 정리 기법이라 1:1이 정확히 맞지 않는 것이 정상`);}
+  if(t==="RandomOverSampler"){const m={};R.P.forEach(p=>{if(p.kind==="dup")m[p.src]=(m[p.src]||0)+1;});const mx=Math.max(0,...Object.values(m));
+    const same=R.P.filter(p=>p.kind==="dup").every(p=>p.x===R.P[p.src].x&&p.y===R.P[p.src].y);
+    ok(same,`복제 점은 모두 원본과 같은 좌표 · 가장 많이 복제된 점 ×${mx+1}`);}
+  return C;
+}
+
+/* ---------- 모형 ---------- */
+function trainLR(D,balanced){
+  const n=D.length;const [n0,n1]=counts(D);const sw=D.map(p=>balanced?n/(2*(p.c?n1:n0)):1);
+  let w=[0,0,0];
+  for(let it=0;it<40;it++){const g=[w[0],w[1],0];const H=[[1,0,0],[0,1,0],[0,0,1e-9]];
+    D.forEach((p,i)=>{const x=[p.x,p.y,1];const z=w[0]*x[0]+w[1]*x[1]+w[2];const pr=1/(1+Math.exp(-z));const e=sw[i]*(pr-p.c),h=sw[i]*pr*(1-pr);
+      for(let a=0;a<3;a++){g[a]+=e*x[a];for(let b=0;b<3;b++)H[a][b]+=h*x[a]*x[b];}});
+    const st=solve3(H,g);w=w.map((v,a)=>v-st[a]);if(Math.hypot(...st)<1e-10)break;}
+  return{type:"lr",w,p:(x,y)=>1/(1+Math.exp(-(w[0]*x+w[1]*y+w[2])))};
+}
+function solve3(A,b){const M=A.map((r,i)=>[...r,b[i]]);for(let c=0;c<3;c++){let p=c;for(let r=c+1;r<3;r++)if(Math.abs(M[r][c])>Math.abs(M[p][c]))p=r;[M[c],M[p]]=[M[p],M[c]];
+  for(let r=0;r<3;r++){if(r===c)continue;const f=M[r][c]/M[c][c];for(let k=c;k<4;k++)M[r][k]-=f*M[c][k];}}return M.map((r,i)=>r[3]/r[i]);}
+function trainKNN(D){const k=5;return{type:"knn",p:(x,y)=>{const q={x,y};const b=[];for(let i=0;i<D.length;i++){const d=d2(D[i],q);if(b.length<k){b.push([d,D[i].c]);b.sort((u,v)=>u[0]-v[0]);}else if(d<b[k-1][0]){b[k-1]=[d,D[i].c];b.sort((u,v)=>u[0]-v[0]);}}
+  return b.reduce((s,q)=>s+q[1],0)/b.length;}};}
+function evaluate(m){let tp=0,fn=0,fp=0,tn=0;VAL.forEach(v=>{const yh=m.p(v.x,v.y)>0.5?1:0;if(v.c){yh?tp++:fn++;}else{yh?fp++:tn++;}});
+  const acc=(tp+tn)/VAL.length,rec=tp/(tp+fn),prec=tp+fp?tp/(tp+fp):0,f1=prec+rec?2*prec*rec/(prec+rec):0,spec=tn/(tn+fp);
+  return{tp,fn,fp,tn,acc,rec,prec,f1,bal:(rec+spec)/2,spec};}
+function fitModels(){
+  const fin=finalSet(R);const tr=S.clf==="lr"?trainLR:trainKNN;
+  const m0=tr(TRAIN),m1=tr(fin),m2=S.clf==="lr"?trainLR(TRAIN,true):null;
+  MODEL={m0,m1,m2,e0:evaluate(m0),e1:evaluate(m1),e2:m2?evaluate(m2):null,nFin:fin.length};
+}
+
+/* ---------- 그리기 ---------- */
+function fitCanvas(cv){const dpr=window.devicePixelRatio||1;const w=Math.max(60,cv.clientWidth),h=Math.max(60,cv.clientHeight||w/1.1);
+  cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);const ctx=cv.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);return{ctx,w,h};}
+function view(w,h){const mL=44,mR=8,mT=8,mB=36;const s=Math.min((w-mL-mR)/(XMAX-XMIN),(h-mT-mB)/(YMAX-YMIN));
+  const pw=s*(XMAX-XMIN),ph=s*(YMAX-YMIN);const L=mL+((w-mL-mR)-pw)/2,T=mT+((h-mT-mB)-ph)/2;
+  return{s,L,T,pw,ph,X:x=>L+(x-XMIN)*s,Y:y=>T+(YMAX-y)*s,ix:px=>XMIN+(px-L)/s,iy:py=>YMAX-(py-T)/s};}
+function axes(ctx,V,w,h,col){
+  ctx.save();ctx.font="11px "+css("--mono");ctx.fillStyle=col.muted;ctx.strokeStyle=col.line;ctx.lineWidth=1;
+  for(let g=60;g<=180;g+=20){const x=V.X(fromG(g));if(x<V.L-1||x>V.L+V.pw+1)continue;ctx.beginPath();ctx.moveTo(x,V.T);ctx.lineTo(x,V.T+V.ph);ctx.stroke();ctx.textAlign="center";ctx.fillText(g,x,V.T+V.ph+14);}
+  for(let b=16;b<=36;b+=4){const y=V.Y(fromB(b));if(y<V.T-1||y>V.T+V.ph+1)continue;ctx.beginPath();ctx.moveTo(V.L,y);ctx.lineTo(V.L+V.pw,y);ctx.stroke();ctx.textAlign="right";ctx.fillText(b,V.L-5,y+4);}
+  ctx.strokeStyle=col.lineS;ctx.strokeRect(V.L,V.T,V.pw,V.ph);
+  ctx.font="600 11.5px "+css("--sans");ctx.textAlign="center";ctx.fillText("혈당 (mg/dL)",V.L+V.pw/2,V.T+V.ph+29);
+  ctx.save();ctx.translate(12,V.T+V.ph/2);ctx.rotate(-Math.PI/2);ctx.fillText("BMI",0,0);ctx.restore();ctx.restore();}
+function colors(){return{c0:css("--c0"),c1:css("--c1"),ink:css("--ink"),muted:css("--muted"),faint:css("--faint"),line:css("--line"),lineS:css("--line-strong"),
+  surf:css("--surface"),pur:css("--pur"),red:css("--red"),grn:css("--grn"),teal:css("--teal")};}
+function dot(ctx,x,y,r,fill,stroke,lw){ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.lineWidth=lw||1;ctx.strokeStyle=stroke;ctx.stroke();}}
+function diamond(ctx,x,y,r,fill,stroke,lw){ctx.beginPath();ctx.moveTo(x,y-r);ctx.lineTo(x+r,y);ctx.lineTo(x,y+r);ctx.lineTo(x-r,y);ctx.closePath();ctx.fillStyle=fill;ctx.fill();ctx.lineWidth=lw||1.6;ctx.strokeStyle=stroke;ctx.stroke();}
+function cross(ctx,x,y,r,col,a){ctx.save();ctx.globalAlpha=a;ctx.strokeStyle=col;ctx.lineWidth=1.8;ctx.beginPath();ctx.moveTo(x-r,y-r);ctx.lineTo(x+r,y+r);ctx.moveTo(x+r,y-r);ctx.lineTo(x-r,y+r);ctx.stroke();ctx.restore();}
+function ring(ctx,x,y,r,col,lw,dash){ctx.save();ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.strokeStyle=col;ctx.lineWidth=lw||2;if(dash)ctx.setLineDash(dash);ctx.stroke();ctx.restore();}
+function line(ctx,x1,y1,x2,y2,col,lw,a,dash){ctx.save();ctx.globalAlpha=a==null?1:a;ctx.strokeStyle=col;ctx.lineWidth=lw||1;if(dash)ctx.setLineDash(dash);ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();ctx.restore();}
+function label(ctx,x,y,t,col,bg){ctx.save();ctx.font="600 11px "+css("--mono");const w=ctx.measureText(t).width+8;ctx.fillStyle=bg;ctx.globalAlpha=.92;ctx.beginPath();ctx.roundRect?ctx.roundRect(x-w/2,y-8,w,16,4):ctx.rect(x-w/2,y-8,w,16);ctx.fill();ctx.globalAlpha=1;ctx.fillStyle=col;ctx.textAlign="center";ctx.fillText(t,x,y+4);ctx.restore();}
+const prad=V=>Math.max(2.6,Math.min(4.4,V.s*0.058));
+
+function drawOrig(){
+  const cv=$("cvOrig");const {ctx,w,h}=fitCanvas(cv);const V=view(w,h);const col=colors();ctx.clearRect(0,0,w,h);axes(ctx,V,w,h,col);
+  const P=R.P,t=curTech(),r=prad(V);const info=R.info||{};
+  // 분석 겹쳐 그리기 (아래층)
+  if(t==="TomekLinks"&&info.links)info.links.forEach(([i,j])=>line(ctx,V.X(P[i].x),V.Y(P[i].y),V.X(P[j].x),V.Y(P[j].y),col.pur,3,.9));
+  if(t==="NearMiss"&&info.kept){info.kept.forEach(i=>(info.used[i]||[]).forEach(j=>line(ctx,V.X(P[i].x),V.Y(P[i].y),V.X(P[j].x),V.Y(P[j].y),col.pur,1,.28)));}
+  if(t==="EditedNearestNeighbours"&&info.why)info.rem.forEach(i=>info.why[i].nb.forEach(j=>line(ctx,V.X(P[i].x),V.Y(P[i].y),V.X(P[j].x),V.Y(P[j].y),col.red,1,.45)));
+  TRAIN.forEach((p,i)=>{const x=V.X(p.x),y=V.Y(p.y);dot(ctx,x,y,r,p.c?col.c1:col.c0,p.user?col.ink:col.surf,p.user?2:1);});
+  if(t==="BorderlineSMOTE"&&info.cat)Object.keys(info.cat).forEach(k=>{const p=P[k],c=info.cat[k];ring(ctx,V.X(p.x),V.Y(p.y),r+3.5,c==="SAFE"?col.grn:c==="DANGER"?col.red:col.faint,2.4,c==="NOISE"?[3,2]:null);});
+  if(t==="ADASYN"&&info.g)info.min.forEach((i,ii)=>{const p=P[i];if(info.g[ii]>0){ring(ctx,V.X(p.x),V.Y(p.y),r+2+Math.min(8,info.g[ii]*0.9),col.c1,1.6);label(ctx,V.X(p.x),V.Y(p.y)-r-12-Math.min(8,info.g[ii]*0.9),String(info.g[ii]),col.ink,col.surf);}});
+  if(t==="TomekLinks"&&info.links)info.links.forEach(([i,j])=>{[i,j].forEach(q=>{if(S.tss==="all"||P[q].c===0)ring(ctx,V.X(P[q].x),V.Y(P[q].y),r+3.5,col.red,2);});});
+  if(t==="NearMiss"&&info.kept){if(info.cand)info.cand.forEach(i=>ring(ctx,V.X(P[i].x),V.Y(P[i].y),r+6,col.pur,1.4,[3,3]));info.kept.forEach(i=>ring(ctx,V.X(P[i].x),V.Y(P[i].y),r+3,col.ink,2));}
+  if(t==="EditedNearestNeighbours"&&info.rem)info.rem.forEach(i=>ring(ctx,V.X(P[i].x),V.Y(P[i].y),r+3.5,col.red,2));
+}
+function drawRes(){
+  const cv=$("cvRes");const {ctx,w,h}=fitCanvas(cv);const V=view(w,h);const col=colors();ctx.clearRect(0,0,w,h);axes(ctx,V,w,h,col);
+  const P=R.P,r=prad(V);const {shown,dead}=stateAt(R,S.step);const cur=S.step>0?R.ev[S.step-1]:null;const d=cur?cur.d:null;
+  // 삭제된 점 (흐린 X)
+  P.forEach((p,i)=>{if(shown[i]&&dead[i])cross(ctx,V.X(p.x),V.Y(p.y),r*.95,p.c?col.c1:col.c0,.42);});
+  // 현재 SMOTE 단계 (아래층)
+  const sub=S.sub;
+  if(d&&d.t==="smote"){const a=P[d.i],b=P[d.j];const ax=V.X(a.x),ay=V.Y(a.y);
+    if(sub>=1){ring(ctx,ax,ay,d.rad*V.s,col.pur,1.6,[5,4]);d.nbrs.forEach(j=>line(ctx,ax,ay,V.X(P[j].x),V.Y(P[j].y),col.pur,1.2,.55));}
+    if(sub>=2)line(ctx,ax,ay,V.X(b.x),V.Y(b.y),col.ink,2.6,1);}
+  if(d&&d.t==="tomek")line(ctx,V.X(P[d.i].x),V.Y(P[d.i].y),V.X(P[d.j].x),V.Y(P[d.j].y),col.pur,3,.95);
+  if(d&&d.t==="clean"&&d.links)d.links.forEach(([i,j])=>line(ctx,V.X(P[i].x),V.Y(P[i].y),V.X(P[j].x),V.Y(P[j].y),col.pur,3,.9));
+  // 살아 있는 원본
+  P.forEach((p,i)=>{if(p.kind==="orig"&&!dead[i])dot(ctx,V.X(p.x),V.Y(p.y),r,p.c?col.c1:col.c0,col.surf,1);});
+  // 새 점
+  const hideCurNew=d&&d.t==="smote"&&sub<3;
+  P.forEach((p,i)=>{if(p.kind==="orig"||!shown[i]||dead[i])return;if(hideCurNew&&cur.add[0]===i)return;
+    if(p.kind==="dup")return;diamond(ctx,V.X(p.x),V.Y(p.y),r*1.25,p.c?col.c1:col.c0,col.ink,1.4);});
+  // 복제 배지
+  const dup={};P.forEach((p,i)=>{if(p.kind==="dup"&&shown[i]&&!dead[i])dup[p.src]=(dup[p.src]||0)+1;});
+  Object.keys(dup).forEach(k=>{const p=P[k];const x=V.X(p.x),y=V.Y(p.y);ring(ctx,x,y,r+2,col.ink,1.8);label(ctx,x+r+13,y-r-6,"×"+(dup[k]+1),col.ink,col.surf);});
+  // 현재 단계 강조
+  if(d&&d.t==="smote"){const a=P[d.i],b=P[d.j];ring(ctx,V.X(a.x),V.Y(a.y),r+4,col.ink,2.4);
+    if(sub>=2)ring(ctx,V.X(b.x),V.Y(b.y),r+4,col.pur,2.4);
+    if(sub>=3){const np=P[cur.add[0]];diamond(ctx,V.X(np.x),V.Y(np.y),r*1.7,col.c1,col.ink,2.2);label(ctx,V.X(np.x),V.Y(np.y)-r*1.7-11,"λ="+f2(d.lam),col.ink,col.surf);}}
+  if(d&&d.t==="dup"){const p=P[d.i];ring(ctx,V.X(p.x),V.Y(p.y),r+7,col.c1,2.4);}
+  if(cur&&(d.t==="tomek"))cur.del.forEach(i=>ring(ctx,V.X(P[i].x),V.Y(P[i].y),r+4,col.red,2.2));
+}
+function drawBoundary(cv,m,title){
+  const {ctx,w,h}=fitCanvas(cv);const V=view(w,h);const col=colors();ctx.clearRect(0,0,w,h);
+  const nx=Math.max(40,Math.round(V.pw/5)),ny=Math.max(36,Math.round(V.ph/5));const cw=V.pw/nx,ch=V.ph/ny;
+  const pp=new Path2D(),pn=new Path2D();
+  for(let i=0;i<nx;i++)for(let j=0;j<ny;j++){const x=V.ix(V.L+(i+.5)*cw),y=V.iy(V.T+(j+.5)*ch);(m.p(x,y)>0.5?pp:pn).rect(V.L+i*cw,V.T+j*ch,cw+.5,ch+.5);}
+  ctx.save();ctx.globalAlpha=.22;ctx.fillStyle=col.c1;ctx.fill(pp);ctx.globalAlpha=.08;ctx.fillStyle=col.c0;ctx.fill(pn);ctx.restore();
+  axes(ctx,V,w,h,col);
+  if(m.type==="lr"){const [a,b,c]=m.w;ctx.save();ctx.beginPath();ctx.rect(V.L,V.T,V.pw,V.ph);ctx.clip();
+    if(Math.abs(b)>1e-9){const y1=-(a*XMIN+c)/b,y2=-(a*XMAX+c)/b;line(ctx,V.X(XMIN),V.Y(y1),V.X(XMAX),V.Y(y2),col.ink,2.2);}
+    else if(Math.abs(a)>1e-9){const x0=-c/a;line(ctx,V.X(x0),V.Y(YMIN),V.X(x0),V.Y(YMAX),col.ink,2.2);}ctx.restore();}
+  const r=Math.max(1.8,prad(V)*.62);
+  VAL.forEach(v=>{if(!v.c)dot(ctx,V.X(v.x),V.Y(v.y),r,col.c0,null);});
+  VAL.forEach(v=>{if(v.c){dot(ctx,V.X(v.x),V.Y(v.y),r+.6,col.c1,col.surf,.8);if(m.p(v.x,v.y)<=0.5)ring(ctx,V.X(v.x),V.Y(v.y),r+3.2,col.red,1.8);}});
+}
+
+/* ---------- 설명 ---------- */
+const DESC={
+  RandomOverSampler:["<b>소수 클래스 점을 복원추출로 뽑아 그대로 복제</b>합니다. 새로운 정보는 없고 같은 자리에 점이 겹칩니다(배지 ×n = 그 자리에 겹친 개수). 같은 점에 과하게 맞추는 과적합 위험이 있습니다.",
+    "뽑기: i ~ 균등(소수 점들), 복원추출\n새 점 = x_i (좌표 그대로)\n생성 수 = int(N_다수 × sampling_strategy − N_소수)"],
+  SMOTE:["소수 점 <b>x_i</b>를 고르고, <b>소수 클래스 안에서</b> 가장 가까운 k개 이웃(보라 점선 원) 중 하나 <b>x_nn</b>을 무작위로 고른 뒤, 두 점을 잇는 선분 위 λ 위치에 새 점을 만듭니다. 새 점은 항상 두 소수 점 사이에 놓입니다.",
+    "x_new = x_i + λ · (x_nn − x_i),   λ ~ U(0, 1)\nx_nn ∈ x_i의 k_neighbors개 최근접 소수 이웃 (자기 자신 제외)"],
+  BorderlineSMOTE:["소수 점마다 <b>전체 데이터</b>에서 m개 이웃을 보고 그중 다수(정상) 이웃 수 m′로 나눕니다: <b class='im-grn'>SAFE</b> m′ &lt; m/2, <b class='im-red'>DANGER</b> m/2 ≤ m′ &lt; m, <b>NOISE</b> m′ = m. <b>DANGER 점만 기준 점</b>으로 SMOTE를 적용해 경계 근처를 집중적으로 채웁니다(kind='borderline-1': 보간 이웃은 소수 클래스에서).",
+    "m′ᵢ = x_i의 m_neighbors개 이웃 중 정상 점 수\nDANGER ⇔ m/2 ≤ m′ᵢ < m    → 여기서만 x_new = x_i + λ(x_nn − x_i)"],
+  ADASYN:["소수 점마다 전체 데이터 k 이웃 중 다수 비율 rᵢ를 구하고, 정규화한 r̂ᵢ에 비례해 <b>gᵢ = rint(r̂ᵢ × G)</b>개씩 만듭니다. 정상 점에 둘러싸인(배우기 어려운) 점일수록 더 많이 생성합니다. 원본 그림의 숫자가 gᵢ입니다.",
+    "rᵢ = (k 이웃 중 정상 수) / k,   r̂ᵢ = rᵢ / Σ rⱼ\ngᵢ = rint(r̂ᵢ × G),   G = int(N_다수 × sampling_strategy − N_소수)\n각 새 점: x_new = x_i + λ(x_nn − x_i)"],
+  RandomUnderSampler:["<b>다수 클래스에서 무작위로 골라 남기고</b> 나머지를 버립니다(비복원). 빠르고 단순하지만 버린 정상 환자의 정보가 사라집니다.",
+    "남길 정상 수 = int(N_소수 / sampling_strategy)\n버리는 점은 흐린 X로 표시"],
+  TomekLinks:["두 점이 <b>서로가 서로의 최근접 이웃</b>이면서 <b>클래스가 다르면</b> Tomek 링크(보라 선)입니다. 링크의 다수 쪽 점(빨간 원)을 지워 경계를 정리합니다. 개수를 맞추는 기법이 아니라 경계를 '청소'하는 기법이라 조금만 줄어듭니다.",
+    "(a, b)가 Tomek 링크 ⇔ y_a ≠ y_b  이고  NN(a) = b  이고  NN(b) = a\nNN(·) = 자기 자신을 뺀 전체 데이터에서의 최근접 이웃"],
+  NearMiss:["소수 점과의 <b>거리</b>를 기준으로 남길 다수 점을 고릅니다. 아래 버전별 규칙에서 선택한 버전이 강조됩니다. 원본 그림: 검은 원 = 남긴 정상 점, 보라 선 = 거리 계산에 쓴 소수 점, 보라 점선 원 = 버전 3의 후보.",
+    ""],
+  EditedNearestNeighbours:["각 정상 점의 k 이웃(자기 제외)을 봅니다. kind_sel='mode'는 <b>이웃 다수결이 자기 클래스와 다르면</b>, 'all'은 <b>이웃 중 하나라도 다르면</b> 그 점을 지웁니다(빨간 원, 빨간 선 = 판정에 쓴 이웃). imblearn의 기본값은 'all'입니다.",
+    "mode : 다수결(이웃 k개의 클래스) ≠ 자기 클래스  → 제거  (동률이면 0으로 봄)\nall  : 이웃 k개가 모두 자기 클래스가 아님이 하나라도 있으면  → 제거"],
+  ClusterCentroids:["다수 클래스를 k-means로 <b>N개 군집</b>으로 묶고, 원래 정상 점 대신 <b>군집 중심(새 점, 마름모)</b>을 넣습니다. 원래 점이 아닌 '대표 점'으로 바뀌는 점이 다른 언더샘플링과 다릅니다.",
+    "K = int(N_소수 / sampling_strategy)\n중심 c_j = (군집 j에 속한 정상 점들의 평균)"],
+  SMOTETomek:["<b>① SMOTE</b>로 소수 클래스를 늘린 뒤 <b>② Tomek 링크</b>를 지웁니다. imblearn의 SMOTETomek는 기본으로 TomekLinks(sampling_strategy='all')를 써서 <b>링크 양쪽 점을 모두</b> 지웁니다. 합성 점이 다수 쪽에 파고든 경계가 정리됩니다.",
+    "① x_new = x_i + λ(x_nn − x_i)  (G = int(N_다수 × sampling_strategy − N_소수)개)\n② (a, b) Tomek 링크 → a, b 모두 제거"],
+  SMOTEENN:["<b>① SMOTE</b>로 늘린 뒤 <b>② ENN</b>으로 정리합니다. 기본 ENN은 sampling_strategy='all', kind_sel='all', n_neighbors=3이라 <b>두 클래스 모두</b>에서 이웃과 섞여 있는 점을 지웁니다. Tomek보다 훨씬 많이 지웁니다.",
+    "① x_new = x_i + λ(x_nn − x_i)\n② 이웃 3개 중 하나라도 다른 클래스인 점 → 제거 (정상·질환·합성 점 모두 대상)"]
+};
+const NM_RULES=[["NearMiss-1","소수 점 중 <b>가장 가까운 n개</b>까지의 평균 거리가 <b>가장 작은</b> 정상 점을 남김. 소수 무리 바로 옆의 정상 점이 남아 경계가 좁아집니다."],
+  ["NearMiss-2","소수 점 중 <b>가장 먼 n개</b>까지의 평균 거리가 <b>가장 작은</b> 정상 점을 남김. 소수 클래스 전체와 두루 가까운 점이 남습니다."],
+  ["NearMiss-3","① 소수 점마다 가장 가까운 정상 점 n_neighbors_ver3개(=3)를 후보로 모으고 ② 후보 중 가장 가까운 소수 n개까지의 평균 거리가 <b>가장 큰</b> 점을 남김."]];
+
+/* ---------- 화면 갱신 ---------- */
+function syncParams(){
+  const t=curTech();const ps=PARAMS[t];
+  document.querySelectorAll("#params [data-p]").forEach(el=>{el.hidden=!ps.includes(el.dataset.p);});
+  const {nMaj,nMin,lo}=ssClamp();const ss=$("ss");ss.min=lo.toFixed(2);
+  if(S.ss[S.mode]<lo)S.ss[S.mode]=lo;ss.value=S.ss[S.mode];
+  const al=alphaVal();$("ssV").textContent=al>=1?"1.00 (auto)":al.toFixed(2);
+  $("ssLab").textContent=S.mode==="under"?"sampling_strategy (질환 수 / 남길 정상 수)":"sampling_strategy (샘플링 후 질환 / 정상)";
+  const kmax=Math.max(1,Math.min(10,nMin-1));$("kn").max=kmax;if(S.k>kmax)S.k=kmax;$("kn").value=S.k;$("knV").textContent=S.k;
+  $("knLab").textContent=t==="ADASYN"?"n_neighbors (다수 비율·보간 이웃 수)":"k_neighbors (소수 이웃 수)";
+  $("mnV").textContent=S.m;$("nmkV").textContent=S.nmk;$("ekV").textContent=S.ek;
+  segSet("verSeg",String(S.ver));segSet("kindSeg",S.kind);segSet("tssSeg",S.tss);
+}
+function segSet(id,v){document.querySelectorAll("#"+id+" button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===v?"true":"false"));}
+function renderChips(){
+  const host=$("techChips");host.innerHTML="";
+  TECH[S.mode].forEach(t=>{const b=document.createElement("button");b.type="button";b.dataset.t=t;b.setAttribute("aria-pressed",t===curTech()?"true":"false");
+    b.innerHTML=t+(t==="ClusterCentroids"?'<span class="opt">(선택)</span>':"");b.onclick=()=>{S.tech[S.mode]=t;recompute(true);};host.appendChild(b);});
+  $("techTitle").textContent={over:"Over Sampling 기법: 소수(질환)를 늘린다",under:"Under Sampling 기법: 다수(정상)를 줄인다",combine:"Combine 기법: SMOTE로 늘리고 경계를 청소한다"}[S.mode];
+}
+function renderDesc(){
+  const t=curTech();const d=DESC[t];$("techDesc").innerHTML=d[0];
+  let f=d[1];if(t==="NearMiss")f=["거리 합(n개 소수 이웃) 가장 작은 N개 남김  (n = n_neighbors)","가장 먼 n개 소수 점까지 거리 합 가장 작은 N개 남김","후보(소수 점마다 가장 가까운 정상 3개) 중 거리 합 가장 큰 N개 남김"][S.ver-1]+"\nN = int(N_소수 / sampling_strategy)";
+  $("techFormula").textContent=f;
+}
+function legends(){
+  const t=curTech();let o='<span><i class="im-shape dot" style="background:var(--c0)"></i>정상</span><span><i class="im-shape dot" style="background:var(--c1)"></i>질환</span><span><i class="im-shape ring" style="color:var(--ink)"></i>직접 추가한 점(굵은 테두리)</span>';
+  if(t==="BorderlineSMOTE")o+='<span><i class="im-shape ring im-grn"></i>SAFE</span><span><i class="im-shape ring im-red"></i>DANGER</span><span><i class="im-shape ring" style="color:var(--faint)"></i>NOISE</span>';
+  if(t==="ADASYN")o+='<span><i class="im-shape ring im-c1"></i>숫자 = 이 점에서 만들 개수 gᵢ</span>';
+  if(t==="TomekLinks")o+='<span><i style="background:var(--pur);height:3px;vertical-align:3px"></i>Tomek 링크</span><span><i class="im-shape ring im-red"></i>제거 대상</span>';
+  if(t==="NearMiss")o+='<span><i class="im-shape ring" style="color:var(--ink)"></i>남길 정상 점</span>'+(S.ver===3?'<span><i class="im-shape ring im-pur"></i>버전 3 후보</span>':"");
+  if(t==="EditedNearestNeighbours")o+='<span><i class="im-shape ring im-red"></i>제거 대상 (선 = 이웃)</span>';
+  $("origLegend").innerHTML=o;
+  let r='<span><i class="im-shape dia" style="background:var(--c1)"></i>새로 만든 점</span><span><i class="im-shape x"></i>삭제된 점</span>';
+  if(t==="RandomOverSampler")r='<span><i class="im-shape ring" style="color:var(--ink)"></i>복제된 점 (×n = 겹친 수)</span><span><i class="im-shape x"></i>삭제된 점</span>';
+  if(t==="ClusterCentroids")r='<span><i class="im-shape dia" style="background:var(--c0)"></i>군집 중심 (새 점)</span><span><i class="im-shape x"></i>삭제된 원래 정상 점</span>';
+  if(["SMOTE","BorderlineSMOTE","ADASYN","SMOTETomek","SMOTEENN"].includes(t))r+='<span><i class="im-shape ring im-pur"></i>k 이웃 범위</span>';
+  $("resLegend").innerHTML=r;
+}
+function renderStep(){
+  const T=R.ev.length;const s=S.step;const t=curTech();
+  $("stepNum").textContent=`단계 ${s} / ${T}`;$("stepBar").style.width=(T?s/T*100:100)+"%";
+  $("stFirst").disabled=$("stPrev").disabled=s===0;$("stNext").disabled=$("stLast").disabled=s>=T;
+  $("stPlay").textContent=S.playing?"멈춤":"재생";
+  const cur=s>0?R.ev[s-1]:null,d=cur&&cur.d;let cap="",frm="";
+  const P=R.P;const gb=p=>`(혈당 ${f1(toG(p.x))}, BMI ${f1(toB(p.y))})`;
+  if(!cur){cap=T?`<b>원본 상태</b>입니다. [다음]을 누르면 ${t}가 ${d0word(t)} 한 단계씩 보여 줍니다.`:"<b>바뀌는 점이 없습니다.</b> 이 설정에서는 샘플링할 것이 없습니다.";
+    frm=DESC[t][1]||"";if(R.warn)cap+=`<br><span class="im-red">${esc(R.warn)}</span>`;}
+  else if(d.t==="smote"){const a=P[d.i],b=P[d.j],np=P[cur.add[0]];const nth=R.ev.slice(0,s).filter(e=>e.d.t==="smote").length;
+    const lab=d.label==="ADASYN"&&R.info.g?` · 이 점의 gᵢ = ${R.info.g[R.info.min.indexOf(d.i)]} (rᵢ = ${f2(R.info.r[R.info.min.indexOf(d.i)])})`:d.label==="BorderlineSMOTE"?" · 기준 점은 DANGER":"";
+    const ph=["① 기준 소수 점 x_i 고르기","② 소수 클래스에서 k개 최근접 이웃 찾기 (보라 원)","③ 이웃 하나 x_nn 무작위 선택","④ 선분 위 λ 위치에 새 점"][S.sub];
+    cap=`<b>${d.label==="SMOTE"&&(t==="SMOTETomek"||t==="SMOTEENN")?"① SMOTE ":""}${nth}번째 새 점</b> · ${ph}${lab}`;
+    const dx=b.x-a.x,dy=b.y-a.y;
+    frm=`x_i  = #${d.i}  ${gb(a)}\n`+(S.sub>=1?`k=${d.nbrs.length} 이웃 = {${d.nbrs.map(j=>"#"+j).join(", ")}}\n`:"\n")+
+      (S.sub>=2?`x_nn = #${d.j}  ${gb(b)}\n`:"\n")+
+      (S.sub>=3?`λ = ${f3(d.lam)}\nx_new = x_i + λ(x_nn − x_i)\n      = (${f1(toG(a.x))} + ${f3(d.lam)}×(${f1(toG(b.x))} − ${f1(toG(a.x))}),  ${f1(toB(a.y))} + ${f3(d.lam)}×(${f1(toB(b.y))} − ${f1(toB(a.y))}))\n      = (${f1(toG(np.x))}, ${f1(toB(np.y))})`:"λ = ?\n\n\n");}
+  else if(d.t==="dup"){const p=P[d.i];const n=R.ev.slice(0,s).filter(e=>e.d.t==="dup"&&e.d.i===d.i).length;
+    cap=`<b>${s}번째 복제</b> · 소수 점 #${d.i}을(를) 복원추출로 뽑아 그대로 복사 → 같은 자리에 지금 ${n+1}개가 겹침`;
+    frm=`뽑힌 점 #${d.i}  ${gb(p)}\n새 점 = 같은 좌표 ${gb(p)}\n겹친 수 = ${n+1}\n새로운 정보: 없음 (같은 점을 여러 번 학습)`;}
+  else if(d.t==="tomek"){const a=P[d.i],b=P[d.j];const dd=Math.sqrt(d2(a,b));
+    cap=`<b>Tomek 링크 ${s}/${T}</b> · #${d.i}(${a.c?"질환":"정상"}) ↔ #${d.j}(${b.c?"질환":"정상"}) → ${cur.del.length===2?"양쪽 모두":"다수(정상) 쪽 #"+cur.del[0]} 제거`;
+    frm=`#${d.i} ${a.c?"질환":"정상"} ${gb(a)}\n#${d.j} ${b.c?"질환":"정상"} ${gb(b)}\nNN(#${d.i}) = #${R.info.nn[d.i]},  NN(#${d.j}) = #${R.info.nn[d.j]}   → 서로 최근접\n클래스 다름 → Tomek 링크 (표준화 거리 ${f3(dd)})\n제거: ${cur.del.map(i=>"#"+i).join(", ")}`;}
+  else{cap=`<b>${esc(d.what)}</b>`;
+    const [a0,b0]=counts(finalSetAt(s-1)),[a1,b1]=counts(finalSetAt(s));
+    frm=`이 단계 전: 정상 ${a0}, 질환 ${b0}\n이 단계 후: 정상 ${a1}, 질환 ${b1}\n제거 ${cur.del.length}개`+(cur.add.length?` · 새 점 ${cur.add.length}개`:"")+
+      (t==="ClusterCentroids"?`\nk-means 반복 ${R.info.iter}회 후 수렴`:"")+(R.warn?`\n\n${R.warn}`:"");}
+  if(s===T&&T>0&&cur&&cur.d.t!=="bulk"&&cur.d.t!=="enn"&&cur.d.t!=="clean")cap+=" · <b>마지막 단계</b>";
+  $("stepCap").innerHTML=cap;$("stepFrm").textContent=frm;
+  drawRes();renderBars();
+}
+function d0word(t){return({RandomOverSampler:"소수 점을 복제하는 과정을",SMOTE:"새 점을 만드는 과정을",BorderlineSMOTE:"DANGER 점에서 새 점을 만드는 과정을",ADASYN:"어려운 점 주변에 새 점을 만드는 과정을",
+  RandomUnderSampler:"정상 점을 지우는 결과를",TomekLinks:"링크를 하나씩 지우는 과정을",NearMiss:"남길 점을 고른 결과를",EditedNearestNeighbours:"지울 점을 고른 결과를",ClusterCentroids:"군집 중심으로 바꾼 결과를",
+  SMOTETomek:"① 생성 → ② Tomek 제거 순서로",SMOTEENN:"① 생성 → ② ENN 정리 순서로"})[t];}
+function finalSetAt(s){const {shown,dead}=stateAt(R,s);return R.P.filter((p,i)=>shown[i]&&!dead[i]);}
+function renderBars(){
+  const [a0,b0]=counts(TRAIN);const [a1,b1]=counts(finalSetAt(S.step));const [af,bf]=counts(finalSet(R));
+  const mx=Math.max(a0,b0,a1,b1,af,bf,1);
+  const row=(g,l,v,c,delta)=>`${g}<span class="l">${l}</span><div class="tr"><div class="fl${delta>0?" new":""}" style="width:${v/mx*100}%;background:var(${c})"></div></div><span class="v">${v}${delta?` (${delta>0?"+":""}${delta})`:""}</span>`;
+  $("bars").innerHTML=row('<span class="g">원본</span>',"정상",a0,"--c0",0)+row("<span></span>","질환",b0,"--c1",0)+
+    row(`<span class="g">${S.step<R.ev.length?"진행 중":"샘플링 후"}</span>`,"정상",a1,"--c0",a1-a0)+row("<span></span>","질환",b1,"--c1",b1-b0);
+  const rt=(a,b)=>b?`1 : ${(a/b).toFixed(a/b>=10?1:2)}`:"-";
+  $("ratioTxt").textContent=`질환:정상 ${rt(a0,b0)} → ${rt(a1,b1)}`;
+}
+function renderChecks(){
+  const C=verify(R);R.checks=C;
+  $("checks").innerHTML=C.map(c=>`<li><span class="sk-pill ${c.pass===null?"im-info":c.pass?"im-ok":"im-bad"}">${c.pass===null?"참고":c.pass?"통과":"불일치"}</span><span>${c.html}</span></li>`).join("")||'<li><span class="sk-pill im-info">참고</span><span>검산할 항목이 없습니다.</span></li>';
+}
+function renderDetail(){
+  const t=curTech(),P=R.P,info=R.info||{};let title=t+" 세부",hint="",html="";
+  const gb=p=>`${f1(toG(p.x))}</td><td class="n">${f1(toB(p.y))}`;
+  const curBase=(()=>{const c=S.step>0?R.ev[S.step-1]:null;return c&&c.d.t==="smote"?c.d.i:-1;})();
+  if(t==="BorderlineSMOTE"&&info.cat){title="BorderlineSMOTE: 소수 점 분류 (m = "+info.m+")";hint="표 행 = 소수 점 · 초록 SAFE / 빨강 DANGER / 회색 NOISE";
+    const cc=k=>Object.values(info.cat).filter(v=>v===k).length;
+    html=`<div class="sk-stats"><div class="sk-stat"><b class="im-grn">${cc("SAFE")}</b><span>SAFE (m′ &lt; ${info.m/2})</span></div><div class="sk-stat"><b class="im-red">${cc("DANGER")}</b><span>DANGER (${info.m/2} ≤ m′ &lt; ${info.m})</span></div><div class="sk-stat"><b>${cc("NOISE")}</b><span>NOISE (m′ = ${info.m})</span></div></div>`+
+      `<div class="im-tbl-wrap" style="margin-top:10px"><table class="sk-table"><thead><tr><th>점</th><th class="n">혈당</th><th class="n">BMI</th><th class="n">정상 이웃 m′/${info.m}</th><th>분류</th><th class="n">이 점에서 생성</th></tr></thead><tbody>`+
+      Object.keys(info.cat).map(k=>{const c=info.cat[k];const g=P.filter(p=>p.kind==="new"&&p.base===+k).length;
+        return`<tr class="${+k===curBase?"cur":""}"><td class="sk-mono">#${k}</td><td class="n">${gb(P[k])}</td><td class="n">${info.mc[k]}</td><td><span class="im-tag" style="background:${c==="SAFE"?"var(--grn)":c==="DANGER"?"var(--red)":"var(--faint)"}">${c}</span></td><td class="n">${g}</td></tr>`;}).join("")+"</tbody></table></div>";}
+  else if(t==="ADASYN"&&info.g){title="ADASYN: 점마다 생성 개수 가중치";hint=`G = ${info.G} · 막대 = gᵢ`;
+    const mg=Math.max(1,...info.g);
+    html=`<div class="im-tbl-wrap" style="padding:8px 10px"><div class="im-wbar">`+info.min.map((i,ii)=>`<span class="${i===curBase?"cur":""}">#${i}</span><div class="tr"><div class="fl" style="width:${info.g[ii]/mg*100}%"></div></div><span class="${i===curBase?"cur":""}">r=${f2(info.r[ii])} g=${info.g[ii]}</span>`).join("")+`</div></div>`+
+      `<p class="sk-lead" style="margin-top:8px">rᵢ가 0이면(이웃이 모두 질환) 그 점에서는 하나도 만들지 않습니다. 정상 점 사이에 섞인 점일수록 막대가 깁니다.</p>`;}
+  else if(t==="TomekLinks"||t==="SMOTETomek"){const L=info.links||[];title=(t==="SMOTETomek"?"② 단계 ":"")+`Tomek 링크 ${L.length}쌍`;hint="서로 최근접 + 클래스 다름";
+    html=L.length?`<div class="im-tbl-wrap"><table class="sk-table"><thead><tr><th>쌍</th><th>점 a</th><th>점 b</th><th class="n">거리(표준화)</th><th>제거</th></tr></thead><tbody>`+
+      L.map(([i,j],q)=>{const ty=p=>p.kind==="new"?"합성 질환":p.c?"질환":"정상";const del=t==="SMOTETomek"||S.tss==="all"?"a, b":(P[i].c===0?"a":"b");
+        return`<tr><td class="sk-mono">${q+1}</td><td class="sk-mono">#${i} ${ty(P[i])}</td><td class="sk-mono">#${j} ${ty(P[j])}</td><td class="n">${f3(Math.sqrt(d2(P[i],P[j])))}</td><td>${del}</td></tr>`;}).join("")+"</tbody></table></div>"
+      :`<p class="sk-lead">Tomek 링크가 없습니다. 두 클래스가 잘 떨어져 있으면 서로 최근접인 다른 클래스 쌍이 생기지 않습니다. 겹침을 키워 보세요.</p>`;
+    if(t==="TomekLinks")html+=`<p class="sk-note" style="margin-top:10px">Tomek 링크는 불균형 비율을 거의 바꾸지 않습니다. 보통 RandomUnderSampler나 SMOTE와 함께 씁니다(→ Combine의 SMOTETomek).</p>`;}
+  else if(t==="NearMiss"){title="NearMiss 버전별 규칙";hint=`N = ${R.target.keep}개 남김 · n_neighbors = ${info.nk}`;
+    html=`<div class="im-rules">`+NM_RULES.map((r,i)=>`<div class="im-rule${S.ver===i+1?" on":""}"><h3>${r[0]}${S.ver===i+1?" (선택)":""}</h3><p>${r[1]}</p></div>`).join("")+`</div>`;
+    const kept=info.kept.slice(0,8);
+    html+=`<div class="sk-scroll" style="margin-top:10px"><table class="sk-table"><thead><tr><th>남긴 정상 점 (앞 8개)</th><th class="n">혈당</th><th class="n">BMI</th><th class="n">거리 합 (${info.nk}개)</th><th>쓴 소수 점</th></tr></thead><tbody>`+
+      kept.map(i=>`<tr><td class="sk-mono">#${i}</td><td class="n">${gb(P[i])}</td><td class="n">${f3(info.score[i])}</td><td class="sk-mono">${info.used[i].map(j=>"#"+j).join(" ")}</td></tr>`).join("")+`</tbody></table></div>`;}
+  else if(t==="EditedNearestNeighbours"||t==="SMOTEENN"){const rem=info.rem||[];title=(t==="SMOTEENN"?"② 단계 ENN: ":"ENN: ")+`제거 ${rem.length}개`;hint="이웃의 클래스 구성";
+    html=rem.length?`<div class="im-tbl-wrap"><table class="sk-table"><thead><tr><th>제거된 점</th><th class="n">혈당</th><th class="n">BMI</th><th class="n">이웃 정상</th><th class="n">이웃 질환</th></tr></thead><tbody>`+
+      rem.map(i=>`<tr><td class="sk-mono">#${i} ${P[i].kind==="new"?"합성 질환":P[i].c?"질환":"정상"}</td><td class="n">${gb(P[i])}</td><td class="n">${info.why[i].n0}</td><td class="n">${info.why[i].n1}</td></tr>`).join("")+"</tbody></table></div>"
+      :`<p class="sk-lead">지울 점이 없습니다.</p>`;}
+  else if(t==="RandomOverSampler"){title="복제 횟수 분포";const m={};R.P.forEach(p=>{if(p.kind==="dup")m[p.src]=(m[p.src]||0)+1;});
+    const minI=idxOf(R.P,1).filter(i=>R.P[i].kind==="orig");const hist={};minI.forEach(i=>{const c=m[i]||0;hist[c]=(hist[c]||0)+1;});
+    html=`<div class="sk-stats">`+Object.keys(hist).sort((a,b)=>a-b).map(k=>`<div class="sk-stat"><b>${hist[k]}</b><span>${k}번 복제된 점 (×${+k+1})</span></div>`).join("")+`</div><p class="sk-lead" style="margin-top:8px">복원추출이라 어떤 점은 여러 번, 어떤 점은 한 번도 뽑히지 않습니다. 모형은 같은 점을 여러 번 보고 그 자리에 과하게 맞출 수 있습니다.</p>`;}
+  else if(t==="SMOTE"){title="SMOTE 요약";const g=R.P.filter(p=>p.kind==="new");const byBase={};g.forEach(p=>byBase[p.base]=(byBase[p.base]||0)+1);
+    html=`<div class="sk-stats"><div class="sk-stat"><b>${g.length}</b><span>새 점</span></div><div class="sk-stat"><b>${R.kEff}</b><span>k_neighbors</span></div><div class="sk-stat"><b>${Object.keys(byBase).length}/${R.nMin}</b><span>기준 점으로 쓰인 소수 점</span></div></div>`+
+      `<p class="sk-lead" style="margin-top:8px">k가 작으면 가까운 점끼리만 이어 새 점이 촘촘히 모이고, k가 크면 멀리 떨어진 소수 점까지 이어 정상 영역을 가로지르는 새 점이 생길 수 있습니다. k를 바꿔 보세요.</p>`;}
+  else if(t==="RandomUnderSampler"||t==="ClusterCentroids"){title=t==="ClusterCentroids"?"ClusterCentroids 요약":"RandomUnderSampler 요약";const [a,b]=counts(finalSet(R));
+    html=`<div class="sk-stats"><div class="sk-stat"><b>${R.nMaj} → ${a}</b><span>정상</span></div><div class="sk-stat"><b>${b}</b><span>질환 (그대로)</span></div><div class="sk-stat"><b>${R.nMaj-a}</b><span>버린 정상 점</span></div></div>`+
+      `<p class="sk-lead" style="margin-top:8px">${t==="ClusterCentroids"?"원래 정상 점은 모두 사라지고 대표 점(군집 중심)만 남습니다. 분포의 모양은 유지하지만 개별 환자 정보는 없어집니다.":"비율은 맞지만 버린 정상 점에 있던 정보가 사라집니다. 데이터가 아주 많을 때 주로 씁니다."}</p>`;}
+  $("detailTitle").textContent=title;$("detailHint").textContent=hint;$("detailBody").innerHTML=html;
+}
+function renderModel(){
+  const e0=MODEL.e0,e1=MODEL.e1,e2=MODEL.e2;const t=curTech();
+  $("b1Title").textContent=`${t} 적용 데이터로 학습`;
+  const [va,vb]=counts(VAL);
+  $("valInfo").innerHTML=`검증 세트: 같은 분포에서 따로 뽑은 정상 ${va}명, 질환 ${vb}명 (원본 비율 1 : ${(va/vb).toFixed(1)} 그대로, 샘플링 안 함). 그림의 점은 검증 세트이고, 빨간 원은 모형이 놓친 질환 환자입니다.`;
+  drawBoundary($("cvB0"),MODEL.m0);drawBoundary($("cvB1"),MODEL.m1);
+  const rows=[["정확도 (accuracy)","acc"],["재현율 = 민감도 (recall)","rec"],["정밀도 (precision)","prec"],["F1","f1"],["balanced accuracy","bal"]];
+  const cls=(k,v,o)=>{if(k==="rec"&&v<0.5)return"bad";if(o!=null&&(k==="rec"||k==="f1"||k==="bal")&&v-o>0.02)return"good";return"";};
+  $("metTbl").innerHTML=`<thead><tr><th>지표 (질환 = 양성)</th><th class="n">원본 학습</th><th class="n">${t}</th><th class="n">원본 + class_weight</th></tr></thead><tbody>`+
+    rows.map(([n,k])=>`<tr><td>${n}</td><td class="n ${cls(k,e0[k])}">${pct(e0[k])}</td><td class="n ${cls(k,e1[k],e0[k])}">${pct(e1[k])}</td><td class="n ${e2?cls(k,e2[k],e0[k]):""}">${e2?pct(e2[k]):"-"}</td></tr>`).join("")+
+    `<tr><td>모두 '정상'이라고 답하면</td><td class="n" colspan="3" style="text-align:left;white-space:normal">정확도 ${va}/${va+vb} = ${pct(va/(va+vb))}, 재현율 0%</td></tr></tbody>`;
+  const cm=(e,ttl)=>`<div class="im-cm"><div class="t">${ttl}</div><div></div><div class="h">예측 정상</div><div class="h">예측 질환</div>
+    <div class="rh">실제 정상</div><div class="c ok">${e.tn}</div><div class="c">${e.fp}</div><div class="rh">실제 질환</div><div class="c fn" title="놓친 질환(FN)">${e.fn}</div><div class="c ok">${e.tp}</div></div>`;
+  $("cms").innerHTML=cm(e0,"혼동행렬: 원본 학습")+cm(e1,"혼동행렬: "+t);
+  const miss=e0.fn,tot=e0.fn+e0.tp;
+  $("modelNote").innerHTML=`<b>원본 모형: 정확도 ${pct(e0.acc)}인데 질환 ${tot}명 중 ${miss}명(${pct(miss/tot)})을 놓칩니다.</b> 정상이 대부분이라 '정상'이라고만 해도 정확도가 높게 나오기 때문입니다. ${t} 적용 후 재현율 ${pct(e0.rec)} → ${pct(e1.rec)}, 정밀도 ${pct(e0.prec)} → ${pct(e1.prec)}, balanced accuracy ${pct(e0.bal)} → ${pct(e1.bal)}. 불균형 데이터는 정확도 대신 재현율·F1·balanced accuracy로 보세요.`;
+  $("altLine").innerHTML=S.clf==="lr"?`<b>대안 비교</b>: 점을 만들거나 지우지 않고 손실에 가중치를 주는 <code>LogisticRegression(class_weight='balanced')</code> (질환 가중치 = n/(2·n_질환) = ${f2(TRAIN.length/(2*counts(TRAIN)[1]))}) → 재현율 ${pct(e2.rec)}, F1 ${pct(e2.f1)}, balanced accuracy ${pct(e2.bal)}. 데이터를 바꾸지 않아 누수 걱정이 적은 첫 번째 선택지입니다.`
+    :`<b>대안 비교</b>: <code>KNeighborsClassifier</code>에는 class_weight가 없습니다. 로지스틱 회귀를 고르면 <code>class_weight='balanced'</code>와 비교할 수 있습니다.`;
+}
+function genCode(){
+  const t=curTech();const al=alphaVal();const ss=al>=1?"'auto'":al.toFixed(2);const [nMaj,nMin]=counts(TRAIN);
+  const mod={RandomOverSampler:"over_sampling",SMOTE:"over_sampling",BorderlineSMOTE:"over_sampling",ADASYN:"over_sampling",RandomUnderSampler:"under_sampling",TomekLinks:"under_sampling",NearMiss:"under_sampling",EditedNearestNeighbours:"under_sampling",ClusterCentroids:"under_sampling",SMOTETomek:"combine",SMOTEENN:"combine"}[t];
+  let ctor;const k=R.kEff;
+  switch(t){
+    case"RandomOverSampler":ctor=`RandomOverSampler(sampling_strategy=${ss}, random_state=42)`;break;
+    case"SMOTE":ctor=`SMOTE(sampling_strategy=${ss}, k_neighbors=${k}, random_state=42)`;break;
+    case"BorderlineSMOTE":ctor=`BorderlineSMOTE(sampling_strategy=${ss}, k_neighbors=${k}, m_neighbors=${S.m},\n                          kind='borderline-1', random_state=42)`;break;
+    case"ADASYN":ctor=`ADASYN(sampling_strategy=${ss}, n_neighbors=${k}, random_state=42)`;break;
+    case"RandomUnderSampler":ctor=`RandomUnderSampler(sampling_strategy=${ss}, random_state=42)`;break;
+    case"TomekLinks":ctor=`TomekLinks(sampling_strategy='${S.tss}')`;break;
+    case"NearMiss":ctor=`NearMiss(sampling_strategy=${ss}, version=${S.ver}, n_neighbors=${S.nmk}${S.ver===3?", n_neighbors_ver3=3":""})`;break;
+    case"EditedNearestNeighbours":ctor=`EditedNearestNeighbours(n_neighbors=${S.ek}, kind_sel='${S.kind}')`;break;
+    case"ClusterCentroids":ctor=`ClusterCentroids(sampling_strategy=${ss}, random_state=42)`;break;
+    case"SMOTETomek":ctor=`SMOTETomek(sampling_strategy=${ss},\n                     smote=SMOTE(k_neighbors=${k}, random_state=42),\n                     tomek=TomekLinks(sampling_strategy='all'),  # 기본값: 링크 양쪽 제거\n                     random_state=42)`;break;
+    case"SMOTEENN":ctor=`SMOTEENN(sampling_strategy=${ss},\n                   smote=SMOTE(k_neighbors=${k}, random_state=42),\n                   enn=EditedNearestNeighbours(sampling_strategy='all', n_neighbors=3, kind_sel='all'),  # 기본값\n                   random_state=42)`;break;}
+  const extra=(t==="SMOTETomek"?"from imblearn.over_sampling import SMOTE\nfrom imblearn.under_sampling import TomekLinks\n":t==="SMOTEENN"?"from imblearn.over_sampling import SMOTE\nfrom imblearn.under_sampling import EditedNearestNeighbours\n":"");
+  const model=S.clf==="lr"?"LogisticRegression()":"KNeighborsClassifier(n_neighbors=5)";
+  const mImp=S.clf==="lr"?"from sklearn.linear_model import LogisticRegression":"from sklearn.neighbors import KNeighborsClassifier";
+  const c=`from collections import Counter
+from sklearn.model_selection import train_test_split, StratifiedKFold, cross_validate
+from sklearn.preprocessing import StandardScaler
+${mImp}
+from sklearn.metrics import classification_report, balanced_accuracy_score
+from imblearn.${mod} import ${t}
+${extra}from imblearn.pipeline import Pipeline          # sklearn Pipeline이 아니라 imblearn Pipeline
+
+# X: [혈당, BMI],  y: 0 = 정상, 1 = 질환   (현재 학습 데이터 질환:정상 = ${nMin}:${nMaj})
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.3, stratify=y, random_state=42)   # 1) 먼저 나눈다
+
+sampler = ${ctor}
+
+# 2) 샘플링 결과 확인 (학습 데이터에만! 거리 기반이므로 스케일을 맞춘 뒤)
+scaler = StandardScaler().fit(X_train)
+X_res, y_res = sampler.fit_resample(scaler.transform(X_train), y_train)
+print(Counter(y_train), '->', Counter(y_res))
+
+# 3) 모형과 묶기: fit 때만 샘플링, predict·score 때는 샘플링을 건너뜀
+pipe = Pipeline([
+    ('scaler', StandardScaler()),
+    ('sampler', sampler),
+    ('model', ${model}),
+])
+
+# 4) 교차검증: fold마다 학습 부분에서만 샘플링 (검증 fold는 원본 분포 그대로)
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+scores = cross_validate(pipe, X_train, y_train, cv=cv,
+                        scoring=['balanced_accuracy', 'recall', 'precision', 'f1'])
+print({k: v.mean().round(3) for k, v in scores.items() if k.startswith('test_')})
+
+# 5) 최종 평가: 테스트 세트는 샘플링하지 않는다
+pipe.fit(X_train, y_train)
+y_pred = pipe.predict(X_test)
+print(classification_report(y_test, y_pred, target_names=['정상', '질환']))
+print('balanced accuracy:', balanced_accuracy_score(y_test, y_pred))
+${S.clf==="lr"?`
+# 대안: 샘플링 없이 손실 가중치로
+alt = Pipeline([('scaler', StandardScaler()),
+                ('model', LogisticRegression(class_weight='balanced'))])
+`:""}
+# 누수 (하지 말 것): 나누기 전에 전체 데이터를 샘플링
+# X_res, y_res = sampler.fit_resample(X, y)
+# train_test_split(X_res, y_res, ...)   # 합성·복제 점이 테스트에 섞임`;
+  $("code").innerHTML=hl(c);$("code").dataset.raw=c;
+}
+function hl(src){return src.split("\n").map(l=>{const i=l.indexOf("#");let code=i>=0?l.slice(0,i):l,cm=i>=0?l.slice(i):"";
+  code=esc(code).replace(/('[^']*')/g,'<span class="st">$1</span>').replace(/\b(from|import|for|in|if|print)\b/g,'<span class="kw">$1</span>');
+  return code+(cm?`<span class="cm">${esc(cm)}</span>`:"");}).join("\n");}
+function renderFolds(){let h="";for(let f=0;f<5;f++){h+=`<span class="fl">fold ${f+1}</span>`;for(let c=0;c<5;c++)h+=`<span class="cell ${c===f?"va":"tr"}">${c===f?"검증":"학습"}</span>`;}$("folds").innerHTML=h;}
+
+/* ---------- 흐름 ---------- */
+function recompute(resetStep){
+  stop();R=run();if(resetStep!==false)S.step=R.ev.length;S.step=Math.min(S.step,R.ev.length);S.sub=3;
+  renderChips();syncParams();renderDesc();legends();drawOrig();renderStep();renderChecks();renderDetail();fitModels();renderModel();genCode();
+}
+function full(){regen();const [a,b]=counts(TRAIN);
+  $("dataInfo").textContent=`학습 데이터: 정상 ${a}, 질환 ${b}${S.user.length?` (직접 추가 ${S.user.length}개 포함)`:""}`;
+  $("ratioV").textContent="1 : "+S.ratio;$("ovlV").textContent=Math.round(S.ovl*100)+"%";recompute(true);}
+function setStep(s,sub){S.step=Math.max(0,Math.min(R.ev.length,s));S.sub=sub==null?3:sub;renderStep();renderDetailCur();}
+function renderDetailCur(){const t=curTech();if(t==="BorderlineSMOTE"||t==="ADASYN")renderDetail();}
+function stop(){S.playing=false;clearTimeout(S.timer);S.timer=null;if($("stPlay"))$("stPlay").textContent="재생";}
+const SPEEDS=[0.5,1,2,4,8,16];
+function tick(){
+  if(!S.playing)return;const T=R.ev.length;const sp=SPEEDS[S.speed];
+  const cur=S.step>0?R.ev[S.step-1]:null;const useSub=!reduceMotion&&sp<=2;
+  if(cur&&cur.d.t==="smote"&&useSub&&S.sub<3){S.sub++;renderStep();S.timer=setTimeout(tick,420/sp);return;}
+  if(S.step>=T){stop();renderStep();return;}
+  const nx=R.ev[S.step];const sub=(nx.d.t==="smote"&&useSub)?0:3;setStep(S.step+1,sub);
+  S.timer=setTimeout(tick,(nx.d.t==="smote"&&useSub?420:nx.d.t==="bulk"||nx.d.t==="clean"||nx.d.t==="enn"?1100:300)/sp);
+}
+function play(){if(S.playing){stop();renderStep();return;}if(S.step>=R.ev.length)setStep(0);S.playing=true;$("stPlay").textContent="멈춤";tick();}
+
+/* ---------- 방식 탭 ---------- */
+const MODES=["over","under","combine"];
+function showMode(m,focus){if(!MODES.includes(m))m="over";S.mode=m;
+  MODES.forEach(k=>{const b=$("tab-"+k),on=k===m;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;});
+  $("pane-main").setAttribute("aria-labelledby","tab-"+m);if(focus)$("tab-"+m).focus();
+  if(location.hash!=="#"+m)history.replaceState(null,"","#"+m);recompute(true);}
+MODES.forEach(k=>$("tab-"+k).addEventListener("click",()=>showMode(k)));
+document.querySelector(".im-modes").addEventListener("keydown",e=>{if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;e.preventDefault();e.stopPropagation();
+  const i=MODES.indexOf(S.mode);showMode(MODES[(i+(e.key==="ArrowRight"?1:-1)+3)%3],true);});
+window.addEventListener("hashchange",()=>{const k=location.hash.slice(1);if(MODES.includes(k)&&k!==S.mode)showMode(k);});
+
+/* ---------- 조작 연결 ---------- */
+$("ratio").oninput=e=>{S.ratio=+e.target.value;full();};
+$("ovl").oninput=e=>{S.ovl=+e.target.value/100;full();};
+$("seed").onchange=e=>{S.seed=Math.max(0,Math.min(99999,Math.round(+e.target.value||0)));e.target.value=S.seed;full();};
+$("seedNew").onclick=()=>{S.seed=(S.seed*48271+11)%99991;$("seed").value=S.seed;full();};
+$("clearUser").onclick=()=>{S.user=[];full();};
+function segWire(id,fn){document.querySelectorAll("#"+id+" button").forEach(b=>b.addEventListener("click",()=>{segSet(id,b.dataset.v);fn(b.dataset.v);}));}
+segWire("clickSeg",v=>{S.clickC=v==="off"?null:+v;$("cvOrig").style.cursor=S.clickC==null?"default":"crosshair";});
+segWire("verSeg",v=>{S.ver=+v;recompute(true);});
+segWire("kindSeg",v=>{S.kind=v;recompute(true);});
+segWire("tssSeg",v=>{S.tss=v;recompute(true);});
+segWire("clfSeg",v=>{S.clf=v;fitModels();renderModel();genCode();});
+$("ss").oninput=e=>{S.ss[S.mode]=+e.target.value;recompute(true);};
+$("kn").oninput=e=>{S.k=+e.target.value;recompute(true);};
+$("mn").oninput=e=>{S.m=+e.target.value;recompute(true);};
+$("nmk").oninput=e=>{S.nmk=+e.target.value;recompute(true);};
+$("ek").oninput=e=>{S.ek=+e.target.value;recompute(true);};
+$("stFirst").onclick=()=>{stop();setStep(0);};
+$("stPrev").onclick=()=>{stop();setStep(S.step-1);};
+$("stNext").onclick=()=>{stop();setStep(S.step+1);};
+$("stLast").onclick=()=>{stop();setStep(R.ev.length);};
+$("stPlay").onclick=play;
+$("spd").oninput=e=>{S.speed=+e.target.value;$("spdV").textContent=SPEEDS[S.speed]+"×";};
+document.addEventListener("keydown",e=>{
+  if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;const a=document.activeElement;
+  if(a&&(a.closest('[role="tablist"]')||/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)))return;
+  if(e.altKey||e.ctrlKey||e.metaKey)return;e.preventDefault();stop();setStep(S.step+(e.key==="ArrowRight"?1:-1));});
+$("cvOrig").addEventListener("click",e=>{
+  const cv=$("cvOrig");const rc=cv.getBoundingClientRect();const V=view(rc.width,rc.height);const px=e.clientX-rc.left,py=e.clientY-rc.top;
+  const x=V.ix(px),y=V.iy(py);
+  const hit=S.user.findIndex(p=>Math.hypot(V.X(p.x)-px,V.Y(p.y)-py)<9);
+  if(hit>=0){S.user.splice(hit,1);full();return;}
+  if(S.clickC==null||x<XMIN||x>XMAX||y<YMIN||y>YMAX)return;
+  S.user.push({x,y,c:S.clickC});full();});
+$("copyBtn").onclick=()=>{const t=$("code").dataset.raw;const done=()=>{$("copyBtn").textContent="복사됨";setTimeout(()=>$("copyBtn").textContent="복사",1400);};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(done,()=>fallback(t,done));else fallback(t,done);};
+function fallback(t,done){const ta=document.createElement("textarea");ta.value=t;ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();try{document.execCommand("copy");done();}catch(e){}ta.remove();}
+
+/* ---------- 다시 그리기 (테마·크기) ---------- */
+function redraw(){if(!R)return;drawOrig();drawRes();drawBoundary($("cvB0"),MODEL.m0);drawBoundary($("cvB1"),MODEL.m1);}
+new MutationObserver(redraw).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+if(window.matchMedia)matchMedia("(prefers-color-scheme: dark)").addEventListener("change",redraw);
+let rzT=null;const ro=new ResizeObserver(()=>{clearTimeout(rzT);rzT=setTimeout(redraw,60);});["cvOrig","cvRes","cvB0","cvB1"].forEach(id=>ro.observe($(id)));
+
+renderFolds();regen();
+const h0=location.hash.slice(1);S.mode=MODES.includes(h0)?h0:"over";
+MODES.forEach(k=>{const b=$("tab-"+k),on=k===S.mode;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;});
+full();
+})();
+</script>
+</body>
+</html>
