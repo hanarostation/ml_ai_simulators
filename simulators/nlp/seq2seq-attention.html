@@ -1,0 +1,880 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Seq2Seq · Attention 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+:root{
+  --card:var(--surface); --txt:var(--text); --sub:var(--muted); --soft:var(--surface-2);
+  --enc:#2563EB; --enc-l:#DBEAFE; --dec:#EA580C; --dec-l:#FFEDD5; --dec-m:#FDBA74; --ctx:#7C3AED; --ctx-l:#EDE9FE;
+  --att:#0D9488; --att-l:#CCFBF1; --red:#DC2626; --red-l:#FEE2E2; --grn:#16A34A; --grn-l:#DCFCE7;
+  --on-role:#FFFFFF;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --enc:#6AA5FF; --enc-l:#1B2A45; --dec:#FF914D; --dec-l:#3A2519; --dec-m:#8A4A22; --ctx:#B294FF; --ctx-l:#2A2145;
+    --att:#33D1BD; --att-l:#123B37; --red:#FF6B6B; --red-l:#3A1A1E; --grn:#4ADE80; --grn-l:#15301F;
+    --on-role:#10131A;
+  }
+}
+:root[data-theme="dark"]{
+  --enc:#6AA5FF; --enc-l:#1B2A45; --dec:#FF914D; --dec-l:#3A2519; --dec-m:#8A4A22; --ctx:#B294FF; --ctx-l:#2A2145;
+  --att:#33D1BD; --att-l:#123B37; --red:#FF6B6B; --red-l:#3A1A1E; --grn:#4ADE80; --grn-l:#15301F;
+  --on-role:#10131A;
+}
+.wrap{width:100%;max-width:var(--max);margin:0 auto;padding:18px var(--gutter) 56px;color:var(--txt)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;margin-top:18px}
+.card:first-child{margin-top:0}
+.card h2{margin:0 0 4px;font-size:19px;color:var(--ink);display:flex;align-items:center;gap:10px}
+.card h2 .n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--on-ink);font-size:14px}
+.card .lead{margin:0 0 14px;color:var(--sub);font-size:14px}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:18px}
+@media (max-width:960px){.grid2{grid-template-columns:minmax(0,1fr)}}
+textarea{width:100%;min-height:250px;font-family:var(--mono);font-size:13.5px;border:1px solid var(--line);border-radius:10px;padding:10px;resize:vertical;background:var(--soft);color:var(--ink)}
+input[type=text],select{font:inherit;border:1px solid var(--line-strong);border-radius:8px;padding:7px 10px;background:var(--card);color:var(--ink);min-width:0}
+button{font:inherit;border:1px solid var(--line-strong);background:var(--card);color:var(--ink);border-radius:8px;padding:7px 14px;cursor:pointer;white-space:nowrap;font-weight:600}
+button:hover:not(:disabled){background:var(--soft)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.pri{background:var(--ink);color:var(--on-ink);border-color:var(--ink)}
+button.pri:hover:not(:disabled){background:var(--ink);opacity:.88}
+button.enc{background:var(--enc);border-color:var(--enc);color:var(--on-role)}
+button.enc:hover:not(:disabled){background:var(--enc);opacity:.88}
+button.att{background:var(--att);border-color:var(--att);color:var(--on-role)}
+button.att:hover:not(:disabled){background:var(--att);opacity:.88}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.row label{font-size:13.5px;color:var(--sub)}
+.stat{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.pill{background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:3px 11px;font-size:13px}
+.pill b{color:var(--ink)}
+.msg{margin-top:10px;font-size:13.5px}
+.msg.err{color:var(--red)}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:9px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:7px 13px}
+.seg button.on{background:var(--ink);color:var(--on-ink)}
+.seg button+button{border-left:1px solid var(--line-strong)}
+.lossbox{border:1px solid var(--line);border-radius:10px;background:var(--soft);padding:8px}
+.legend{display:flex;gap:14px;font-size:13px;color:var(--sub);margin:4px 4px 0}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{white-space:nowrap;padding:5px 8px;border-bottom:1px solid var(--line);text-align:left}
+th{color:var(--sub);font-weight:600;background:var(--soft)}
+td.ok{color:var(--grn);font-weight:600} td.ng{color:var(--red)}
+.tscroll{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:10px}
+.explain{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:6px 0 14px}
+@media (max-width:760px){.explain{grid-template-columns:minmax(0,1fr)}}
+.explain div{border-radius:10px;padding:10px 12px;font-size:13.5px}
+.explain .tf{background:var(--grn-l)} .explain .ar{background:var(--dec-l)}
+.explain b{color:var(--ink)}
+.controls{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--soft)}
+.controls .f{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.controls input[type=text]{width:190px}
+.player{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+.player .where{font-weight:600;color:var(--ink);margin-left:6px}
+.summary{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--card);border:1px solid var(--line);font-size:14px}
+.summary b{color:var(--ink)}
+.stage-scroll{overflow-x:auto;margin-top:12px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.stage{display:inline-block;min-width:100%;padding:14px 16px}
+.lane{display:flex;align-items:stretch;gap:10px}
+.lane+.lane{margin-top:14px;padding-top:14px;border-top:1px dashed var(--line)}
+.lane-label{width:92px;flex:0 0 92px;font-weight:700;font-size:14px;display:flex;flex-direction:column;justify-content:center}
+.lane-label small{font-weight:400;color:var(--sub);font-size:11.5px}
+.cells{display:flex;gap:8px;align-items:stretch}
+.ecell,.dcol,.ctxbox{border-radius:10px;border:1.5px solid var(--line);padding:6px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;transition:opacity .2s,box-shadow .2s;background:var(--card)}
+.ecell{width:78px;border-color:var(--enc)} .dcol{width:96px;border-color:var(--dec)} .ctxbox{width:104px;border-color:var(--ctx);background:var(--ctx-l)}
+.hidden-step{opacity:.28}
+.active{box-shadow:0 0 0 3px var(--ink)}
+.tok{font-size:20px;font-weight:700;color:var(--ink);line-height:1.2;min-height:24px}
+.tag{font-size:11px;color:var(--sub);font-family:var(--mono)}
+.lstm{font-size:11px;font-weight:700;border-radius:6px;padding:2px 6px;width:100%;text-align:center}
+.ecell .lstm{background:var(--enc-l);color:var(--enc)} .dcol .lstm{background:var(--dec-l);color:var(--dec)}
+canvas.hm{display:block;image-rendering:pixelated;border-radius:3px;border:1px solid var(--line)}
+.alpha{width:100%;font-size:11.5px;text-align:center;font-weight:700;color:var(--att);border-radius:5px;padding:1px 0}
+.src{font-size:10.5px;border-radius:4px;padding:0 5px;font-weight:700}
+.src.truth{background:var(--grn-l);color:var(--grn)} .src.pred{background:var(--dec-l);color:var(--dec)} .src.sos{background:var(--ctx-l);color:var(--ctx)}
+.dout{font-size:18px;font-weight:800;color:var(--dec);line-height:1.1}
+.dout.wrong{color:var(--red)}
+.pct{font-size:11px;color:var(--sub)}
+.tgt{font-size:11.5px;border-top:1px dashed var(--line);width:100%;text-align:center;padding-top:3px}
+.forced{font-size:10px;background:var(--red);color:var(--on-role);border-radius:4px;padding:0 4px}
+.arrow{font-size:11px;color:var(--sub);line-height:1}
+.bottom{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:16px;margin-top:14px}
+@media (max-width:960px){.bottom{grid-template-columns:minmax(0,1fr)}}
+.panel{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--card)}
+.panel h3{margin:0 0 8px;font-size:16px;color:var(--ink)}
+.kv{display:grid;grid-template-columns:120px 1fr;gap:6px 12px;font-size:13.5px;align-items:center}
+.kv .k{color:var(--sub)}
+.bars{display:flex;flex-direction:column;gap:5px;margin-top:6px}
+.bar{display:grid;grid-template-columns:64px 1fr 150px;gap:8px;align-items:center;font-size:13px}
+.bar .b{height:14px;border-radius:4px;background:var(--line);overflow:hidden}
+.bar .b i{display:block;height:100%}
+.bar .lab{font-weight:700;color:var(--ink);font-family:var(--mono)}
+.bar.click{cursor:pointer;border-radius:6px}
+.bar.click:hover{background:var(--soft)}
+.bar.sel .lab{color:var(--dec)}
+.hint{font-size:12.5px;color:var(--sub);margin-top:8px}
+.formula{font-family:var(--mono);background:var(--soft);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--ink);margin:8px 0}
+.amat{border-collapse:separate;border-spacing:2px;width:auto;font-size:12px}
+.amat td,.amat th{border:0;padding:0;text-align:center;background:none}
+.amat th{font-family:var(--mono);color:var(--ink);font-weight:700;min-width:30px;height:24px}
+.amat td.c{width:32px;height:26px;border-radius:4px;font-size:10.5px;color:var(--ink)}
+.amat tr.cur th{color:var(--dec)}
+.amat tr.cur td.c{outline:2px solid var(--ink)}
+.note{font-size:12.5px;color:var(--sub);margin-top:6px}
+.scaleleg{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--sub);margin-top:6px}
+.scaleleg span.sw{display:inline-block;width:60px;height:10px;border-radius:3px;background:linear-gradient(90deg,#2563EB,#fff,#EA580C);border:1px solid var(--line)}
+.empty{color:var(--sub);font-size:14px;padding:30px;text-align:center}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+</style>
+<!-- TensorFlow.js (공용 파일) -->
+<script src="../../assets/vendor/tf.min.js"></script>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)" aria-current="page">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">Seq2Seq · Attention 시뮬레이터</h1>
+      <p class="ds-hero__lede">글자 단위 영→한 번역 모델을 이 페이지 안에서 직접 학습하고, 인코더 → 컨텍스트 → 디코더가 한 시점씩 어떻게 계산되는지 따라가 봅니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="wrap" id="main">
+
+<section class="card">
+  <h2><span class="n">1</span>데이터</h2>
+  <p class="lead">한 줄에 한 쌍: <code>영어 | 한국어</code> (탭으로 구분해도 됩니다). 수정 후 <b>데이터 적용</b>을 누르면 글자 사전을 다시 만들고 모델을 초기화합니다.</p>
+  <div class="grid2">
+    <div>
+      <textarea id="pairs" spellcheck="false"></textarea>
+      <div class="row" style="margin-top:8px"><button id="applyData" class="pri">데이터 적용</button><span id="dataMsg" class="msg"></span></div>
+    </div>
+    <div>
+      <div class="stat" id="dataStat"></div>
+      <div class="panel" style="margin-top:12px">
+        <h3>전처리 규칙 (노트북과 동일한 생각)</h3>
+        <div class="kv">
+          <div class="k">인코더 입력</div><div>영어 문장을 <b>글자 하나씩</b> one-hot (사전 크기 = 영어 글자 수 + PAD)</div>
+          <div class="k">디코더 입력</div><div><b>SOS</b> + 한국어 글자들 &nbsp;<span class="tag">예) SOS 들 어 와 .</span></div>
+          <div class="k">디코더 정답</div><div>한국어 글자들 + <b>EOS</b> &nbsp;<span class="tag">예) 들 어 와 . EOS</span></div>
+          <div class="k">패딩</div><div>가장 긴 문장에 맞춰 0(PAD)으로 채우고, <b>마스크</b>로 계산에서 제외 (인코더 상태 유지 · 손실 제외 · Attention 제외)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2><span class="n">2</span>학습 — Teacher Forcing</h2>
+  <p class="lead">학습은 항상 Teacher Forcing: 디코더 입력으로 <b>정답을 한 칸 밀어</b> 넣고, 모든 시점의 손실(−log P(정답))을 한 번에 계산해 Adam으로 갱신합니다. 전체 문장을 한 배치로 사용합니다.</p>
+  <div class="row">
+    <label>은닉 크기</label><select id="hsize"><option>32</option><option selected>64</option><option>128</option></select>
+    <label>epoch</label><select id="epochs"><option>80</option><option selected>150</option><option>300</option><option>500</option></select>
+    <label>학습률</label><select id="lr"><option>0.003</option><option selected>0.01</option><option>0.03</option></select>
+    <label>연산</label><select id="backend"><option value="cpu" selected>CPU</option><option value="webgl">GPU(WebGL)</option></select>
+    <span class="note" style="margin:0">기본값 기준 한 모델당 보통 1~2분 · 손실이 0.05 아래로 내려가면 대부분 외운 상태</span>
+  </div>
+  <div class="row" style="margin-top:10px">
+    <button id="trainS2S" class="enc">Seq2Seq 학습</button>
+    <button id="trainAtt" class="att">Attention 학습</button>
+    <button id="stopTrain" disabled>중지</button>
+    <span id="trainMsg" class="msg"></span>
+  </div>
+  <div class="grid2" style="margin-top:12px">
+    <div class="lossbox">
+      <svg id="lossSvg" viewBox="0 0 560 220" width="100%" height="220" preserveAspectRatio="none"></svg>
+      <div class="legend"><span><i style="background:var(--enc)"></i>Seq2Seq 손실</span><span><i style="background:var(--att)"></i>Attention 손실</span><span id="lossNow"></span></div>
+    </div>
+    <div>
+      <div class="stat" id="modelStat"></div>
+      <div class="tscroll"><table id="sampleTbl"><thead><tr><th>입력</th><th>정답</th><th>Seq2Seq 생성</th><th>Attention 생성</th></tr></thead><tbody></tbody></table></div>
+      <div class="note">생성 열은 자기회귀(직전 예측을 다음 입력으로) 결과입니다. 학습 중 50 epoch마다 갱신됩니다.</div>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2><span class="n">3</span>시뮬레이터 — 한 시점씩 따라가기</h2>
+  <div class="explain">
+    <div class="tf"><b>Teacher Forcing</b> (학습 방식) — 디코더 입력 = 정답을 한 칸 민 것. 어느 시점에서 틀려도 그 시점 손실만 커지고, 다음 입력은 항상 정답입니다.</div>
+    <div class="ar"><b>자기회귀</b> (추론 방식) — 디코더 입력 = 직전 예측. 정답이 없으니 한 글자씩 생성하고, 한 번 틀리면 뒤로 이어질 수 있습니다(노출 편향). 후보 글자를 클릭해 일부러 틀려 보세요.</div>
+  </div>
+  <div class="controls">
+    <div class="f"><label>모델</label><div class="seg" id="segModel"><button data-v="s2s">Seq2Seq</button><button data-v="att" class="on">Attention</button></div></div>
+    <div class="f"><label>디코더 입력</label><div class="seg" id="segMode"><button data-v="tf">Teacher Forcing</button><button data-v="ar" class="on">자기회귀</button></div></div>
+    <div class="f"><label>입력</label><input type="text" id="inSent" list="sentList" value="Come in."><datalist id="sentList"></datalist></div>
+    <div class="f" id="tgtWrap"><label>정답</label><input type="text" id="tgtSent" value="들어와."></div>
+    <button id="runSim" class="pri">실행</button>
+  </div>
+  <div class="player">
+    <button id="bFirst" title="처음">⏮ 처음</button>
+    <button id="bPrev" title="이전">◀ 이전</button>
+    <button id="bNext" title="다음">다음 ▶</button>
+    <button id="bPlay">⏵ 자동 재생</button>
+    <button id="bLast" title="끝">끝 ⏭</button>
+    <label style="margin-left:6px">속도</label><input type="range" id="speed" min="150" max="1500" value="700" step="50" style="width:120px">
+    <span class="where" id="where"></span>
+  </div>
+  <div class="summary" id="summary"><span class="empty" style="padding:0">먼저 ② 에서 모델을 학습하세요.</span></div>
+  <div class="stage-scroll"><div class="stage" id="stage"></div></div>
+  <div class="bottom">
+    <div class="panel" id="detail"><h3>현재 단계 내부 값</h3><div class="empty">실행하면 여기에 one-hot 번호, 은닉 상태 h·c, Attention 점수, Softmax 후보가 나타납니다.</div></div>
+    <div class="panel" id="attPanel"><h3>Attention 가중치 α (디코더 시점 × 입력 글자)</h3><div class="empty">Attention 모델을 실행하면 표시됩니다.</div></div>
+  </div>
+</section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js"></script>
+<script>
+"use strict";
+const PAD = 0, SOS = 1, EOS = 2;
+const DEFAULT_PAIRS = `Go. | 가.
+Hi. | 안녕.
+Run! | 뛰어!
+Stop! | 멈춰!
+Wait. | 기다려.
+Help! | 도와줘!
+Come in. | 들어와.
+Come here. | 이리 와.
+Go away. | 저리 가.
+Go home. | 집에 가.
+Sit down. | 앉아.
+Get up. | 일어나.
+Get out. | 나가.
+Be calm. | 진정해.
+Be quiet. | 조용히 해.
+Hurry up. | 서둘러.
+Look out! | 조심해!
+Call me. | 전화해.
+Eat it. | 먹어.
+Try it. | 해 봐.
+Open it. | 열어.
+Close it. | 닫아.
+Take it. | 가져가.
+Keep going. | 계속해.
+I see. | 알겠어.
+I agree. | 동의해.
+I won. | 내가 이겼어.
+I lost. | 내가 졌어.
+I am sad. | 나는 슬퍼.
+I am happy. | 나는 행복해.
+I am tired. | 나는 피곤해.
+I love you. | 사랑해.
+Thank you. | 고마워.
+Good job. | 잘했어.
+Good night. | 잘 자.
+See you. | 또 봐.
+Welcome. | 환영해.
+Who is it? | 누구야?
+Let's go. | 가자.
+I'm home. | 다녀왔어.`;
+
+const $ = s => document.querySelector(s);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+let D = null;
+const models = { s2s: null, att: null };
+const losses = { s2s: [], att: [] };
+let training = false, stopFlag = false;
+let sim = null, step = 0, playTimer = null;
+let forced = {};
+let ui = { model: "att", mode: "ar" };
+
+/* ------------------------------------------------ data ------------------------------------------------ */
+function parsePairs(text) {
+  return text.split("\n").map(l => l.trim()).filter(Boolean).map(l => {
+    const p = l.includes("\t") ? l.split("\t") : l.split("|");
+    return p.length >= 2 ? [p[0].trim(), p[1].trim()] : null;
+  }).filter(p => p && p[0] && p[1]);
+}
+function buildData(pairs) {
+  const ic = new Set(), oc = new Set();
+  pairs.forEach(([a, b]) => { [...a].forEach(c => ic.add(c)); [...b].forEach(c => oc.add(c)); });
+  const inV = ["<PAD>", ...[...ic].sort()];
+  const outV = ["<PAD>", "<SOS>", "<EOS>", ...[...oc].sort()];
+  const inIdx = new Map(inV.map((c, i) => [c, i]));
+  const outIdx = new Map(outV.map((c, i) => [c, i]));
+  const maxIn = Math.max(...pairs.map(p => [...p[0]].length));
+  const maxOut = Math.max(...pairs.map(p => [...p[1]].length));
+  return { pairs, inV, outV, inIdx, outIdx, maxIn, maxOut };
+}
+function dispIn(ch) { return ch === " " ? "␣" : ch; }
+function dispOut(i) {
+  const c = D.outV[i];
+  return c === "<SOS>" ? "SOS" : c === "<EOS>" ? "EOS" : c === "<PAD>" ? "PAD" : c === " " ? "␣" : c;
+}
+function showData() {
+  $("#dataStat").innerHTML = [
+    `문장 쌍 <b>${D.pairs.length}</b>`,
+    `영어 사전 <b>${D.inV.length}</b> (글자 ${D.inV.length - 1} + PAD)`,
+    `한국어 사전 <b>${D.outV.length}</b> (글자 ${D.outV.length - 3} + PAD·SOS·EOS)`,
+    `최대 길이 영어 <b>${D.maxIn}</b> · 한국어 <b>${D.maxOut}</b>(+1)`
+  ].map(s => `<span class="pill">${s}</span>`).join("");
+  $("#sentList").innerHTML = D.pairs.map(p => `<option value="${esc(p[0])}">`).join("");
+}
+function applyData() {
+  if (training) return;
+  const pairs = parsePairs($("#pairs").value);
+  if (pairs.length < 2) { $("#dataMsg").className = "msg err"; $("#dataMsg").textContent = "문장 쌍을 2개 이상 입력하세요."; return; }
+  Object.keys(models).forEach(k => { if (models[k]) models[k].dispose(); models[k] = null; losses[k] = []; });
+  D = buildData(pairs);
+  $("#dataMsg").className = "msg"; $("#dataMsg").textContent = "적용했습니다. 모델을 다시 학습하세요.";
+  showData(); drawLoss(); updateModelStat(); fillSampleTable();
+  sim = null; renderAll();
+}
+
+/* ------------------------------------------------ model ------------------------------------------------ */
+function glorot(r, c) { const lim = Math.sqrt(6 / (r + c)); return tf.variable(tf.randomUniform([r, c], -lim, lim)); }
+function lstmBias(H) { const b = new Float32Array(4 * H); for (let i = H; i < 2 * H; i++) b[i] = 1; return tf.variable(tf.tensor1d(b)); }
+class Seq2Seq {
+  constructor(type, H, Vin, Vout) {
+    this.type = type; this.H = H; this.Vin = Vin; this.Vout = Vout;
+    this.We = glorot(Vin + H, 4 * H); this.be = lstmBias(H);
+    this.Wd = glorot(Vout + H, 4 * H); this.bd = lstmBias(H);
+    const F = type === "att" ? 2 * H : H;
+    this.Wo = glorot(F, Vout); this.bo = tf.variable(tf.zeros([Vout]));
+    this.trained = false;
+  }
+  vars() { return [this.We, this.be, this.Wd, this.bd, this.Wo, this.bo]; }
+  nParams() { return this.vars().reduce((s, v) => s + v.size, 0); }
+  dispose() { this.vars().forEach(v => v.dispose()); }
+}
+// LSTM 한 시점: z = [x, h]·W + b → i, f, g, o 게이트
+function cell(x, h, c, W, b) {
+  const z = tf.add(tf.matMul(tf.concat([x, h], 1), W), b);
+  const [zi, zf, zg, zo] = tf.split(z, 4, 1);
+  const i = tf.sigmoid(zi), f = tf.sigmoid(zf), g = tf.tanh(zg), o = tf.sigmoid(zo);
+  const c2 = tf.add(tf.mul(f, c), tf.mul(i, g));
+  const h2 = tf.mul(o, tf.tanh(c2));
+  return { h: h2, c: c2, i, f, o };
+}
+// Luong dot Attention: e_i = s·h_i → α = softmax(e) → ctx = Σ α_i h_i
+function attend(encOut, s, negMask) {
+  let scores = tf.sum(tf.mul(encOut, tf.expandDims(s, 1)), 2);
+  const masked = negMask ? tf.add(scores, negMask) : scores;
+  const a = tf.softmax(masked);
+  const ctx = tf.sum(tf.mul(encOut, tf.expandDims(a, 2)), 1);
+  return { scores, a, ctx };
+}
+function makeBatch() {
+  const B = D.pairs.length, Tin = D.maxIn, Tout = D.maxOut + 1;
+  const eI = [], eM = [], dI = [], dO = [], dM = [];
+  for (let t = 0; t < Tin; t++) { eI.push(new Int32Array(B)); eM.push(new Float32Array(B)); }
+  for (let t = 0; t < Tout; t++) { dI.push(new Int32Array(B)); dO.push(new Int32Array(B)); dM.push(new Float32Array(B)); }
+  const eMaskAll = new Float32Array(B * Tin);
+  let nTok = 0;
+  D.pairs.forEach(([a, b], n) => {
+    const ia = [...a].map(c => D.inIdx.get(c)), ob = [...b].map(c => D.outIdx.get(c));
+    ia.forEach((id, t) => { eI[t][n] = id; eM[t][n] = 1; eMaskAll[n * Tin + t] = 1; });
+    const din = [SOS, ...ob], dout = [...ob, EOS];
+    din.forEach((id, t) => { dI[t][n] = id; dO[t][n] = dout[t]; dM[t][n] = 1; nTok++; });
+  });
+  const oh = (arr, V) => tf.tidy(() => tf.cast(tf.oneHot(tf.tensor1d(arr, "int32"), V), "float32"));
+  return {
+    B, Tin, Tout, nTok,
+    encX: eI.map(a => oh(a, D.inV.length)), encM: eM.map(a => tf.tensor2d(a, [B, 1])),
+    encMaskAll: tf.tensor2d(eMaskAll, [B, Tin]),
+    decX: dI.map(a => oh(a, D.outV.length)), decY: dO.map(a => oh(a, D.outV.length)), decM: dM.map(a => tf.tensor1d(a))
+  };
+}
+function disposeBatch(T) { [...T.encX, ...T.encM, T.encMaskAll, ...T.decX, ...T.decY, ...T.decM].forEach(t => t.dispose()); }
+// Teacher Forcing 손실: 디코더 입력 = SOS + 정답, 타깃 = 정답 + EOS
+function batchLoss(m, T) {
+  const B = T.B, H = m.H;
+  let h = tf.zeros([B, H]), c = tf.zeros([B, H]);
+  const hs = [];
+  for (let t = 0; t < T.Tin; t++) {
+    const r = cell(T.encX[t], h, c, m.We, m.be);
+    const mk = T.encM[t], inv = tf.sub(1, mk);
+    h = tf.add(tf.mul(r.h, mk), tf.mul(h, inv));   // 패딩 시점은 이전 상태 유지
+    c = tf.add(tf.mul(r.c, mk), tf.mul(c, inv));
+    hs.push(tf.mul(r.h, mk));
+  }
+  const encOut = tf.stack(hs, 1);
+  const neg = tf.mul(tf.sub(1, T.encMaskAll), -1e9);
+  let tot = tf.scalar(0);
+  for (let t = 0; t < T.Tout; t++) {
+    const r = cell(T.decX[t], h, c, m.Wd, m.bd);
+    h = r.h; c = r.c;
+    let feat = h;
+    if (m.type === "att") { const at = attend(encOut, h, neg); feat = tf.concat([at.ctx, h], 1); }
+    const lp = tf.logSoftmax(tf.add(tf.matMul(feat, m.Wo), m.bo));
+    const ce = tf.neg(tf.sum(tf.mul(lp, T.decY[t]), 1));
+    tot = tf.add(tot, tf.sum(tf.mul(ce, T.decM[t])));
+  }
+  return tf.div(tot, T.nTok);
+}
+
+/* ------------------------------------------------ simulate (record) ------------------------------------------------ */
+function checkChars(str, map, label) {
+  const bad = [...new Set([...str].filter(c => !map.has(c)))];
+  if (bad.length) throw new Error(`${label}에 사전에 없는 글자가 있습니다: ${bad.map(c => `'${c === " " ? "공백" : c}'`).join(", ")} (노트북에서는 KeyError가 나는 상황)`);
+}
+function topk(p, k) { return p.map((v, i) => [i, v]).sort((a, b) => b[1] - a[1]).slice(0, k); }
+function mean(t) { const a = t.dataSync(); let s = 0; for (const v of a) s += v; return s / a.length; }
+function simulate(m, inStr, mode, tgtStr, forcedMap, record = true) {
+  const inChars = [...inStr];
+  const inIds = inChars.map(c => D.inIdx.get(c));
+  const outIds = mode === "tf" ? [...tgtStr].map(c => D.outIdx.get(c)) : [];
+  return tf.tidy(() => {
+    const H = m.H;
+    let h = tf.zeros([1, H]), c = tf.zeros([1, H]);
+    const enc = [], hs = [];
+    inIds.forEach((id, t) => {
+      const x = tf.cast(tf.oneHot(tf.tensor1d([id], "int32"), m.Vin), "float32");
+      const r = cell(x, h, c, m.We, m.be);
+      h = r.h; c = r.c; hs.push(h);
+      if (record) enc.push({ ch: inChars[t], id, h: Array.from(h.dataSync()), c: Array.from(c.dataSync()), gi: mean(r.i), gf: mean(r.f), go: mean(r.o) });
+    });
+    const encOut = tf.stack(hs, 1);
+    const ctx = record ? { h: Array.from(h.dataSync()), c: Array.from(c.dataSync()) } : null;
+    const dec = [];
+    let tok = SOS;
+    const maxSteps = mode === "tf" ? outIds.length + 1 : D.maxOut + 6;
+    for (let t = 0; t < maxSteps; t++) {
+      const inTok = mode === "tf" ? (t === 0 ? SOS : outIds[t - 1]) : tok;
+      const x = tf.cast(tf.oneHot(tf.tensor1d([inTok], "int32"), m.Vout), "float32");
+      const r = cell(x, h, c, m.Wd, m.bd);
+      h = r.h; c = r.c;
+      let feat = h, scores = null, alpha = null;
+      if (m.type === "att") {
+        const at = attend(encOut, h, null);
+        feat = tf.concat([at.ctx, h], 1);
+        scores = Array.from(at.scores.dataSync()); alpha = Array.from(at.a.dataSync());
+      }
+      const probs = Array.from(tf.softmax(tf.add(tf.matMul(feat, m.Wo), m.bo)).dataSync());
+      let argmax = 0; probs.forEach((v, i) => { if (v > probs[argmax]) argmax = i; });
+      let pred = argmax, isForced = false;
+      if (mode === "ar" && forcedMap && forcedMap[t] !== undefined) { pred = forcedMap[t]; isForced = true; }
+      const rec = { t, inTok, src: t === 0 ? "sos" : mode === "tf" ? "truth" : "pred", pred, argmax, isForced, probs, top: topk(probs, 5), scores, alpha };
+      if (record) { rec.h = Array.from(h.dataSync()); rec.c = Array.from(c.dataSync()); rec.gi = mean(r.i); rec.gf = mean(r.f); rec.go = mean(r.o); }
+      if (mode === "tf") { const tg = t < outIds.length ? outIds[t] : EOS; rec.target = tg; rec.pT = probs[tg]; rec.loss = -Math.log(Math.max(probs[tg], 1e-12)); }
+      dec.push(rec);
+      if (mode === "ar") { if (pred === EOS) break; tok = pred; }
+    }
+    return { inChars, enc, ctx, dec, mode, type: m.type, H, tgt: tgtStr };
+  });
+}
+function greedy(m, s) {
+  const r = simulate(m, s, "ar", "", null, false);
+  return r.dec.filter(d => d.pred !== EOS).map(d => D.outV[d.pred]).join("");
+}
+
+/* ------------------------------------------------ training ------------------------------------------------ */
+async function train(type) {
+  if (training || !D) return;
+  const be = $("#backend").value;
+  try { await tf.setBackend(be); await tf.ready(); } catch (e) { await tf.setBackend("cpu"); }
+  training = true; stopFlag = false; setTrainButtons();
+  const H = +$("#hsize").value, epochs = +$("#epochs").value, lr = +$("#lr").value;
+  if (models[type]) models[type].dispose();
+  const m = new Seq2Seq(type, H, D.inV.length, D.outV.length);
+  models[type] = m; losses[type] = [];
+  const T = makeBatch();
+  const opt = tf.train.adam(lr);
+  const t0 = performance.now();
+  const name = type === "att" ? "Attention" : "Seq2Seq";
+  for (let e = 1; e <= epochs && !stopFlag; e++) {
+    const cost = opt.minimize(() => batchLoss(m, T), true, m.vars());
+    const v = (await cost.data())[0]; cost.dispose();
+    losses[type].push(v);
+    if (e % 5 === 0 || e === epochs) {
+      drawLoss();
+      $("#trainMsg").className = "msg";
+      $("#trainMsg").textContent = `${name} 학습 중 · epoch ${e}/${epochs} · 손실 ${v.toFixed(4)} · ${((performance.now() - t0) / 1000).toFixed(1)}초`;
+    }
+    if (e % 50 === 0) { m.trained = true; fillSampleTable(); }
+    if (e % 3 === 0) await tf.nextFrame();
+  }
+  disposeBatch(T); opt.dispose();
+  m.trained = true; training = false;
+  const sec = ((performance.now() - t0) / 1000).toFixed(1);
+  $("#trainMsg").textContent = `${name} 학습 ${stopFlag ? "중지" : "완료"} · ${losses[type].length} epoch · 최종 손실 ${losses[type].at(-1).toFixed(4)} · ${sec}초`;
+  drawLoss(); fillSampleTable(); updateModelStat(); setTrainButtons();
+  if (ui.model === type || !models[ui.model]) { setSeg("#segModel", type); ui.model = type; runSim(); }
+}
+function setTrainButtons() {
+  $("#trainS2S").disabled = training; $("#trainAtt").disabled = training; $("#stopTrain").disabled = !training;
+  $("#applyData").disabled = training;
+}
+function drawLoss() {
+  const svg = $("#lossSvg"), W = 560, Hh = 220, pl = 44, pr = 10, pt = 12, pb = 26;
+  const all = [...losses.s2s, ...losses.att];
+  let out = "";
+  if (!all.length) { svg.innerHTML = `<text x="${W / 2}" y="${Hh / 2}" text-anchor="middle" style="fill:var(--faint)" font-size="14">학습하면 손실 곡선이 그려집니다</text>`; return; }
+  const maxE = Math.max(losses.s2s.length, losses.att.length, 10), maxL = Math.max(...all) * 1.05;
+  const X = e => pl + (W - pl - pr) * (e / maxE), Y = v => pt + (Hh - pt - pb) * (1 - v / maxL);
+  for (let k = 0; k <= 4; k++) {
+    const v = maxL * k / 4, y = Y(v);
+    out += `<line x1="${pl}" x2="${W - pr}" y1="${y}" y2="${y}" style="stroke:var(--line)"/><text x="${pl - 6}" y="${y + 4}" text-anchor="end" font-size="11" style="fill:var(--sub)">${v.toFixed(2)}</text>`;
+  }
+  out += `<text x="${W - pr}" y="${Hh - 6}" text-anchor="end" font-size="11" style="fill:var(--sub)">epoch ${maxE}</text><text x="${pl}" y="${Hh - 6}" font-size="11" style="fill:var(--sub)">0</text>`;
+  [["s2s", "var(--enc)"], ["att", "var(--att)"]].forEach(([k, col]) => {
+    const L = losses[k]; if (!L.length) return;
+    const step = Math.max(1, Math.floor(L.length / 400));
+    const pts = L.filter((_, i) => i % step === 0 || i === L.length - 1).map((v, j, arr) => `${X((j === arr.length - 1 ? L.length : j * step + 1)).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+    out += `<polyline points="${pts}" fill="none" style="stroke:${col}" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+  });
+  svg.innerHTML = out;
+  $("#lossNow").textContent = ["s2s", "att"].filter(k => losses[k].length).map(k => `${k === "att" ? "Attention" : "Seq2Seq"} ${losses[k].at(-1).toFixed(4)}`).join(" · ");
+}
+function updateModelStat() {
+  const s = [];
+  ["s2s", "att"].forEach(k => {
+    const m = models[k], name = k === "att" ? "Attention" : "Seq2Seq";
+    if (!m) { s.push(`${name} <b>미학습</b>`); return; }
+    let ok = 0; D.pairs.forEach(p => { if (greedy(m, p[0]) === p[1]) ok++; });
+    s.push(`${name} 파라미터 <b>${m.nParams().toLocaleString()}</b> · 학습 문장 정확히 생성 <b>${ok}/${D.pairs.length}</b>`);
+  });
+  $("#modelStat").innerHTML = s.map(x => `<span class="pill">${x}</span>`).join("");
+}
+function fillSampleTable() {
+  const tb = $("#sampleTbl tbody");
+  if (!D) { tb.innerHTML = ""; return; }
+  tb.innerHTML = D.pairs.map(([a, b]) => {
+    const cells = ["s2s", "att"].map(k => {
+      const m = models[k]; if (!m || !m.trained) return `<td class="tag">—</td>`;
+      const g = greedy(m, a); return `<td class="${g === b ? "ok" : "ng"}">${esc(g) || "(빈 문장)"}</td>`;
+    }).join("");
+    return `<tr><td>${esc(a)}</td><td>${esc(b)}</td>${cells}</tr>`;
+  }).join("");
+}
+
+/* ------------------------------------------------ rendering ------------------------------------------------ */
+function heat(vals, cols, px, scale) {
+  const rows = Math.ceil(vals.length / cols);
+  const cv = document.createElement("canvas");
+  cv.width = cols; cv.height = rows; cv.className = "hm";
+  cv.style.width = cols * px + "px"; cv.style.height = rows * px + "px";
+  const ctx = cv.getContext("2d"), img = ctx.createImageData(cols, rows);
+  const mx = scale || Math.max(1e-6, ...vals.map(Math.abs));
+  vals.forEach((v, i) => {
+    const a = Math.min(1, Math.abs(v) / mx);
+    const base = v >= 0 ? [234, 88, 12] : [37, 99, 235];
+    const k = i * 4;
+    img.data[k] = Math.round(255 + (base[0] - 255) * a);
+    img.data[k + 1] = Math.round(255 + (base[1] - 255) * a);
+    img.data[k + 2] = Math.round(255 + (base[2] - 255) * a);
+    img.data[k + 3] = 255;
+  });
+  ctx.putImageData(img, 0, 0);
+  return cv;
+}
+function totalSteps() { return sim ? sim.enc.length + 1 + sim.dec.length : 0; }
+function stepInfo(s) {
+  const n = sim.enc.length;
+  if (s < n) return { kind: "enc", t: s };
+  if (s === n) return { kind: "ctx" };
+  return { kind: "dec", t: s - n - 1 };
+}
+function renderAll() { renderSummary(); renderStage(); renderDetail(); renderAttention(); renderWhere(); }
+function renderWhere() {
+  if (!sim) { $("#where").textContent = ""; return; }
+  const I = stepInfo(step), tot = totalSteps();
+  const name = I.kind === "enc" ? `인코더 t=${I.t + 1}` : I.kind === "ctx" ? "컨텍스트 전달" : `디코더 t=${I.t + 1}`;
+  $("#where").textContent = `${step + 1} / ${tot} · ${name}`;
+}
+function renderSummary() {
+  const box = $("#summary");
+  if (!sim) {
+    box.innerHTML = models.s2s || models.att ? "입력 문장을 넣고 <b>실행</b>을 누르세요." : "먼저 ② 에서 모델을 학습하세요.";
+    return;
+  }
+  const name = sim.type === "att" ? "Attention" : "Seq2Seq";
+  if (sim.mode === "tf") {
+    const L = sim.dec.reduce((s, d) => s + d.loss, 0) / sim.dec.length;
+    const wrong = sim.dec.filter(d => d.argmax !== d.target).length;
+    box.innerHTML = `<b>${name} · Teacher Forcing</b> — 디코더 입력은 <b>SOS + 정답 '${esc(sim.tgt)}'</b>. 시점별 예측(argmax) 중 오답 <b>${wrong}</b>개 · 평균 손실 <b>${L.toFixed(4)}</b>. 틀린 시점이 있어도 다음 입력은 정답입니다.`;
+  } else {
+    const out = sim.dec.filter(d => d.pred !== EOS).map(d => D.outV[d.pred]).join("");
+    const ended = sim.dec.at(-1).pred === EOS;
+    const nf = Object.keys(forced).length;
+    box.innerHTML = `<b>${name} · 자기회귀</b> — 생성 결과 <b style="color:var(--dec);font-size:17px">'${esc(out)}'</b> ${ended ? "(EOS에서 종료)" : "(최대 길이에서 종료)"}${nf ? ` · <span class="forced">강제 선택 ${nf}곳</span> <button id="clearForced" style="padding:2px 8px;font-size:12.5px">강제 선택 해제</button>` : ""}`;
+    const b = $("#clearForced"); if (b) b.onclick = () => { forced = {}; runSim(true); };
+  }
+}
+function renderStage() {
+  const st = $("#stage"); st.innerHTML = "";
+  if (!sim) { st.appendChild(el("div", "empty", "학습 후 실행하면 인코더·디코더가 시점별로 펼쳐집니다.")); return; }
+  const I = stepInfo(step), n = sim.enc.length;
+  const curDec = I.kind === "dec" ? sim.dec[I.t] : null;
+  // encoder lane
+  const lane1 = el("div", "lane");
+  lane1.appendChild(el("div", "lane-label", `<span style="color:var(--enc)">Encoder</span><small>LSTM(${sim.H})<br>글자를 읽기만 함</small>`));
+  const cells1 = el("div", "cells");
+  sim.enc.forEach((e, t) => {
+    const c = el("div", "ecell");
+    if (t > step) c.classList.add("hidden-step");
+    if (I.kind === "enc" && I.t === t) c.classList.add("active");
+    c.appendChild(el("div", "tok", esc(dispIn(e.ch))));
+    c.appendChild(el("div", "tag", `#${e.id} / ${D.inV.length}`));
+    c.appendChild(el("div", "lstm", `LSTM t=${t + 1}`));
+    c.appendChild(t <= step ? heat(e.h, 16, 4, 1) : el("div", "tag", "h = ?"));
+    if (sim.type === "att" && curDec) {
+      const a = curDec.alpha[t];
+      const al = el("div", "alpha", `α ${a.toFixed(2)}`);
+      al.style.background = `rgba(13,148,136,${Math.min(0.9, a * 1.2)})`;
+      if (a > 0.45) al.style.color = "#fff";
+      c.appendChild(al);
+    }
+    c.onclick = () => goStep(t);
+    cells1.appendChild(c);
+  });
+  lane1.appendChild(cells1);
+  st.appendChild(lane1);
+  // decoder lane
+  const lane2 = el("div", "lane");
+  lane2.appendChild(el("div", "lane-label", `<span style="color:var(--dec)">Decoder</span><small>LSTM(${sim.H})<br>${sim.mode === "tf" ? "입력 = 정답" : "입력 = 직전 예측"}</small>`));
+  const cells2 = el("div", "cells");
+  const cb = el("div", "ctxbox");
+  if (step < n) cb.classList.add("hidden-step");
+  if (I.kind === "ctx") cb.classList.add("active");
+  cb.appendChild(el("div", "lstm", "Context"));
+  cb.appendChild(el("div", "tag", "[h, c]"));
+  if (step >= n) { cb.appendChild(heat(sim.ctx.h, 16, 4, 1)); cb.appendChild(heat(sim.ctx.c, 16, 4)); }
+  cb.appendChild(el("div", "tag", sim.type === "att" ? "+ 모든 h_i" : "초기 상태"));
+  cb.onclick = () => goStep(n);
+  cells2.appendChild(cb);
+  sim.dec.forEach((d, t) => {
+    const s = n + 1 + t;
+    const c = el("div", "dcol");
+    if (s > step) c.classList.add("hidden-step");
+    if (I.kind === "dec" && I.t === t) c.classList.add("active");
+    const srcTxt = d.src === "sos" ? "시작" : d.src === "truth" ? "정답" : "직전 예측";
+    c.appendChild(el("div", "", `<span class="src ${d.src}">${srcTxt}</span>`));
+    c.appendChild(el("div", "tok", esc(dispOut(d.inTok))));
+    c.appendChild(el("div", "arrow", "↓"));
+    c.appendChild(el("div", "lstm", `LSTM t=${t + 1}`));
+    if (s <= step) {
+      c.appendChild(heat(d.h, 16, 4, 1));
+      c.appendChild(el("div", "arrow", sim.type === "att" ? "↓ Attention · Dense" : "↓ Dense"));
+      const wrong = sim.mode === "tf" && d.argmax !== d.target;
+      c.appendChild(el("div", "dout" + (wrong ? " wrong" : ""), esc(dispOut(d.pred))));
+      c.appendChild(el("div", "pct", `${(d.probs[d.pred] * 100).toFixed(1)}%${d.isForced ? ' <span class="forced">강제</span>' : ""}`));
+      if (sim.mode === "tf") c.appendChild(el("div", "tgt", `정답 <b>${esc(dispOut(d.target))}</b> ${wrong ? '<span style="color:var(--red)">✗</span>' : '<span style="color:var(--grn)">✓</span>'}<br><span class="tag">loss ${d.loss.toFixed(3)}</span>`));
+    } else {
+      c.appendChild(el("div", "tag", "?"));
+    }
+    c.onclick = () => goStep(s);
+    cells2.appendChild(c);
+  });
+  lane2.appendChild(cells2);
+  st.appendChild(lane2);
+  const act = st.querySelector(".active");
+  if (act) {
+    const sc = $(".stage-scroll"), r = act.getBoundingClientRect(), rs = sc.getBoundingClientRect();
+    if (r.left < rs.left + 100 || r.right > rs.right - 40) sc.scrollLeft += (r.left - rs.left) - rs.width / 2 + r.width / 2;
+  }
+}
+function statRow(k, v) { return `<div class="k">${k}</div><div>${v}</div>`; }
+function heatBlock(title, vals, scale) {
+  const w = el("div", "");
+  w.appendChild(el("div", "tag", title));
+  w.appendChild(heat(vals, 16, 12, scale));
+  const mn = Math.min(...vals), mx = Math.max(...vals);
+  w.appendChild(el("div", "tag", `최소 ${mn.toFixed(3)} · 최대 ${mx.toFixed(3)}`));
+  return w;
+}
+function renderDetail() {
+  const P = $("#detail");
+  P.innerHTML = "<h3>현재 단계 내부 값</h3>";
+  if (!sim) { P.appendChild(el("div", "empty", "실행하면 여기에 one-hot 번호, 은닉 상태 h·c, Attention 점수, Softmax 후보가 나타납니다.")); return; }
+  const I = stepInfo(step);
+  const hmRow = el("div", "row"); hmRow.style.gap = "18px"; hmRow.style.marginTop = "10px";
+  if (I.kind === "enc") {
+    const e = sim.enc[I.t];
+    P.appendChild(el("div", "kv",
+      statRow("단계", `<b>인코더 t=${I.t + 1}</b> — 입력 글자 <b>'${esc(dispIn(e.ch))}'</b>`) +
+      statRow("one-hot", `사전 번호 <b>#${e.id}</b> 자리만 1, 나머지 ${D.inV.length - 1}칸은 0 (길이 ${D.inV.length} 벡터)`) +
+      statRow("게이트 평균", `입력 i <b>${e.gi.toFixed(2)}</b> · 망각 f <b>${e.gf.toFixed(2)}</b> · 출력 o <b>${e.go.toFixed(2)}</b>`) +
+      statRow("계산", `[h, c]_${I.t + 1} = LSTM(x_${I.t + 1}, h_${I.t}, c_${I.t}) — 지금까지 읽은 '${esc(sim.inChars.slice(0, I.t + 1).join(""))}'의 요약`)));
+    hmRow.appendChild(heatBlock(`h_${I.t + 1} (은닉 상태, ${sim.H}개)`, e.h, 1));
+    hmRow.appendChild(heatBlock(`c_${I.t + 1} (셀 상태)`, e.c));
+    P.appendChild(hmRow);
+    P.appendChild(el("div", "scaleleg", `<span class="sw"></span>음수 ← 0 → 양수`));
+    if (sim.type === "att") P.appendChild(el("div", "note", "Attention 모델: 이 h 가 encoder_output 에 저장되어 디코더의 Key·Value 로 다시 쓰입니다."));
+    else P.appendChild(el("div", "note", "Seq2Seq 모델: 중간 시점의 h 는 버려지고, 마지막 시점의 [h, c] 만 디코더로 넘어갑니다."));
+  } else if (I.kind === "ctx") {
+    P.appendChild(el("div", "kv",
+      statRow("단계", `<b>컨텍스트 전달</b> — 인코더 마지막 [h, c] → 디코더 초기 상태`) +
+      statRow("크기", `h ${sim.H}개 + c ${sim.H}개 = <b>${sim.H * 2}개 숫자</b> (문장 길이와 무관하게 고정)`) +
+      statRow("Attention", sim.type === "att" ? `추가로 인코더 <b>모든 시점 h_1..h_${sim.enc.length}</b> 을 보관 → 디코더 매 시점 다시 참조` : "없음 — 디코더는 이 128개 숫자만 보고 문장을 생성")));
+    hmRow.appendChild(heatBlock("h (마지막 은닉 상태)", sim.ctx.h, 1));
+    hmRow.appendChild(heatBlock("c (마지막 셀 상태)", sim.ctx.c));
+    P.appendChild(hmRow);
+  } else {
+    const d = sim.dec[I.t];
+    const srcTxt = d.src === "sos" ? "시작 기호 SOS" : d.src === "truth" ? "정답의 직전 글자 (Teacher Forcing)" : "직전 시점의 예측 (자기회귀)";
+    let kv = statRow("단계", `<b>디코더 t=${I.t + 1}</b> — 입력 <b>'${esc(dispOut(d.inTok))}'</b> · ${srcTxt}`) +
+      statRow("one-hot", `한국어 사전 번호 <b>#${d.inTok}</b> / ${D.outV.length}`) +
+      statRow("게이트 평균", `i <b>${d.gi.toFixed(2)}</b> · f <b>${d.gf.toFixed(2)}</b> · o <b>${d.go.toFixed(2)}</b>`);
+    if (sim.mode === "tf") kv += statRow("정답 비교", `정답 <b>'${esc(dispOut(d.target))}'</b> · P(정답) <b>${(d.pT * 100).toFixed(2)}%</b> · 손실 −log P = <b>${d.loss.toFixed(4)}</b> ${d.argmax !== d.target ? '<span style="color:var(--red)">· 예측이 틀렸지만 다음 입력은 정답</span>' : ""}`);
+    else kv += statRow("다음 입력", d.pred === EOS ? "<b>EOS</b> → 생성 종료" : `방금 고른 <b>'${esc(dispOut(d.pred))}'</b> 가 다음 시점 입력이 됩니다`);
+    P.appendChild(el("div", "kv", kv));
+    hmRow.appendChild(heatBlock(`s_${I.t + 1} (디코더 은닉 상태 = Query)`, d.h, 1));
+    P.appendChild(hmRow);
+    if (sim.type === "att") {
+      P.appendChild(el("div", "formula", `e_i = s_${I.t + 1} · h_i   →   α = softmax(e)   →   c_${I.t + 1} = Σ α_i h_i   →   Dense([c, s]) → softmax`));
+      const bars = el("div", "bars");
+      const maxA = Math.max(...d.alpha);
+      sim.inChars.forEach((ch, i) => {
+        bars.appendChild(el("div", "bar", `<span class="lab">${esc(dispIn(ch))} <span class="tag">h${i + 1}</span></span><span class="b"><i style="width:${(d.alpha[i] / maxA * 100).toFixed(1)}%;background:var(--att)"></i></span><span class="tag">e ${d.scores[i].toFixed(2)} · α ${d.alpha[i].toFixed(3)}</span>`));
+      });
+      P.appendChild(el("div", "tag", "입력 글자별 점수 e_i 와 가중치 α_i (합 = 1)"));
+      P.appendChild(bars);
+    }
+    P.appendChild(el("div", "tag", `Softmax 상위 5개 후보 (${D.outV.length}개 글자 중)` + (sim.mode === "ar" ? " — 클릭하면 이 시점 출력을 강제로 바꿉니다" : "")));
+    const b2 = el("div", "bars");
+    d.top.forEach(([id, p]) => {
+      const cls = "bar" + (sim.mode === "ar" ? " click" : "") + (id === d.pred ? " sel" : "");
+      const isT = sim.mode === "tf" && id === d.target;
+      const row = el("div", cls, `<span class="lab">${esc(dispOut(id))}${isT ? ' <span style="color:var(--grn)">정답</span>' : ""}</span><span class="b"><i style="width:${(p * 100).toFixed(1)}%;background:${id === d.pred ? "var(--dec)" : "var(--dec-m)"}"></i></span><span class="tag">${(p * 100).toFixed(2)}%</span>`);
+      if (sim.mode === "ar") row.onclick = () => { if (id === d.argmax) delete forced[I.t]; else forced[I.t] = id; Object.keys(forced).forEach(k => { if (+k > I.t) delete forced[k]; }); runSim(true); };
+      b2.appendChild(row);
+    });
+    P.appendChild(b2);
+    if (sim.mode === "tf" && !d.top.some(([id]) => id === d.target)) P.appendChild(el("div", "note", `정답 '${esc(dispOut(d.target))}' 은 상위 5개 밖 (P = ${(d.pT * 100).toFixed(3)}%)`));
+  }
+}
+function renderAttention() {
+  const P = $("#attPanel");
+  P.innerHTML = "<h3>Attention 가중치 α (디코더 시점 × 입력 글자)</h3>";
+  if (!sim) { P.appendChild(el("div", "empty", "Attention 모델을 실행하면 표시됩니다.")); return; }
+  if (sim.type !== "att") {
+    P.appendChild(el("div", "empty", "Seq2Seq 모델은 Attention 이 없습니다.<br>모든 디코더 시점이 같은 컨텍스트 [h, c] 하나에서 출발합니다."));
+    return;
+  }
+  const I = stepInfo(step), n = sim.enc.length;
+  const shown = I.kind === "dec" ? I.t + 1 : 0;
+  let html = `<div style="overflow-x:auto"><table class="amat"><tr><th></th>${sim.inChars.map(c => `<th>${esc(dispIn(c))}</th>`).join("")}</tr>`;
+  sim.dec.forEach((d, t) => {
+    const vis = t < shown;
+    html += `<tr class="${I.kind === "dec" && I.t === t ? "cur" : ""}"><th>${vis ? esc(dispOut(d.pred)) : "?"}</th>` +
+      d.alpha.map((a, i) => vis ? `<td class="c" style="background:rgba(13,148,136,${(0.06 + 0.94 * a).toFixed(3)});color:${a > 0.5 ? "#fff" : "var(--ink)"}" title="${esc(dispOut(d.pred))} ← ${esc(dispIn(sim.inChars[i]))} : ${a.toFixed(3)}">${a >= 0.1 ? a.toFixed(1) : ""}</td>` : `<td class="c" style="background:var(--soft)"></td>`).join("") + "</tr>";
+  });
+  html += "</table></div>";
+  P.insertAdjacentHTML("beforeend", html);
+  P.appendChild(el("div", "note", "행 = 디코더가 만든 글자, 열 = 입력 글자. 행마다 합이 1. 디코더 단계를 진행하면 한 줄씩 채워집니다. 글자 단위라 단어 정렬처럼 깔끔하지 않을 수 있습니다."));
+}
+
+/* ------------------------------------------------ controls ------------------------------------------------ */
+function setSeg(sel, v) { document.querySelectorAll(sel + " button").forEach(b => b.classList.toggle("on", b.dataset.v === v)); }
+function goStep(s) { if (!sim) return; step = Math.max(0, Math.min(totalSteps() - 1, s)); renderAll(); }
+function stopPlay() { if (playTimer) { clearInterval(playTimer); playTimer = null; } $("#bPlay").textContent = "⏵ 자동 재생"; }
+function runSim(keepStep) {
+  stopPlay();
+  const m = models[ui.model];
+  const name = ui.model === "att" ? "Attention" : "Seq2Seq";
+  if (!m || !m.trained) { sim = null; $("#summary").innerHTML = `<span style="color:var(--red)">${name} 모델이 아직 학습되지 않았습니다. ② 에서 학습하세요.</span>`; renderStage(); renderDetail(); renderAttention(); renderWhere(); return; }
+  const inStr = $("#inSent").value.trim(), tgt = $("#tgtSent").value.trim();
+  try {
+    if (!inStr) throw new Error("입력 문장을 넣으세요.");
+    checkChars(inStr, D.inIdx, "입력 문장");
+    if (ui.mode === "tf") { if (!tgt) throw new Error("Teacher Forcing 에는 정답 문장이 필요합니다."); checkChars(tgt, D.outIdx, "정답 문장"); }
+    const prev = step;
+    sim = simulate(m, inStr, ui.mode, tgt, forced, true);
+    step = keepStep ? Math.min(prev, totalSteps() - 1) : 0;
+    renderAll();
+  } catch (e) {
+    sim = null; $("#summary").innerHTML = `<span style="color:var(--red)">${esc(e.message)}</span>`;
+    renderStage(); renderDetail(); renderAttention(); renderWhere();
+  }
+}
+function syncTarget() {
+  const p = D && D.pairs.find(p => p[0] === $("#inSent").value.trim());
+  if (p) $("#tgtSent").value = p[1];
+}
+function init() {
+  $("#pairs").value = DEFAULT_PAIRS;
+  D = buildData(parsePairs(DEFAULT_PAIRS));
+  showData(); drawLoss(); updateModelStat(); fillSampleTable(); renderAll();
+  $("#applyData").onclick = applyData;
+  $("#trainS2S").onclick = () => train("s2s");
+  $("#trainAtt").onclick = () => train("att");
+  $("#stopTrain").onclick = () => { stopFlag = true; };
+  $("#segModel").onclick = e => { const v = e.target.dataset.v; if (!v) return; ui.model = v; setSeg("#segModel", v); forced = {}; runSim(); };
+  $("#segMode").onclick = e => { const v = e.target.dataset.v; if (!v) return; ui.mode = v; setSeg("#segMode", v); forced = {}; $("#tgtWrap").style.opacity = v === "tf" ? 1 : .5; runSim(); };
+  $("#tgtWrap").style.opacity = .5;
+  $("#runSim").onclick = () => { forced = {}; runSim(); };
+  $("#inSent").addEventListener("change", () => { syncTarget(); });
+  $("#inSent").addEventListener("keydown", e => { if (e.key === "Enter") { syncTarget(); forced = {}; runSim(); } });
+  $("#tgtSent").addEventListener("keydown", e => { if (e.key === "Enter") { forced = {}; runSim(); } });
+  $("#bFirst").onclick = () => { stopPlay(); goStep(0); };
+  $("#bPrev").onclick = () => { stopPlay(); goStep(step - 1); };
+  $("#bNext").onclick = () => { stopPlay(); goStep(step + 1); };
+  $("#bLast").onclick = () => { stopPlay(); goStep(totalSteps() - 1); };
+  $("#bPlay").onclick = () => {
+    if (!sim) return;
+    if (playTimer) { stopPlay(); return; }
+    if (step >= totalSteps() - 1) step = -1;
+    $("#bPlay").textContent = "⏸ 일시 정지";
+    const tick = () => { if (step >= totalSteps() - 1) { stopPlay(); return; } goStep(step + 1); };
+    tick(); playTimer = setInterval(tick, +$("#speed").value);
+  };
+  $("#speed").oninput = () => { if (playTimer) { stopPlay(); $("#bPlay").click(); } };
+  document.addEventListener("keydown", e => {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") return;
+    if (e.key === "ArrowRight") { stopPlay(); goStep(step + 1); }
+    if (e.key === "ArrowLeft") { stopPlay(); goStep(step - 1); }
+  });
+  setTrainButtons();
+  tf.enableProdMode();
+  tf.setBackend("cpu");
+}
+window.addEventListener("load", () => {
+  if (typeof tf === "undefined") { document.body.insertAdjacentHTML("afterbegin", '<div style="background:var(--red-l);color:var(--red);padding:12px;text-align:center">TensorFlow.js 를 불러오지 못했습니다.</div>'); return; }
+  init();
+});
+</script>
+</body>
+</html>

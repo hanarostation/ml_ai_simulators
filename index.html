@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Machine Learning & AI 모형 시뮬레이터 | 데이터스테이션</title>
+<meta name="description" content="머신러닝 · 신경망 · 컴퓨터 비전 · 자연어처리 모형을 브라우저에서 직접 조작하며 배우는 시뮬레이터 모음">
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/css/site.css">
+<style>
+/* ---------- 메인 페이지 전용 ---------- */
+.home { max-width: var(--max); width: 100%; margin: 0 auto; padding: 0 var(--gutter) 56px; }
+
+.intro { padding: 44px 0 28px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px 40px; align-items: end; }
+.intro__eyebrow { margin: 0 0 12px; font-size: 13px; font-weight: 700; letter-spacing: .08em; color: var(--muted); }
+.intro__title { margin: 0; font-size: 40px; line-height: 1.15; font-weight: 700; letter-spacing: -.02em; text-wrap: balance; }
+.intro__title span { color: var(--muted); font-weight: 600; }
+.intro__lede { margin: 14px 0 0; color: var(--muted); font-size: 16px; max-width: 62ch; }
+.intro__stats { display: flex; gap: 10px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; min-width: 104px; }
+.stat b { display: block; font-family: var(--mono); font-size: 26px; line-height: 1.1; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 13px; color: var(--muted); font-weight: 600; }
+
+/* 탭 */
+.tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 6px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; }
+.tab {
+  appearance: none; font: inherit; cursor: pointer; border: 1px solid transparent; background: transparent; color: var(--muted);
+  border-radius: 10px; padding: 11px 14px; display: flex; align-items: center; justify-content: center; gap: 9px;
+  font-size: 15px; font-weight: 700; min-width: 0; transition: background .15s, color .15s;
+}
+.tab .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex: none; }
+.tab > span:nth-child(2) { white-space: nowrap; }
+.tab .en { font-size: 12px; font-weight: 600; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tab .count { font-family: var(--mono); font-size: 12px; font-weight: 600; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 10px; display: inline-grid; place-items: center; background: var(--line); color: var(--muted); }
+.tab:hover { color: var(--ink); background: color-mix(in srgb, var(--surface) 60%, transparent); }
+.tab[aria-selected="true"] { background: var(--surface); color: var(--ink); border-color: var(--line); box-shadow: var(--shadow); }
+.tab[aria-selected="true"] .count { background: var(--c); color: var(--on-ink); }
+.tab:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.panel { padding-top: 26px; }
+.panel__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 20px; margin-bottom: 16px; }
+.panel__head h2 { margin: 0; font-size: 22px; display: flex; align-items: center; gap: 10px; }
+.panel__head h2::before { content: ""; width: 4px; height: 20px; border-radius: 2px; background: var(--c); }
+.panel__head p { margin: 0; color: var(--muted); font-size: 14px; max-width: 70ch; }
+
+/* 카드 */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; list-style: none; margin: 0; padding: 0; }
+.card {
+  position: relative; display: flex; flex-direction: column; height: 100%;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  text-decoration: none; color: var(--ink); overflow: hidden;
+  transition: transform .18s, box-shadow .18s, border-color .18s;
+}
+.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lift); border-color: color-mix(in srgb, var(--c) 45%, var(--line)); }
+.card:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.card__art { height: 132px; display: grid; place-items: center; color: var(--c); background:
+  radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--c) 16%, transparent), transparent 60%),
+  color-mix(in srgb, var(--c) 6%, var(--surface-2)); border-bottom: 1px solid var(--line); }
+.card__art svg { width: 190px; height: 100px; }
+.card__body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.card__cat { font-size: 12px; font-weight: 700; color: var(--c); letter-spacing: .02em; }
+.card__title { margin: 0; font-size: 19px; line-height: 1.3; font-weight: 700; }
+.card__sum { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.tags span { font-size: 12px; font-weight: 600; color: var(--muted); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; }
+.card__foot { margin-top: auto; padding-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px dashed var(--line); }
+.card__req { font-size: 12px; color: var(--faint); font-weight: 600; min-width: 0; }
+.card__go { flex: none; white-space: nowrap; font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+.card__go svg { width: 16px; height: 16px; transition: transform .18s; }
+.card:hover .card__go svg { transform: translateX(3px); }
+
+.empty {
+  border: 1.5px dashed var(--line-strong); border-radius: var(--radius); padding: 44px 24px; text-align: center;
+  color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 10px; background: color-mix(in srgb, var(--surface) 55%, transparent);
+}
+.empty__icon { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; color: var(--c); background: color-mix(in srgb, var(--c) 12%, var(--surface)); }
+.empty__icon svg { width: 24px; height: 24px; }
+.empty b { color: var(--ink); font-size: 17px; }
+.empty p { margin: 0; font-size: 14px; max-width: 52ch; }
+
+@media (max-width: 1180px) { .tab .en { display: none; } }
+@media (max-width: 900px) {
+  .intro { grid-template-columns: minmax(0, 1fr); padding-top: 32px; }
+  .intro__title { font-size: 32px; }
+  .tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .intro__title { font-size: 27px; }
+  .intro__stats .stat { flex: 1; min-width: 0; }
+  .tab { padding: 10px 8px; font-size: 14px; }
+  .tab .en { display: none; }
+  .cards { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) { .card, .card__go svg, .tab { transition: none; } .card:hover { transform: none; } }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="image/logo1.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="image/logo2.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<main class="home" id="main">
+  <section class="intro">
+    <div>
+      <p class="intro__eyebrow">DATA STATION · INTERACTIVE LAB</p>
+      <h1 class="intro__title">Machine Learning &amp; AI<br><span>모형 시뮬레이터</span></h1>
+      <p class="intro__lede">강의에서 배운 모형을 브라우저에서 직접 조작하며 계산 과정을 한 단계씩 따라가 보세요. 설치 없이 바로 실행됩니다.</p>
+    </div>
+    <div class="intro__stats" aria-label="요약">
+      <div class="stat"><b id="statSims">0</b><span>시뮬레이터</span></div>
+      <div class="stat"><b id="statCats">4</b><span>분야</span></div>
+    </div>
+  </section>
+
+  <div class="tabs" role="tablist" aria-label="시뮬레이터 분류" id="tabs"></div>
+  <div id="panels"></div>
+</main>
+
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="assets/js/catalog.js"></script>
+<script src="assets/js/site.js"></script>
+<script>
+(function () {
+  var CATS = window.DS_CATEGORIES, SIMS = window.DS_SIMULATORS;
+  var tabsEl = document.getElementById("tabs"), panelsEl = document.getElementById("panels");
+
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+
+  /* 카드 윗부분 그림 — glyph 이름별 작은 도식 (없으면 분류 기본 그림) */
+  var GLYPHS = {
+    lda: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      [0, 1, 2].map(function (r) {
+        var pat = [[1, 1, 1, 1], [2, 2, 2, 2], [1, 2, 1, 2]][r];
+        return pat.map(function (k, i) {
+          var x = 16 + i * 30, y = 12 + r * 28;
+          return '<rect x="' + x + '" y="' + y + '" width="24" height="20" rx="5" fill="' + (k === 1 ? "var(--cat-ml)" : "currentColor") + '" opacity="' + (k === 1 ? .85 : .75) + '"/>';
+        }).join("");
+      }).join("") +
+      '<path d="M140 50h10" stroke="var(--faint)" stroke-width="2" stroke-linecap="round"/>' +
+      '<rect x="156" y="16" width="20" height="30" rx="4" fill="var(--cat-ml)" opacity=".85"/><rect x="156" y="48" width="20" height="36" rx="4" fill="currentColor" opacity=".75"/></svg>',
+    s2s: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      [0, 1, 2, 3].map(function (i) { return '<rect x="' + (10 + i * 20) + '" y="64" width="16" height="22" rx="4" fill="currentColor" opacity=".8"/>'; }).join("") +
+      [0, 1, 2].map(function (i) { return '<rect x="' + (120 + i * 22) + '" y="14" width="18" height="22" rx="4" fill="var(--cat-ml)" opacity=".85"/>'; }).join("") +
+      [0, 1, 2, 3].map(function (i) { return '<path d="M' + (18 + i * 20) + ' 62 C ' + (18 + i * 20) + ' 40, 150 50, 151 38" stroke="currentColor" stroke-width="' + [1, 2.6, 1.4, .8][i] + '" opacity="' + [.35, .9, .5, .3][i] + '"/>'; }).join("") +
+      '</svg>',
+    tr: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      (function () {
+        var v = [[.9, .2, .1, .1], [.3, .8, .2, .1], [.1, .3, .9, .2], [.2, .1, .4, .8]], s = "";
+        for (var r = 0; r < 4; r++) for (var c = 0; c < 4; c++) s += '<rect x="' + (18 + c * 19) + '" y="' + (12 + r * 19) + '" width="17" height="17" rx="3" fill="currentColor" opacity="' + (0.12 + v[r][c] * 0.8).toFixed(2) + '"/>';
+        return s;
+      })() +
+      '<rect x="112" y="12" width="62" height="20" rx="5" stroke="currentColor" stroke-width="1.6"/><rect x="112" y="40" width="62" height="20" rx="5" fill="currentColor" opacity=".25"/><rect x="112" y="68" width="62" height="20" rx="5" stroke="var(--cat-nn)" stroke-width="1.6"/>' +
+      '<path d="M143 32v8M143 60v8" stroke="var(--faint)" stroke-width="1.6"/></svg>',
+    ml: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true"><path d="M20 84 170 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>' +
+      [[30, 70], [48, 76], [62, 58], [80, 62], [96, 48], [112, 52], [128, 36], [146, 40], [160, 24]].map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="4.5" fill="currentColor" opacity=".55"/>'; }).join("") + '</svg>',
+    nn: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      (function () {
+        var L = [[30, [26, 50, 74]], [95, [18, 40, 60, 82]], [160, [38, 62]]], s = "";
+        for (var a = 0; a < 2; a++) L[a][1].forEach(function (y1) { L[a + 1][1].forEach(function (y2) { s += '<path d="M' + L[a][0] + ' ' + y1 + 'L' + L[a + 1][0] + ' ' + y2 + '" stroke="currentColor" stroke-width="1" opacity=".35"/>'; }); });
+        L.forEach(function (l) { l[1].forEach(function (y) { s += '<circle cx="' + l[0] + '" cy="' + y + '" r="7" fill="var(--surface)" stroke="currentColor" stroke-width="2"/>'; }); });
+        return s;
+      })() + '</svg>',
+    cv: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      (function () { var s = ""; for (var r = 0; r < 5; r++) for (var c = 0; c < 5; c++) s += '<rect x="' + (20 + c * 15) + '" y="' + (13 + r * 15) + '" width="14" height="14" fill="currentColor" opacity="' + (0.1 + ((r * 7 + c * 3) % 9) / 12).toFixed(2) + '"/>'; return s; })() +
+      '<rect x="34" y="27" width="44" height="44" stroke="var(--ink)" stroke-width="2"/><path d="M100 50h14" stroke="var(--faint)" stroke-width="2"/>' +
+      '<rect x="124" y="28" width="42" height="42" rx="4" fill="currentColor" opacity=".7"/></svg>'
+  };
+  var EMPTY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+  var ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+
+  function card(s, cat) {
+    return '<li><a class="card" href="' + esc(s.href) + '" style="--c:var(--cat-' + cat.id + ')">' +
+      '<div class="card__art">' + (GLYPHS[s.glyph] || GLYPHS[cat.id]) + '</div>' +
+      '<div class="card__body">' +
+        '<span class="card__cat">' + esc(cat.label) + '</span>' +
+        '<h3 class="card__title">' + esc(s.title) + '</h3>' +
+        '<p class="card__sum">' + esc(s.summary) + '</p>' +
+        (s.tags && s.tags.length ? '<div class="tags">' + s.tags.map(function (t) { return '<span>' + esc(t) + '</span>'; }).join("") + '</div>' : "") +
+        '<div class="card__foot"><span class="card__req">' + (s.requires === "tfjs" ? "브라우저에서 직접 학습 · TensorFlow.js" : "브라우저에서 바로 실행") + '</span>' +
+        '<span class="card__go">열기 ' + ARROW + '</span></div>' +
+      '</div></a></li>';
+  }
+
+  var tabsHtml = "", panelsHtml = "";
+  CATS.forEach(function (c) {
+    var list = SIMS.filter(function (s) { return s.category === c.id; });
+    tabsHtml += '<button class="tab" role="tab" type="button" id="tab-' + c.id + '" aria-controls="panel-' + c.id + '" aria-selected="false" tabindex="-1" data-cat="' + c.id + '" style="--c:var(--cat-' + c.id + ')">' +
+      '<span class="dot" aria-hidden="true"></span><span>' + esc(c.label) + '</span><span class="en">' + esc(c.en) + '</span><span class="count" aria-label="' + list.length + '개">' + list.length + '</span></button>';
+    panelsHtml += '<section class="panel" role="tabpanel" id="panel-' + c.id + '" aria-labelledby="tab-' + c.id + '" hidden style="--c:var(--cat-' + c.id + ')">' +
+      '<div class="panel__head"><h2>' + esc(c.label) + '</h2><p>' + esc(c.blurb) + '</p></div>' +
+      (list.length
+        ? '<ul class="cards">' + list.map(function (s) { return card(s, c); }).join("") + '</ul>'
+        : '<div class="empty"><div class="empty__icon">' + EMPTY_ICON + '</div><b>시뮬레이터 준비 중입니다</b><p>' + esc(c.label) + ' 분야의 시뮬레이터가 곧 추가됩니다.</p></div>') +
+      '</section>';
+  });
+  tabsEl.innerHTML = tabsHtml;
+  panelsEl.innerHTML = panelsHtml;
+  document.getElementById("statSims").textContent = SIMS.length;
+  document.getElementById("statCats").textContent = CATS.length;
+
+  var ids = CATS.map(function (c) { return c.id; });
+  function firstFilled() {
+    for (var i = 0; i < CATS.length; i++) if (SIMS.some(function (s) { return s.category === CATS[i].id; })) return CATS[i].id;
+    return ids[0];
+  }
+  function select(id, focus) {
+    if (ids.indexOf(id) < 0) id = firstFilled();
+    ids.forEach(function (k) {
+      var on = k === id, t = document.getElementById("tab-" + k);
+      t.setAttribute("aria-selected", on ? "true" : "false");
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById("panel-" + k).hidden = !on;
+      var a = document.querySelector('.ds-nav a[href="#' + k + '"]');
+      if (a) { if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); }
+    });
+    if (focus) document.getElementById("tab-" + id).focus();
+  }
+  function fromHash() { return (location.hash || "").replace("#", ""); }
+
+  tabsEl.addEventListener("click", function (e) {
+    var b = e.target.closest(".tab"); if (!b) return;
+    var id = b.getAttribute("data-cat");
+    if (history.replaceState) history.replaceState(null, "", "#" + id);
+    select(id);
+  });
+  tabsEl.addEventListener("keydown", function (e) {
+    var cur = ids.indexOf(document.activeElement && document.activeElement.getAttribute("data-cat"));
+    if (cur < 0) return;
+    var n = null;
+    if (e.key === "ArrowRight") n = (cur + 1) % ids.length;
+    else if (e.key === "ArrowLeft") n = (cur - 1 + ids.length) % ids.length;
+    else if (e.key === "Home") n = 0;
+    else if (e.key === "End") n = ids.length - 1;
+    if (n === null) return;
+    e.preventDefault();
+    if (history.replaceState) history.replaceState(null, "", "#" + ids[n]);
+    select(ids[n], true);
+  });
+  window.addEventListener("hashchange", function () {
+    select(fromHash());
+    document.getElementById("tabs").scrollIntoView({ block: "nearest" });
+  });
+  select(fromHash());
+})();
+</script>
+</body>
+</html>

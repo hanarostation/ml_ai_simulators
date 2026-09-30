@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>시뮬레이터 제목 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/*
+  이 파일은 새 시뮬레이터를 만들 때 복사해서 쓰는 기본 틀입니다.
+  1) simulators/<ml|nn|cv|nlp>/<파일명>.html 로 복사
+  2) <title>, 경로(분류), 제목, 설명을 바꾸고 아래 .wrap 안에 시뮬레이터를 작성
+  3) assets/js/catalog.js 의 DS_SIMULATORS 에 항목 추가 → 메인 페이지에 카드가 생깁니다.
+
+  공통 토큰(assets/css/site.css): --bg --surface --surface-2 --ink --text --muted --faint
+  --line --line-strong --on-ink --accent --radius --max --gutter --sans --mono
+  시뮬레이터 고유 색(역할 색)은 여기 :root 에 정의하고, 어두운 화면용 값도 함께 적어 주세요.
+*/
+:root{
+  --role-a:#2563EB;
+  --role-b:#EA580C;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --role-a:#6AA5FF; --role-b:#FF914D; }
+}
+:root[data-theme="dark"]{ --role-a:#6AA5FF; --role-b:#FF914D; }
+
+.wrap{width:100%;max-width:var(--max);margin:0 auto;padding:18px var(--gutter) 56px;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px}
+.card h2{margin:0 0 6px;font-size:18px}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{font:inherit;font-weight:600;font-size:14px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);border-radius:var(--radius-sm);padding:7px 13px;cursor:pointer}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
+.btn:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.note{margin:0;color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)" aria-current="page">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">시뮬레이터 제목</h1>
+      <p class="ds-hero__lede">이 시뮬레이터에서 무엇을 조작하고 무엇을 관찰하는지 한두 문장으로 적습니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="wrap" id="main">
+  <section class="card">
+    <h2>조작</h2>
+    <div class="controls">
+      <button class="btn primary" type="button" id="btnRun">▶ 실행</button>
+      <button class="btn" type="button" id="btnReset">처음으로</button>
+    </div>
+  </section>
+  <section class="card">
+    <h2>결과</h2>
+    <p class="note" id="out">여기에 시뮬레이터 내용을 작성합니다.</p>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js"></script>
+<!-- TensorFlow.js가 필요하면 아래 줄의 주석을 풉니다 (공용 파일, 약 1.4MB) -->
+<!-- <script src="../../assets/vendor/tf.min.js"></script> -->
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  $("btnRun").onclick = () => { $("out").textContent = "실행했습니다."; };
+  $("btnReset").onclick = () => { $("out").textContent = "여기에 시뮬레이터 내용을 작성합니다."; };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,171 @@
+/* =====================================================================
+   Machine Learning & AI 모형 시뮬레이터 — 공통 스타일
+   - 모든 페이지(메인 · 시뮬레이터)가 이 파일을 먼저 불러옵니다.
+   - 공통 색·글꼴 토큰(:root)과 사이트 머리글/푸터/히어로 모양을 정의합니다.
+   - 공통 부품 클래스는 모두 ds- 로 시작해 시뮬레이터 자체 CSS와 겹치지 않습니다.
+   ===================================================================== */
+
+:root {
+  --bg: #F4F6F9;
+  --surface: #FFFFFF;
+  --surface-2: #EEF1F5;
+  --ink: #161B26;
+  --text: #2B3342;
+  --muted: #5A6477;
+  --faint: #8A93A5;
+  --line: #DCE1E8;
+  --line-strong: #C3CAD5;
+  --on-ink: #FFFFFF;
+  --accent: #2F6FDB;
+  --accent-soft: #E3ECFB;
+  --focus: #2F6FDB;
+
+  /* 분류별 색 (메인 탭 · 카드 · 머리글 표시) */
+  --cat-ml: #D9622B;
+  --cat-nn: #7C3AED;
+  --cat-cv: #0D9488;
+  --cat-nlp: #2F6FDB;
+
+  --sans: "IBM Plex Sans KR", "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", "D2Coding", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --radius: 14px;
+  --radius-sm: 9px;
+  --max: 1320px;
+  --gutter: 20px;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 2px 8px rgba(16, 24, 40, .05);
+  --shadow-lift: 0 2px 4px rgba(16, 24, 40, .05), 0 12px 28px rgba(16, 24, 40, .10);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0F1319; --surface: #171C25; --surface-2: #1E2430; --ink: #E7EAF1; --text: #CDD3DE;
+    --muted: #A0A8B8; --faint: #737D90; --line: #2B3240; --line-strong: #3B4454; --on-ink: #10131A;
+    --accent: #6C9BF2; --accent-soft: #1B2A45; --focus: #6C9BF2;
+    --cat-ml: #F0874A; --cat-nn: #B294FF; --cat-cv: #33D1BD; --cat-nlp: #6C9BF2;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3); --shadow-lift: 0 10px 28px rgba(0, 0, 0, .45);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0F1319; --surface: #171C25; --surface-2: #1E2430; --ink: #E7EAF1; --text: #CDD3DE;
+  --muted: #A0A8B8; --faint: #737D90; --line: #2B3240; --line-strong: #3B4454; --on-ink: #10131A;
+  --accent: #6C9BF2; --accent-soft: #1B2A45; --focus: #6C9BF2;
+  --cat-ml: #F0874A; --cat-nn: #B294FF; --cat-cv: #33D1BD; --cat-nlp: #6C9BF2;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3); --shadow-lift: 0 10px 28px rgba(0, 0, 0, .45);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+  background: var(--bg); color: var(--ink);
+  font-family: var(--sans); font-size: 15px; line-height: 1.55;
+}
+[hidden] { display: none !important; }
+img { max-width: 100%; }
+
+/* ---------------- 머리글 ---------------- */
+.ds-header {
+  position: sticky; top: 0; z-index: 50;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  -webkit-backdrop-filter: saturate(1.4) blur(10px); backdrop-filter: saturate(1.4) blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.ds-header__inner {
+  max-width: var(--max); margin: 0 auto; padding: 0 var(--gutter);
+  height: 64px; display: flex; align-items: center; gap: 20px;
+}
+.ds-brand { display: inline-flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ink); flex: none; border-radius: 8px; }
+.ds-brand__logo { display: block; height: 34px; width: auto; max-width: 220px; object-fit: contain; }
+.ds-brand__fallback { display: none; font-weight: 700; font-size: 17px; letter-spacing: .02em; }
+/* 로고: 밝은 화면 = logo1.png, 어두운 화면 = logo2.png
+   logo2가 없으면 어두운 화면에서도 logo1, 둘 다 없으면 글자 로고 */
+.ds-brand__logo--dark { display: none; }
+.ds-brand.no-logo-light .ds-brand__logo--light { display: none; }
+.ds-brand.no-logo-light .ds-brand__fallback { display: inline; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ds-brand__logo--light { display: none; }
+  :root:not([data-theme="light"]) .ds-brand__logo--dark { display: block; }
+  :root:not([data-theme="light"]) .ds-brand.no-logo-light .ds-brand__fallback { display: none; }
+  :root:not([data-theme="light"]) .ds-brand.no-logo-dark .ds-brand__logo--dark { display: none; }
+  :root:not([data-theme="light"]) .ds-brand.no-logo-dark:not(.no-logo-light) .ds-brand__logo--light { display: block; }
+  :root:not([data-theme="light"]) .ds-brand.no-logo-dark.no-logo-light .ds-brand__fallback { display: inline; }
+}
+:root[data-theme="dark"] .ds-brand__logo--light { display: none; }
+:root[data-theme="dark"] .ds-brand__logo--dark { display: block; }
+:root[data-theme="dark"] .ds-brand.no-logo-light .ds-brand__fallback { display: none; }
+:root[data-theme="dark"] .ds-brand.no-logo-dark .ds-brand__logo--dark { display: none; }
+:root[data-theme="dark"] .ds-brand.no-logo-dark:not(.no-logo-light) .ds-brand__logo--light { display: block; }
+:root[data-theme="dark"] .ds-brand.no-logo-dark.no-logo-light .ds-brand__fallback { display: inline; }
+.ds-brand__sep { width: 1px; height: 22px; background: var(--line); }
+.ds-brand__site { font-size: 14px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+
+.ds-nav { display: flex; align-items: center; gap: 2px; margin-left: auto; overflow-x: auto; scrollbar-width: none; }
+.ds-nav::-webkit-scrollbar { display: none; }
+.ds-nav a {
+  display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+  padding: 7px 12px; border-radius: 8px; font-size: 14px; font-weight: 600;
+  color: var(--muted); text-decoration: none;
+}
+.ds-nav a::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--c, var(--faint)); opacity: .9; }
+.ds-nav a:hover { background: var(--surface-2); color: var(--ink); }
+.ds-nav a[aria-current="page"] { background: var(--surface-2); color: var(--ink); }
+
+.ds-theme {
+  flex: none; display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 9px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; padding: 0;
+}
+.ds-theme:hover { color: var(--ink); background: var(--surface-2); }
+.ds-theme svg { width: 18px; height: 18px; }
+
+/* ---------------- 시뮬레이터 페이지 머리 (히어로) ---------------- */
+.ds-hero { max-width: var(--max); width: 100%; margin: 0 auto; padding: 26px var(--gutter) 6px; }
+.ds-hero__row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 28px; }
+.ds-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--faint); margin: 0 0 10px; }
+.ds-crumbs a { color: var(--muted); text-decoration: none; }
+.ds-crumbs a:hover { color: var(--ink); text-decoration: underline; }
+.ds-crumbs .ds-cat { display: inline-flex; align-items: center; gap: 6px; color: var(--c, var(--muted)); }
+.ds-crumbs .ds-cat::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.ds-hero .ds-hero__title { font-size: 30px; line-height: 1.2; font-weight: 700; letter-spacing: -.01em; margin: 0; color: var(--ink); text-wrap: balance; }
+.ds-hero .ds-hero__lede { margin: 8px 0 0; color: var(--muted); max-width: 74ch; font-size: 15px; }
+
+/* ---------------- 푸터 ---------------- */
+.ds-footer { margin-top: auto; border-top: 1px solid var(--line); background: var(--surface); }
+.ds-footer__inner {
+  max-width: var(--max); margin: 0 auto; padding: 22px var(--gutter);
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 24px;
+}
+.ds-footer__meta { font-size: 13px; color: var(--faint); display: flex; flex-direction: column; gap: 2px; }
+.ds-footer__meta b { color: var(--muted); font-weight: 600; }
+.ds-cta {
+  display: inline-flex; align-items: center; gap: 10px; text-decoration: none;
+  background: var(--ink); color: var(--on-ink); border-radius: 11px; padding: 11px 18px;
+  font-weight: 700; font-size: 15px; transition: transform .15s, box-shadow .15s;
+}
+.ds-cta:hover { transform: translateY(-1px); box-shadow: var(--shadow-lift); }
+.ds-cta svg { width: 16px; height: 16px; }
+
+/* ---------------- 공통 ---------------- */
+.ds-skip { position: absolute; left: -9999px; top: 8px; z-index: 100; background: var(--ink); color: var(--on-ink); padding: 8px 12px; border-radius: 8px; }
+.ds-skip:focus { left: 8px; }
+.ds-header a:focus-visible, .ds-header button:focus-visible, .ds-footer a:focus-visible, .ds-crumbs a:focus-visible {
+  outline: 2px solid var(--focus); outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  :root { --gutter: 16px; }
+  .ds-header__inner { height: auto; min-height: 56px; flex-wrap: wrap; row-gap: 0; padding-top: 8px; }
+  .ds-brand__sep, .ds-brand__site { display: none; }
+  .ds-brand__logo { height: 28px; }
+  .ds-theme { margin-left: auto; }
+  .ds-nav { order: 3; width: calc(100% + 2 * var(--gutter)); margin: 2px calc(-1 * var(--gutter)) 6px; padding: 0 var(--gutter) 2px; }
+  .ds-nav a { font-size: 13px; padding: 6px 10px; }
+  .ds-hero .ds-hero__title { font-size: 24px; }
+  .ds-footer__inner { flex-direction: column; align-items: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ds-cta { transition: none; }
+}

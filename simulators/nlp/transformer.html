@@ -1,0 +1,1351 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>트랜스포머 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 레이아웃: 상단 탭 3개 → [전체 흐름] 왼쪽 조작 패널 + 오른쪽 단계 화면 / [실험실] 조작 줄 + 그림 격자.
+   색은 강의 도식(T·P·TA)과 같은 역할 색: 인코더 파랑 · 디코더 주황 · 위치 보라 · Attention 청록 · 정답 초록 */
+:root {
+  --panel: var(--surface); --panel2: var(--surface-2); --sub: var(--muted);
+  --enc: #2563EB; --dec: #E0590F; --pe: #7C3AED; --att: #0D9488; --ok: #15803D; --warn: #C62828;
+  --neg: #2563EB; --pos: #D9480F;
+  --r: var(--radius);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --enc: #6AA5FF; --dec: #FF914D; --pe: #B294FF; --att: #33D1BD; --ok: #4ADE80; --warn: #FF6B6B;
+  --neg: #5B9BFF; --pos: #FF8A4C; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --enc: #6AA5FF; --dec: #FF914D; --pe: #B294FF; --att: #33D1BD; --ok: #4ADE80; --warn: #FF6B6B;
+  --neg: #5B9BFF; --pos: #FF8A4C; color-scheme: dark; }
+
+.wrap { width: 100%; max-width: var(--max); margin: 0 auto; padding-inline: var(--gutter); padding-block: 18px 48px; line-height: 1.6; }
+h2, h3 { text-wrap: balance; margin: 0; line-height: 1.3; }
+h2 { font-size: 1.2rem; font-weight: 700; }
+h3 { font-size: 1rem; font-weight: 700; }
+p { margin: 0; }
+.muted { color: var(--sub); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.small { font-size: 0.84rem; }
+code { font-family: var(--mono); font-size: 0.86em; background: var(--panel2); border: 1px solid var(--line); border-radius: 5px; padding: 0 4px; }
+
+/* 범례 (페이지 머리 오른쪽) */
+.legend { max-width: 420px; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.8rem; color: var(--sub); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+
+/* 탭 */
+.tabs { display: flex; gap: 4px; border-bottom: 2px solid var(--line); margin-bottom: 16px; overflow-x: auto; }
+.tab { appearance: none; border: 0; background: none; font: inherit; font-weight: 700; color: var(--sub); padding: 10px 16px 9px; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; white-space: nowrap; }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--att); }
+.tab:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible, .stepbtn:focus-visible { outline: 2px solid var(--att); outline-offset: 2px; }
+
+/* 공통 부품 */
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; min-width: 0; }
+.panel + .panel { margin-top: 12px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.stack { display: grid; gap: 10px; }
+label.f { display: grid; gap: 3px; font-size: 0.82rem; color: var(--sub); font-weight: 500; }
+input[type="text"], input[type="number"], select, textarea {
+  font: inherit; color: var(--ink); background: var(--panel2); border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px; min-width: 0; }
+textarea { font-family: var(--mono); font-size: 0.8rem; line-height: 1.5; width: 100%; resize: vertical; }
+input[type="range"] { width: 100%; accent-color: var(--att); }
+.btn { appearance: none; font: inherit; font-weight: 600; font-size: 0.88rem; border-radius: 8px; padding: 7px 13px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--panel2); color: var(--ink); }
+.btn:hover { border-color: var(--sub); }
+.btn.primary { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
+.btn.primary:hover { opacity: .88; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 700; border-radius: 999px; padding: 2px 10px; border: 1px solid currentColor; }
+.pill.untrained { color: var(--warn); }
+.pill.trained { color: var(--ok); }
+.note { border-left: 3px solid var(--att); background: color-mix(in srgb, var(--att) 8%, var(--panel)); padding: 9px 12px; border-radius: 0 8px 8px 0; font-size: 0.88rem; }
+.note.warn { border-left-color: var(--warn); background: color-mix(in srgb, var(--warn) 8%, var(--panel)); }
+.note.pe { border-left-color: var(--pe); background: color-mix(in srgb, var(--pe) 8%, var(--panel)); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 0.85rem; }
+.kv dt { color: var(--sub); }
+.kv dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.scroll { overflow-x: auto; max-width: 100%; padding-bottom: 4px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.cap { font-size: 0.8rem; color: var(--sub); margin-top: 4px; }
+.lbl { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.02em; color: var(--sub); }
+
+/* 토큰 칩 */
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { font-size: 0.82rem; border-radius: 6px; padding: 3px 8px; border: 1px solid var(--line); background: var(--panel2); white-space: nowrap; }
+.chip.enc { border-color: var(--enc); background: color-mix(in srgb, var(--enc) 12%, var(--panel)); }
+.chip.dec { border-color: var(--dec); background: color-mix(in srgb, var(--dec) 12%, var(--panel)); }
+.chip.ok { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, var(--panel)); }
+.chip.sp { border-color: var(--pe); background: color-mix(in srgb, var(--pe) 12%, var(--panel)); }
+.chip.pad { color: var(--sub); border-style: dashed; }
+.chip.unk { border-color: var(--warn); color: var(--warn); }
+.chip small { display: block; font-family: var(--mono); font-size: 0.7rem; color: var(--sub); text-align: center; }
+.strip { display: grid; grid-template-columns: 110px 1fr; gap: 6px 10px; align-items: center; }
+.strip > .name { font-size: 0.8rem; font-weight: 700; }
+
+/* 히트맵 */
+.hm { display: grid; gap: 1px; font-family: var(--mono); font-size: 10.5px; width: max-content; }
+.hm .c { height: var(--ch, 24px); min-width: var(--cw, 30px); display: grid; place-items: center; border-radius: 2px; cursor: default; font-variant-numeric: tabular-nums; }
+.hm .c.x { background: repeating-linear-gradient(45deg, var(--panel2), var(--panel2) 3px, var(--line) 3px, var(--line) 5px); color: var(--sub); }
+.hm .c.gs { box-shadow: inset 2px 0 0 var(--ink); }
+.hm .c.sel { outline: 2px solid var(--ink); outline-offset: -1px; z-index: 1; }
+.hm .rl, .hm .cl { font-family: var(--sans); font-size: 11px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hm .rl { padding-right: 6px; text-align: right; max-width: 80px; align-self: center; cursor: pointer; }
+.hm .rl.on { color: var(--ink); font-weight: 700; }
+.hm .cl { text-align: center; max-width: var(--cw, 30px); align-self: end; padding-bottom: 2px; }
+.hm.click .c { cursor: pointer; }
+.hmtitle { font-size: 0.86rem; font-weight: 700; margin-bottom: 4px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.hmtitle .shape { font-family: var(--mono); font-weight: 400; font-size: 0.76rem; color: var(--sub); }
+.readout { font-family: var(--mono); font-size: 0.78rem; color: var(--sub); min-height: 1.4em; margin-top: 4px; }
+
+/* 흐름 탭 레이아웃 */
+.flow { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 16px; align-items: start; }
+.side { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 10px); display: grid; gap: 12px; }
+.steps { display: grid; gap: 2px; }
+.stepbtn { appearance: none; border: 0; background: none; font: inherit; text-align: left; display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: center;
+  padding: 6px 8px; border-radius: 8px; cursor: pointer; color: var(--sub); font-size: 0.88rem; }
+.stepbtn b { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--line); font-size: 0.76rem; font-family: var(--mono); color: var(--sub); }
+.stepbtn:hover { background: var(--panel2); }
+.stepbtn[aria-current="step"] { background: color-mix(in srgb, var(--att) 12%, var(--panel)); color: var(--ink); font-weight: 700; }
+.stepbtn[aria-current="step"] b { background: var(--att); border-color: var(--att); color: var(--panel); }
+.stephead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
+.stephead .where { font-size: 0.78rem; color: var(--sub); }
+.body { display: grid; gap: 16px; }
+.explain { max-width: 78ch; }
+.explain p + p { margin-top: 6px; }
+.chart { width: 100%; height: 120px; display: block; }
+.bars { display: grid; gap: 4px; }
+.bar { display: grid; grid-template-columns: 90px 1fr 56px; gap: 8px; align-items: center; font-size: 0.82rem; }
+.bar .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+.bar .track { height: 14px; background: var(--panel2); border-radius: 4px; overflow: hidden; border: 1px solid var(--line); }
+.bar .fill { height: 100%; background: var(--att); }
+.bar .v { font-family: var(--mono); font-size: 0.78rem; text-align: right; }
+.bar.pick .t { font-weight: 700; color: var(--ok); }
+.bar.pick .fill { background: var(--ok); }
+table.t { border-collapse: collapse; font-size: 0.84rem; width: 100%; }
+table.t th, table.t td { border-bottom: 1px solid var(--line); padding: 5px 8px; text-align: left; white-space: nowrap; }
+table.t th { font-size: 0.76rem; color: var(--sub); font-weight: 700; }
+table.t td.n { font-family: var(--mono); text-align: right; }
+table.t tr.off td { color: var(--sub); opacity: 0.65; }
+.ok { color: var(--ok); font-weight: 700; } .bad { color: var(--warn); font-weight: 700; }
+.genrow { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 14px; padding: 12px 0; border-top: 1px solid var(--line); }
+.answer { font-size: 1.15rem; font-weight: 700; padding: 10px 14px; border-radius: 8px; background: color-mix(in srgb, var(--ok) 10%, var(--panel)); border: 1px solid var(--ok); }
+
+/* 실험실 */
+.lab { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 16px; align-items: start; }
+canvas { display: block; max-width: 100%; }
+.sl { display: grid; gap: 2px; }
+.sl .h { display: flex; justify-content: space-between; font-size: 0.84rem; }
+.sl .h b { font-family: var(--mono); }
+.dimchips { display: flex; flex-wrap: wrap; gap: 4px; }
+.dimchips button { font: inherit; font-family: var(--mono); font-size: 0.76rem; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); color: var(--sub); cursor: pointer; }
+.dimchips button[aria-pressed="true"] { color: var(--panel); border-color: transparent; font-weight: 600; }
+.clocks { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 12px; }
+.clock { text-align: center; font-size: 0.78rem; line-height: 1.45; }
+.clock svg { margin: 0 auto; display: block; }
+.qkv { display: grid; gap: 1px; width: max-content; }
+.qkv input { width: 58px; padding: 3px 5px; font-family: var(--mono); font-size: 0.82rem; text-align: right; border-radius: 4px; }
+.qkv .rl { font-size: 0.78rem; color: var(--sub); padding-right: 6px; align-self: center; text-align: right; }
+.qkv .cl { font-size: 0.72rem; color: var(--sub); text-align: center; }
+.calc { font-family: var(--mono); font-size: 0.8rem; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; line-height: 1.7; overflow-x: auto; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { font: inherit; font-size: 0.82rem; border: 0; background: var(--panel2); color: var(--sub); padding: 5px 10px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--att); color: var(--panel); font-weight: 700; }
+
+@media (max-width: 980px) {
+  .flow, .lab { grid-template-columns: minmax(0, 1fr); }
+  .side { position: static; }
+  .steps { grid-auto-flow: column; grid-auto-columns: max-content; overflow-x: auto; padding-bottom: 4px; }
+  .genrow { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+  .strip { grid-template-columns: minmax(0, 1fr); }
+  .bar { grid-template-columns: 70px 1fr 48px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)" aria-current="page">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">트랜스포머 시뮬레이터</h1>
+      <p class="ds-hero__lede">노트북 Transformer 챗봇 모델의 구조를 작게 줄여 브라우저에서 직접 계산합니다. 문장을 넣고 단계마다 숫자가 어떻게 바뀌는지 따라가 보세요.</p>
+    </div>
+      <div class="legend" aria-label="색 범례">
+        <span><i style="background:var(--enc)"></i>인코더</span>
+        <span><i style="background:var(--dec)"></i>디코더</span>
+        <span><i style="background:var(--pe)"></i>위치 인코딩 · 특수 토큰</span>
+        <span><i style="background:var(--att)"></i>Attention</span>
+        <span><i style="background:var(--ok)"></i>정답 · 출력</span>
+        </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<div class="wrap" id="main">
+
+  <nav class="tabs" role="tablist" aria-label="시뮬레이터 탭">
+    <button class="tab" role="tab" id="tab-flow" aria-controls="pane-flow" aria-selected="true">① 전체 흐름 따라가기</button>
+    <button class="tab" role="tab" id="tab-pe" aria-controls="pane-pe" aria-selected="false">② 위치 인코딩 실험실</button>
+    <button class="tab" role="tab" id="tab-attn" aria-controls="pane-attn" aria-selected="false">③ Attention 실험실</button>
+  </nav>
+
+  <!-- ============ ① 전체 흐름 ============ -->
+  <section id="pane-flow" role="tabpanel" aria-labelledby="tab-flow">
+    <div class="flow">
+      <aside class="side">
+        <div class="panel stack">
+          <div class="row" style="justify-content:space-between">
+            <h3>모델 상태</h3>
+            <span id="mstate" class="pill untrained">학습 전 · 무작위 가중치</span>
+          </div>
+          <dl class="kv" id="mstats"></dl>
+          <canvas id="losschart" class="chart" width="600" height="220" aria-label="학습 손실과 정확도 그래프"></canvas>
+          <p class="cap" id="losscap">학습을 시작하면 손실(초록 아닌 선)과 정확도가 그려집니다.</p>
+          <div class="row">
+            <button class="btn primary" id="btnTrain">학습 50 step</button>
+            <button class="btn" id="btnTrainMore">+200 step</button>
+            <button class="btn" id="btnStop" disabled>멈춤</button>
+          </div>
+          <fieldset style="border:0;padding:0;margin:0" class="stack">
+            <legend class="lbl" style="margin-bottom:4px">손실에 넣을 칸</legend>
+            <label class="small"><input type="radio" name="lossmode" value="masked" checked> 패딩 제외 (셀 33 <code>loss_function</code>)</label>
+            <label class="small"><input type="radio" name="lossmode" value="all"> 패딩 포함 (셀 34 재컴파일 방식)</label>
+          </fieldset>
+          <details>
+            <summary class="small" style="cursor:pointer;font-weight:700">모델 크기 · 학습 데이터 바꾸기</summary>
+            <div class="stack" style="margin-top:10px">
+              <div class="row">
+                <label class="f">d_model<select id="optD"><option>8</option><option selected>16</option><option>32</option></select></label>
+                <label class="f">num_heads<select id="optH"><option>1</option><option selected>2</option><option>4</option></select></label>
+                <label class="f">시드<input type="number" id="optSeed" value="7" min="1" max="9999" style="width:80px"></label>
+              </div>
+              <label class="small"><input type="checkbox" id="optScale" checked> 임베딩 × √d_model 후 위치 인코딩 더하기</label>
+              <label class="f">학습 데이터 (한 줄에 <code>질문 | 답변</code>)
+                <textarea id="optPairs" rows="8" spellcheck="false"></textarea></label>
+              <button class="btn" id="btnRebuild">이 설정으로 모델 새로 만들기</button>
+              <p class="cap">새로 만들면 가중치가 다시 무작위가 됩니다. 노트북 모델은 d_model 256 · 8헤드 · 2층이고, 여기서는 보기 쉽게 1층으로 줄였습니다.</p>
+            </div>
+          </details>
+        </div>
+        <div class="panel">
+          <p class="lbl" style="margin-bottom:6px">단계</p>
+          <nav class="steps" id="stepnav" aria-label="단계 목록"></nav>
+        </div>
+      </aside>
+
+      <main class="panel" style="padding:18px">
+        <div class="stack" style="margin-bottom:14px">
+          <div class="row">
+            <label class="f" style="flex:1 1 220px">예시 문장<select id="selPair"></select></label>
+          </div>
+          <div class="row">
+            <label class="f" style="flex:1 1 240px">질문 (인코더 입력)<input type="text" id="inQ" autocomplete="off"></label>
+            <label class="f" style="flex:1 1 240px">답변 (디코더 정답 · 1~9단계용)<input type="text" id="inA" autocomplete="off"></label>
+          </div>
+        </div>
+        <div class="stephead">
+          <div><h2 id="stepTitle"></h2><div class="where" id="stepWhere"></div></div>
+          <div class="row"><button class="btn" id="prevStep">← 이전</button><button class="btn" id="nextStep">다음 →</button></div>
+        </div>
+        <div class="body" id="stepBody"></div>
+      </main>
+    </div>
+  </section>
+
+  <!-- ============ ② 위치 인코딩 실험실 ============ -->
+  <section id="pane-pe" role="tabpanel" aria-labelledby="tab-pe" hidden>
+    <div class="lab">
+      <aside class="panel stack">
+        <h3>조절하기</h3>
+        <div class="sl"><div class="h"><span>d_model (벡터 길이)</span><b id="vD"></b></div><input type="range" id="peD" min="4" max="256" step="4" value="64"></div>
+        <div class="sl"><div class="h"><span>문장 최대 길이 (position)</span><b id="vP"></b></div><input type="range" id="peP" min="8" max="100" step="1" value="40"></div>
+        <div class="sl"><div class="h"><span>살펴볼 위치 pos</span><b id="vPos"></b></div><input type="range" id="pePos" min="0" max="39" step="1" value="10"></div>
+        <div class="stack" style="gap:4px">
+          <span class="small muted">곡선으로 볼 차원 (sin 칸)</span>
+          <div class="dimchips" id="peDims"></div>
+        </div>
+        <div class="calc" id="peCalc"></div>
+        <p class="cap">수식: PE(pos, 2i) = sin(pos / 10000<sup>2i/d</sup>), PE(pos, 2i+1) = cos(같은 각도). 셀 26 <code>_compute_positional_encoding</code>과 같은 계산입니다.</p>
+      </aside>
+      <div class="stack" style="gap:14px">
+        <div class="panel">
+          <div class="hmtitle">위치 인코딩 표 전체 <span class="shape" id="peShape"></span></div>
+          <div class="scroll"><canvas id="peHeat" width="1000" height="300" aria-label="위치 인코딩 히트맵"></canvas></div>
+          <p class="cap">가로 = 차원(dim), 세로 = 위치(pos). 빨강 +1 · 흰색 0 · 파랑 −1. 테두리 친 줄이 선택한 위치의 벡터 PE(pos)입니다. 표를 누르면 그 위치가 선택됩니다.</p>
+        </div>
+        <div class="grid2">
+          <div class="panel">
+            <div class="hmtitle">차원별 sin 곡선</div>
+            <canvas id="peCurve" width="700" height="300" aria-label="차원별 사인 곡선"></canvas>
+            <p class="cap">앞쪽 차원은 빨리, 뒤쪽 차원은 천천히 출렁입니다. 세로 점선이 선택 위치입니다.</p>
+          </div>
+          <div class="panel">
+            <div class="hmtitle">선택 위치와 다른 위치의 닮은 정도 <span class="shape">코사인 유사도</span></div>
+            <p class="small mono muted" id="peSimVal"></p>
+            <canvas id="peSim" width="700" height="300" aria-label="위치 간 코사인 유사도"></canvas>
+            <p class="cap">자기 자신은 1. 대체로 가까울수록 높고 멀수록 낮습니다(d_model이 작으면 출렁임이 큼). 거리가 같으면 어느 위치에서 재도 값이 같습니다.</p>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="panel">
+            <div class="hmtitle">시계 바늘로 보기 <span class="shape">(sin, cos) 한 쌍 = 바늘 끝 좌표</span></div>
+            <div class="clocks" id="peClocks"></div>
+            <p class="cap">pos가 1 늘 때마다 모든 바늘이 각자의 속도로 돕니다. 바늘 각도의 조합이 위치마다 다릅니다.</p>
+          </div>
+          <div class="panel">
+            <div class="hmtitle">같은 단어, 다른 위치 <span class="shape">임베딩 + PE</span></div>
+            <div id="peSame"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ③ Attention 실험실 ============ -->
+  <section id="pane-attn" role="tabpanel" aria-labelledby="tab-attn" hidden>
+    <div class="lab">
+      <aside class="panel stack">
+        <h3>조절하기</h3>
+        <div class="stack" style="gap:6px">
+          <span class="small muted">예시 불러오기</span>
+          <div class="row">
+            <button class="btn" data-preset="ta2">TA2 예제</button>
+            <button class="btn" data-preset="same">모두 같음</button>
+            <button class="btn" data-preset="peak">한 단어로 쏠림</button>
+            <button class="btn" data-preset="rand">무작위</button>
+          </div>
+        </div>
+        <div class="row">
+          <span class="small muted">단어 수</span>
+          <button class="btn" id="aMinus" aria-label="단어 하나 빼기">−</button>
+          <b class="mono" id="aN">3</b>
+          <button class="btn" id="aPlus" aria-label="단어 하나 더하기">+</button>
+        </div>
+        <label class="small"><input type="checkbox" id="aScale" checked> ÷ √d_k 로 나누기 (d_k = 4 → ÷ 2)</label>
+        <div class="sl"><div class="h"><span>Q 값 배율 (벡터가 커지면?)</span><b id="vMul"></b></div><input type="range" id="aMul" min="0.25" max="6" step="0.25" value="1"></div>
+        <div class="stack" style="gap:4px">
+          <span class="small muted">마스크</span>
+          <div class="seg" id="aMask">
+            <button data-m="none" aria-pressed="true">없음</button>
+            <button data-m="la" aria-pressed="false">미래 가리기</button>
+            <button data-m="pad" aria-pressed="false">마지막 = 패딩</button>
+          </div>
+        </div>
+        <div class="stack" style="gap:6px">
+          <span class="small muted">단어 이름</span>
+          <div class="row" id="aNames"></div>
+        </div>
+        <p class="cap">Q·K·V 값을 직접 고쳐 보세요. 오른쪽 결과가 바로 다시 계산됩니다. 점수표 칸을 누르면 내적 풀이, 가중치 표의 줄을 누르면 가중합 풀이가 나옵니다.</p>
+      </aside>
+      <div class="stack" style="gap:14px">
+        <div class="panel">
+          <div class="grid3" id="aInputs"></div>
+        </div>
+        <div class="panel">
+          <div class="grid3" id="aResults"></div>
+          <div class="calc" id="aCalc" style="margin-top:12px"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js"></script>
+<!-- TensorFlow.js (공용 파일) -->
+<script src="../../assets/vendor/tf.min.js"></script>
+<script>
+const TF_URLS = [];
+/* ===== 작은 Transformer (학습·추론·과정 기록) — 노트북 transformer_chatbot 구조 축소판 ===== */
+function makeSim(tf) {
+  // ---------- 토크나이저 (단어 단위, 노트북 셀 8·9 전처리 규칙) ----------
+  function preprocess(s) {
+    return s.replace(/([!.?,])/g, " $1 ").trim().split(/\s+/).filter(Boolean);
+  }
+  class WordTokenizer {
+    constructor(texts) {
+      const freq = new Map();
+      texts.forEach(t => preprocess(t).forEach(w => freq.set(w, (freq.get(w) || 0) + 1)));
+      const words = [...freq.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).map(e => e[0]);
+      this.itos = ["<PAD>", "<UNK>", ...words];           // 0 = 패딩, 1 = 모르는 단어
+      this.stoi = new Map(this.itos.map((w, i) => [w, i]));
+      this.vocabSize = this.itos.length;                    // tokenizer.vocab_size 에 해당
+      this.SOS = this.vocabSize;                            // START_TOKEN
+      this.EOS = this.vocabSize + 1;                        // END_TOKEN
+      this.VOCAB = this.vocabSize + 2;                      // VOCAB_SIZE
+    }
+    encode(s) { return preprocess(s).map(w => this.stoi.has(w) ? this.stoi.get(w) : 1); }
+    word(id) {
+      if (id === this.SOS) return "<SOS>";
+      if (id === this.EOS) return "<EOS>";
+      return this.itos[id] ?? "?";
+    }
+    decode(ids) { return ids.filter(i => i > 1 && i < this.vocabSize).map(i => this.itos[i]).join(" "); }
+    // tokenize_and_filter: SOS + encode + EOS → 뒤쪽 0 패딩 (maxlen, padding='post')
+    pack(s, maxLen) {
+      let ids = [this.SOS, ...this.encode(s), this.EOS];
+      const truncated = ids.length > maxLen;
+      if (truncated) ids = ids.slice(0, maxLen);          // pad_sequences 기본은 앞쪽을 자르지만, 설명 편의상 뒤를 자름
+      return { ids: ids.concat(Array(maxLen - ids.length).fill(0)), real: ids.length, truncated };
+    }
+  }
+
+  // ---------- 시드 난수 ----------
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function positionalEncoding(P, d) {
+    const out = [];
+    for (let p = 0; p < P; p++) {
+      const row = [];
+      for (let j = 0; j < d; j++) {
+        const ang = p / Math.pow(10000, (2 * Math.floor(j / 2)) / d);
+        row.push(j % 2 === 0 ? Math.sin(ang) : Math.cos(ang));
+      }
+      out.push(row);
+    }
+    return out;
+  }
+
+  // ---------- 모델 ----------
+  class TinyTransformer {
+    constructor({ vocab, d = 16, heads = 2, dff = 32, maxLen = 12, seed = 7, scaleEmb = true }) {
+      Object.assign(this, { vocab, d, heads, dff, maxLen, seed, scaleEmb });
+      this.dk = d / heads;
+      const r = mulberry32(seed);
+      const uni = (lim) => (r() * 2 - 1) * lim;
+      const P = {};
+      const mat = (name, a, b) => {
+        const lim = Math.sqrt(6 / (a + b)), v = new Float32Array(a * b);
+        for (let i = 0; i < v.length; i++) v[i] = uni(lim);
+        P[name] = tf.variable(tf.tensor2d(v, [a, b]), true, name);
+      };
+      const vec = (name, n, val = 0) => { P[name] = tf.variable(tf.fill([n], val), true, name); };
+      const emb = (name) => {
+        const v = new Float32Array(vocab * d);
+        for (let i = 0; i < v.length; i++) v[i] = uni(0.05);   // Keras Embedding 기본(uniform ±0.05)
+        P[name] = tf.variable(tf.tensor2d(v, [vocab, d]), true, name);
+      };
+      const attn = (pre) => {
+        ["q", "k", "v", "o"].forEach(s => { mat(pre + "W" + s, d, d); vec(pre + "b" + s, d); });
+      };
+      const ln = (pre) => { vec(pre + "g", d, 1); vec(pre + "b", d, 0); };
+      const ffn = (pre) => { mat(pre + "W1", d, dff); vec(pre + "b1", dff); mat(pre + "W2", dff, d); vec(pre + "b2", d); };
+      emb("encEmb"); emb("decEmb");
+      attn("eA_"); ln("eLn1_"); ffn("eF_"); ln("eLn2_");
+      attn("dS_"); ln("dLn1_"); attn("dC_"); ln("dLn2_"); ffn("dF_"); ln("dLn3_");
+      mat("outW", d, vocab); vec("outB", vocab);
+      this.P = P;
+      this.pe = tf.tensor2d(positionalEncoding(maxLen, d));
+      this.steps = 0;
+    }
+    paramCount() { return Object.values(this.P).reduce((s, v) => s + v.size, 0); }
+    dispose() { Object.values(this.P).forEach(v => v.dispose()); this.pe.dispose(); }
+
+    // x: [B,L,din] · W: [din,dout]
+    dense(x, W, b) { const [B, L, n] = x.shape; return x.reshape([B * L, n]).matMul(W).add(b).reshape([B, L, W.shape[1]]); }
+    ln(x, pre) {
+      const { mean, variance } = tf.moments(x, -1, true);
+      return x.sub(mean).div(variance.add(1e-6).sqrt()).mul(this.P[pre + "g"]).add(this.P[pre + "b"]);
+    }
+    split(x) { const [B, L] = x.shape; return x.reshape([B, L, this.heads, this.dk]).transpose([0, 2, 1, 3]); }
+    embed(ids, table, tr, key) {
+      const L = ids.shape[1];
+      const e = tf.gather(this.P[table], ids);                     // (B, L, d)
+      const es = this.scaleEmb ? e.mul(Math.sqrt(this.d)) : e;       // × √d_model
+      const pe = this.pe.slice([0, 0], [L, this.d]);                  // pos_encoding[:, :seq_len, :]
+      const x = es.add(pe);
+      if (tr) tr[key] = { emb: e.arraySync()[0], scaled: es.arraySync()[0], pe: pe.arraySync(), x: x.arraySync()[0] };
+      return x;
+    }
+    mha(xq, xkv, pre, mask, tr, key) {
+      const P = this.P;
+      const q = this.dense(xq, P[pre + "Wq"], P[pre + "bq"]);
+      const k = this.dense(xkv, P[pre + "Wk"], P[pre + "bk"]);
+      const v = this.dense(xkv, P[pre + "Wv"], P[pre + "bv"]);
+      const qh = this.split(q), kh = this.split(k), vh = this.split(v);
+      const raw = tf.matMul(qh, kh, false, true);                   // (B,h,Lq,Lk)
+      const scaled = raw.div(Math.sqrt(this.dk));
+      const logits = mask ? scaled.add(mask.mul(-1e9)) : scaled;
+      const w = tf.softmax(logits, -1);
+      const o = tf.matMul(w, vh);                                    // (B,h,Lq,dk)
+      const [B, , Lq] = o.shape;
+      const concat = o.transpose([0, 2, 1, 3]).reshape([B, Lq, this.d]);
+      const out = this.dense(concat, P[pre + "Wo"], P[pre + "bo"]);
+      if (tr) tr[key] = {
+        q: q.arraySync()[0], k: k.arraySync()[0], v: v.arraySync()[0],
+        raw: raw.arraySync()[0], scaled: scaled.arraySync()[0], w: w.arraySync()[0],
+        heads: o.arraySync()[0], concat: concat.arraySync()[0], out: out.arraySync()[0],
+        mask: mask ? mask.arraySync()[0][0] : null,
+      };
+      return out;
+    }
+    ffn(x, pre, tr, key) {
+      const h = this.dense(x, this.P[pre + "W1"], this.P[pre + "b1"]).relu();
+      const y = this.dense(h, this.P[pre + "W2"], this.P[pre + "b2"]);
+      if (tr) tr[key] = { hidden: h.arraySync()[0], out: y.arraySync()[0] };
+      return y;
+    }
+    padMask(ids) { const [B, L] = ids.shape; return ids.equal(0).cast("float32").reshape([B, 1, 1, L]); }
+    lookAhead(ids) {
+      const L = ids.shape[1];
+      const la = tf.sub(1, tf.linalg.bandPart(tf.ones([L, L]), -1, 0)).reshape([1, 1, L, L]);
+      return tf.maximum(la, this.padMask(ids));
+    }
+    // encIds: (B,Le) · decIds: (B,Ld) → logits (B,Ld,V)
+    forward(encIds, decIds, tr) {
+      const encPad = this.padMask(encIds);
+      let x = this.embed(encIds, "encEmb", tr, "encIn");
+      const a = this.mha(x, x, "eA_", encPad, tr, "encAtt");
+      const x1 = this.ln(x.add(a), "eLn1_");
+      const f = this.ffn(x1, "eF_", tr, "encFfn");
+      const enc = this.ln(x1.add(f), "eLn2_");
+      if (tr) tr.encNorm1 = x1.arraySync()[0], tr.encOut = enc.arraySync()[0];
+
+      const y = this.embed(decIds, "decEmb", tr, "decIn");
+      const a1 = this.mha(y, y, "dS_", this.lookAhead(decIds), tr, "decSelf");
+      const y1 = this.ln(y.add(a1), "dLn1_");
+      const a2 = this.mha(y1, enc, "dC_", encPad, tr, "cross");
+      const y2 = this.ln(y1.add(a2), "dLn2_");
+      const f2 = this.ffn(y2, "dF_", tr, "decFfn");
+      const y3 = this.ln(y2.add(f2), "dLn3_");
+      const logits = this.dense(y3, this.P.outW, this.P.outB);
+      if (tr) { tr.decOut = y3.arraySync()[0]; tr.probs = tf.softmax(logits, -1).arraySync()[0]; }
+      return logits;
+    }
+    // 패딩 제외 손실 (노트북 셀 33의 loss_function 방식) + 정확도 2종
+    lossAndAcc(encIds, decIn, target, includePad = false) {
+      const logits = this.forward(encIds, decIn);
+      const V = this.vocab;
+      const logp = tf.logSoftmax(logits, -1);
+      const nll = tf.neg(tf.sum(logp.mul(tf.oneHot(target, V)), -1));   // (B,L)
+      const real = target.notEqual(0).cast("float32");
+      const m = includePad ? tf.onesLike(real) : real;
+      const pred = logits.argMax(-1);
+      const eq = pred.equal(target).cast("float32");
+      return {
+        loss: nll.mul(m).sum().div(m.sum()),
+        accMasked: eq.mul(real).sum().div(real.sum()),   // 패딩 제외 정확도
+        accAll: eq.mean(),                               // 패딩 포함 정확도 (노트북 셀 34 방식)
+      };
+    }
+  }
+
+  // ---------- 추론: evaluate() (Greedy, 자기회귀) ----------
+  function generate(model, tok, sentence, maxSteps) {
+    const enc = tok.pack(sentence, model.maxLen).ids;
+    const out = [tok.SOS];
+    const steps = [];
+    for (let i = 0; i < (maxSteps || model.maxLen - 1); i++) {
+      const tr = {};
+      tf.tidy(() => {
+        model.forward(tf.tensor2d([enc], [1, enc.length], "int32"), tf.tensor2d([out], [1, out.length], "int32"), tr);
+      });
+      const last = tr.probs[tr.probs.length - 1];
+      const order = last.map((p, j) => [p, j]).sort((a, b) => b[0] - a[0]);
+      const pick = order[0][1];
+      steps.push({ input: out.slice(), top: order.slice(0, 5), pick, cross: tr.cross.w.map(h => h[h.length - 1]), trace: tr });
+      if (pick === tok.EOS) break;
+      out.push(pick);
+    }
+    return { enc, out, steps, text: tok.decode(out) };
+  }
+
+  return { preprocess, WordTokenizer, TinyTransformer, positionalEncoding, generate, mulberry32 };
+}
+if (typeof module !== "undefined") module.exports = makeSim;
+
+/* ================== 공통: 색 · 히트맵 ================== */
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let COL = {};
+function readColors() {
+  const st = getComputedStyle(document.documentElement);
+  ["panel", "panel2", "ink", "sub", "line", "enc", "dec", "pe", "att", "ok", "warn", "neg", "pos"].forEach(k => COL[k] = st.getPropertyValue("--" + k).trim());
+}
+function hex(h) {
+  h = h.replace("#", "").trim();
+  if (h.length === 3) h = h.split("").map(c => c + c).join("");
+  return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
+}
+function mix(a, b, t) { const A = hex(a), B = hex(b); return A.map((v, i) => Math.round(v + (B[i] - v) * t)); }
+function textOn(rgb) { const L = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255; return L > 0.56 ? "#10151c" : "#ffffff"; }
+function divCol(v, vmax) {
+  const t = Math.max(-1, Math.min(1, v / (vmax || 1)));
+  const rgb = mix(COL.panel2, t < 0 ? COL.neg : COL.pos, Math.abs(t));
+  return { bg: `rgb(${rgb})`, fg: textOn(rgb) };
+}
+function seqCol(v, vmax, acc) {
+  const t = Math.max(0, Math.min(1, v / (vmax || 1)));
+  const rgb = mix(COL.panel2, acc || COL.att, t);
+  return { bg: `rgb(${rgb})`, fg: textOn(rgb) };
+}
+const fmt2 = (v) => (Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2));
+
+/* heat(el, M, {rows, cols, mode:'div'|'seq', vmax, nums, cw, ch, masked(r,c), group, selRow, selCell, onCell, readout, acc, fmt}) */
+function heat(el, M, o = {}) {
+  const R = M.length, K = R ? M[0].length : 0;
+  const vals = M.flat().filter(Number.isFinite);
+  const vmax = o.vmax || Math.max(1e-6, ...vals.map(Math.abs));
+  const nums = o.nums ?? K <= 14;
+  const cw = o.cw || (nums ? 40 : 20), ch = o.ch || (nums ? 24 : 20);
+  const f = o.fmt || fmt2;
+  let h = `<div class="hm${o.onCell ? " click" : ""}" style="grid-template-columns:${o.rows ? "auto " : ""}repeat(${K},${cw}px);--cw:${cw}px;--ch:${ch}px">`;
+  if (o.cols) {
+    if (o.rows) h += "<div></div>";
+    o.cols.forEach((c, j) => h += `<div class="cl" title="${esc(c)}"${o.colColor ? ` style="color:${o.colColor(j)}"` : ""}>${esc(c)}</div>`);
+  }
+  for (let r = 0; r < R; r++) {
+    if (o.rows) h += `<div class="rl${o.selRow === r ? " on" : ""}" data-r="${r}" title="${esc(o.rows[r])}">${esc(o.rows[r])}</div>`;
+    for (let c = 0; c < K; c++) {
+      const v = M[r][c];
+      const g = o.group && c > 0 && c % o.group === 0 ? " gs" : "";
+      const s = o.selCell && o.selCell[0] === r && o.selCell[1] === c ? " sel" : "";
+      if (o.masked && o.masked(r, c)) { h += `<div class="c x${g}${s}" data-r="${r}" data-c="${c}">×</div>`; continue; }
+      const col = o.mode === "seq" ? seqCol(v, vmax, o.acc) : divCol(v, vmax);
+      h += `<div class="c${g}${s}" data-r="${r}" data-c="${c}" style="background:${col.bg};color:${col.fg}">${nums ? f(v) : ""}</div>`;
+    }
+  }
+  el.innerHTML = h + "</div>";
+  const grid = el.firstChild;
+  if (o.onCell) grid.addEventListener("click", e => {
+    const t = e.target.closest("[data-r]"); if (!t) return;
+    o.onCell(+t.dataset.r, t.dataset.c !== undefined ? +t.dataset.c : null);
+  });
+  if (o.readout) {
+    const ro = o.readout;
+    grid.addEventListener("mouseover", e => {
+      const t = e.target.closest(".c"); if (!t) return;
+      const r = +t.dataset.r, c = +t.dataset.c;
+      const masked = o.masked && o.masked(r, c);
+      ro.textContent = `${o.rows ? o.rows[r] : "행 " + r} · ${o.cols ? o.cols[c] : "열 " + c} = ${masked ? "가림 (×)" : M[r][c].toFixed(4)}`;
+    });
+  }
+}
+function hmBlock(title, shape, id, cap) {
+  return `<div style="min-width:0"><div class="hmtitle">${title}<span class="shape">${shape || ""}</span></div>
+  <div class="scroll" id="${id}"></div><div class="readout" id="${id}-ro"></div>${cap ? `<p class="cap">${cap}</p>` : ""}</div>`;
+}
+function setupCanvas(cv, cssH) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.max(200, cv.parentElement.clientWidth);
+  cv.style.width = w + "px"; cv.style.height = cssH + "px";
+  cv.width = Math.round(w * dpr); cv.height = Math.round(cssH * dpr);
+  const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, cssH);
+  return { ctx, w, h: cssH };
+}
+function tf16(v) { return v.toFixed(3); }
+
+/* ================== 탭 ================== */
+const TABS = { flow: "tab-flow", pe: "tab-pe", attn: "tab-attn" };
+function showTab(key) {
+  Object.entries(TABS).forEach(([k, id]) => {
+    const on = k === key;
+    $("#" + id).setAttribute("aria-selected", on);
+    $("#pane-" + k).hidden = !on;
+  });
+  try { history.replaceState(null, "", "#" + key); } catch (e) { }
+  if (key === "pe") PE.draw();
+  if (key === "attn") ATT.results();
+  if (key === "flow") FLOW.drawLoss();
+}
+Object.entries(TABS).forEach(([k, id]) => $("#" + id).addEventListener("click", () => showTab(k)));
+
+/* ================== ② 위치 인코딩 실험실 ================== */
+const PE = (() => {
+  const st = { D: 64, P: 40, pos: 10, dims: new Set([0, 8, 32]) };
+  const cand = [0, 2, 4, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192, 254];
+  const palette = () => [COL.pos, COL.att, COL.enc, COL.dec, COL.pe, COL.ok, COL.warn];
+  const pe = (p, j, D) => { const a = p / Math.pow(10000, (2 * Math.floor(j / 2)) / D); return j % 2 ? Math.cos(a) : Math.sin(a); };
+  const vec = (p) => Array.from({ length: st.D }, (_, j) => pe(p, j, st.D));
+  const wordEmb = (() => { const r = mulberry(11); return Array.from({ length: 256 }, () => +((r() * 2 - 1) * 0.3).toFixed(2)); })();
+
+  function dimChips() {
+    const el = $("#peDims"); const pal = palette();
+    const avail = cand.filter(d => d < st.D);
+    [...st.dims].forEach(d => { if (d >= st.D) st.dims.delete(d); });
+    if (!st.dims.size) st.dims.add(0);
+    const sel = [...st.dims].sort((a, b) => a - b);
+    el.innerHTML = avail.map(d => {
+      const k = sel.indexOf(d);
+      return `<button type="button" data-d="${d}" aria-pressed="${k >= 0}" ${k >= 0 ? `style="background:${pal[k % pal.length]}"` : ""}>dim ${d}</button>`;
+    }).join("");
+    $$("button", el).forEach(b => b.onclick = () => {
+      const d = +b.dataset.d;
+      if (st.dims.has(d)) { if (st.dims.size > 1) st.dims.delete(d); } else if (st.dims.size < 6) st.dims.add(d);
+      draw();
+    });
+  }
+  function heatDraw() {
+    const cv = $("#peHeat");
+    const rowH = Math.max(3, Math.min(9, Math.floor(320 / st.P)));
+    const { ctx, w } = setupCanvas(cv, st.P * rowH + 26);
+    const left = 34, cw = (w - left - 4) / st.D;
+    for (let p = 0; p < st.P; p++) for (let j = 0; j < st.D; j++) {
+      ctx.fillStyle = divCol(pe(p, j, st.D), 1).bg;
+      ctx.fillRect(left + j * cw, p * rowH, Math.ceil(cw) + 0.5, rowH + 0.5);
+    }
+    ctx.strokeStyle = COL.pe; ctx.lineWidth = 2;
+    ctx.strokeRect(left - 1, st.pos * rowH - 1, st.D * cw + 2, rowH + 2);
+    ctx.fillStyle = COL.sub; ctx.font = `11px ${getComputedStyle(document.body).fontFamily}`;
+    ctx.textAlign = "right";
+    [0, Math.floor(st.P / 2), st.P - 1].forEach(p => ctx.fillText(p, left - 6, p * rowH + rowH / 2 + 4));
+    ctx.fillStyle = COL.pe; ctx.fillText("▶", left - 2, st.pos * rowH + rowH / 2 + 4);
+    ctx.fillStyle = COL.sub; ctx.textAlign = "center";
+    [0, Math.floor(st.D / 2), st.D - 1].forEach(j => ctx.fillText(j, left + j * cw + cw / 2, st.P * rowH + 16));
+    cv.onclick = (e) => {
+      const r = cv.getBoundingClientRect();
+      const p = Math.floor((e.clientY - r.top) / rowH);
+      if (p >= 0 && p < st.P) { st.pos = p; $("#pePos").value = p; draw(); }
+    };
+    $("#peShape").textContent = `(${st.P}, ${st.D})  =  (position, d_model)`;
+  }
+  function axes(ctx, w, h, pad, yMin, yMax, yTicks, xMax, xlab) {
+    ctx.strokeStyle = COL.line; ctx.lineWidth = 1; ctx.fillStyle = COL.sub; ctx.font = `11px ${getComputedStyle(document.body).fontFamily}`;
+    const X = (x) => pad.l + (x / xMax) * (w - pad.l - pad.r);
+    const Y = (y) => pad.t + (1 - (y - yMin) / (yMax - yMin)) * (h - pad.t - pad.b);
+    ctx.textAlign = "right";
+    yTicks.forEach(v => { ctx.beginPath(); ctx.moveTo(pad.l, Y(v)); ctx.lineTo(w - pad.r, Y(v)); ctx.stroke(); ctx.fillText(v, pad.l - 6, Y(v) + 4); });
+    ctx.textAlign = "center";
+    const step = xMax > 60 ? 20 : xMax > 30 ? 10 : 5;
+    for (let x = 0; x <= xMax; x += step) ctx.fillText(x, X(x), h - pad.b + 16);
+    ctx.fillText(xlab, (pad.l + w - pad.r) / 2, h - 4);
+    return { X, Y };
+  }
+  function curveDraw() {
+    const cv = $("#peCurve");
+    const { ctx, w, h } = setupCanvas(cv, 280);
+    const pad = { l: 36, r: 100, t: 14, b: 38 };
+    const { X, Y } = axes(ctx, w, h, pad, -1, 1, [-1, 0, 1], st.P - 1, "위치 pos");
+    const pal = palette();
+    const sel = [...st.dims].sort((a, b) => a - b);
+    ctx.setLineDash([4, 4]); ctx.strokeStyle = COL.pe; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(X(st.pos), pad.t); ctx.lineTo(X(st.pos), h - pad.b); ctx.stroke(); ctx.setLineDash([]);
+    sel.forEach((d, k) => {
+      ctx.strokeStyle = pal[k % pal.length]; ctx.lineWidth = 2; ctx.beginPath();
+      for (let i = 0; i <= 300; i++) { const x = (i / 300) * (st.P - 1); const y = pe(x, d, st.D); i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y)); }
+      ctx.stroke();
+      const v = pe(st.pos, d, st.D);
+      ctx.fillStyle = pal[k % pal.length]; ctx.beginPath(); ctx.arc(X(st.pos), Y(v), 4.5, 0, 7); ctx.fill();
+      ctx.textAlign = "left"; ctx.font = `600 11px ${getComputedStyle(document.body).fontFamily}`;
+      const period = 2 * Math.PI * Math.pow(10000, d / st.D);
+      ctx.fillText(`dim ${d} ${v >= 0 ? "+" : ""}${v.toFixed(2)}`, w - pad.r + 6, pad.t + 12 + k * 30);
+      ctx.fillStyle = COL.sub; ctx.font = `10px ${getComputedStyle(document.body).fontFamily}`;
+      ctx.fillText(`주기 ${period < 1000 ? period.toFixed(1) : Math.round(period).toLocaleString()}`, w - pad.r + 6, pad.t + 25 + k * 30);
+    });
+  }
+  function simDraw() {
+    const cv = $("#peSim");
+    const { ctx, w, h } = setupCanvas(cv, 280);
+    const base = vec(st.pos), nb = Math.hypot(...base);
+    const sims = Array.from({ length: st.P }, (_, p) => { const v = vec(p); return v.reduce((s, x, j) => s + x * base[j], 0) / (nb * Math.hypot(...v)); });
+    const lo = Math.floor(Math.min(...sims) * 10) / 10;
+    const pad = { l: 36, r: 16, t: 14, b: 38 };
+    const ticks = []; for (let t = lo; t <= 1.0001; t += (1 - lo) / 4) ticks.push(+t.toFixed(2));
+    const { X, Y } = axes(ctx, w, h, pad, lo, 1, ticks, st.P - 1, "위치 pos");
+    ctx.strokeStyle = COL.pe; ctx.lineWidth = 2; ctx.beginPath();
+    sims.forEach((s, p) => p ? ctx.lineTo(X(p), Y(s)) : ctx.moveTo(X(p), Y(s))); ctx.stroke();
+    ctx.fillStyle = COL.pe; sims.forEach((s, p) => { ctx.beginPath(); ctx.arc(X(p), Y(s), p === st.pos ? 5 : 2.2, 0, 7); ctx.fill(); });
+    const near = [1, 5, 10].map(k => st.pos + k < st.P ? `+${k}칸 ${sims[st.pos + k].toFixed(2)}` : null).filter(Boolean).join(" · ");
+    $("#peSimVal").textContent = `pos ${st.pos} 기준: ${near || "뒤쪽 위치 없음"}`;
+  }
+  function clocks() {
+    const pairs = [0, Math.floor(st.D / 8), Math.floor(st.D / 4), st.D / 2 - 1].filter((v, i, a) => a.indexOf(v) === i);
+    const names = ["가장 빠름", "빠름", "느림", "가장 느림"];
+    const pal = [COL.warn, COL.dec, COL.enc, COL.pe];
+    $("#peClocks").innerHTML = pairs.map((i, k) => {
+      const w = 1 / Math.pow(10000, (2 * i) / st.D), ang = st.pos * w, R = 36;
+      const x = 44 + R * Math.sin(ang), y = 44 - R * Math.cos(ang);
+      const c = pal[k];
+      return `<div class="clock"><svg width="88" height="88" viewBox="0 0 88 88" aria-label="dim ${2 * i}, ${2 * i + 1} 바늘">
+        <circle cx="44" cy="44" r="40" fill="${COL.panel2}" stroke="${c}" stroke-width="2"/>
+        ${[0, 1, 2, 3].map(q => `<line x1="44" y1="6" x2="44" y2="11" stroke="${COL.line}" stroke-width="2" transform="rotate(${q * 90} 44 44)"/>`).join("")}
+        <line x1="44" y1="44" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${c}" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="44" cy="44" r="3.5" fill="${c}"/></svg>
+        <div><b style="color:${c}">dim ${2 * i}·${2 * i + 1}</b></div>
+        <div class="muted mono small">(${Math.sin(ang).toFixed(2)}, ${Math.cos(ang).toFixed(2)})</div>
+        <div class="muted small">${names[k] || ""} · 1칸 ${(w * 180 / Math.PI).toFixed(w < 0.01 ? 3 : 1)}°</div></div>`;
+    }).join("");
+  }
+  function sameWord() {
+    const n = Math.min(st.D, 8), p2 = Math.min(st.P - 1, st.pos + 5);
+    const e = wordEmb.slice(0, n), a = vec(st.pos).slice(0, n), b = vec(p2).slice(0, n);
+    const M = [e, a, e.map((v, j) => v + a[j]), b, e.map((v, j) => v + b[j])];
+    const el = $("#peSame");
+    el.innerHTML = `<div class="scroll" id="peSameHm"></div><p class="cap">같은 단어 벡터(설명용 값)에 위치 ${st.pos}와 ${p2}의 PE를 더하면 입력이 달라집니다. 앞 ${n}칸만 표시.</p>`;
+    heat($("#peSameHm"), M, { rows: ["단어 임베딩", `PE(${st.pos})`, `입력 @${st.pos}`, `PE(${p2})`, `입력 @${p2}`], cols: Array.from({ length: n }, (_, j) => "d" + j), vmax: 1.3, cw: 46 });
+  }
+  function calc() {
+    const is = [0, 1, st.D / 2 - 1];
+    const rows = is.map(i => {
+      const div = Math.pow(10000, (2 * i) / st.D), ang = st.pos / div;
+      const dv = div < 100 ? div.toFixed(3) : div.toFixed(1);
+      return `<b>i = ${i}</b> · dim ${2 * i}, ${2 * i + 1}<br>나누는 수 10000^(${2 * i}/${st.D}) = ${dv}<br>각도 = ${st.pos} ÷ ${dv} = ${ang.toFixed(4)}<br>sin <b>${Math.sin(ang).toFixed(4)}</b> · cos <b>${Math.cos(ang).toFixed(4)}</b>`;
+    });
+    $("#peCalc").innerHTML = `<b>pos = ${st.pos} 계산 풀이</b><br>` + rows.join("<br><br>");
+  }
+  function draw() {
+    $("#vD").textContent = st.D; $("#vP").textContent = st.P; $("#vPos").textContent = st.pos;
+    $("#pePos").max = st.P - 1;
+    dimChips(); heatDraw(); curveDraw(); simDraw(); clocks(); sameWord(); calc();
+  }
+  $("#peD").addEventListener("input", e => { st.D = +e.target.value; draw(); });
+  $("#peP").addEventListener("input", e => { st.P = +e.target.value; if (st.pos >= st.P) st.pos = st.P - 1; $("#pePos").value = st.pos; draw(); });
+  $("#pePos").addEventListener("input", e => { st.pos = +e.target.value; draw(); });
+  return { draw };
+})();
+
+/* ================== ③ Attention 실험실 ================== */
+const ATT = (() => {
+  const NAMES = ["나는", "너를", "좋아해", "정말", "많이"];
+  const TA2 = {
+    Q: [[1, 0, 1, 0], [0, 2, 0, 1], [1, 1, 1, 0], [0, 1, 1, 0], [1, 0, 0, 1]],
+    K: [[1, 0, 1, 0], [0, 1, 0, 1], [1, 1, 0, 0], [0, 0, 1, 1], [1, 0, 0, 0]],
+    V: [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 1], [0.5, 0.5, 0, 0], [0, 0, 0, 1]],
+  };
+  const st = { n: 3, names: NAMES.slice(), Q: [], K: [], V: [], scale: true, mul: 1, mask: "none", selCell: null, selRow: 0 };
+  function preset(k) {
+    const r = mulberry(Date.now() % 100000);
+    const pick = (M) => M.map(row => row.slice());
+    if (k === "ta2") { st.Q = pick(TA2.Q); st.K = pick(TA2.K); st.V = pick(TA2.V); st.names = NAMES.slice(); }
+    if (k === "same") { st.Q = TA2.Q.map(() => [1, 1, 1, 1]); st.K = TA2.K.map(() => [1, 1, 1, 1]); st.V = pick(TA2.V); }
+    if (k === "peak") { st.Q = pick(TA2.Q).map(r => r.map(v => v * 3)); st.K = pick(TA2.K); st.V = pick(TA2.V); }
+    if (k === "rand") { const g = () => Math.round((r() * 3 - 1.5) * 2) / 2; st.Q = TA2.Q.map(row => row.map(g)); st.K = TA2.K.map(row => row.map(g)); st.V = TA2.V.map(row => row.map(g)); }
+    st.mul = 1; $("#aMul").value = 1; st.selCell = null; st.selRow = 0;
+    inputs(); results();
+  }
+  function inputs() {
+    $("#aN").textContent = st.n;
+    $("#aNames").innerHTML = st.names.slice(0, st.n).map((nm, i) => `<input type="text" id="aName${i}" value="${esc(nm)}" style="width:80px" aria-label="단어 ${i + 1} 이름">`).join("");
+    $$("#aNames input").forEach((inp, i) => inp.addEventListener("input", () => { st.names[i] = inp.value || `w${i}`; results(); }));
+    const block = (key, col, title, desc) => {
+      let h = `<div style="min-width:0"><div class="hmtitle"><span style="color:${col}">${title}</span><span class="shape">(${st.n}, 4) · ${desc}</span></div><div class="scroll"><div class="qkv" style="grid-template-columns:auto repeat(4, 60px)"><div></div>`;
+      for (let j = 0; j < 4; j++) h += `<div class="cl">d${j}</div>`;
+      for (let i = 0; i < st.n; i++) {
+        h += `<div class="rl">${esc(st.names[i])}</div>`;
+        for (let j = 0; j < 4; j++) h += `<input type="number" step="0.1" id="a${key}${i}${j}" data-k="${key}" data-i="${i}" data-j="${j}" value="${st[key][i][j]}" aria-label="${title} ${st.names[i]} d${j}" style="border-color:color-mix(in srgb, ${col} 45%, var(--line))">`;
+      }
+      return h + `</div></div></div>`;
+    };
+    $("#aInputs").innerHTML = block("Q", COL.dec, "Q · Query", "찾는 질문") + block("K", COL.enc, "K · Key", "이름표") + block("V", COL.ok, "V · Value", "건네줄 내용");
+    $$("#aInputs input").forEach(inp => inp.addEventListener("input", () => {
+      const v = parseFloat(inp.value); st[inp.dataset.k][+inp.dataset.i][+inp.dataset.j] = Number.isFinite(v) ? v : 0; results();
+    }));
+  }
+  function compute() {
+    const n = st.n, Q = st.Q.slice(0, n).map(r => r.map(v => v * st.mul)), K = st.K.slice(0, n), V = st.V.slice(0, n);
+    const S = Q.map(q => K.map(k => q.reduce((s, x, j) => s + x * k[j], 0)));
+    const div = st.scale ? 2 : 1;
+    const Lg = S.map(r => r.map(v => v / div));
+    const masked = (r, c) => (st.mask === "la" && c > r) || (st.mask === "pad" && c === n - 1 && n > 1);
+    const A = Lg.map((row, r) => {
+      const ok = row.map((v, c) => !masked(r, c));
+      const m = Math.max(...row.filter((_, c) => ok[c]));
+      const e = row.map((v, c) => ok[c] ? Math.exp(v - m) : 0);
+      const s = e.reduce((a, b) => a + b, 0);
+      return e.map(x => x / s);
+    });
+    const O = A.map(a => [0, 1, 2, 3].map(j => a.reduce((s, w, c) => s + w * V[c][j], 0)));
+    return { Q, K, V, S, Lg, A, O, masked, div };
+  }
+  function results() {
+    const R = compute(), n = st.n, names = st.names.slice(0, n);
+    $("#vMul").textContent = "× " + st.mul;
+    $("#aResults").innerHTML =
+      hmBlock("① 점수 S = Q × K<sup>T</sup>", `(${n}, ${n})`, "aS", "행 = 질문하는 단어, 열 = 참고 대상. 칸을 누르면 내적 풀이") +
+      hmBlock(st.scale ? "② S ÷ √d_k (+ 마스크)" : "② S (나누지 않음) + 마스크", `(${n}, ${n})`, "aL", "× = 마스크로 −10억이 더해진 칸") +
+      hmBlock("③ softmax → 가중치 A", `(${n}, ${n}) · 행 합 1`, "aA", "줄을 누르면 가중합 풀이") +
+      hmBlock("④ 출력 = A × V", `(${n}, 4)`, "aO", "입력과 같은 모양의 새 벡터");
+    heat($("#aS"), R.S, { rows: names, cols: names, readout: $("#aS-ro"), selCell: st.selCell, onCell: (r, c) => { if (c === null) return; st.selCell = [r, c]; results(); } });
+    heat($("#aL"), R.Lg, { rows: names, cols: names, masked: R.masked, readout: $("#aL-ro") });
+    heat($("#aA"), R.A, { rows: names, cols: names, mode: "seq", vmax: 1, masked: R.masked, fmt: v => v.toFixed(3), cw: 48, selRow: st.selRow, readout: $("#aA-ro"), onCell: (r) => { st.selRow = r; st.selCell = null; results(); } });
+    heat($("#aO"), R.O, { rows: names, cols: ["d0", "d1", "d2", "d3"], fmt: v => v.toFixed(3), cw: 48, readout: $("#aO-ro") });
+    // 풀이
+    let h = "";
+    if (st.selCell) {
+      const [r, c] = st.selCell;
+      const terms = R.Q[r].map((q, j) => `${fmtN(q)}×${fmtN(R.K[c][j])}`).join(" + ");
+      h += `<b>S[${esc(names[r])}, ${esc(names[c])}]</b> = Q(${esc(names[r])}) · K(${esc(names[c])}) = ${terms} = <b>${fmtN(R.S[r][c])}</b>` +
+        (st.mul !== 1 ? `<br><span class="muted">Q에 배율 × ${st.mul} 적용된 값</span>` : "") +
+        (st.scale ? `<br>÷ √4 = ÷ 2 → ${fmtN(R.Lg[r][c])}` : "") + "<br><br>";
+    }
+    const r = Math.min(st.selRow, n - 1);
+    const lg = R.Lg[r], ok = lg.map((_, c) => !R.masked(r, c));
+    const ex = lg.map((v, c) => ok[c] ? Math.exp(v) : 0), sum = ex.reduce((a, b) => a + b, 0);
+    h += `<b>'${esc(names[r])}' 행 softmax</b>: ` + lg.map((v, c) => ok[c] ? `e^${fmtN(v)} = ${ex[c].toFixed(3)}` : `${esc(names[c])}: 가림 → 0`).join(", ") +
+      `<br>합 = ${sum.toFixed(3)} → 가중치 = ` + ex.map(e => (e / sum).toFixed(3)).join(", ") +
+      `<br><b>출력[${esc(names[r])}]</b> = ` + R.A[r].map((w, c) => `${w.toFixed(3)}×V(${esc(names[c])})`).join(" + ") +
+      ` = [${R.O[r].map(v => v.toFixed(3)).join(", ")}]`;
+    const mx = Math.max(...R.A[r]);
+    h += `<br><span class="${mx > 0.9 ? "bad" : "muted"}">가장 큰 가중치 ${mx.toFixed(3)}${mx > 0.9 ? " — 한 단어로 거의 다 쏠림. 이러면 나머지 칸의 기울기가 0에 가까워져 학습이 어려워집니다. ÷√d_k가 이를 줄여 줍니다." : ""}</span>`;
+    $("#aCalc").innerHTML = h;
+  }
+  const fmtN = (v) => (Number.isInteger(v) ? String(v) : v.toFixed(2));
+  $$("[data-preset]").forEach(b => b.addEventListener("click", () => preset(b.dataset.preset)));
+  $("#aScale").addEventListener("change", e => { st.scale = e.target.checked; results(); });
+  $("#aMul").addEventListener("input", e => { st.mul = +e.target.value; results(); });
+  $$("#aMask button").forEach(b => b.addEventListener("click", () => {
+    st.mask = b.dataset.m; $$("#aMask button").forEach(x => x.setAttribute("aria-pressed", x === b)); results();
+  }));
+  $("#aPlus").addEventListener("click", () => { if (st.n < 5) { st.n++; inputs(); results(); } });
+  $("#aMinus").addEventListener("click", () => { if (st.n > 2) { st.n--; st.selRow = Math.min(st.selRow, st.n - 1); st.selCell = null; inputs(); results(); } });
+  return { init: () => preset("ta2"), results, inputs };
+})();
+
+function mulberry(a) {
+  return function () { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
+/* ================== ① 전체 흐름 ================== */
+const FLOW = (() => {
+  const L = 12;                                  // MAX_LENGTH (노트북 40 → 보기 쉽게 12)
+  const DEFAULT_PAIRS = [
+    "12시 땡! | 하루가 또 가네요.", "1지망 학교 떨어졌어 | 위로해 드립니다.", "3박4일 놀러가고 싶다 | 여행은 언제나 좋죠.",
+    "3박4일 정도 놀러가고 싶다 | 여행은 언제나 좋죠.", "PPL 심하네 | 눈살이 찌푸려지죠.", "SD카드 망가졌어 | 다시 새로 사는 게 마음 편해요.",
+    "SD카드 안돼 | 다시 새로 사는 게 마음 편해요.", "SNS 맞팔 왜 안하지ㅠㅠ | 잘 모르고 있을 수도 있어요.",
+    "SNS 시간낭비인 거 아는데 매일 하는 중 | 시간을 정하고 해보세요.", "SNS 시간낭비인데 자꾸 보게됨 | 시간을 정하고 해보세요.",
+  ].join("\n");
+  let S, tok, model, opt, T = {}, pairs = [], hist = [], trace = null, cur = null, gen = null, genShown = 0;
+  let step = 0, head = 0, selEnc = 1, selDec = 1, training = false, stopReq = false, ready = false, backend = "";
+  const st = { q: "SD카드 망가졌어", a: "다시 새로 사는 게 마음 편해요." };
+
+  const STEPS = [
+    { t: "토큰화 · 패딩", w: "셀 8~19 · 전처리, tokenizer.encode, SOS/EOS, pad_sequences", r: sTokens },
+    { t: "디코더 입력과 정답 (한 칸 밀기)", w: "셀 21 · dec_inputs = answers[:, :-1], 정답 = answers[:, 1:]", r: sShift },
+    { t: "임베딩 + 위치 인코딩", w: "셀 26 PositionalEncoding.call() · inputs + pos_encoding[:, :seq_len, :]", r: sEmbed },
+    { t: "Q · K · V 만들고 헤드로 나누기", w: "MultiHeadAttention · Dense W_Q, W_K, W_V → split_heads", r: sQKV },
+    { t: "인코더 Self-Attention", w: "scaled_dot_product_attention · 패딩 마스크", r: sEncAtt },
+    { t: "Add & Norm · FFN", w: "잔차 연결 + LayerNormalization, Position-wise FFNN", r: sFfn },
+    { t: "디코더 Masked Self-Attention", w: "look-ahead mask + 패딩 마스크", r: sDecSelf },
+    { t: "인코더-디코더 Attention", w: "Q = 디코더, K · V = 인코더 출력", r: sCross },
+    { t: "출력 확률 · 손실", w: "Dense(VOCAB_SIZE) → softmax · 셀 33 loss_function", r: sOut },
+    { t: "추론 — 한 토큰씩 생성", w: "셀 36~39 evaluate() · predict()", r: sGen },
+  ];
+
+  /* ---------- 준비 ---------- */
+  function parsePairs(text) {
+    return text.split("\n").map(l => l.split("|").map(s => s.trim())).filter(p => p.length >= 2 && p[0] && p[1]).map(p => [p[0], p[1]]);
+  }
+  function build() {
+    stopReq = true;
+    if (model) model.dispose();
+    Object.values(T).forEach(t => t.dispose());
+    pairs = parsePairs($("#optPairs").value);
+    if (!pairs.length) { $("#optPairs").value = DEFAULT_PAIRS; pairs = parsePairs(DEFAULT_PAIRS); }
+    tok = new S.WordTokenizer(pairs.flat());
+    const d = +$("#optD").value, h = Math.min(+$("#optH").value, d);
+    model = new S.TinyTransformer({ vocab: tok.VOCAB, d, heads: h, dff: d * 2, maxLen: L, seed: +$("#optSeed").value || 7, scaleEmb: $("#optScale").checked });
+    opt = tf.train.adam(0.01, 0.9, 0.98, 1e-9);
+    const Q = pairs.map(p => tok.pack(p[0], L).ids), A = pairs.map(p => tok.pack(p[1], L).ids);
+    T = {
+      enc: tf.tensor2d(Q, [Q.length, L], "int32"),
+      dec: tf.tensor2d(A.map(a => a.slice(0, -1)), [A.length, L - 1], "int32"),
+      tgt: tf.tensor2d(A.map(a => a.slice(1)), [A.length, L - 1], "int32"),
+    };
+    hist = []; head = 0;
+    $("#selPair").innerHTML = pairs.map((p, i) => `<option value="${i}">${esc(p[0])} → ${esc(p[1])}</option>`).join("") + `<option value="-1">직접 입력한 문장</option>`;
+    const idx = pairs.findIndex(p => p[0] === st.q);
+    $("#selPair").value = idx >= 0 ? idx : -1;
+    recompute(); stats(); drawLoss(); render();
+  }
+  function recompute() {
+    const e = tok.pack(st.q, L), d = tok.pack(st.a, L);
+    cur = { e, d, decIn: d.ids.slice(0, -1), tgt: d.ids.slice(1) };
+    trace = {};
+    tf.tidy(() => { model.forward(tf.tensor2d([e.ids], [1, L], "int32"), tf.tensor2d([cur.decIn], [1, L - 1], "int32"), trace); });
+    gen = null; genShown = 0;
+    selEnc = Math.max(0, Math.min(selEnc, e.real - 1)); selDec = Math.max(0, Math.min(selDec, d.real - 2));
+  }
+  const W = (id) => (id === 0 ? "0" : tok.word(id));
+  const encLabels = () => cur.e.ids.map(W);
+  const decLabels = () => cur.decIn.map(W);
+  const dimLabels = () => Array.from({ length: model.d }, (_, j) => "d" + j);
+  const trained = () => model.steps > 0;
+  const decReal = () => Math.min(cur.d.real, L - 1);
+
+  /* ---------- 학습 ---------- */
+  async function train(n) {
+    if (training || !ready) return;
+    training = true; stopReq = false; buttons();
+    const inc = $("input[name=lossmode]:checked").value === "all";
+    for (let i = 0; i < n && !stopReq; i++) {
+      let am = 0, aa = 0;
+      const cost = opt.minimize(() => {
+        const r = model.lossAndAcc(T.enc, T.dec, T.tgt, inc);
+        am = r.accMasked.dataSync()[0]; aa = r.accAll.dataSync()[0];
+        return r.loss;
+      }, true);
+      const loss = cost.dataSync()[0]; cost.dispose();
+      model.steps++; hist.push({ s: model.steps, loss, am, aa, inc });
+      if (i % 4 === 0 || i === n - 1) { stats(); drawLoss(); }
+      await tf.nextFrame();
+    }
+    training = false; buttons(); recompute(); stats(); drawLoss(); render();
+  }
+  function buttons() {
+    $("#btnTrain").disabled = training || !ready; $("#btnTrainMore").disabled = training || !ready;
+    $("#btnStop").disabled = !training; $("#btnRebuild").disabled = training || !ready;
+  }
+  function stats() {
+    const last = hist[hist.length - 1];
+    const pill = $("#mstate");
+    pill.className = "pill " + (trained() ? "trained" : "untrained");
+    pill.textContent = trained() ? `학습됨 · ${model.steps} step` : "학습 전 · 무작위 가중치";
+    const rows = [
+      ["학습 step", model.steps],
+      ["손실" + (last ? (last.inc ? " (패딩 포함)" : " (패딩 제외)") : ""), last ? last.loss.toFixed(4) : "—"],
+      ["정확도 · 패딩 제외", last ? (last.am * 100).toFixed(1) + "%" : "—"],
+      ["정확도 · 패딩 포함", last ? (last.aa * 100).toFixed(1) + "%" : "—"],
+      ["d_model · heads · d_k", `${model.d} · ${model.heads} · ${model.dk}`],
+      ["단어 사전 · VOCAB_SIZE", `${tok.vocabSize} · ${tok.VOCAB}`],
+      ["학습 문장 수", pairs.length],
+      ["파라미터 수", model.paramCount().toLocaleString()],
+    ];
+    $("#mstats").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+  }
+  function drawLoss() {
+    const cv = $("#losschart"); if (!cv || !cv.parentElement.clientWidth) return;
+    const { ctx, w, h } = setupCanvas(cv, 120);
+    const pad = { l: 30, r: 30, t: 8, b: 18 };
+    ctx.font = `10px ${getComputedStyle(document.body).fontFamily}`;
+    ctx.strokeStyle = COL.line; ctx.lineWidth = 1;
+    [0, 0.5, 1].forEach(t => { const y = pad.t + (1 - t) * (h - pad.t - pad.b); ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke(); });
+    if (!hist.length) {
+      ctx.fillStyle = COL.sub; ctx.textAlign = "center"; ctx.fillText("아직 학습하지 않았습니다", w / 2, h / 2 + 4);
+      $("#losscap").textContent = "학습 50 step을 누르면 손실과 정확도가 그려집니다. 예측이 맞아 가는 과정을 9·10단계에서 확인하세요.";
+      return;
+    }
+    const n = hist.length, lmax = Math.max(...hist.map(p => p.loss)) || 1;
+    const X = (i) => pad.l + (n === 1 ? 0 : (i / (n - 1)) * (w - pad.l - pad.r));
+    const Y = (v) => pad.t + (1 - v) * (h - pad.t - pad.b);
+    const line = (get, col, dash) => { ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash(dash || []); ctx.beginPath(); hist.forEach((p, i) => i ? ctx.lineTo(X(i), Y(get(p))) : ctx.moveTo(X(i), Y(get(p)))); ctx.stroke(); ctx.setLineDash([]); };
+    line(p => p.loss / lmax, COL.dec);
+    line(p => p.aa, COL.sub, [4, 3]);
+    line(p => p.am, COL.ok);
+    ctx.fillStyle = COL.sub; ctx.textAlign = "right"; ctx.fillText(lmax.toFixed(1), pad.l - 4, pad.t + 8); ctx.fillText("0", pad.l - 4, h - pad.b + 3);
+    ctx.textAlign = "left"; ctx.fillText("100%", w - pad.r + 3, pad.t + 8); ctx.fillText("0%", w - pad.r + 3, h - pad.b + 3);
+    ctx.textAlign = "center"; ctx.fillText(`step ${hist[0].s} ~ ${hist[n - 1].s}`, (pad.l + w - pad.r) / 2, h - 4);
+    $("#losscap").innerHTML = `<span style="color:${COL.dec}">━</span> 손실 <span style="color:${COL.ok}">━</span> 정확도(패딩 제외) <span style="color:${COL.sub}">┅</span> 정확도(패딩 포함)`;
+  }
+
+  /* ---------- 단계 화면 ---------- */
+  function nav() {
+    $("#stepnav").innerHTML = STEPS.map((s, i) => `<button class="stepbtn" data-i="${i}" ${i === step ? 'aria-current="step"' : ""}><b>${i + 1}</b><span>${s.t}</span></button>`).join("");
+    $$("#stepnav .stepbtn").forEach(b => b.onclick = () => { step = +b.dataset.i; render(); });
+  }
+  function render() {
+    if (!ready) return;
+    nav();
+    $("#stepTitle").textContent = `${step + 1}. ${STEPS[step].t}`;
+    $("#stepWhere").textContent = "노트북: " + STEPS[step].w;
+    $("#prevStep").disabled = step === 0; $("#nextStep").disabled = step === STEPS.length - 1;
+    const body = $("#stepBody");
+    body.innerHTML = "";
+    STEPS[step].r(body);
+  }
+  const untrainedNote = () => trained() ? "" : `<div class="note warn">지금은 <b>학습 전 무작위 가중치</b>라서 가중치 무늬와 예측에 의미가 없습니다. 계산 과정은 그대로이니 먼저 흐름을 보고, 왼쪽 <b>학습 50 step</b>을 누른 뒤 다시 비교해 보세요.</div>`;
+  function headSeg(extraAvg) {
+    const n = model.heads;
+    const btns = Array.from({ length: n }, (_, i) => `<button data-h="${i}" aria-pressed="${head === i}">head ${i + 1}</button>`).join("") + (extraAvg ? `<button data-h="-1" aria-pressed="${head === -1}">평균</button>` : "");
+    return `<div class="row"><span class="small muted">헤드 선택</span><div class="seg" id="headSeg">${btns}</div><span class="small muted">헤드마다 d_k = ${model.dk}칸씩 따로 계산</span></div>`;
+  }
+  function bindHead(cb) { $$("#headSeg button").forEach(b => b.onclick = () => { head = +b.dataset.h; cb(); }); }
+  const pickHead = (arr) => head === -1 ? arr[0].map((row, r) => row.map((_, c) => arr.reduce((s, H) => s + H[r][c], 0) / arr.length)) : arr[Math.max(0, Math.min(head, arr.length - 1))];
+
+  function chipRow(ids, cls) {
+    return ids.map((id, j) => {
+      let c = cls;
+      if (id === tok.SOS || id === tok.EOS) c = "sp"; else if (id === 0) c = "pad"; else if (id === 1) c = "unk";
+      return `<span class="chip ${c}">${esc(W(id))}<small>${id}</small></span>`;
+    }).join("");
+  }
+  function sTokens(b) {
+    const pre = (s) => S.preprocess(s).join(" ");
+    const qw = S.preprocess(st.q), aw = S.preprocess(st.a);
+    const unk = [...qw, ...aw].filter(w => !tok.stoi.has(w));
+    b.innerHTML = `
+      <div class="explain"><p>문장을 모델이 다룰 수 있는 <b>정수 벡터</b>로 바꿉니다. 특수문자 앞뒤에 공백을 넣어 떼어 내고(셀 8·9), 단어마다 사전 번호를 붙이고, 앞뒤에 SOS·EOS를 붙인 뒤, 길이 ${L}이 될 때까지 뒤쪽에 0을 채웁니다.</p>
+      <p class="muted small">노트북은 서브워드 토크나이저(8,179개)와 길이 40을 쓰고, 여기서는 보기 쉽게 단어 단위 사전과 길이 ${L}을 씁니다.</p></div>
+      <div class="stack">
+        <div class="strip"><span class="name">① 특수문자 분리</span><span class="mono small">"${esc(st.q)}" → "${esc(pre(st.q))}"</span></div>
+        <div class="strip"><span class="name">② 단어 → 번호</span><div class="chips">${qw.map(w => { const id = tok.stoi.get(w) ?? 1; return `<span class="chip ${id === 1 ? "unk" : "enc"}">${esc(w)}<small>${id}</small></span>`; }).join("")}</div></div>
+        <div class="strip"><span class="name" style="color:var(--enc)">③ 질문 (1, ${L})</span><div class="chips">${chipRow(cur.e.ids, "enc")}</div></div>
+        <div class="strip"><span class="name" style="color:var(--dec)">③ 답변 (1, ${L})</span><div class="chips">${chipRow(cur.d.ids, "dec")}</div></div>
+      </div>
+      ${unk.length ? `<div class="note warn">사전에 없는 단어 <b>${unk.map(esc).join(", ")}</b> → 1번 &lt;UNK&gt;로 바뀝니다. 노트북의 서브워드 토크나이저는 이런 단어도 더 작은 조각으로 쪼개서 처리합니다(OOV 해결).</div>` : ""}
+      ${cur.e.truncated || cur.d.truncated ? `<div class="note warn">문장이 길어 ${L}칸에서 잘렸습니다.</div>` : ""}
+      <div class="grid2">
+        <dl class="kv"><dt>단어 사전 크기 (tokenizer.vocab_size)</dt><dd>${tok.vocabSize}</dd><dt>START_TOKEN (SOS)</dt><dd>${tok.SOS}</dd><dt>END_TOKEN (EOS)</dt><dd>${tok.EOS}</dd><dt>VOCAB_SIZE (+SOS·EOS)</dt><dd>${tok.VOCAB}</dd><dt>MAX_LENGTH</dt><dd>${L}</dd></dl>
+        <div><p class="lbl">사전 앞부분</p><div class="chips">${tok.itos.slice(0, 18).map((w, i) => `<span class="chip">${esc(w)}<small>${i}</small></span>`).join("")}<span class="chip pad">…</span></div></div>
+      </div>`;
+  }
+  function sShift(b) {
+    const col = (ids, cls, off) => `<div style="display:grid;grid-template-columns:repeat(${L}, minmax(46px, 1fr));gap:4px">${off ? "<span></span>".repeat(off) : ""}${ids.map(id => `<span class="chip ${id === tok.SOS || id === tok.EOS ? "sp" : id === 0 ? "pad" : cls}" style="text-align:center">${esc(W(id))}<small>${id}</small></span>`).join("")}</div>`;
+    b.innerHTML = `
+      <div class="explain"><p>디코더는 "지금까지 나온 단어"를 보고 "다음 단어"를 맞힙니다. 그래서 답변 한 줄로 입력과 정답을 함께 만듭니다. <b>입력</b>은 마지막 칸을 뺀 것, <b>정답</b>은 첫 칸(SOS)을 뺀 것이라 서로 한 칸씩 어긋납니다.</p>
+      <p>학습 때는 앞 단어를 틀려도 다음 입력으로 항상 <b>정답 단어</b>를 넣습니다(Teacher Forcing). 덕분에 ${L - 1}자리를 한 번에 병렬로 학습합니다.</p></div>
+      <div class="scroll"><div class="stack" style="min-width:${L * 50 + 140}px">
+        <div class="strip"><span class="name">answers_out <span class="muted mono small">(1, ${L})</span></span>${col(cur.d.ids, "dec")}</div>
+        <div class="strip"><span class="name" style="color:var(--dec)">dec_inputs <span class="muted mono small">[:, :-1]</span></span>${col(cur.decIn, "dec")}</div>
+        <div class="strip"><span class="name"></span><div style="display:grid;grid-template-columns:repeat(${L}, minmax(46px, 1fr));gap:4px;text-align:center;color:var(--sub)">${cur.decIn.map(() => "<span>↓</span>").join("")}</div></div>
+        <div class="strip"><span class="name" style="color:var(--ok)">정답 train_y <span class="muted mono small">[:, 1:]</span></span>${col(cur.tgt, "ok")}</div>
+      </div></div>
+      <div class="note">위치 t의 입력 <code>dec_inputs[t]</code> → 맞혀야 할 정답 <code>train_y[t]</code>. 예: 입력 <b>${esc(W(cur.decIn[0]))}</b> → 정답 <b>${esc(W(cur.tgt[0]))}</b>, 입력 <b>${esc(W(cur.decIn[1]))}</b> → 정답 <b>${esc(W(cur.tgt[1]))}</b>. 정답이 0(패딩)인 칸은 손실 계산에서 빼는 것이 원래 설계입니다(셀 33).</div>`;
+  }
+  function sEmbed(b) {
+    const E = trace.encIn, rows = encLabels(), dl = dimLabels();
+    const avg = (M) => (M.flat().reduce((s, v) => s + Math.abs(v), 0) / M.flat().length).toFixed(3);
+    b.innerHTML = `
+      <div class="explain"><p>각 토큰 번호로 임베딩 표에서 줄을 하나씩 꺼내면 (${L}, ${model.d}) 행렬이 됩니다. ${model.scaleEmb ? `여기에 √d_model = ${Math.sqrt(model.d).toFixed(2)}를 곱하고` : "(√d_model 곱하기 끔)"}, 위치 인코딩 표의 앞 ${L}줄을 그대로 더합니다. 같은 단어라도 자리가 다르면 합한 벡터가 달라집니다.</p>
+      <p class="muted small">평균 크기 |값|: 임베딩 ${avg(E.scaled)} · 위치 인코딩 ${avg(E.pe)} · 합 ${avg(E.x)}. 학습 전 임베딩은 ±0.05 무작위 값이라 처음에는 위치 정보가 더 크게 보입니다.</p></div>
+      <div class="grid2">
+        ${hmBlock(model.scaleEmb ? `임베딩 × √${model.d}` : "임베딩", `(${L}, ${model.d})`, "hE")}
+        ${hmBlock("+ 위치 인코딩 PE", `(${L}, ${model.d}) · 학습 안 함`, "hP")}
+      </div>
+      ${hmBlock("= 인코더 입력 X", `(${L}, ${model.d})`, "hX", "파랑 음수 · 빨강 양수. 칸에 마우스를 올리면 값이 보입니다. 위치 인코딩 자세히 보기는 ② 탭.")}`;
+    const o = (id, vmax) => ({ rows, cols: dl, readout: $(`#${id}-ro`), vmax });
+    const vm = Math.max(1, ...E.x.flat().map(Math.abs));
+    heat($("#hE"), E.scaled, o("hE", vm)); heat($("#hP"), E.pe, o("hP", vm)); heat($("#hX"), E.x, o("hX", vm));
+  }
+  function sQKV(b) {
+    const A = trace.encAtt, rows = encLabels(), dk = model.dk;
+    const cols = Array.from({ length: model.d }, (_, j) => `h${Math.floor(j / dk) + 1}·${j % dk}`);
+    b.innerHTML = `
+      <div class="explain"><p>같은 입력 X에 서로 다른 가중치 행렬 W_Q, W_K, W_V(각 ${model.d}×${model.d})를 곱해 Q · K · V를 만듭니다. 그다음 ${model.d}칸을 ${model.heads}개 헤드로 ${dk}칸씩 잘라 헤드마다 따로 Attention을 계산합니다. 굵은 세로선이 헤드 경계입니다.</p>
+      <p class="muted small">shape: (1, ${L}, ${model.d}) → reshape (1, ${L}, ${model.heads}, ${dk}) → transpose (1, ${model.heads}, ${L}, ${dk}). 노트북은 (64, 40, 256) → (64, 8, 40, 32).</p></div>
+      ${hmBlock('<span style="color:var(--dec)">Q = X · W_Q</span>', `(${L}, ${model.d})`, "hQ")}
+      ${hmBlock('<span style="color:var(--enc)">K = X · W_K</span>', `(${L}, ${model.d})`, "hK")}
+      ${hmBlock('<span style="color:var(--ok)">V = X · W_V</span>', `(${L}, ${model.d})`, "hV")}`;
+    ["q", "k", "v"].forEach((k, i) => heat($("#h" + "QKV"[i]), A[k], { rows, cols, group: dk, readout: $(`#h${"QKV"[i]}-ro`), nums: model.d <= 16 }));
+  }
+  function attView(b, key, rowsAll, colsAll, maskFn, intro, rowPick, rn, cn) {
+    const A = trace[key];
+    const cut = (M) => M.slice(0, rn).map(r => r.slice(0, cn));
+    const W8 = cut(pickHead(A.w)), SC = cut(pickHead(A.scaled));
+    const rowsL = rowsAll.slice(0, rn), colsL = colsAll.slice(0, cn);
+    const sel = Math.min(rowPick.get(), rn - 1);
+    const wrow = W8[sel];
+    const Vh = head === -1 ? null : A.v.map(r => r.slice(head * model.dk, (head + 1) * model.dk));
+    const order = wrow.map((w, j) => [w, j]).filter(([, j]) => !maskFn(sel, j)).sort((a, b) => b[0] - a[0]);
+    b.innerHTML = `${untrainedNote()}<div class="explain">${intro}</div>${headSeg(true)}
+      <div class="grid2">
+        ${hmBlock(`점수 ÷ √d_k${head === -1 ? " (헤드 평균)" : ""}`, `(${rowsAll.length}, ${colsAll.length}) 중 앞부분`, "hS", `× = 마스크 (−10억을 더해 softmax 후 0). 패딩 줄은 생략하고 패딩 열은 ${Math.max(0, cn - (rowsAll === colsAll ? rn : cur.e.real))}개만 표시`)}
+        ${hmBlock(`softmax 가중치${head === -1 ? " (헤드 평균)" : ""}`, `행 합 1`, "hW", "줄 이름을 누르면 아래에 그 단어의 풀이가 나옵니다")}
+      </div>
+      <div class="panel" style="background:var(--panel2)">
+        <h3 style="margin-bottom:8px">'${esc(rowsL[sel])}'(Query)가 참고하는 비율</h3>
+        <div class="bars">${order.slice(0, 8).map(([w, j]) => `<div class="bar"><span class="t">${esc(colsL[j])}</span><span class="track"><span class="fill" style="display:block;width:${(w * 100).toFixed(1)}%"></span></span><span class="v">${w.toFixed(3)}</span></div>`).join("")}</div>
+        <p class="cap" style="margin-top:8px">${Vh ? `새 벡터(head ${head + 1}, ${model.dk}칸) = ${order.slice(0, 3).map(([w, j]) => `${w.toFixed(2)}×V(${esc(colsL[j])})`).join(" + ")} + … = [${Vh[0].map((_, k) => order.reduce((s, [w, j]) => s + w * Vh[j][k], 0).toFixed(2)).slice(0, 6).join(", ")}${model.dk > 6 ? ", …" : ""}]` : "헤드 평균 보기에서는 가중합을 헤드별로 계산하므로 헤드를 하나 골라 보세요."}</p>
+      </div>`;
+    const commonCols = { rows: rowsL, cols: colsL, masked: maskFn, selRow: sel, onCell: (r) => { if (r !== null) { rowPick.set(r); attView(b, key, rowsAll, colsAll, maskFn, intro, rowPick, rn, cn); } } };
+    heat($("#hS"), SC, { ...commonCols, readout: $("#hS-ro"), nums: colsL.length <= 12, cw: 38 });
+    heat($("#hW"), W8, { ...commonCols, mode: "seq", vmax: 1, readout: $("#hW-ro"), fmt: v => v.toFixed(2), nums: colsL.length <= 12, cw: 38 });
+    bindHead(() => attView(b, key, rowsAll, colsAll, maskFn, intro, rowPick, rn, cn));
+  }
+  const encPick = { get: () => selEnc, set: (r) => selEnc = r };
+  const decPick = { get: () => selDec, set: (r) => selDec = r };
+  function sEncAtt(b) {
+    const m = trace.encAtt.mask; const rows = encLabels();
+    attView(b, "encAtt", rows, rows, (r, c) => m[0][c] > 0,
+      `<p>질문의 모든 단어가 Query가 되어 질문 전체(Key)와 점수를 매깁니다. 점수 = Q · K ÷ √${model.dk}. 패딩(0) 열은 마스크로 가려 가중치가 0입니다. 그다음 가중치대로 V를 섞어 "문맥이 들어간 새 벡터"를 만듭니다.</p>`, encPick, cur.e.real, Math.min(L, cur.e.real + 2));
+  }
+  function sFfn(b) {
+    const x = trace.encIn.x[selEnc], a = trace.encAtt.out[selEnc], s1 = x.map((v, j) => v + a[j]);
+    const n1 = trace.encNorm1[selEnc], f = trace.encFfn.out[selEnc], o = trace.encOut[selEnc];
+    const M = [x, a, s1, n1, f, o];
+    const names = ["① 입력 X", "② Attention 출력", "③ X + Attention (잔차)", "④ LayerNorm", "⑤ FFN 출력", "⑥ ④ + ⑤ → LayerNorm (층 출력)"];
+    const ms = (v) => { const m = v.reduce((s, x) => s + x, 0) / v.length; const sd = Math.sqrt(v.reduce((s, x) => s + (x - m) ** 2, 0) / v.length); return `평균 ${m.toFixed(2)} · 표준편차 ${sd.toFixed(2)}`; };
+    const rows = encLabels();
+    b.innerHTML = `<div class="explain"><p>Attention 결과를 입력에 <b>더하고</b>(잔차 연결) 정규화합니다. 그다음 위치(단어)마다 같은 2층 신경망 FFN(${model.d} → ${model.d * 2}, ReLU → ${model.d})을 적용하고 한 번 더 더하고 정규화합니다. 층을 깊게 쌓아도 원래 정보가 사라지지 않고 학습이 안정됩니다.</p></div>
+      <div class="row"><span class="small muted">단어 선택</span><div class="chips">${rows.slice(0, cur.e.real).map((w, i) => `<button class="chip ${i === selEnc ? "enc" : ""}" data-i="${i}" style="cursor:pointer;font:inherit;font-size:.82rem">${esc(w)}</button>`).join("")}</div></div>
+      ${hmBlock(`'${esc(rows[selEnc])}' 벡터가 층을 지나는 모습`, `각 줄 (${model.d})`, "hF")}
+      <div class="kv" style="max-width:520px">${M.map((v, i) => `<dt>${names[i]}</dt><dd>${ms(v)}</dd>`).join("")}</div>
+      <p class="cap">LayerNorm을 지나면 평균 0 · 표준편차 1 근처로 맞춰집니다(학습된 γ·β만큼 조정). 노트북 모델은 이 블록을 2층 쌓습니다.</p>`;
+    heat($("#hF"), M, { rows: names, cols: dimLabels(), readout: $("#hF-ro"), nums: model.d <= 16 });
+    $$("#stepBody button.chip").forEach(btn => btn.onclick = () => { selEnc = +btn.dataset.i; sFfn(b); });
+  }
+  function sDecSelf(b) {
+    const m = trace.decSelf.mask, rows = decLabels();
+    attView(b, "decSelf", rows, rows, (r, c) => m[r][c] > 0,
+      `<p>디코더 입력(답변) 단어끼리 Attention을 계산하되, <b>자기보다 뒤(미래) 칸</b>은 가립니다. 학습 때 정답 문장 전체를 한 번에 넣어도 "다음 단어"를 미리 보지 못하게 하려는 것입니다. 표의 오른쪽 위 삼각형이 모두 ×입니다.</p>`, decPick, decReal(), Math.min(L - 1, decReal() + 2));
+  }
+  function sCross(b) {
+    const m = trace.cross.mask;
+    attView(b, "cross", decLabels(), encLabels(), (r, c) => m[0][c] > 0,
+      `<p>Query는 <b style="color:var(--dec)">디코더</b>(답변 단어), Key · Value는 <b style="color:var(--enc)">인코더 최종 출력</b>(질문 단어)입니다. 답변의 각 자리가 "질문의 어디를 보고 다음 단어를 정할지"를 계산합니다. 표 모양은 (답변 ${L - 1}) × (질문 ${L})이고, 질문의 패딩 열만 가립니다.</p>`, decPick, decReal(), Math.min(L, cur.e.real + 2));
+  }
+  function sOut(b) {
+    const P = trace.probs, inc = $("input[name=lossmode]:checked").value === "all";
+    let lossSum = 0, cnt = 0, okM = 0, nM = 0, okA = 0;
+    const rows = cur.decIn.map((id, t) => {
+      const p = P[t], y = cur.tgt[t];
+      const order = p.map((v, j) => [v, j]).sort((a, b) => b[0] - a[0]);
+      const top = order[0][1], nll = -Math.log(Math.max(p[y], 1e-12)), hit = top === y;
+      const counted = inc || y !== 0;
+      if (counted) { lossSum += nll; cnt++; }
+      if (y !== 0) { nM++; if (hit) okM++; }
+      if (hit) okA++;
+      return `<tr class="${y === 0 ? "off" : ""}"><td class="n">${t}</td><td>${esc(W(id))}</td><td><b>${esc(W(y))}</b></td>
+        <td>${order.slice(0, 3).map(([v, j]) => `${esc(W(j))} <span class="muted mono">${v.toFixed(2)}</span>`).join(" · ")}</td>
+        <td class="n">${p[y].toFixed(3)}</td><td class="n">${nll.toFixed(2)}</td><td>${hit ? '<span class="ok">맞음</span>' : '<span class="bad">틀림</span>'}${y === 0 ? ` <span class="muted small">${inc ? "패딩 · 손실 포함" : "패딩 · 손실 제외"}</span>` : ""}</td></tr>`;
+    }).join("");
+    b.innerHTML = `${untrainedNote()}<div class="explain"><p>디코더 출력(${model.d}칸)을 Dense(${model.d} → ${tok.VOCAB})에 넣어 자리마다 모든 단어의 점수를 내고, softmax로 확률로 바꿉니다. 손실은 정답 단어 확률에 −log를 취한 값의 평균입니다. 정답 확률이 1에 가까울수록 손실은 0에 가까워집니다.</p></div>
+      <div class="scroll"><table class="t"><thead><tr><th>t</th><th>입력</th><th>정답</th><th>예측 상위 3개 (확률)</th><th>정답 확률</th><th>−log p</th><th>결과</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="grid3">
+        <dl class="kv"><dt>이 문장 손실 (${inc ? "패딩 포함" : "패딩 제외"})</dt><dd>${(lossSum / Math.max(cnt, 1)).toFixed(3)}</dd></dl>
+        <dl class="kv"><dt>정확도 · 패딩 제외</dt><dd>${okM}/${nM} = ${(okM / Math.max(nM, 1) * 100).toFixed(0)}%</dd></dl>
+        <dl class="kv"><dt>정확도 · 패딩 포함</dt><dd>${okA}/${L - 1} = ${(okA / (L - 1) * 100).toFixed(0)}%</dd></dl>
+      </div>
+      <div class="note warn">노트북 셀 34는 재컴파일하면서 패딩까지 손실·정확도에 넣었습니다. 40칸 중 대부분이 0이라 0만 맞혀도 정확도가 높게 나옵니다(0.9938). 왼쪽 손실 방식을 <b>패딩 포함</b>으로 바꾸고 모델을 새로 만든 뒤 짧게 학습하면, 초반에 두 정확도 선이 벌어지는 것을 볼 수 있습니다.</div>`;
+  }
+  function sGen(b) {
+    if (!gen) gen = S.generate(model, tok, st.q);
+    const qLab = gen.enc.map(W);
+    const real = gen.enc.findIndex(x => x === 0); const qn = real < 0 ? L : real;
+    const shown = gen.steps.slice(0, genShown);
+    const done = genShown >= gen.steps.length;
+    b.innerHTML = `${untrainedNote()}<div class="explain"><p>추론 때는 정답이 없으므로 디코더에 <b>SOS 하나</b>만 넣고 시작합니다. 마지막 자리의 확률에서 가장 높은 단어를 고르고(Greedy), 그 단어를 입력 뒤에 붙여 다시 넣습니다. EOS가 나오거나 ${L - 1}번이 되면 멈춥니다. 인코더 입력(질문)은 매번 같습니다.</p>
+      <p class="muted small">첫 step에서는 디코더 Self-Attention 점수표가 1×1이라 가중치가 항상 1입니다. 노트북 셀 39의 softmax 경고 [1, 8, 1, 1]이 바로 이 경우이고 버그가 아닙니다.</p></div>
+      <div class="row"><label class="f" style="flex:1 1 260px">질문<input type="text" id="genQ" value="${esc(st.q)}" autocomplete="off"></label>
+        <button class="btn primary" id="gStep" ${done ? "disabled" : ""}>한 토큰 생성</button><button class="btn" id="gAll" ${done ? "disabled" : ""}>끝까지</button><button class="btn" id="gReset">처음부터</button></div>
+      <div>${shown.map((s, k) => {
+        const isEnd = s.pick === tok.EOS;
+        const cross = s.cross[0].map((_, j) => s.cross.reduce((acc, H) => acc + H[j], 0) / s.cross.length);
+        return `<div class="genrow"><div class="stack" style="gap:6px"><div class="lbl">step ${k + 1} · 디코더 입력 (1, ${s.input.length})</div><div class="chips">${chipRow(s.input, "dec")}</div>
+          <div class="lbl" style="margin-top:4px">질문 중 어디를 봤나 (인코더-디코더 Attention, 헤드 평균)</div><div class="scroll" id="gx${k}"></div></div>
+          <div class="bars">${s.top.map(([p, j]) => `<div class="bar ${j === s.pick ? "pick" : ""}"><span class="t">${esc(W(j))}</span><span class="track"><span class="fill" style="display:block;width:${(p * 100).toFixed(1)}%"></span></span><span class="v">${p.toFixed(3)}</span></div>`).join("")}
+          <p class="small ${isEnd ? "ok" : ""}" style="margin-top:4px">→ 선택: <b>${esc(W(s.pick))}</b>${isEnd ? " · 생성 종료" : " · 입력 뒤에 붙임"}</p></div></div>`;
+      }).join("")}</div>
+      ${done ? `<div class="stack"><span class="lbl">챗봇 대답 (tokenizer.decode)</span><div class="answer">${esc(gen.text) || "(빈 문장)"}</div></div>` : ""}`;
+    shown.forEach((s, k) => {
+      const cross = s.cross[0].map((_, j) => s.cross.reduce((acc, H) => acc + H[j], 0) / s.cross.length);
+      heat($("#gx" + k), [cross.slice(0, qn)], { cols: qLab.slice(0, qn), mode: "seq", vmax: 1, fmt: v => v.toFixed(2), cw: 52, ch: 22 });
+    });
+    $("#gStep").onclick = () => { genShown++; sGen(b); };
+    $("#gAll").onclick = () => { genShown = gen.steps.length; sGen(b); };
+    $("#gReset").onclick = () => { genShown = 0; sGen(b); };
+    $("#genQ").onchange = (e) => { st.q = e.target.value.trim() || st.q; $("#inQ").value = st.q; syncPair(); recompute(); genShown = 0; sGen(b); };
+  }
+
+  function syncPair() {
+    const idx = pairs.findIndex(p => p[0] === st.q);
+    $("#selPair").value = idx >= 0 ? idx : -1;
+  }
+  function wire() {
+    $("#optPairs").value = DEFAULT_PAIRS;
+    $("#inQ").value = st.q; $("#inA").value = st.a;
+    $("#selPair").addEventListener("change", e => {
+      const i = +e.target.value; if (i < 0) return;
+      st.q = pairs[i][0]; st.a = pairs[i][1]; $("#inQ").value = st.q; $("#inA").value = st.a; recompute(); render();
+    });
+    $("#inQ").addEventListener("change", e => {
+      st.q = e.target.value.trim() || st.q;
+      const m = pairs.find(p => p[0] === st.q); if (m) { st.a = m[1]; $("#inA").value = st.a; }
+      syncPair(); recompute(); render();
+    });
+    $("#inA").addEventListener("change", e => { st.a = e.target.value.trim() || st.a; recompute(); render(); });
+    $("#prevStep").onclick = () => { if (step > 0) { step--; render(); } };
+    $("#nextStep").onclick = () => { if (step < STEPS.length - 1) { step++; render(); } };
+    $("#btnTrain").onclick = () => train(50);
+    $("#btnTrainMore").onclick = () => train(200);
+    $("#btnStop").onclick = () => { stopReq = true; };
+    $("#btnRebuild").onclick = () => { build(); };
+    $$("input[name=lossmode]").forEach(r => r.addEventListener("change", () => { if (step === 8) render(); }));
+    buttons();
+  }
+  async function init() {
+    wire();
+    if (!window.tf) {
+      $("#stepBody").innerHTML = `<div class="note warn">계산 라이브러리(TensorFlow.js)를 불러오지 못했습니다. 인터넷 연결을 확인한 뒤 새로 고침해 주세요. ② · ③ 실험실은 그대로 쓸 수 있습니다.</div>`;
+      $("#stepTitle").textContent = "불러오기 실패"; return;
+    }
+    try { await tf.setBackend("cpu"); } catch (e) { }
+    await tf.ready(); backend = tf.getBackend();
+    S = makeSim(tf); ready = true;
+    build(); buttons();
+  }
+  return { init, drawLoss, rerender: () => { if (ready) { render(); drawLoss(); } } };
+})();
+
+/* ================== 시작 ================== */
+(function boot() {
+  readColors();
+  ATT.init();
+  const start = (location.hash || "").replace("#", "");
+  showTab(TABS[start] ? start : "flow");
+  const rethem = () => { readColors(); ATT.inputs(); ATT.results(); if (!$("#pane-pe").hidden) PE.draw(); FLOW.rerender(); };
+  try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", rethem); } catch (e) { }
+  new MutationObserver(rethem).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  let tmr; window.addEventListener("resize", () => { clearTimeout(tmr); tmr = setTimeout(() => { if (!$("#pane-pe").hidden) PE.draw(); FLOW.drawLoss(); }, 150); });
+  const urls = TF_URLS.slice();
+  (function load() {
+    const u = urls.shift();
+    if (!u) { FLOW.init(); return; }
+    const s = document.createElement("script"); s.src = u; s.async = true;
+    s.onload = () => FLOW.init(); s.onerror = load;
+    document.head.appendChild(s);
+  })();
+})();
+
+</script>
+</body>
+</html>
