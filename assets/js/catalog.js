@@ -24,6 +24,54 @@ window.DS_CATEGORIES = [
 ];
 
 window.DS_SIMULATORS = [
+  /* ---------- 컴퓨터 비전 ---------- */
+  {
+    id: "cnn-conv-pooling",
+    category: "cv",
+    href: "simulators/cv/cnn-conv-pooling.html",
+    title: "CNN 합성곱 · 풀링",
+    summary: "3×3 필터가 입력 위를 한 칸씩 미끄러지며 곱하고 더하는 과정과 최대·평균 풀링을 강의 예제 숫자로 따라가고, 실제 이미지의 특성맵과 CNN 전체 구조까지 확인합니다.",
+    tags: ["합성곱", "풀링", "특성맵", "CNN 구조"],
+    glyph: "cnn"
+  },
+  {
+    id: "resnet-skip-connection",
+    category: "cv",
+    href: "simulators/cv/resnet-skip-connection.html",
+    title: "ResNet 스킵 커넥션",
+    summary: "잔차 블록 y = F(x) + x 안을 들여다보고, plain과 residual을 깊게 쌓았을 때 신호·기울기·훈련 손실이 어떻게 달라지는지 비교합니다.",
+    tags: ["ResNet", "스킵 커넥션", "기울기 소실", "퇴화 문제"],
+    glyph: "resnet"
+  },
+  {
+    id: "image-augmentation",
+    category: "cv",
+    href: "simulators/cv/image-augmentation.html",
+    title: "이미지 증강",
+    summary: "회전·이동·확대, 밝기·대비·노이즈, Random Erasing·Mixup·CutMix를 의료영상 모사 이미지에 걸어 보고, 에폭마다 달라지는 실시간 증강과 Keras 코드까지 확인합니다.",
+    tags: ["데이터 증강", "Keras", "의료영상", "정칙화"],
+    glyph: "aug"
+  },
+  {
+    id: "detection-metrics",
+    category: "cv",
+    href: "simulators/cv/detection-metrics.html",
+    title: "객체 탐지 평가 지표",
+    summary: "요추 MRI 모사 영상 위에서 IoU, TP·FP·FN 매칭, NMS를 한 단계씩 따라가고, PR 곡선으로 AP·mAP를, FROC로 허용 오탐 수 대비 민감도를 계산합니다.",
+    tags: ["IoU", "NMS", "AP · mAP", "FROC"],
+    glyph: "detmetric"
+  },
+  {
+    id: "yolo-how-it-works",
+    category: "cv",
+    href: "simulators/cv/yolo-how-it-works.html",
+    title: "YOLO 작동 원리",
+    summary: "YOLOv8n이 영상을 8,400칸(P3·P4·P5)으로 나눠 DFL로 박스를 디코딩하고, conf·NMS로 거르고, TAL로 정답을 배정해 학습하는 과정을 직접 조작해 봅니다.",
+    tags: ["YOLOv8", "Anchor-free", "DFL", "TAL"],
+    glyph: "yolo"
+  },
+
+  /* ---------- 자연어처리 ---------- */
   {
     id: "lda-gibbs-sampling",
     category: "nlp",

@@ -8,37 +8,23 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20260930c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20260930c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 /*
-  이 파일은 새 시뮬레이터를 만들 때 복사해서 쓰는 기본 틀입니다.
-  1) simulators/<ml|nn|cv|nlp>/<파일명>.html 로 복사
-  2) <title>, 경로(분류), 제목, 설명을 바꾸고 아래 .wrap 안에 시뮬레이터를 작성
-  3) assets/js/catalog.js 의 DS_SIMULATORS 에 항목 추가 → 메인 페이지에 카드가 생깁니다.
+  새 시뮬레이터 기본 틀
+  1) simulators/<ml|nn|cv|nlp>/<파일명>.html 로 복사 (분류 폴더 안에 있어야 ../../ 경로가 맞음)
+  2) 머리글 ds-nav 의 aria-current="page", 위치 표시(ds-crumbs)의 분류, <title>, 제목, 설명을 바꾸기
+  3) 부품은 assets/css/sim-kit.css 의 sk- 클래스를 사용 (탭·카드·버튼·슬라이더·행렬·표 등)
+  4) assets/js/catalog.js 의 DS_SIMULATORS 에 항목 추가 → 메인 페이지에 카드가 생김
 
-  공통 토큰(assets/css/site.css): --bg --surface --surface-2 --ink --text --muted --faint
-  --line --line-strong --on-ink --accent --radius --max --gutter --sans --mono
-  시뮬레이터 고유 색(역할 색)은 여기 :root 에 정의하고, 어두운 화면용 값도 함께 적어 주세요.
+  중립색은 공통 토큰(--bg --surface --surface-2 --ink --text --muted --faint --line --line-strong --on-ink)만 사용.
+  역할 색은 아래 :root 에 정의하고 어두운 화면 값도 함께 적기. 캔버스는 테마가 바뀌면 다시 그리기.
 */
-:root{
-  --role-a:#2563EB;
-  --role-b:#EA580C;
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){ --role-a:#6AA5FF; --role-b:#FF914D; }
-}
+:root{ --sk-accent: var(--cat-ml); --role-a:#2563EB; --role-b:#EA580C; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --role-a:#6AA5FF; --role-b:#FF914D; } }
 :root[data-theme="dark"]{ --role-a:#6AA5FF; --role-b:#FF914D; }
-
-.wrap{width:100%;max-width:var(--max);margin:0 auto;padding:18px var(--gutter) 56px;display:flex;flex-direction:column;gap:16px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px}
-.card h2{margin:0 0 6px;font-size:18px}
-.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.btn{font:inherit;font-weight:600;font-size:14px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);border-radius:var(--radius-sm);padding:7px 13px;cursor:pointer}
-.btn:hover{background:var(--surface-2)}
-.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
-.btn:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-.note{margin:0;color:var(--muted);font-size:14px}
 </style>
 </head>
 <body>
@@ -49,8 +35,8 @@
   <div class="ds-header__inner">
     <a class="ds-brand" href="../../index.html" aria-label="메인으로">
       <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
-      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-light')">
-      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
       <span class="ds-brand__fallback">DATA STATION</span>
       <span class="ds-brand__sep" aria-hidden="true"></span>
       <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
@@ -80,17 +66,24 @@
 </section>
 
 <!-- ===== 시뮬레이터 본문 ===== -->
-<main class="wrap" id="main">
-  <section class="card">
-    <h2>조작</h2>
-    <div class="controls">
-      <button class="btn primary" type="button" id="btnRun">▶ 실행</button>
-      <button class="btn" type="button" id="btnReset">처음으로</button>
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button class="sk-tab" role="tab" id="tab-a" aria-controls="pane-a" aria-selected="true"><span class="sk-num">1</span>첫 화면</button>
+    <button class="sk-tab" role="tab" id="tab-b" aria-controls="pane-b" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>둘째 화면</button>
+  </nav>
+  <section id="pane-a" role="tabpanel" aria-labelledby="tab-a">
+    <div class="sk-card">
+      <div class="sk-head"><h2>제목</h2><span class="sk-hint">도움말</span></div>
+      <p class="sk-lead">이 화면에서 무엇을 조작하고 무엇을 보는지 적습니다.</p>
+      <div class="sk-controls">
+        <button class="sk-btn sk-btn--primary" type="button" id="btnRun">▶ 실행</button>
+        <button class="sk-btn" type="button" id="btnReset">처음으로</button>
+      </div>
+      <p class="sk-note" id="out">여기에 시뮬레이터 내용을 작성합니다.</p>
     </div>
   </section>
-  <section class="card">
-    <h2>결과</h2>
-    <p class="note" id="out">여기에 시뮬레이터 내용을 작성합니다.</p>
+  <section id="pane-b" role="tabpanel" aria-labelledby="tab-b" hidden>
+    <div class="sk-card"><h2>둘째 화면</h2></div>
   </section>
 </main>
 
@@ -108,13 +101,29 @@
   </div>
 </footer>
 
-<script src="../../assets/js/site.js"></script>
+<script src="../../assets/js/site.js?v=20260930c"></script>
 <!-- TensorFlow.js가 필요하면 아래 줄의 주석을 풉니다 (공용 파일, 약 1.4MB) -->
 <!-- <script src="../../assets/vendor/tf.min.js"></script> -->
 <script>
 (function () {
   "use strict";
   const $ = id => document.getElementById(id);
+  /* 안쪽 탭 (URL 해시 연동, ←/→ 키 이동) */
+  const tabs = [...document.querySelectorAll(".sk-tab")];
+  function show(t) {
+    tabs.forEach(b => { const on = b === t; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1;
+      document.getElementById(b.getAttribute("aria-controls")).hidden = !on; });
+    history.replaceState(null, "", "#" + t.id.replace("tab-", ""));
+  }
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => show(b));
+    b.addEventListener("keydown", e => {
+      const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return;
+      const n = tabs[(i + d + tabs.length) % tabs.length]; show(n); n.focus(); e.preventDefault();
+    });
+  });
+  const start = document.getElementById("tab-" + location.hash.slice(1)); if (start) show(start);
+
   $("btnRun").onclick = () => { $("out").textContent = "실행했습니다."; };
   $("btnReset").onclick = () => { $("out").textContent = "여기에 시뮬레이터 내용을 작성합니다."; };
 })();

@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="assets/css/site.css">
+<link rel="stylesheet" href="assets/css/site.css?v=20260930c">
 <style>
 /* ---------- 메인 페이지 전용 ---------- */
 .home { max-width: var(--max); width: 100%; margin: 0 auto; padding: 0 var(--gutter) 56px; }
@@ -104,8 +104,8 @@
   <div class="ds-header__inner">
     <a class="ds-brand" href="index.html" aria-label="메인으로">
       <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
-      <img class="ds-brand__logo ds-brand__logo--light" src="image/logo1.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-light')">
-      <img class="ds-brand__logo ds-brand__logo--dark" src="image/logo2.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <img class="ds-brand__logo ds-brand__logo--light" src="image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
       <span class="ds-brand__fallback">DATA STATION</span>
       <span class="ds-brand__sep" aria-hidden="true"></span>
       <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
@@ -150,8 +150,8 @@
   </div>
 </footer>
 
-<script src="assets/js/catalog.js"></script>
-<script src="assets/js/site.js"></script>
+<script src="assets/js/catalog.js?v=20260930c"></script>
+<script src="assets/js/site.js?v=20260930c"></script>
 <script>
 (function () {
   var CATS = window.DS_CATEGORIES, SIMS = window.DS_SIMULATORS;
@@ -193,6 +193,35 @@
         L.forEach(function (l) { l[1].forEach(function (y) { s += '<circle cx="' + l[0] + '" cy="' + y + '" r="7" fill="var(--surface)" stroke="currentColor" stroke-width="2"/>'; }); });
         return s;
       })() + '</svg>',
+    cnn: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      (function () { var s = ""; for (var r = 0; r < 5; r++) for (var c = 0; c < 5; c++) s += '<rect x="' + (8 + c * 15) + '" y="' + (13 + r * 15) + '" width="13" height="13" rx="2" fill="currentColor" opacity="' + ((r < 3 && c < 3) ? .7 : .2) + '"/>'; return s; })() +
+      '<rect x="6" y="11" width="47" height="47" rx="4" stroke="var(--ink)" stroke-width="2"/>' +
+      '<path d="M88 50h12" stroke="var(--faint)" stroke-width="2" stroke-linecap="round"/><path d="M96 45l5 5-5 5" stroke="var(--faint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+      (function () { var s = ""; for (var r = 0; r < 3; r++) for (var c = 0; c < 3; c++) s += '<rect x="' + (110 + c * 15) + '" y="' + (28 + r * 15) + '" width="13" height="13" rx="2" fill="currentColor" opacity="' + (r === 0 && c === 0 ? .9 : .3) + '"/>'; return s; })() +
+      '<rect x="164" y="36" width="13" height="13" rx="2" fill="var(--cat-ml)" opacity=".85"/><rect x="164" y="51" width="13" height="13" rx="2" fill="var(--cat-ml)" opacity=".45"/></svg>',
+    resnet: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      '<rect x="12" y="52" width="26" height="30" rx="5" fill="currentColor" opacity=".35"/>' +
+      '<rect x="54" y="52" width="30" height="30" rx="5" fill="currentColor" opacity=".8"/><rect x="96" y="52" width="30" height="30" rx="5" fill="currentColor" opacity=".8"/>' +
+      '<path d="M38 67h16M84 67h12M126 67h14" stroke="var(--faint)" stroke-width="2"/>' +
+      '<circle cx="150" cy="67" r="10" stroke="var(--cat-nn)" stroke-width="2.4"/><path d="M150 61v12M144 67h12" stroke="var(--cat-nn)" stroke-width="2.4" stroke-linecap="round"/>' +
+      '<path d="M25 52 C 25 14, 150 14, 150 55" stroke="var(--cat-ml)" stroke-width="2.6" stroke-dasharray="5 4"/>' +
+      '<path d="M160 67h18" stroke="var(--faint)" stroke-width="2"/></svg>',
+    aug: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      [[30, 0, 1], [75, -14, .8], [120, 12, .55], [162, 0, .35]].map(function (a, i) {
+        return '<g transform="translate(' + a[0] + ' 50) rotate(' + a[1] + ') scale(' + (i === 3 ? '-1 1' : '1') + ')"><rect x="-18" y="-24" width="36" height="48" rx="5" fill="currentColor" opacity="' + a[2] * .35 + '"/>' +
+          '<ellipse cx="-6" cy="-2" rx="6" ry="12" fill="currentColor" opacity="' + a[2] + '"/><ellipse cx="7" cy="-2" rx="5" ry="11" fill="currentColor" opacity="' + a[2] * .8 + '"/><circle cx="8" cy="-14" r="3" fill="var(--cat-ml)"/></g>';
+      }).join("") + '</svg>',
+    detmetric: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      '<rect x="14" y="16" width="56" height="54" rx="3" stroke="var(--cat-nlp)" stroke-width="2.4"/><rect x="34" y="32" width="56" height="54" rx="3" stroke="var(--cat-ml)" stroke-width="2.4" stroke-dasharray="5 3"/>' +
+      '<rect x="34" y="32" width="36" height="38" fill="currentColor" opacity=".35"/>' +
+      '<path d="M112 16v70h66" stroke="var(--faint)" stroke-width="1.6"/>' +
+      '<path d="M112 22 H130 V30 H146 V44 H160 V62 H174 V86 H112 Z" fill="currentColor" opacity=".18"/>' +
+      '<path d="M112 22 H130 V30 H146 V44 H160 V62 H174 V86" stroke="currentColor" stroke-width="2.2"/></svg>',
+    yolo: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      (function () { var s = '<rect x="30" y="8" width="84" height="84" rx="4" fill="currentColor" opacity=".12"/>'; for (var i = 1; i < 6; i++) { s += '<path d="M' + (30 + i * 14) + ' 8v84M30 ' + (8 + i * 14) + 'h84" stroke="currentColor" stroke-width="1" opacity=".4"/>'; } return s; })() +
+      '<rect x="50" y="28" width="46" height="40" rx="2" stroke="var(--cat-ml)" stroke-width="2.4"/><circle cx="72" cy="50" r="3.5" fill="var(--cat-ml)"/>' +
+      '<path d="M72 50H50M72 50H96M72 50V28M72 50V68" stroke="var(--cat-ml)" stroke-width="1.2" stroke-dasharray="2 2"/>' +
+      [0, 1, 2].map(function (i) { return '<rect x="' + (128 + i * 18) + '" y="' + (70 - [30, 44, 20][i]) + '" width="12" height="' + [30, 44, 20][i] + '" rx="2" fill="currentColor" opacity="' + [.45, .85, .3][i] + '"/>'; }).join("") + '</svg>',
     cv: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
       (function () { var s = ""; for (var r = 0; r < 5; r++) for (var c = 0; c < 5; c++) s += '<rect x="' + (20 + c * 15) + '" y="' + (13 + r * 15) + '" width="14" height="14" fill="currentColor" opacity="' + (0.1 + ((r * 7 + c * 3) % 9) / 12).toFixed(2) + '"/>'; return s; })() +
       '<rect x="34" y="27" width="44" height="44" stroke="var(--ink)" stroke-width="2"/><path d="M100 50h14" stroke="var(--faint)" stroke-width="2"/>' +

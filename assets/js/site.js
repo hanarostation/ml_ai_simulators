@@ -43,9 +43,36 @@
       if (mq && mq.addEventListener) mq.addEventListener("change", function () { paintButton(btn); });
     }
 
+    /* 로고 파일 찾기: logo1.png / logo2.png 가 안 열리면 흔한 다른 이름도 차례로 시도
+       (대문자 확장자, jpg·webp·svg, 윈도우에서 확장자가 숨겨져 생긴 "logo2.png.png" 등) */
+    var EXTS = [".png", ".PNG", ".jpg", ".jpeg", ".JPG", ".webp", ".svg", ".png.png", ".png.jpg", ".png.jpeg", ".png.webp"];
+    function findLogo(img, cls) {
+      if (!img || img._dsTrying) return;
+      img._dsTrying = true;
+      var brand = img.closest(".ds-brand");
+      var src = img.getAttribute("src");
+      var dir = src.replace(/[^\/]*$/, "");
+      var base = src.slice(dir.length).replace(/\..*$/, "");
+      var tries = [];
+      EXTS.forEach(function (e) { tries.push(base + e); });
+      tries.push(base.charAt(0).toUpperCase() + base.slice(1) + ".png");
+      var i = 1; /* 0번(원래 이름)은 이미 실패 */
+      img.onload = function () { brand.classList.remove(cls); img.removeAttribute("data-fail"); };
+      img.onerror = function () {
+        if (i >= tries.length) {
+          brand.classList.add(cls);
+          if (window.console) console.warn("[로고] " + dir + base + ".png 파일을 찾지 못했습니다. image 폴더의 파일 이름을 확인하세요.");
+          return;
+        }
+        img.src = dir + tries[i++];
+      };
+      img.onerror();
+    }
     [["light", "no-logo-light"], ["dark", "no-logo-dark"]].forEach(function (p) {
       var img = document.querySelector(".ds-brand__logo--" + p[0]);
-      if (img && img.complete && img.naturalWidth === 0) img.closest(".ds-brand").classList.add(p[1]);
+      if (!img) return;
+      if (img.getAttribute("data-fail") || (img.complete && img.naturalWidth === 0)) findLogo(img, p[1]);
+      else img.addEventListener("error", function () { findLogo(img, p[1]); });
     });
 
     var y = document.querySelector("[data-ds-year]");

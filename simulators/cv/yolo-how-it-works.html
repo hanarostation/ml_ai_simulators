@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css">
-<link rel="stylesheet" href="../../assets/css/sim-kit.css">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20260930c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20260930c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 /* 역할 색: 스케일(P3/P4/P5), 정답 박스, 클래스, 층 종류 — 밝은/어두운 화면 둘 다 정의 */
@@ -155,8 +155,8 @@
   <div class="ds-header__inner">
     <a class="ds-brand" href="../../index.html" aria-label="메인으로">
       <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
-      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-light')">
-      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
       <span class="ds-brand__fallback">DATA STATION</span>
       <span class="ds-brand__sep" aria-hidden="true"></span>
       <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
@@ -460,7 +460,7 @@
   </div>
 </footer>
 
-<script src="../../assets/js/site.js"></script>
+<script src="../../assets/js/site.js?v=20260930c"></script>
 <script>
 (function () {
 "use strict";
