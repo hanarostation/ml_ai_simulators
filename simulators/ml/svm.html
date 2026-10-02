@@ -8,8 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
-<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 /* 역할 색: 클래스 0 정상 파랑 · 클래스 1 질환 주황 · 클래스 2 보라 · 검증 청록 · 최소제곱 보라 · 마진 안/오분류 빨강 · 마진 위 초록 · SVR 회귀선 주황 */
@@ -120,6 +121,8 @@
       <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -157,6 +160,7 @@
       <button type="button" class="sk-tab" role="tab" id="tab-svc-kernel" aria-controls="pane-svc-kernel" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>커널 트릭</button>
       <button type="button" class="sk-tab" role="tab" id="tab-svc-smo" aria-controls="pane-svc-smo" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>쌍대 문제와 SMO</button>
       <button type="button" class="sk-tab" role="tab" id="tab-svc-multi" aria-controls="pane-svc-multi" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>확률 · 다중 클래스</button>
+      <button type="button" class="sk-tab" role="tab" id="tab-svc-diagram" aria-controls="pane-svc-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>알고리즘 구성도</button>
     </nav>
 
     <!-- ---------- 분류 1. 최대 마진 ---------- -->
@@ -391,6 +395,11 @@
         <p class="sk-note" id="m5PlattNote"></p>
       </div>
     </section>
+
+    <!-- ---------- 알고리즘 구성도 ---------- -->
+    <section class="sv-pane" id="pane-svc-diagram" role="tabpanel" aria-labelledby="tab-svc-diagram" hidden>
+      <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">SVC 최대 마진 · 소프트 마진과 커널 · 쌍대와 다중 클래스 · SVR 4장 · 강의용 도식</span></div><div data-ds-diagrams="svm"></div></section>
+    </section>
   </div>
 
   <!-- ================================ SVM 회귀 ================================ -->
@@ -400,6 +409,7 @@
       <button type="button" class="sk-tab" role="tab" id="tab-svr-kernel" aria-controls="pane-svr-kernel" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>C와 커널</button>
       <button type="button" class="sk-tab" role="tab" id="tab-svr-loss" aria-controls="pane-svr-loss" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>손실 비교 · 이상값</button>
       <button type="button" class="sk-tab" role="tab" id="tab-svr-dual" aria-controls="pane-svr-dual" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>쌍대와 서포트 벡터</button>
+      <button type="button" class="sk-tab" role="tab" id="tab-svr-diagram" aria-controls="pane-svr-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>알고리즘 구성도</button>
     </nav>
 
     <!-- ---------- 회귀 1. ε-튜브 ---------- -->
@@ -555,6 +565,11 @@
         <div class="sk-formula sv-terms" id="r4Terms"></div>
       </div>
     </section>
+
+    <!-- ---------- 알고리즘 구성도 ---------- -->
+    <section class="sv-pane" id="pane-svr-diagram" role="tabpanel" aria-labelledby="tab-svr-diagram" hidden>
+      <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">SVR ε-튜브 장부터 · SVC와 함께 4장 · 강의용 도식</span></div><div data-ds-diagrams="svm" id="dgSvr" data-dg-mounted="1"></div></section>
+    </section>
   </div>
 
   <!-- ================================ 공통 ================================ -->
@@ -623,7 +638,9 @@
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/svm.js?v=20261002c"></script>
 <script>
 (function () {
 "use strict";
@@ -1700,10 +1717,10 @@ function renderCode(){
 }
 
 /* ================================================================== 파트 · 탭 */
-const TABS={svc:["margin","soft","kernel","smo","multi"], svr:["tube","kernel","loss","dual"]};
-const RENDER={"svc-margin":renderM1,"svc-soft":renderM2,"svc-kernel":renderM3,"svc-smo":renderM4,"svc-multi":renderM5,"svr-tube":renderR1,"svr-kernel":renderR2,"svr-loss":renderR3,"svr-dual":renderR4};
+const TABS={svc:["margin","soft","kernel","smo","multi","diagram"], svr:["tube","kernel","loss","dual","diagram"]};
+const RENDER={"svc-diagram":()=>{},"svr-diagram":()=>{},"svc-margin":renderM1,"svc-soft":renderM2,"svc-kernel":renderM3,"svc-smo":renderM4,"svc-multi":renderM5,"svr-tube":renderR1,"svr-kernel":renderR2,"svr-loss":renderR3,"svr-dual":renderR4};
 const NOTES={svc:"범주(질환 여부)를 맞힙니다. 두 클래스 사이 마진을 최대로 하고, 힌지 손실로 위반을 벌합니다.",svr:"숫자(혈압)를 맞힙니다. ±ε 튜브 안 오차는 무시하고, 튜브 밖 오차만 ε-무감 손실로 벌합니다."};
-function writeHash(){ const t=S.tab[S.part]; history.replaceState(null,"","#"+S.part+(t===TABS[S.part][0]?"":"-"+t)); }
+function writeHash(){ const t=S.tab[S.part]; if(t==="diagram"){ history.replaceState(null,"","#diagram"); return; } history.replaceState(null,"","#"+S.part+(t===TABS[S.part][0]?"":"-"+t)); }
 function redraw(){ stopM4(); const key=S.part+"-"+S.tab[S.part]; RENDER[key](); renderCode(); if(S.part==="svc"&&S.tab.svc==="kernel"&&S.m3.play) play3(true); }
 function redrawAll(){ const key=S.part+"-"+S.tab[S.part]; RENDER[key](); renderScale(); renderCode(); }
 function setPart(p,write){
@@ -1732,10 +1749,13 @@ Object.keys(TABS).forEach(p=>{
 });
 function readHash(){
   const h=location.hash.slice(1), [p,t]=h.split("-");
+  if(h==="diagram"){ S.tab[S.part]="diagram"; setPart(S.part,false); return; }
   const part=TABS[p]?p:"svc", tab=(TABS[part].includes(t)?t:TABS[part][0]);
   S.tab[part]=tab; setPart(part,false);
 }
 window.addEventListener("hashchange",readHash);
+/* svr 파트의 구성도 탭은 해당 장부터 보여 줌 */
+(function(){ const el=$("dgSvr"); if(!el||!window.DSDiagram) return; const v=DSDiagram.mount(el,"svm"); if(v) v.show(3); })();
 
 /* ================================================================== 조작 연결 */
 function seg(el,cb){ el.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ if(b.disabled) return; el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b)); cb(b.dataset.v); })); }

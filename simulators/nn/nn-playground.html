@@ -8,8 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
-<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 /* 역할 색: 파랑 = 양(+) 가중치·양(+) 출력·클래스 1 / 주황 = 음(−) 가중치·음(−) 출력·클래스 0
@@ -190,6 +191,8 @@
       <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -217,6 +220,7 @@
     <button type="button" class="sk-tab" role="tab" id="tab-sweep" aria-controls="pane-sweep" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>자동 스윕</button>
     <button type="button" class="sk-tab" role="tab" id="tab-guide" aria-controls="pane-guide" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>해석 가이드</button>
     <button type="button" class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>코드</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>알고리즘 구성도</button>
   </nav>
 
   <!-- ================= 1. 실험실 ================= -->
@@ -443,6 +447,10 @@
       <p class="sk-hint" style="margin:0">초깃값 규칙(Glorot uniform, 편향 0), 손실(binary_crossentropy), L2(λ·Σw²), Adam(β₁ 0.9, β₂ 0.999, ε 1e-7), Momentum 0.9는 이 페이지 계산과 같습니다. 난수 생성기가 달라 점 위치와 초깃값은 조금 다릅니다.</p>
     </div>
   </section>
+  <!-- ================= 알고리즘 구성도 ================= -->
+  <section id="pane-diagram" class="np-pane" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">강의 슬라이드 2장 · 층·노드와 학습 한 단계 → 하이퍼파라미터와 학습 곡선 진단</span></div><div data-ds-diagrams="nn-playground"></div></section>
+  </section>
 </main>
 
 <!-- ===== 공통 푸터 ===== -->
@@ -459,7 +467,9 @@
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/nn-playground.js?v=20261002c"></script>
 <script>
 (function () {
 "use strict";
@@ -744,7 +754,7 @@ function catChart(host,o){
 }
 
 /* ================= 탭 ================= */
-const TABS=["lab","log","sweep","guide","code"];let curTab="lab";const onShow={};
+const TABS=["lab","log","sweep","guide","code","diagram"];let curTab="lab";const onShow={};
 function showTab(k,focus){
   if(!TABS.includes(k))k="lab";
   TABS.forEach(t=>{const b=$("tab-"+t),on=t===k;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;$("pane-"+t).hidden=!on;});

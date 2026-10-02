@@ -8,8 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
-<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 /* 역할 색: 파랑 = 학습 구간·특성 / 주황 = 예측·목표·평가(test) / 회색 = 실제 미래 / 빨강 = 누수 / 초록 = 올바른 방법 / 보라 = 롤링 창·직접 전략 / 청록 = 달력 특성·다중 출력 */
@@ -189,6 +190,8 @@ details.rp-more[open] summary{margin-bottom:8px}
       <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)" aria-current="page">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -252,6 +255,7 @@ details.rp-more[open] summary{margin-bottom:8px}
     <button type="button" class="sk-tab" role="tab" id="tab-multi" aria-controls="pane-multi" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>다중 스텝 전략</button>
     <button type="button" class="sk-tab" role="tab" id="tab-once" aria-controls="pane-once" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>한 번 vs 롤링</button>
     <button type="button" class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>코드</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>알고리즘 구성도</button>
   </nav>
 
   <!-- ================= 1. Time Shift ================= -->
@@ -519,6 +523,10 @@ details.rp-more[open] summary{margin-bottom:8px}
       <p class="sk-note"><b>append vs refit</b> — <code>res.append(new, refit=False)</code>는 계수를 그대로 두고 새 관측만 이어 붙여 다음 예측의 입력을 갱신합니다. <code>refit=True</code>면 늘어난 데이터로 계수를 다시 추정합니다. 3번 화면의 "재학습" 설정이 이 차이입니다.</p>
     </div>
   </section>
+  <!-- ================= 7. 알고리즘 구성도 ================= -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">Time Shift 표 · 시간순 분할 · 워크포워드와 다중 스텝 전략을 강의 슬라이드로 정리</span></div><div data-ds-diagrams="rolling-prediction"></div></section>
+  </section>
 </main>
 
 <!-- ===== 공통 푸터 ===== -->
@@ -535,7 +543,9 @@ details.rp-more[open] summary{margin-bottom:8px}
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/rolling-prediction.js?v=20261002c"></script>
 <script>
 (function () {
 "use strict";
@@ -682,7 +692,7 @@ function parseCSV(txt){
 /* ============================================================
    탭
    ============================================================ */
-const TABS=["shift","split","walk","multi","once","code"];let curTab="shift";const onShow={};const players=[];
+const TABS=["shift","split","walk","multi","once","code","diagram"];let curTab="shift";const onShow={};const players=[];
 function showTab(k,focus){
   if(!TABS.includes(k))k="shift";
   TABS.forEach(t=>{const b=$("tab-"+t),p=$("pane-"+t),on=t===k;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;p.hidden=!on;});

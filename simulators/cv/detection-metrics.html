@@ -8,8 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
-<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 /* 역할 색: 글자·배지용(테마별) + 영상 위 표시용(영상은 항상 어두우므로 밝은 색 고정) */
@@ -111,6 +112,8 @@
       <a href="../../index.html#cv" style="--c:var(--cat-cv)" aria-current="page">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -138,6 +141,7 @@
     <button class="sk-tab" type="button" role="tab" id="tab-nms" data-tab="nms" aria-controls="pane-nms" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>NMS</button>
     <button class="sk-tab" type="button" role="tab" id="tab-ap" data-tab="ap" aria-controls="pane-ap" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>PR 곡선 · AP · mAP</button>
     <button class="sk-tab" type="button" role="tab" id="tab-froc" data-tab="froc" aria-controls="pane-froc" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>FROC</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-diagram" data-tab="diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>알고리즘 구성도</button>
   </nav>
 
   <!-- ================= 1. IoU ================= -->
@@ -374,6 +378,10 @@
     </div>
     <p class="sk-note">같은 예측 목록이라도 <b>mAP</b>는 "모든 임계값에서 정밀도·재현율이 얼마나 좋은가"를 한 숫자로 요약하고, <b>FROC</b>는 "영상 한 장에 오탐을 몇 개까지 참으면 병변을 몇 % 찾는가"를 보여 줍니다. 판독 현장에서는 FROC 문장이 바로 쓰입니다.</p>
   </section>
+  <!-- ========== 알고리즘 구성도 ========== -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">강의 도식 3장 · IoU / TP·FP·FN · NMS / AP·mAP·FROC</span></div><div data-ds-diagrams="detection-metrics"></div></section>
+  </section>
 </main>
 
 <!-- ===== 공통 푸터 ===== -->
@@ -390,7 +398,9 @@
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/detection-metrics.js?v=20261002c"></script>
 <script>
 (function(){
 "use strict";
@@ -1354,7 +1364,7 @@ const FROC = (function(){
 /* ================================================================
    탭 · 해시 · 키보드 · 테마 다시 그리기
    ================================================================ */
-const PANES = { iou: IOU, match: MATCH, nms: NMS, ap: AP, froc: FROC };
+const PANES = { iou: IOU, match: MATCH, nms: NMS, ap: AP, froc: FROC, diagram: { draw(){} } };
 const tabs = $$(".sk-tab");
 let current = "iou";
 function selectTab(name, focus){
@@ -1394,7 +1404,6 @@ IOU.init(); MATCH.init(); NMS.init(); AP.init(); FROC.init();
 selectTab((location.hash || "").slice(1) || "iou");
 
 /* 검산용 (Playwright 등에서 확인) */
-window.__DM = { iou, IOU, MATCH, NMS, DATA, AP, FROC };
 })();
 </script>
 </body>

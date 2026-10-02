@@ -8,8 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
-<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 /* 시계열 차트 규칙: 학습 = 파랑 실선 / 검증 = 회색 점선 / 예측 = 주황 실선 / 예측 구간 = 주황 음영 / 예측 시작 = 세로 점선
@@ -145,6 +146,8 @@
       <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)" aria-current="page">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -229,6 +232,7 @@
     <button class="sk-tab" role="tab" id="tab-decomp" aria-controls="pane-decomp" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>분해 보기</button>
     <button class="sk-tab" role="tab" id="tab-compare" aria-controls="pane-compare" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>모형 비교</button>
     <button class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>파이썬 코드</button>
+    <button class="sk-tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>알고리즘 구성도</button>
   </nav>
 
   <!-- ---------- 1. 모형 ---------- -->
@@ -460,6 +464,11 @@
       <pre class="ts-code" id="code" tabindex="0" aria-label="파이썬 코드"></pre>
     </div>
   </section>
+
+  <!-- ---------- 5. 알고리즘 구성도 ---------- -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">Naive 계열 · 지수평활(ETS) · Theta를 강의 슬라이드 한 장씩으로 정리</span></div><div data-ds-diagrams="classical-forecasting"></div></section>
+  </section>
 </main>
 
 <!-- ===== 공통 푸터 ===== -->
@@ -476,7 +485,9 @@
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/classical-forecasting.js?v=20261002c"></script>
 <script>
 (function () {
   "use strict";
@@ -868,7 +879,7 @@
   };
   const MODEL_KEYS = ["naive","snaive","drift","mean","ses","holt","damped","hwa","hwm","theta"];
   const NV_NAME = { naive:"Naive", snaive:"Seasonal Naive", drift:"Drift", mean:"Mean" };
-  const ALGOS = ["naive","ets","theta"], TABS = ["model","decomp","compare","code"];
+  const ALGOS = ["naive","ets","theta"], TABS = ["model","decomp","compare","code","diagram"];
 
   /* ---------------- 상태 ---------------- */
   const S = {
@@ -1549,7 +1560,7 @@ print(pd.DataFrame(results).T.sort_values("MASE").round(3))
     if (S.tab === "model"){ if (S.algo === "naive") renderNaive(); else if (S.algo === "ets") renderEts(); else renderTheta(); }
     else if (S.tab === "decomp") renderDecomp();
     else if (S.tab === "compare") renderCompare();
-    else renderCode();
+    else if (S.tab === "code") renderCode();
   }
   function recompute(){ CUR = computeCurrent(); }
   function renderAll(){ syncControls(); renderMain(); renderPane(); }
@@ -1560,7 +1571,7 @@ print(pd.DataFrame(results).T.sort_values("MASE").round(3))
 
   /* ---------------- 탭 · 해시 ---------------- */
   const tabs = [...document.querySelectorAll(".sk-tab")];
-  function setHash(){ history.replaceState(null, "", "#" + S.algo + (S.tab === "model" ? "" : "-" + S.tab)); }
+  function setHash(){ history.replaceState(null, "", S.tab === "diagram" ? "#diagram" : "#" + S.algo + (S.tab === "model" ? "" : "-" + S.tab)); }
   function showTab(name, focus){
     S.tab = name; tabs.forEach(b => { const on = b.id === "tab-" + name; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1; $(b.getAttribute("aria-controls")).hidden = !on; if (on && focus) b.focus(); });
     setHash(); stopAll(); renderPane();
@@ -1577,6 +1588,7 @@ print(pd.DataFrame(results).T.sort_values("MASE").round(3))
   $("algoSeg").addEventListener("keydown", e => { const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return; e.preventDefault(); setAlgo(ALGOS[(ALGOS.indexOf(S.algo) + d + 3) % 3], true); });
   function parseHash(){
     const hs = location.hash.slice(1).split("-"); let changed = false;
+    if (hs[0] === "diagram"){ if (S.tab !== "diagram"){ S.tab = "diagram"; changed = true; } return changed; }
     if (ALGOS.includes(hs[0]) && hs[0] !== S.algo){ S.algo = hs[0]; changed = true; }
     const tb = TABS.includes(hs[1]) ? hs[1] : "model"; if (ALGOS.includes(hs[0]) && tb !== S.tab){ S.tab = tb; changed = true; }
     return changed;

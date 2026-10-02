@@ -1,0 +1,1566 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>[Case Study] 열화상 영상 객체 탐지 멀티 모달 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 영상 = 청록, 문장 = 파랑, 결합 = 자주, 시간축·추적 = 초록, 정답 = 회색, 경고 = 빨강
+   --img-* 는 열화상 영상 위에 그리는 표시 색 (영상은 테마와 무관하므로 고정) */
+:root{
+  --sk-accent: var(--cat-mm);
+  --role-img:#0E8A84; --role-txt:#2563EB; --role-fuse:#A3237E; --role-time:#2B8A3E; --role-gt:#64748B; --role-warn:#DC2626;
+  --c-day:#C2410C; --c-night:#4338CA;
+  --img-person:#FF5C5C; --img-car:#22D3EE; --img-bike:#FACC15; --img-gt:#F1F5F9; --img-tp:#4ADE80; --img-fp:#FB923C; --img-fn:#FF4D6D; --img-det:#C084FC; --img-ink:#0B0F14;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --role-img:#3CCFC2; --role-txt:#6AA5FF; --role-fuse:#EC7FD0; --role-time:#51CF66; --role-gt:#A3AEC0; --role-warn:#F87171;
+  --c-day:#FB923C; --c-night:#A5B4FC;
+} }
+:root[data-theme="dark"]{
+  --role-img:#3CCFC2; --role-txt:#6AA5FF; --role-fuse:#EC7FD0; --role-time:#51CF66; --role-gt:#A3AEC0; --role-warn:#F87171;
+  --c-day:#FB923C; --c-night:#A5B4FC;
+}
+
+[role=tabpanel]{display:flex;flex-direction:column;gap:16px}
+.sk-card > .sk-seg{align-self:flex-start;max-width:100%;overflow-x:auto}
+.sk-group{max-width:100%;min-width:0}
+.sk-group .sk-seg{max-width:100%;overflow-x:auto}
+.th-split{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start}
+.th-split--wide{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}
+.th-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+@media (max-width:980px){.th-split,.th-split--wide{grid-template-columns:minmax(0,1fr)}}
+
+.th-img{display:block;width:100%;aspect-ratio:640/512;border-radius:10px;background:#000;touch-action:manipulation}
+.th-chart{display:block;width:100%;aspect-ratio:16/9;border-radius:8px}
+.th-chart--sq{aspect-ratio:5/4}
+.th-small{font-size:13px;color:var(--muted);margin:0}
+.th-readout{font-family:var(--mono);font-size:13px;color:var(--text);min-height:1.6em;margin:0}
+
+.th-kv{max-width:820px}
+.th-kv dd{font-family:var(--sans);text-align:left}
+@media (max-width:520px){.th-kv{grid-template-columns:minmax(0,1fr);gap:0 0}.th-kv dd{margin-bottom:6px}}
+.th-mods{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:900px){.th-mods{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:420px){.th-mods{grid-template-columns:minmax(0,1fr)}}
+.th-mod{border:1.5px solid var(--c);border-radius:12px;padding:10px 12px;background:color-mix(in srgb,var(--c) 8%,var(--surface));display:flex;flex-direction:column;gap:3px;min-width:0}
+.th-mod b{font-size:14.5px;color:var(--ink)}
+.th-mod span{font-size:12.5px;color:var(--muted)}
+.th-mod code{font-family:var(--mono);font-size:12px;color:var(--c);font-weight:600}
+
+.th-bars{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:5px 10px;align-items:center;font-size:13px}
+.th-bars .lb{color:var(--muted);white-space:nowrap}
+.th-bars .bar{height:14px;border-radius:4px;background:var(--surface-2);overflow:hidden;display:flex;flex-direction:column}
+.th-bars .bar i{display:block;height:100%;border-radius:4px;background:var(--c,var(--sk-accent))}
+.th-bars .bar--two{height:18px;gap:2px;background:none}
+.th-bars .bar--two i{height:8px}
+.th-bars .v{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);text-align:right;white-space:nowrap}
+.th-legend i{border-radius:3px}
+
+.th-dia{display:block;width:100%;min-width:820px;height:auto}
+.th-dia .blk{cursor:pointer}
+.th-dia .blk rect{stroke-width:1.5;transition:stroke-width .15s,fill .15s}
+.th-dia .blk text{pointer-events:none}
+.th-dia .blk .t1{font-size:13px;font-weight:700;fill:var(--ink)}
+.th-dia .blk .t2{font-size:11px;font-family:var(--mono);fill:var(--muted)}
+.th-dia .blk:hover rect,.th-dia .blk:focus-visible rect{stroke-width:2.5}
+.th-dia .blk:focus{outline:none}
+.th-dia .blk:focus-visible rect{stroke:var(--focus)}
+.th-dia .blk.on rect{stroke-width:3.2}
+.th-dia .blk.dim{opacity:.38}
+.th-dia .ar{fill:none;stroke-width:1.6}
+.th-dia .ar.on{stroke-width:2.8}
+.th-dia .grp{font-size:11.5px;font-weight:700;fill:var(--faint);letter-spacing:.02em}
+.th-dia .grpbox{fill:none;stroke:var(--line);stroke-dasharray:4 4}
+.th-dia .alab{font-size:10.5px;fill:var(--muted);font-family:var(--mono)}
+.r-img{--c:var(--role-img)} .r-txt{--c:var(--role-txt)} .r-fuse{--c:var(--role-fuse)} .r-time{--c:var(--role-time)} .r-gt{--c:var(--role-gt)} .r-warn{--c:var(--role-warn)}
+.th-dia .blk rect{fill:color-mix(in srgb,var(--c) 11%,var(--surface));stroke:var(--c)}
+.th-dia .blk.on rect{fill:color-mix(in srgb,var(--c) 26%,var(--surface))}
+.th-detail h3{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.th-detail .sk-pill{color:var(--c)}
+.th-detail p{margin:0;font-size:14px;color:var(--text)}
+.th-io{font-family:var(--mono);font-size:13px;color:var(--ink);background:var(--surface-2);border-radius:8px;padding:6px 10px;overflow-x:auto}
+
+.th-tablebox{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.th-tablebox .sk-table th{z-index:1}
+.sk-table td.hit{background:color-mix(in srgb,var(--sk-accent) 22%,var(--surface));font-weight:700;color:var(--ink)}
+.sk-table td.forb{color:var(--faint)}
+.sk-table tr.cur td{background:color-mix(in srgb,var(--sk-accent) 12%,var(--surface))}
+.sk-table td.warn{color:var(--role-warn);font-weight:700}
+.sk-table td.good{color:var(--role-time);font-weight:700}
+.sk-table caption{caption-side:top;text-align:left;font-size:12.5px;color:var(--faint);padding:0 0 6px}
+
+.th-hm{display:inline-grid;grid-template-columns:auto repeat(3,52px);gap:3px;font-family:var(--mono);font-size:13px}
+.th-hm input{width:52px;font:inherit;text-align:center;padding:5px 2px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);color:var(--ink)}
+.th-hm input.sel{background:color-mix(in srgb,var(--sk-accent) 24%,var(--surface));border-color:var(--sk-accent);font-weight:700}
+.th-hm input.sel2{box-shadow:inset 0 0 0 2px var(--role-gt)}
+.th-hm span{display:grid;place-items:center;color:var(--muted);font-size:12px;padding:0 4px}
+
+.th-report{font-family:var(--mono);font-size:13px;line-height:1.7;white-space:pre-wrap;word-break:break-word;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0;color:var(--ink)}
+.th-code{font-family:var(--mono);font-size:12.5px;line-height:1.6;white-space:pre;overflow-x:auto;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0;color:var(--ink)}
+.th-codehead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.th-play{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.th-frame{flex:1 1 220px;min-width:160px}
+.th-focus:focus-visible{outline:2px solid var(--focus);outline-offset:3px;border-radius:var(--radius)}
+.th-sw{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:5px;vertical-align:0;border:2px solid var(--c)}
+.th-sw--dash{border-style:dashed}
+.th-sw--fill{background:var(--c)}
+.th-warnlist{margin:0;padding-left:20px;display:grid;gap:6px;font-size:14px}
+.th-warnlist b{color:var(--ink)}
+.th-kpi{display:flex;flex-wrap:wrap;gap:8px}
+.th-kpi .sk-stat b{font-size:18px}
+.th-stat-good b{color:var(--role-time)!important}
+.th-stat-bad b{color:var(--role-warn)!important}
+@media (max-width:520px){.th-code,.th-report{font-size:12px}}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+      <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)" aria-current="page">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">[Case Study] 열화상 영상 객체 탐지 멀티 모달 시뮬레이터</h1>
+      <p class="ds-hero__lede">드론 열화상 한 장(영상)에서 사람·차량을 찾고, 프레임을 이어(시간축) 같은 사람을 따라가며, 고도·각도로 픽셀을 미터로 바꿔(기하) 상황 보고문(텍스트)까지 만듭니다. 방사율·AGC, 열점 검출과 IoU·AP, 칼만+헝가리안 SORT, MOTA·IDF1을 직접 계산합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button class="sk-tab" type="button" role="tab" id="tab-data" aria-controls="pane-data" aria-selected="true"><span class="sk-num">1</span>문제·데이터</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-arch" aria-controls="pane-arch" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>모형 구조</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-detect" aria-controls="pane-detect" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>탐지</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-track" aria-controls="pane-track" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>추적</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-report" aria-controls="pane-report" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>궤적·GSD·상황 보고</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-limits" aria-controls="pane-limits" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>한계와 안전장치</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>알고리즘 구성도</button>
+  </nav>
+
+  <!-- ================= 1. 문제·데이터 ================= -->
+  <section id="pane-data" role="tabpanel" aria-labelledby="tab-data">
+    <div class="sk-card">
+      <div class="sk-head"><h2>문제 정의 — 야간 드론 열화상으로 사람을 찾고, 따라가고, 보고한다</h2><span class="sk-hint">네 가지 정보원이 한 흐름으로 묶입니다</span></div>
+      <div class="th-mods">
+        <div class="th-mod r-img" style="--c:var(--role-img)"><b>열화상 영상</b><span>1채널 8bit, 640×512. 값은 온도가 아니라 장면 안 상대 순위(AGC)</span><code>1×512×640 uint8</code></div>
+        <div class="th-mod" style="--c:var(--role-time)"><b>시간축</b><span>7.5 fps 영상 = 프레임을 쌓은 텐서. 칼만 필터로 다음 위치를 예측</span><code>T×512×640</code></div>
+        <div class="th-mod" style="--c:var(--role-fuse)"><b>기하·계량</b><span>고도·카메라 각도·화각으로 픽셀을 미터로(GSD), 궤적을 m/s로</span><code>m/px · m/s</code></div>
+        <div class="th-mod" style="--c:var(--role-txt)"><b>보고 텍스트</b><span>측정값만으로 채우는 SALUTE 관측 보고서. "식별 불가"는 추측으로 채우지 않음</span><code>S·A·L·U·T·E</code></div>
+      </div>
+      <dl class="sk-kv th-kv">
+        <dt>데이터</dt><dd>HIT-UAV 드론 열화상 2,898장 · 640×512 · CC BY 4.0</dd>
+        <dt>클래스</dt><dd>Person · Car · Bicycle · OtherVehicle</dd>
+        <dt>메타데이터</dt><dd>주/야 · 비행 고도(60–130m) · 촬영각</dd>
+        <dt>실습 분할 (FAST_MODE)</dt><dd>train 600 · val 150 · test 200 (전체 train 2,029 · test 579)</dd>
+        <dt>영상</dt><dd>실제 드론 열화상 5편 (7.5 fps) + 정답 궤적이 있는 반합성 시퀀스 4편</dd>
+      </dl>
+      <p class="sk-note">이 시뮬레이터의 영상·장면은 모두 <b>코드로 절차 생성</b>한 모사 영상입니다. 실습 노트북의 실제 결과 숫자는 표마다 "실습 노트북 결과"로 따로 표시합니다.</p>
+    </div>
+
+    <div class="th-split">
+      <div class="sk-card">
+        <div class="sk-head"><h2>열화상 프레임 만들기 — 물리 → 8bit</h2><span class="sk-hint">영상 위에 커서를 올리면 값이 보입니다</span></div>
+        <canvas class="th-img" id="cvScene" aria-label="절차 생성한 드론 열화상 장면. 배경 온도장 위에 사람, 차량, 자전거 열원이 있다"></canvas>
+        <p class="th-readout" id="hoverOut">커서 위치의 8bit 값과 겉보기 온도가 여기에 나옵니다.</p>
+        <div class="sk-legend" id="lgScene"><span><span class="th-sw" style="--c:var(--img-person)"></span>사람</span><span><span class="th-sw" style="--c:var(--img-car)"></span>차량</span><span><span class="th-sw" style="--c:var(--img-bike)"></span>자전거</span><span>(정답 박스 색은 실습 노트북과 같게)</span></div>
+      </div>
+      <div class="th-col">
+        <div class="sk-card">
+          <div class="sk-controls">
+            <label class="sk-slider"><span class="sk-sl-head">시각 <b id="vHour">02:00</b></span><input type="range" id="sHour" min="0" max="24" step="0.25" value="2"></label>
+            <label class="sk-slider"><span class="sk-sl-head">비행 고도 <b id="vAlt1">60 m</b></span><input type="range" id="sAlt1" min="60" max="130" step="10" value="60"></label>
+            <label class="sk-slider"><span class="sk-sl-head">반사원(밤하늘) 온도 <b id="vRefl">−20 °C</b></span><input type="range" id="sRefl" min="-40" max="20" step="1" value="-20"></label>
+          </div>
+          <div class="sk-group"><span class="sk-label">팔레트</span><div class="sk-seg" id="segPal"><button type="button" data-v="white" aria-pressed="true">white-hot</button><button type="button" data-v="black" aria-pressed="false">black-hot</button><button type="button" data-v="iron" aria-pressed="false">iron</button><button type="button" data-v="rainbow" aria-pressed="false">rainbow</button></div></div>
+          <div class="sk-group"><span class="sk-label">AGC</span><div class="sk-seg" id="segAgc"><button type="button" data-v="mm" aria-pressed="true">최소–최대</button><button type="button" data-v="pct" aria-pressed="false">분위수 1–99%</button></div></div>
+          <div class="sk-controls">
+            <label class="sk-check"><input type="checkbox" id="chkGen">막 꺼진 발전기(95°C) 추가</label>
+            <label class="sk-check"><input type="checkbox" id="chkRun">주행 직후 차량(후드 60°C)</label>
+            <label class="sk-check"><input type="checkbox" id="chkGt1" checked>정답 박스</label>
+            <button class="sk-btn sk-btn--sm" type="button" id="btnNewScene">다른 장면</button>
+          </div>
+        </div>
+        <div class="sk-card sk-card--sunk">
+          <h3>같은 사람의 최대 8bit 값 (AGC 실험)</h3>
+          <div class="sk-scroll"><table class="sk-table" id="tblAgc"></table></div>
+          <p class="th-small" id="agcNote"></p>
+          <p class="sk-note">8bit 열화상의 픽셀값은 온도가 아니라 <b>그 장면 안에서의 상대 순위</b>입니다. 그래서 "200 이상은 사람" 같은 절대 임계값은 장면이 바뀌면 깨지고, 장면 통계 기반 적응 임계값(③ 탐지)과 밝기·대비 지터 증강을 씁니다. 팔레트는 보기 방식일 뿐이고, 모델 입력은 항상 1채널 white-hot입니다.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>겉보기 온도 — 방사율과 반사의 착시</h2><span class="sk-hint">반사원 온도 슬라이더와 연동</span></div>
+        <div class="sk-formula">W<sub>측정</sub> = ε·σ·T<sup>4</sup> + (1−ε)·σ·T<sub>반사</sub><sup>4</sup><br>T<sub>겉보기</sub> = (W<sub>측정</sub> / σ)<sup>1/4</sup> − 273.15 &nbsp; (σ = 5.670374×10⁻⁸ W/m²K⁴)</div>
+        <div class="sk-scroll"><table class="sk-table" id="tblApp"></table></div>
+        <p class="th-small" id="appNote"></p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>열 교차 — 대비가 0이 되는 시각</h2><span class="sk-hint">세로선 = 지금 고른 시각</span></div>
+        <canvas class="th-chart" id="cvCross" aria-label="하루 동안 사람(옷 표면), 아스팔트, 잔디 온도와 사람-아스팔트 대비 곡선"></canvas>
+        <div class="sk-legend" id="lgCross"></div>
+        <div class="sk-formula">아스팔트 = 20 + 18·sin(2π(h−9)/24) · 잔디 = 15 + 9·sin(2π(h−9)/24) · 사람(옷) = 0.35·아스팔트 + 20<br><span id="crossOut"></span></div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>탐색적 분석 (EDA) — 실습 노트북 결과, train 600장</h2><span class="sk-hint">고도·주야·클래스 불균형·소형 객체·열 대비</span></div>
+      <div class="sk-grid2">
+        <div class="th-col">
+          <h3>클래스별 박스 수 — OtherVehicle은 극소수(불균형)</h3>
+          <div class="th-bars" id="barsCls"></div>
+          <h3 style="margin-top:8px">고도별 주/야 이미지 수</h3>
+          <div class="sk-legend"><span><i style="background:var(--c-day)"></i>주간(day)</span><span><i style="background:var(--c-night)"></i>야간(night)</span></div>
+          <div class="th-bars" id="barsAlt"></div>
+        </div>
+        <div class="th-col">
+          <h3>고도별 사람 박스 높이(px) 중앙값 vs 이론값</h3>
+          <canvas class="th-chart th-chart--sq" id="cvHeight" aria-label="고도별 사람 박스 높이 중앙값과 GSD 이론선"></canvas>
+          <div class="sk-legend" id="lgHeight"></div>
+          <p class="th-small">이론: 수직 촬영, 화각 45° 가정에서 1.7m가 차지하는 픽셀 수 = 1.7 / GSD. COCO의 '작은 객체' 기준(32×32 px 미만)에 HIT-UAV 사람 대부분이 속합니다.</p>
+          <h3>열 대비 중앙값 (박스 안 상위 25% − 주변 고리 평균, 8bit)</h3>
+          <div class="th-bars" id="barsCon"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 2. 모형 구조 ================= -->
+  <section id="pane-arch" role="tabpanel" aria-labelledby="tab-arch" hidden>
+    <div class="sk-card th-focus" id="diaCard" tabindex="0" aria-label="모형 구조도. 왼쪽·오른쪽 화살표 키로 단계 이동">
+      <div class="sk-head"><h2>모형 구조도</h2><span class="sk-hint">블록을 누르면 설명 · ←/→ 키로 단계 이동</span></div>
+      <div class="sk-seg" id="segDia"><button type="button" data-v="all" aria-pressed="true">전체 흐름</button><button type="button" data-v="two" aria-pressed="false">2단계 검출기</button><button type="button" data-v="yolo" aria-pressed="false">YOLOv8n</button><button type="button" data-v="sort" aria-pressed="false">SORT 추적기</button></div>
+      <div class="sk-legend"><span><i style="background:var(--role-img)"></i>영상(Vision)</span><span><i style="background:var(--role-time)"></i>시간축·추적</span><span><i style="background:var(--role-fuse)"></i>결합(영상+메타데이터)</span><span><i style="background:var(--role-txt)"></i>문장(Text)</span><span><i style="background:var(--role-gt)"></i>정답·평가</span><span><i style="background:var(--role-warn)"></i>사람 판단·경고</span></div>
+      <div class="th-col">
+        <div class="th-col">
+          <div class="sk-scroll" id="diaBox"></div>
+          <div class="th-play">
+            <button class="sk-btn sk-btn--sm" type="button" id="dFirst">처음</button>
+            <button class="sk-btn sk-btn--sm" type="button" id="dPrev">이전</button>
+            <button class="sk-btn sk-btn--sm" type="button" id="dNext">다음</button>
+            <button class="sk-btn sk-btn--sm sk-btn--primary" type="button" id="dPlay">재생</button>
+            <div class="sk-seg" id="segDSpeed"><button type="button" data-v="1600" aria-pressed="false">느리게</button><button type="button" data-v="1000" aria-pressed="true">보통</button><button type="button" data-v="550" aria-pressed="false">빠르게</button></div>
+            <span class="sk-hint" id="dStepOut"></span>
+          </div>
+        </div>
+        <div class="sk-card sk-card--sunk th-detail" id="diaDetail" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 3. 탐지 ================= -->
+  <section id="pane-detect" role="tabpanel" aria-labelledby="tab-detect" hidden>
+    <div class="th-split">
+      <div class="sk-card">
+        <div class="sk-head"><h2>장면과 검출 결과</h2><span class="sk-hint">박스를 누르면 IoU 계산이 보입니다</span></div>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">조건</span><div class="sk-seg" id="segCond"><button type="button" data-v="night" aria-pressed="true">야간 02시</button><button type="button" data-v="day" aria-pressed="false">주간 13시</button></div></div>
+          <div class="sk-group"><span class="sk-label">장면</span><div class="sk-seg" id="segScene"></div></div>
+        </div>
+        <div class="sk-group"><span class="sk-label">방법</span><div class="sk-seg" id="segMethod"><button type="button" data-v="hot" aria-pressed="false">열점만</button><button type="button" data-v="cnn" aria-pressed="true">열점+CNN 검증기</button><button type="button" data-v="yolo" aria-pressed="false">YOLOv8n 미세조정</button></div></div>
+        <div class="sk-group"><span class="sk-label">열점 단계 보기</span><div class="sk-seg" id="segStage"><button type="button" data-v="img" aria-pressed="true">원본</button><button type="button" data-v="open" aria-pressed="false">열림(배경 추정)</button><button type="button" data-v="top" aria-pressed="false">top-hat ×3</button><button type="button" data-v="bin" aria-pressed="false">이진화</button></div></div>
+        <canvas class="th-img" id="cvDet" aria-label="열화상 장면 위에 정답 박스와 예측 박스. 초록은 맞힌 예측, 주황은 오탐, 빨강은 놓친 정답"></canvas>
+        <div class="sk-legend"><span><span class="th-sw" style="--c:var(--img-gt)"></span>정답</span><span><span class="th-sw th-sw--dash" style="--c:var(--img-tp)"></span>맞힌 예측(TP)</span><span><span class="th-sw th-sw--dash" style="--c:var(--img-fp)"></span>오탐(FP)</span><span><span class="th-sw" style="--c:var(--img-fn)"></span>놓친 정답(FN)</span></div>
+        <p class="th-readout" id="detStatus"></p>
+      </div>
+      <div class="th-col">
+        <div class="sk-card">
+          <div class="sk-controls">
+            <label class="sk-slider"><span class="sk-sl-head">비행 고도 <b id="vAlt3">60 m</b></span><input type="range" id="sAlt3" min="60" max="130" step="10" value="60"></label>
+            <label class="sk-slider"><span class="sk-sl-head">구조요소 크기 k <b id="vK">15</b></span><input type="range" id="sK" min="5" max="31" step="2" value="15"></label>
+            <label class="sk-slider"><span class="sk-sl-head">적응 임계값 z <b id="vZ">4.0</b></span><input type="range" id="sZ" min="1" max="8" step="0.5" value="4"></label>
+            <label class="sk-slider"><span class="sk-sl-head">표시 임계값 conf <b id="vConf">0.25</b></span><input type="range" id="sConf" min="0" max="0.95" step="0.05" value="0.25"></label>
+            <label class="sk-slider"><span class="sk-sl-head">NMS IoU <b id="vNms">0.70</b></span><input type="range" id="sNms" min="0.3" max="0.9" step="0.05" value="0.7"></label>
+          </div>
+          <div class="sk-group"><span class="sk-label">AP의 IoU 기준</span><div class="sk-seg" id="segIou"><button type="button" data-v="0.3" aria-pressed="false">0.3</button><button type="button" data-v="0.5" aria-pressed="true">0.5</button></div></div>
+          <div class="sk-formula" id="fmThr"></div>
+        </div>
+        <div class="sk-card sk-card--sunk">
+          <h3>선택한 박스의 IoU</h3>
+          <div class="sk-formula" id="fmIou">영상에서 예측 박스를 눌러 보세요.</div>
+        </div>
+        <p class="sk-note"><b>모의 출력 안내</b> — 열점 후보·top-hat·IoU·NMS·AP는 이 화면에서 실제로 계산합니다. CNN 검증기 점수는 실습 노트북의 패치 분류 혼동행렬(검증 정확도 0.9012) 비율로 뽑은 <b>모의 출력</b>, YOLOv8n 박스도 정답 근처에 흔들림·중복·오탐을 섞어 만든 <b>모의 출력(NMS 전 후보)</b>입니다.</p>
+      </div>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>Person PR 곡선 — 6장 묶음</h2><span class="sk-hint" id="prHint"></span></div>
+        <canvas class="th-chart th-chart--sq" id="cvPR" aria-label="세 검출 방법의 정밀도-재현율 곡선"></canvas>
+        <div class="sk-legend" id="lgPR"></div>
+        <div class="sk-formula">AP = Σ (Δ재현율 × 정밀도 포락선) &nbsp;— 점수순 정렬 → 정답과 IoU ≥ 기준이면 TP(정답 하나에 한 번만) → 누적 TP·FP</div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>클래스별 AP@0.5 — 이 화면의 6장</h2><span class="sk-hint">조건·고도·k·z·NMS를 바꾸면 다시 계산</span></div>
+        <div class="sk-scroll"><table class="sk-table" id="tblApLive"></table></div>
+        <div class="sk-scroll"><table class="sk-table" id="tblApNb"></table></div>
+        <p class="th-small">실습 노트북에서 열점 검출기의 후보 재현율(IoU≥0.3)은 야간 0.818, 주간 0.388, 이미지당 후보 77.1개. 주간엔 햇볕에 달궈진 지면·지붕이 사람만큼 뜨거워 후보 생성 단계에서 놓치고, 그 한계가 2단계 검출기의 상한이 됩니다.</p>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="th-codehead"><h2>파이썬 코드 (현재 설정 반영)</h2><button class="sk-btn sk-btn--sm" type="button" data-copy="codeDet">복사</button></div>
+      <pre class="th-code" id="codeDet"></pre>
+    </div>
+  </section>
+
+  <!-- ================= 4. 추적 ================= -->
+  <section id="pane-track" role="tabpanel" aria-labelledby="tab-track" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>시퀀스와 추적 설정</h2><span class="sk-hint">반합성 시퀀스 4편을 본뜬 절차 생성 영상 · 150프레임 · 7.5 fps</span></div>
+      <div class="sk-group"><span class="sk-label">시퀀스</span><div class="sk-seg" id="segSeq"><button type="button" data-v="walk" aria-pressed="true">night_walk</button><button type="button" data-v="crowd" aria-pressed="false">night_crowd_occlusion</button><button type="button" data-v="shake" aria-pressed="false">night_drone_shake</button><button type="button" data-v="day" aria-pressed="false">day_lowcontrast</button></div></div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">비용</span><div class="sk-seg" id="segMetric"><button type="button" data-v="iou" aria-pressed="true">1−IoU</button><button type="button" data-v="center" aria-pressed="false">중심거리</button></div></div>
+        <label class="sk-slider"><span class="sk-sl-head">iou_thr <b id="vIouThr">0.30</b></span><input type="range" id="sIouThr" min="0.05" max="0.7" step="0.05" value="0.3"></label>
+        <label class="sk-slider"><span class="sk-sl-head">gate (박스 크기 배수) <b id="vGate">1.0</b></span><input type="range" id="sGate" min="0.5" max="3" step="0.25" value="1"></label>
+        <label class="sk-slider"><span class="sk-sl-head">max_age <b id="vMaxAge">5</b></span><input type="range" id="sMaxAge" min="1" max="40" step="1" value="5"></label>
+        <label class="sk-slider"><span class="sk-sl-head">min_hits <b id="vMinHits">2</b></span><input type="range" id="sMinHits" min="1" max="5" step="1" value="2"></label>
+        <label class="sk-check"><input type="checkbox" id="chkCmc">카메라 운동 보정(CMC)</label>
+      </div>
+      <p class="th-small" id="seqDesc"></p>
+    </div>
+
+    <div class="th-split th-split--wide">
+      <div class="sk-card th-focus" id="vidCard" tabindex="0" aria-label="추적 영상. 왼쪽·오른쪽 화살표 키로 프레임 이동">
+        <div class="sk-head"><h2>추적 영상</h2><span class="sk-hint">←/→ 키로 한 프레임씩</span></div>
+        <canvas class="th-img" id="cvVid" aria-label="절차 생성한 드론 열화상 영상 위에 궤적 번호 박스와 꼬리를 그린 화면"></canvas>
+        <div class="th-play">
+          <button class="sk-btn sk-btn--sm" type="button" id="vFirst">처음</button>
+          <button class="sk-btn sk-btn--sm" type="button" id="vPrev">이전</button>
+          <button class="sk-btn sk-btn--sm" type="button" id="vNext">다음</button>
+          <button class="sk-btn sk-btn--sm sk-btn--primary" type="button" id="vPlay">재생</button>
+          <div class="sk-seg" id="segVSpeed"><button type="button" data-v="0.5" aria-pressed="false">0.5×</button><button type="button" data-v="1" aria-pressed="true">1×</button><button type="button" data-v="2" aria-pressed="false">2×</button></div>
+          <label class="sk-slider th-frame"><span class="sk-sl-head">프레임 <b id="vFrame">1 / 150</b></span><input type="range" id="sFrame" min="0" max="149" step="1" value="0"></label>
+        </div>
+        <div class="sk-controls">
+          <label class="sk-check"><input type="checkbox" id="chkVGt">정답(GT)</label>
+          <label class="sk-check"><input type="checkbox" id="chkVDet" checked>검출</label>
+          <label class="sk-check"><input type="checkbox" id="chkVPred">칼만 예측</label>
+          <label class="sk-check"><input type="checkbox" id="chkVTrail" checked>궤적 꼬리</label>
+          <div class="sk-group"><span class="sk-label">화면</span><div class="sk-seg" id="segVView"><button type="button" data-v="track" aria-pressed="true">추적</button><button type="button" data-v="raw" aria-pressed="false">프레임 차분(보정 전)</button><button type="button" data-v="comp" aria-pressed="false">차분(운동 보정 후)</button></div></div>
+        </div>
+        <div class="sk-legend"><span><span class="th-sw" style="--c:var(--img-tp)"></span>궤적(번호별 색)</span><span><span class="th-sw th-sw--dash" style="--c:var(--img-gt)"></span>예측 박스(칼만)</span><span><span class="th-sw" style="--c:var(--img-det)"></span>검출</span><span><span class="th-sw th-sw--dash" style="--c:var(--img-fn)"></span>놓친 정답(FN)</span></div>
+        <p class="th-readout" id="vidStatus"></p>
+      </div>
+      <div class="th-col">
+        <div class="sk-card">
+          <h3>추적 지표 (이 시퀀스, 직접 계산)</h3>
+          <div class="th-kpi" id="kpiTrack"></div>
+          <div class="sk-formula">MOTA = 1 − (FN + FP + IDSW) / GT &nbsp;·&nbsp; IDF1 = 2·IDTP / (GT + 예측)<br><span id="fmMota"></span></div>
+        </div>
+        <div class="sk-card sk-card--sunk">
+          <h3>이번 프레임의 비용 행렬과 헝가리안 할당</h3>
+          <p class="th-small" id="frameSum"></p>
+          <div class="th-tablebox"><table class="sk-table" id="tblCost"></table></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>세 가지 추적 설정 비교 — 이 시퀀스</h2><span class="sk-hint">max_age·min_hits는 위 슬라이더 값</span></div>
+        <div class="sk-scroll"><table class="sk-table" id="tblCfg"></table></div>
+        <div class="sk-scroll"><table class="sk-table" id="tblCfgNb"></table></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>max_age 스윕 — 가림 구간을 얼마나 기다려 줄까</h2><span class="sk-hint">중심거리 매칭, gate 1.0</span></div>
+        <canvas class="th-chart th-chart--sq" id="cvSweep" aria-label="max_age에 따른 IDF1과 IDSW 변화"></canvas>
+        <div class="sk-legend" id="lgSweep"></div>
+        <p class="th-small">max_age를 길게 두면 가림 뒤 재연결은 좋아지지만, 사라진 사람의 궤적이 엉뚱한 새 검출과 이어질 위험과 메모리·연산 증가가 따릅니다. 밀집 장면·저프레임률일수록 짧게, 가림이 잦고 인원이 적으면 길게.</p>
+      </div>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>칼만 필터 — 예측과 관측의 가중 평균</h2><span class="sk-hint">실습 노트북의 정답 궤적 + ±2px 잡음 그대로</span></div>
+        <canvas class="th-chart" id="cvKf" aria-label="정답 궤적, 잡음 섞인 관측, 칼만 추정 궤적"></canvas>
+        <div class="sk-legend" id="lgKf"></div>
+        <div class="sk-controls">
+          <label class="sk-slider"><span class="sk-sl-head">관측 잡음 R 배율 <b id="vRs">1.00</b></span><input type="range" id="sRs" min="-2" max="3" step="0.25" value="0"></label>
+          <label class="sk-slider"><span class="sk-sl-head">과정 잡음 Q 배율 <b id="vQs">1.00</b></span><input type="range" id="sQs" min="-2" max="3" step="0.25" value="0"></label>
+        </div>
+        <div class="sk-formula" id="fmKf"></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>헝가리안 할당 — 전체 비용 최소 1:1 짝</h2><span class="sk-hint">칸 값을 바꿔 보세요</span></div>
+        <div class="sk-group"><div class="sk-seg" id="segHung"><button type="button" data-v="nb" aria-pressed="true">실습 노트북 예</button><button type="button" data-v="greedy" aria-pressed="false">탐욕이 실패하는 예</button></div></div>
+        <div class="sk-scroll"><div class="th-hm" id="hungGrid"></div></div>
+        <div class="sk-legend"><span><i style="background:color-mix(in srgb,var(--sk-accent) 40%,var(--surface))"></i>헝가리안 짝</span><span><i style="background:var(--surface);box-shadow:inset 0 0 0 2px var(--role-gt)"></i>탐욕(행 순서대로 남은 열 중 최소)</span></div>
+        <div class="sk-formula" id="fmHung"></div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="th-codehead"><h2>파이썬 코드 (현재 설정 반영)</h2><button class="sk-btn sk-btn--sm" type="button" data-copy="codeTrack">복사</button></div>
+      <pre class="th-code" id="codeTrack"></pre>
+    </div>
+  </section>
+
+  <!-- ================= 5. 궤적·GSD·상황 보고 ================= -->
+  <section id="pane-report" role="tabpanel" aria-labelledby="tab-report" hidden>
+    <div class="th-split">
+      <div class="sk-card">
+        <div class="sk-head"><h2>픽셀 → 미터: 지상 표본 거리(GSD)</h2><span class="sk-hint">영상 이름 60m-30_1 = 고도 60m, 각도 30°</span></div>
+        <div class="sk-controls">
+          <label class="sk-slider"><span class="sk-sl-head">비행 고도 <b id="vAlt5">60 m</b></span><input type="range" id="sAlt5" min="60" max="130" step="10" value="60"></label>
+          <label class="sk-slider"><span class="sk-sl-head">카메라 각도 (90° = 수직) <b id="vAng5">30°</b></span><input type="range" id="sAng5" min="20" max="90" step="5" value="30"></label>
+          <label class="sk-slider"><span class="sk-sl-head">화각(가정값) <b id="vFov5">45°</b></span><input type="range" id="sFov5" min="25" max="70" step="1" value="45"></label>
+        </div>
+        <div class="sk-formula" id="fmGsd"></div>
+        <div class="sk-stats" id="gsdStats"></div>
+        <p class="sk-note">화각 45°(640 해상도 카메라 + 13mm 렌즈)는 <b>가정값</b>입니다. 실무에서는 드론 로그의 짐벌 각·고도·렌즈 정보를 씁니다. 화면 위아래로 GSD가 달라지는 원근 효과는 무시한 1차 근사입니다.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>궤적 지도 — 카메라 운동을 지운 지면 좌표</h2><span class="sk-hint">화면 4×4 격자(A~D 열, 1~4 행)</span></div>
+        <div class="sk-group"><span class="sk-label">시퀀스</span><div class="sk-seg" id="segSeq5"><button type="button" data-v="walk" aria-pressed="true">night_walk</button><button type="button" data-v="crowd" aria-pressed="false">night_crowd_occlusion</button><button type="button" data-v="shake" aria-pressed="false">night_drone_shake</button><button type="button" data-v="day" aria-pressed="false">day_lowcontrast</button></div></div>
+        <canvas class="th-chart th-chart--sq" id="cvMap" aria-label="지면 좌표로 펼친 궤적 지도와 4×4 구역 격자. 색은 이동 상태"></canvas>
+        <div class="sk-legend"><span><i style="background:var(--role-warn)"></i>정지</span><span><i style="background:var(--role-time)"></i>보행·달리기</span><span><i style="background:var(--role-fuse)"></i>고속(차량 등)</span><span><i style="background:var(--role-gt)"></i>2초 미만 궤적(제외)</span><span>○ = 정지 경보</span></div>
+        <p class="th-small">추적 설정은 실습 노트북의 실제 영상 설정: 1−IoU, iou_thr 0.2, CMC 켬, max_age 8, min_hits 3. wx = cx − Σdx, wy = cy − Σdy (첫 프레임 좌표계 ≈ 지면).</p>
+      </div>
+    </div>
+
+    <div class="th-split">
+      <div class="sk-card">
+        <div class="sk-head"><h2>궤적별 속도와 상태</h2><span class="sk-hint">2초 창 이동 속도의 중앙값</span></div>
+        <div class="sk-controls">
+          <label class="sk-slider"><span class="sk-sl-head">정지 기준 속도 <b id="vStillV">0.30 m/s</b></span><input type="range" id="sStillV" min="0.1" max="1" step="0.05" value="0.3"></label>
+          <label class="sk-slider"><span class="sk-sl-head">정지 경보 시간 STILL_S <b id="vStillS">5 s</b></span><input type="range" id="sStillS" min="2" max="15" step="1" value="5"></label>
+        </div>
+        <div class="sk-formula">v = ‖p<sub>t+k</sub> − p<sub>t</sub>‖ / ((f<sub>t+k</sub> − f<sub>t</sub>) / fps) × GSD, &nbsp; k = int(2초 × 7.5) = 15<br>상태 = 정지(중앙속도 &lt; 기준) · 보행·달리기(&lt; 4.5 m/s) · 고속(차량 등)</div>
+        <div class="th-tablebox"><table class="sk-table" id="tblStats"></table></div>
+      </div>
+      <div class="sk-card">
+        <div class="th-codehead"><h2>SALUTE 관측 보고서 (규칙 기반 템플릿)</h2><button class="sk-btn sk-btn--sm" type="button" data-copy="salute">복사</button></div>
+        <pre class="th-report" id="salute"></pre>
+        <p class="sk-note"><b>왜 LLM이 아니라 템플릿인가</b> — 보고서의 모든 숫자는 측정값에서 곧바로 채웁니다. LLM을 쓴다면 이 구조화된 값을 문장으로 다듬는 역할에만 한정합니다. "식별 불가"를 추측으로 채우지 않는 것이 핵심입니다.</p>
+        <p class="sk-note sk-note--warn"><b>판단은 사람이 한다.</b> 오래 움직이지 않는 열원은 부상자일 수도, 쉬는 사람·경계 근무자일 수도, 따뜻한 물체(오탐)일 수도 있습니다. 시스템은 확인 우선순위를 매길 뿐이고, 경보 기준(속도·시간)은 운용 부서가 정합니다. 추적이 끊기면 정지 시간이 짧게 측정됩니다 → IDF1이 운용 지표에 직접 영향을 줍니다.</p>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="th-codehead"><h2>파이썬 코드 (현재 설정 반영)</h2><button class="sk-btn sk-btn--sm" type="button" data-copy="codeRep">복사</button></div>
+      <pre class="th-code" id="codeRep"></pre>
+    </div>
+  </section>
+
+  <!-- ================= 6. 한계와 안전장치 ================= -->
+  <section id="pane-limits" role="tabpanel" aria-labelledby="tab-limits" hidden>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>도메인 시프트 — 주간으로 배운 모델은 야간에서 통할까</h2><span class="sk-hint">실습 노트북 결과 (패치 CNN 교차 평가)</span></div>
+        <div class="sk-scroll"><table class="sk-table" id="tblShift"></table></div>
+        <p class="th-small">대각선(같은 조건)과 비대각선의 사람 민감도 차이가 도메인 시프트의 크기입니다. 실행마다 수치는 조금씩 다릅니다.</p>
+        <p class="sk-note sk-note--warn">시프트는 <b>비대칭</b>일 수 있습니다. 야간 데이터로만 배운 모델은 '주변보다 뜨거운 점 = 사람'에 기대기 쉬워 햇볕에 달궈진 주간 배경에서 무너집니다. 대응: 두 조건을 섞어 학습, 조건별 임계값, 조건 메타데이터(주/야)를 입력에 추가.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>층화 평가 — 평균 하나로는 보이지 않는 약점</h2><span class="sk-hint">실습 노트북 결과 (YOLOv8n 미세조정, Person AP@0.5)</span></div>
+        <div class="th-bars" id="barsStrat"></div>
+        <div class="sk-legend"><span><i style="background:var(--c-night)"></i>야간</span><span><i style="background:var(--c-day)"></i>주간</span></div>
+        <p class="sk-note sk-note--warn">전체 mAP 한 숫자는 <b>"130m 주간 사람"</b> 같은 약한 구간을 가립니다. 운용 조건(야간 수색 60m 등)에 맞춰 층화해서 보고해야 합니다. COCO 사전학습 YOLOv8n을 그대로 쓰면 Person AP@0.5가 0.033 — 위에서 내려다본 10~20px 사람은 거의 못 잡습니다. 같은 구조라도 <b>데이터(시점·크기·파장)</b>가 성능을 결정합니다.</p>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>한계와 안전장치 정리</h2><span class="sk-hint">사례 전체에서 나온 위험과 대응</span></div>
+      <div class="sk-grid2">
+        <div class="th-col">
+          <p class="sk-note sk-note--warn"><b>8bit 열화상은 온도가 아니다</b> — HIT-UAV는 8bit 비방사측정. 체온 측정처럼 온도 자체가 목적이면 방사측정 카메라 + 방사율·거리·습도 보정이 필수입니다. 금속 지붕·차량 유리는 밤하늘을 반사해 차갑게 보이고, 담요·방한복은 사람의 열 신호를 크게 줄입니다.</p>
+          <p class="sk-note sk-note--warn"><b>열 교차</b> — 아침·저녁에 지면 온도가 사람과 같아지면(단순 모형에서 11.2시·18.5시) 대비가 사라집니다. 주간 사람 열 대비 중앙값은 52.0으로 야간 88.0의 절반 남짓.</p>
+          <p class="sk-note sk-note--warn"><b>소형 객체</b> — 120–130m에서 사람 박스 높이 중앙값은 13–15px. 1~2px 오차가 IoU를 크게 깎으므로 IoU 0.3 지표도 함께 봅니다.</p>
+          <p class="sk-note sk-note--warn"><b>후보 생성기의 상한</b> — 2단계 검출기는 열점 후보가 놓친 것(주간 사람, 차가운 차량)을 영영 찾지 못합니다.</p>
+        </div>
+        <div class="th-col">
+          <p class="sk-note sk-note--warn"><b>추적은 검출을 넘지 못한다</b> — day_lowcontrast 시퀀스는 MOTA 0.196 (IoU 매칭). 드론이 9px 튀면 10px 사람의 예측·검출 박스가 겹치지 않아 IoU 매칭이 번호를 새로 발급합니다(night_drone_shake IDF1 0.199 → CMC 0.766).</p>
+          <p class="sk-note sk-note--warn"><b>GSD는 가정 위의 숫자</b> — 화각·각도·고도가 틀리면 m/s와 정지 판정도 틀립니다. 원근 효과는 무시한 1차 근사입니다.</p>
+          <p class="sk-note sk-note--warn"><b>보고서의 환각 통제</b> — 측정값만 템플릿에 채우고, 소속(U)·무장(E)은 "식별 불가"로 남깁니다. 열화상만으로는 피아·소속을 판별할 수 없습니다.</p>
+          <p class="sk-note sk-note--warn"><b>작전·구조 판단은 사람이</b> — 시스템은 확인 우선순위를 제시할 뿐, 부상자/휴식/오탐 판정과 대응 결정은 운용자가 합니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 7. 알고리즘 구성도 ================= -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">강의 슬라이드 4장 · 전체 흐름 · 탐지 · 추적 · GSD와 보고</span></div><div data-ds-diagrams="thermal-detection-tracking"></div></section>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/thermal-detection-tracking.js?v=20261002c"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const root = document.documentElement;
+  const css = n => getComputedStyle(root).getPropertyValue(n).trim();
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const RM = matchMedia("(prefers-reduced-motion: reduce)");
+  const f2 = v => (Number.isFinite(v) ? v.toFixed(2) : "–");
+  const f3 = v => (Number.isFinite(v) ? v.toFixed(3) : "–");
+  /* numpy 와 같은 반올림(정확히 .5 이면 짝수 쪽) */
+  function npRound(v, d) { const m = Math.pow(10, d), x = v * m, r = Math.round(x); const isHalf = Math.abs(x - Math.trunc(x)) === 0.5; return (isHalf && r % 2 !== 0 ? r - 1 : r) / m; }
+  const nf = (v, d) => npRound(v, d).toFixed(d);
+
+  /* ---------- 난수 (seed 고정) ---------- */
+  function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function gauss(r) { let u = 0; while (u === 0) u = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * r()); }
+
+  /* ---------- 열 물리 ---------- */
+  const SIGMA = 5.670374e-8, K0 = 273.15;
+  function apparent(t, eps, tr) { const w = eps * SIGMA * Math.pow(t + K0, 4) + (1 - eps) * SIGMA * Math.pow(tr + K0, 4); return Math.pow(w / SIGMA, 0.25) - K0; }
+  const asphaltT = h => 20 + 18 * Math.sin(2 * Math.PI * (h - 9) / 24);
+  const grassT = h => 15 + 9 * Math.sin(2 * Math.PI * (h - 9) / 24);
+  const personT = h => 0.35 * asphaltT(h) + 20;
+  function crossHours() { const out = []; let prev = null; for (let i = 0; i < 97; i++) { const h = i * 0.25, s = Math.sign(personT(h) - asphaltT(h)); if (prev !== null && s !== prev.s) out.push(prev.h); prev = { h, s }; } return out; }
+  function gsdMpp(alt, ang, fov, W) { ang = ang || 90; fov = fov || 45; W = W || 640; const D = alt / Math.sin(ang * Math.PI / 180); return 2 * D * Math.tan(fov / 2 * Math.PI / 180) / W; }
+
+  /* ---------- 팔레트 ---------- */
+  const PAL_STOPS = {
+    white: [[0, [0, 0, 0]], [1, [255, 255, 255]]],
+    black: [[0, [255, 255, 255]], [1, [0, 0, 0]]],
+    iron: [[0, [0, 0, 12]], [0.18, [40, 0, 110]], [0.38, [150, 12, 140]], [0.58, [225, 72, 30]], [0.78, [250, 165, 10]], [0.92, [255, 232, 92]], [1, [255, 255, 236]]],
+    rainbow: [[0, [20, 0, 90]], [0.2, [0, 60, 230]], [0.4, [0, 200, 220]], [0.6, [60, 220, 60]], [0.8, [250, 210, 0]], [1, [230, 20, 20]]]
+  };
+  const LUTS = {};
+  function lut(name) {
+    if (LUTS[name]) return LUTS[name];
+    const st = PAL_STOPS[name], L = new Uint8Array(768);
+    for (let i = 0; i < 256; i++) { const t = i / 255; let k = 0; while (k < st.length - 2 && t > st[k + 1][0]) k++; const [t0, c0] = st[k], [t1, c1] = st[k + 1], u = clamp((t - t0) / (t1 - t0), 0, 1); for (let c = 0; c < 3; c++) L[i * 3 + c] = Math.round(c0[c] + (c1[c] - c0[c]) * u); }
+    return (LUTS[name] = L);
+  }
+
+  /* ---------- 온도장 그리기 도구 ---------- */
+  function valueNoise(W, H, cell, r) {
+    const gw = Math.ceil(W / cell) + 2, gh = Math.ceil(H / cell) + 2, g = new Float32Array(gw * gh), out = new Float32Array(W * H);
+    for (let i = 0; i < g.length; i++) g[i] = r() * 2 - 1;
+    for (let y = 0; y < H; y++) { const gy = y / cell, y0 = gy | 0, ty = gy - y0, sy = ty * ty * (3 - 2 * ty);
+      for (let x = 0; x < W; x++) { const gx = x / cell, x0 = gx | 0, tx = gx - x0, sx = tx * tx * (3 - 2 * tx);
+        const a = g[y0 * gw + x0], b = g[y0 * gw + x0 + 1], c = g[(y0 + 1) * gw + x0], d = g[(y0 + 1) * gw + x0 + 1];
+        out[y * W + x] = (a + (b - a) * sx) * (1 - sy) + (c + (d - c) * sx) * sy; } }
+    return out;
+  }
+  function fillEllipse(T, W, H, cx, cy, rx, ry, val) {
+    const x0 = Math.max(0, Math.floor(cx - rx - 1)), x1 = Math.min(W - 1, Math.ceil(cx + rx + 1)), y0 = Math.max(0, Math.floor(cy - ry - 1)), y1 = Math.min(H - 1, Math.ceil(cy + ry + 1)), m = Math.min(rx, ry);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry, d = Math.sqrt(dx * dx + dy * dy); if (d >= 1) continue; const a = clamp((1 - d) * m / 0.9, 0, 1), i = y * W + x; T[i] = T[i] * (1 - a) + val * a; }
+  }
+  function fillRect(T, W, H, x, y, w, h, val, noise) {
+    const x0 = Math.max(0, Math.round(x)), x1 = Math.min(W, Math.round(x + w)), y0 = Math.max(0, Math.round(y)), y1 = Math.min(H, Math.round(y + h));
+    for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) T[yy * W + xx] = val + (noise ? noise[yy * W + xx] : 0);
+  }
+  function overlaps(b, list, pad) { return list.some(o => b.x < o.x + o.w + pad && o.x < b.x + b.w + pad && b.y < o.y + o.h + pad && o.y < b.y + b.h + pad); }
+
+  /* 사람·차량·자전거 그리기 (값 = 겉보기 온도) */
+  function drawPerson(T, W, H, x, y, w, h, tBody, tHead) { fillEllipse(T, W, H, x + w / 2, y + h / 2, w / 2, h / 2, tBody); fillEllipse(T, W, H, x + w / 2, y + h * 0.2, Math.max(1, w * 0.26), Math.max(1, w * 0.26), tHead); }
+  function drawCar(T, W, H, x, y, w, h, tBody, tHood, tGlass, horiz, dirPos) {
+    fillRect(T, W, H, x, y, w, h, tBody);
+    const L = horiz ? w : h;
+    const hoodA = dirPos ? 0.7 : 0, glassA = dirPos ? 0.55 : 0.3;
+    if (horiz) { fillRect(T, W, H, x + L * hoodA, y + 1, L * 0.3, h - 2, tHood); fillRect(T, W, H, x + L * glassA, y + 1, L * 0.15, h - 2, tGlass); }
+    else { fillRect(T, W, H, x + 1, y + L * hoodA, w - 2, L * 0.3, tHood); fillRect(T, W, H, x + 1, y + L * glassA, w - 2, L * 0.15, tGlass); }
+  }
+
+  /* 정지 장면(문제·데이터 / 탐지 탭) */
+  function buildStatic(seed, o) {
+    const W = 640, H = 512, r = mulberry32(seed), g = gsdMpp(o.alt, 90), h = o.hour, A = asphaltT(h), G = grassT(h), P = personT(h), ap = (t, e) => apparent(t, e, o.tRefl);
+    const day = h >= 7 && h <= 18;
+    const T = new Float32Array(W * H), n1 = valueNoise(W, H, 56, r), n2 = valueNoise(W, H, 12, r), tG = ap(G, 0.97), tA = ap(A, 0.95);
+    for (let i = 0; i < T.length; i++) T[i] = tG + n1[i] * 1.2 + n2[i] * 0.35;
+    const used = [], roadW = Math.max(6, 7 / g), ry = 110 + r() * 280, rx = 90 + r() * 440;
+    const roads = [{ x: 0, y: ry - roadW / 2, w: W, h: roadW, horiz: true }, { x: rx - roadW / 2, y: 0, w: roadW, h: H, horiz: false }];
+    roads.forEach(rd => { fillRect(T, W, H, rd.x, rd.y, rd.w, rd.h, tA, n2.map(v => v * 0.3)); });
+    // 금속 지붕 건물
+    const bw = Math.min(220, 17 / g), bh = Math.min(160, 12 / g);
+    for (let t = 0; t < 40; t++) { const b = { x: 10 + r() * (W - bw - 20), y: 10 + r() * (H - bh - 20), w: bw, h: bh }; if (!overlaps(b, roads, 4)) { fillRect(T, W, H, b.x - 2, b.y - 2, b.w + 4, b.h + 4, ap((A + G) / 2, 0.92)); fillRect(T, W, H, b.x, b.y, b.w, b.h, ap(A, o.epsRoof)); used.push(b); break; } }
+    // 나무
+    for (let i = 0; i < 4; i++) { const cx = r() * W, cy = r() * H, rr = 2.2 / g; fillEllipse(T, W, H, cx, cy, rr, rr, ap(G + 1.2, 0.98)); }
+    // 방해 열원 (환기구·바위 등)
+    const nD = day ? 9 : 5, distract = [];
+    for (let i = 0; i < nD; i++) { const s = (0.6 + r() * 0.6) / g, b = { x: r() * (W - s), y: r() * (H - s), w: s, h: s * (0.8 + r() * 0.5) }; if (overlaps(b, used, 2)) continue; const tv = day ? ap(A + 4 + r() * 6, 0.95) : ap(G + 12 + r() * 6, 0.95); fillEllipse(T, W, H, b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2, tv); distract.push(b); used.push(b); }
+    const gt = [];
+    // 차량
+    const bodyReal = day ? A + 5 : G + 1.5;
+    for (let i = 0, t = 0; i < 3 && t < 80; t++) {
+      const rd = roads[(r() * 2) | 0], L = 4.5 / g, Wd = 1.9 / g;
+      let b; if (rd.horiz) b = { x: r() * (W - L), y: rd.y + (r() < 0.5 ? 1 : rd.h - Wd - 1), w: L, h: Wd }; else b = { x: rd.x + (r() < 0.5 ? 1 : rd.w - Wd - 1), y: r() * (H - L), w: Wd, h: L };
+      if (overlaps(b, used, 3)) continue;
+      const run = o.pRun > 0 && r() < o.pRun;
+      drawCar(T, W, H, b.x, b.y, b.w, b.h, ap(bodyReal, 0.9), run ? ap(60, 0.9) : ap(bodyReal, 0.9), ap(bodyReal, 0.85), rd.horiz, r() < 0.5);
+      used.push(b); gt.push({ x: b.x, y: b.y, w: b.w, h: b.h, cls: 1 }); i++;
+    }
+    // 사람
+    const tBody = ap(P, 0.9), tHead = ap(33, 0.98);
+    for (let i = 0, t = 0; i < (o.nP || 10) && t < 300; t++) {
+      const w = (0.55 / g) * (0.9 + r() * 0.2), hh = (1.6 / g) * (0.9 + r() * 0.2), b = { x: 4 + r() * (W - w - 8), y: 4 + r() * (H - hh - 8), w: w, h: hh };
+      if (overlaps(b, used, 2)) continue;
+      drawPerson(T, W, H, b.x, b.y, b.w, b.h, tBody, tHead); used.push(b); gt.push({ x: b.x, y: b.y, w: b.w, h: b.h, cls: 0 }); i++;
+    }
+    // 자전거 (사람 + 차가운 금속 프레임)
+    for (let i = 0, t = 0; i < 2 && t < 100; t++) {
+      const w = 0.7 / g, hh = 1.8 / g, b = { x: 4 + r() * (W - w - 8), y: 4 + r() * (H - hh - 8), w: w, h: hh };
+      if (overlaps(b, used, 2)) continue;
+      fillRect(T, W, H, b.x + w / 2 - 0.6, b.y, 1.2, hh, ap(G, 0.3));
+      drawPerson(T, W, H, b.x + w * 0.1, b.y + hh * 0.18, w * 0.8, hh * 0.62, tBody, tHead);
+      used.push(b); gt.push({ x: b.x, y: b.y, w: b.w, h: b.h, cls: 2 }); i++;
+    }
+    blur121(T, W, H);                                               // 광학계 흐림 (점확산)
+    for (let i = 0; i < T.length; i++) T[i] += gauss(r) * 0.12;     // 센서 잡음
+    gt.forEach(b => { const p = 1.5; b.x -= p + gauss(r) * 0.7; b.y -= p + gauss(r) * 0.7; b.w += 2 * p + gauss(r) * 0.7; b.h += 2 * p + gauss(r) * 0.7; });   // 라벨러 박스: 여백 + 흔들림
+    return { W, H, T, gt, distract, g, A, G, P };
+  }
+  function blur121(T, W, H) {
+    const t = new Float32Array(T.length);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; t[i] = (T[i - (x > 0 ? 1 : 0)] + 2 * T[i] + T[i + (x < W - 1 ? 1 : 0)]) / 4; }
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; T[i] = (t[i - (y > 0 ? W : 0)] + 2 * t[i] + t[i + (y < H - 1 ? W : 0)]) / 4; }
+  }
+  function withGenerator(T, W) { const U = T.slice(); for (let y = 40; y < 70; y++) for (let x = 40; x < 90; x++) U[y * W + x] = 95; return U; }
+
+  /* ---------- AGC: 온도 → 8bit ---------- */
+  function percentiles(T, plo, phi) {
+    let mn = Infinity, mx = -Infinity; for (let i = 0; i < T.length; i++) { const v = T[i]; if (v < mn) mn = v; if (v > mx) mx = v; }
+    if (plo <= 0 && phi >= 100) return [mn, mx];
+    const B = 8192, sc = (B - 1) / ((mx - mn) || 1), hist = new Uint32Array(B);
+    for (let i = 0; i < T.length; i++) hist[((T[i] - mn) * sc) | 0]++;
+    const q = p => { const target = p / 100 * (T.length - 1); let c = 0; for (let b = 0; b < B; b++) { c += hist[b]; if (c > target) return mn + (b + 0.5) / sc; } return mx; };
+    return [plo <= 0 ? mn : q(plo), phi >= 100 ? mx : q(phi)];
+  }
+  function agc8(T, lo, hi) { const out = new Uint8Array(T.length), s = 255 / ((hi - lo) || 1); for (let i = 0; i < T.length; i++) { const v = Math.round((T[i] - lo) * s); out[i] = v < 0 ? 0 : v > 255 ? 255 : v; } return out; }
+  function toCanvas(gray, W, H, palName, off) {
+    off = off || document.createElement("canvas"); off.width = W; off.height = H;
+    const c = off.getContext("2d"), id = c.createImageData(W, H), L = lut(palName), d = id.data;
+    for (let i = 0; i < gray.length; i++) { const v = gray[i] * 3; d[i * 4] = L[v]; d[i * 4 + 1] = L[v + 1]; d[i * 4 + 2] = L[v + 2]; d[i * 4 + 3] = 255; }
+    c.putImageData(id, 0, 0); return off;
+  }
+
+  /* ---------- 캔버스 공통 ---------- */
+  function prep(cv) {
+    const w = cv.clientWidth; if (!w) return null; const h = cv.clientHeight || w * 9 / 16, d = window.devicePixelRatio || 1;
+    cv.width = Math.round(w * d); cv.height = Math.round(h * d); const ctx = cv.getContext("2d"); ctx.setTransform(d, 0, 0, d, 0, 0); return { ctx, w, h };
+  }
+  function boxPath(ctx, b, s, color, dash, lw) {
+    ctx.save(); ctx.setLineDash(dash ? [4, 3] : []);
+    ctx.strokeStyle = css("--img-ink"); ctx.lineWidth = (lw || 1.6) + 2; ctx.globalAlpha = 0.55; ctx.strokeRect(b.x * s, b.y * s, b.w * s, b.h * s);
+    ctx.globalAlpha = 1; ctx.strokeStyle = color; ctx.lineWidth = lw || 1.6; ctx.strokeRect(b.x * s, b.y * s, b.w * s, b.h * s); ctx.restore();
+  }
+  function tagText(ctx, txt, x, y, color) {
+    ctx.save(); ctx.font = "600 11px " + css("--mono"); const w = ctx.measureText(txt).width + 6;
+    ctx.fillStyle = css("--img-ink"); ctx.globalAlpha = 0.75; ctx.fillRect(x, y - 12, w, 13); ctx.globalAlpha = 1; ctx.fillStyle = color; ctx.fillText(txt, x + 3, y - 2); ctx.restore();
+  }
+  /* 선 그래프 */
+  function lineChart(cv, o) {
+    const P = prep(cv); if (!P) return; const { ctx, w, h } = P;
+    const padL = o.padL || 44, padR = o.padR || 14, padT = 12, padB = 34, iw = w - padL - padR, ih = h - padT - padB;
+    const X = v => padL + (v - o.xmin) / (o.xmax - o.xmin) * iw, Y = v => padT + ih - (v - o.ymin) / (o.ymax - o.ymin) * ih;
+    const Y2 = o.y2 ? v => padT + ih - (v - o.y2.min) / (o.y2.max - o.y2.min) * ih : null;
+    ctx.clearRect(0, 0, w, h); ctx.font = "11px " + css("--sans");
+    ctx.strokeStyle = css("--line"); ctx.fillStyle = css("--muted"); ctx.lineWidth = 1;
+    (o.yticks || []).forEach(t => { const y = Y(t); ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + iw, y); ctx.stroke(); ctx.textAlign = "right"; ctx.fillText(o.yfmt ? o.yfmt(t) : t, padL - 5, y + 4); });
+    (o.xticks || []).forEach(t => { const x = X(t); ctx.beginPath(); ctx.moveTo(x, padT + ih); ctx.lineTo(x, padT + ih + 4); ctx.stroke(); ctx.textAlign = "center"; ctx.fillText(o.xfmt ? o.xfmt(t) : t, x, padT + ih + 16); });
+    if (o.y2) { ctx.textAlign = "left"; o.y2.ticks.forEach(t => ctx.fillText(t, padL + iw + 5, Y2(t) + 4)); }
+    ctx.strokeStyle = css("--line-strong"); ctx.beginPath(); ctx.moveTo(padL, padT); ctx.lineTo(padL, padT + ih); ctx.lineTo(padL + iw, padT + ih); ctx.stroke();
+    ctx.fillStyle = css("--faint"); ctx.textAlign = "center"; if (o.xlabel) ctx.fillText(o.xlabel, padL + iw / 2, h - 4);
+    if (o.ylabel) { ctx.save(); ctx.translate(11, padT + ih / 2); ctx.rotate(-Math.PI / 2); ctx.fillText(o.ylabel, 0, 0); ctx.restore(); }
+    (o.hlines || []).forEach(l => { ctx.save(); ctx.setLineDash([3, 3]); ctx.strokeStyle = l.color; ctx.beginPath(); ctx.moveTo(padL, Y(l.y)); ctx.lineTo(padL + iw, Y(l.y)); ctx.stroke(); ctx.restore(); });
+    (o.vlines || []).forEach(l => { ctx.save(); ctx.setLineDash(l.dash ? [4, 3] : []); ctx.strokeStyle = l.color; ctx.lineWidth = l.lw || 1.2; ctx.beginPath(); ctx.moveTo(X(l.x), padT); ctx.lineTo(X(l.x), padT + ih); ctx.stroke(); if (l.label) { ctx.fillStyle = l.color; ctx.textAlign = "left"; ctx.fillText(l.label, X(l.x) + 4, padT + 11); } ctx.restore(); });
+    ctx.save(); ctx.beginPath(); ctx.rect(padL - 2, padT - 2, iw + 4, ih + 4); ctx.clip();
+    o.series.forEach(s => {
+      const YY = s.axis2 ? Y2 : Y; ctx.strokeStyle = s.color; ctx.fillStyle = s.color; ctx.lineWidth = s.lw || 2; ctx.setLineDash(s.dash ? [5, 4] : []);
+      if (!s.noLine) { ctx.beginPath(); s.pts.forEach((p, i) => { const x = X(p[0]), y = YY(p[1]); if (i === 0) ctx.moveTo(x, y); else if (s.step) { ctx.lineTo(x, YY(s.pts[i - 1][1])); ctx.lineTo(x, y); } else ctx.lineTo(x, y); }); ctx.stroke(); }
+      if (s.dots) { ctx.setLineDash([]); s.pts.forEach(p => { ctx.beginPath(); ctx.arc(X(p[0]), YY(p[1]), s.dots, 0, Math.PI * 2); ctx.fill(); }); }
+    });
+    (o.marks || []).forEach(m => { ctx.setLineDash([]); ctx.fillStyle = m.color; ctx.strokeStyle = css("--surface"); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X(m.x), Y(m.y), 5.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); });
+    ctx.restore();
+    return { X, Y };
+  }
+  function legend(el, items) { el.innerHTML = items.map(i => `<span><i style="background:${i.color};${i.dash ? "opacity:.65" : ""}"></i>${i.name}</span>`).join(""); }
+  function seg(id, fn) {
+    const el = $(id); el.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; el.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); fn(b.dataset.v, b); });
+  }
+  function segSet(id, v) { $(id).querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x.dataset.v === String(v))); }
+  const segVal = id => { const b = $(id).querySelector('button[aria-pressed="true"]'); return b ? b.dataset.v : null; };
+  function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+  document.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", () => {
+    const txt = $(b.dataset.copy).textContent, done = () => { const o = b.textContent; b.textContent = "복사됨"; setTimeout(() => (b.textContent = o), 1200); };
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(done, done);
+    else { const ta = document.createElement("textarea"); ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (e) { } ta.remove(); done(); }
+  }));
+
+  /* =====================================================================
+     1. 문제·데이터
+     ===================================================================== */
+  const D1 = { seed: 7, hour: 2, alt: 60, tRefl: -20, pal: "white", agc: "mm", gen: false, run: false, gt: true, scene: null, gray: null, Tshow: null, off: null };
+  function d1Build() { D1.scene = buildStatic(1000 + D1.seed, { hour: D1.hour, alt: D1.alt, tRefl: D1.tRefl, epsRoof: 0.1, pRun: D1.run ? 1 : 0, nP: 9 }); d1Render(); }
+  function d1Render() {
+    const S = D1.scene; D1.Tshow = D1.gen ? withGenerator(S.T, S.W) : S.T;
+    const [lo, hi] = D1.agc === "mm" ? percentiles(D1.Tshow, 0, 100) : percentiles(D1.Tshow, 1, 99);
+    D1.lohi = [lo, hi]; D1.gray = agc8(D1.Tshow, lo, hi); D1.off = toCanvas(D1.gray, S.W, S.H, D1.pal, D1.off);
+    d1Draw(); d1Agc();
+  }
+  function d1Draw() {
+    const cv = $("cvScene"), P = prep(cv); if (!P || !D1.off) return; const { ctx, w } = P, s = w / 640;
+    ctx.imageSmoothingEnabled = s < 1; ctx.drawImage(D1.off, 0, 0, w, w * 512 / 640);
+    if (D1.gt) { const col = [css("--img-person"), css("--img-car"), css("--img-bike")]; D1.scene.gt.forEach(b => boxPath(ctx, b, s, col[b.cls], false, 1.4)); }
+    if (D1.gen) { ctx.save(); ctx.font = "600 11px " + css("--sans"); tagText(ctx, "발전기 95°C", 40 * s, 40 * s - 2, css("--img-fp")); ctx.restore(); }
+  }
+  function d1Agc() {
+    const S = D1.scene, p = S.gt.find(b => b.cls === 0); if (!p) return;
+    const maxIn = (G) => { let m = 0; for (let y = Math.floor(p.y); y < Math.ceil(p.y + p.h); y++) for (let x = Math.floor(p.x); x < Math.ceil(p.x + p.w); x++) m = Math.max(m, G[y * S.W + x]); return m; };
+    let tmax = -99; for (let y = Math.floor(p.y); y < Math.ceil(p.y + p.h); y++) for (let x = Math.floor(p.x); x < Math.ceil(p.x + p.w); x++) tmax = Math.max(tmax, S.T[y * S.W + x]);
+    const Tg = withGenerator(S.T, S.W), mm = percentiles(S.T, 0, 100), mmg = percentiles(Tg, 0, 100), pcg = percentiles(Tg, 1, 99);
+    const a = maxIn(agc8(S.T, mm[0], mm[1])), b = maxIn(agc8(Tg, mmg[0], mmg[1])), c = maxIn(agc8(Tg, pcg[0], pcg[1]));
+    $("tblAgc").innerHTML = `<thead><tr><th>AGC 방식</th><th>이 장면</th><th>실습 노트북</th></tr></thead><tbody>
+      <tr><td>최소–최대 (원래 장면)</td><td class="n">${a}</td><td class="n">253</td></tr>
+      <tr><td>최소–최대 (발전기 추가)</td><td class="n warn">${b}</td><td class="n">46</td></tr>
+      <tr><td>분위수 1–99% (발전기 추가)</td><td class="n good">${c}</td><td class="n">255</td></tr></tbody>`;
+    $("agcNote").innerHTML = `그 사람의 겉보기 온도는 세 경우 모두 <b>${tmax.toFixed(1)}°C</b>로 같습니다 (실습 노트북 장면은 21.1°C). 지금 화면 AGC 범위: ${D1.lohi[0].toFixed(1)} ~ ${D1.lohi[1].toFixed(1)}°C → 0~255.`;
+  }
+  function d1Hover(e) {
+    if (!D1.gray) return; const r = $("cvScene").getBoundingClientRect(), x = Math.floor((e.clientX - r.left) / r.width * 640), y = Math.floor((e.clientY - r.top) / r.height * 512);
+    if (x < 0 || y < 0 || x >= 640 || y >= 512) return; const i = y * 640 + x;
+    $("hoverOut").textContent = `(${x}, ${y}) · 8bit 값 ${D1.gray[i]} · 겉보기 온도 ${D1.Tshow[i].toFixed(1)}°C`;
+  }
+  function d1Tables() {
+    const rows = [["사람 피부(얼굴·손)", 33, 0.98, 32.2], ["사람 옷 표면", 27, 0.9, 23.2], ["아스팔트", 12, 0.95, 10.6], ["잔디", 8, 0.97, 7.3], ["차량 도장(주행 직후 후드)", 60, 0.9, 54.3], ["무광 알루미늄 판", 12, 0.1, -16.2]];
+    $("tblApp").innerHTML = `<thead><tr><th>대상</th><th>실제(°C)</th><th>방사율 ε</th><th>겉보기(°C)</th><th>노트북(−20°C)</th></tr></thead><tbody>` +
+      rows.map(r => { const v = apparent(r[1], r[2], D1.tRefl); return `<tr><td>${r[0]}</td><td class="n">${r[1]}</td><td class="n">${r[2].toFixed(2)}</td><td class="n${v < 0 ? " warn" : ""}">${nf(v, 1)}</td><td class="n">${r[3].toFixed(1)}</td></tr>`; }).join("") + "</tbody>";
+    $("appNote").innerHTML = `반사원 ${D1.tRefl < 0 ? "−" + (-D1.tRefl) : D1.tRefl}°C. 알루미늄 판은 실제 12°C인데 밤하늘을 반사해 <b>영하로</b> 보입니다 — 금속 지붕·차량 유리가 차갑게 보이는 이유. 사람 옷 표면은 피부보다 낮게 읽힙니다.`;
+  }
+  function d1Cross() {
+    const hs = []; for (let i = 0; i < 97; i++) hs.push(i * 0.25);
+    const ser = [{ name: "사람(옷 표면)", color: css("--role-img"), f: personT }, { name: "아스팔트", color: css("--muted"), f: asphaltT }, { name: "잔디", color: css("--role-time"), f: grassT }, { name: "대비 = 사람 − 아스팔트", color: css("--sk-accent"), f: h => personT(h) - asphaltT(h), dash: true }];
+    lineChart($("cvCross"), { xmin: 0, xmax: 24, ymin: -20, ymax: 40, xticks: [0, 3, 6, 9, 12, 15, 18, 21, 24], yticks: [-20, -10, 0, 10, 20, 30, 40], xlabel: "시각(h)", ylabel: "°C",
+      hlines: [{ y: 0, color: css("--faint") }], vlines: [{ x: D1.hour, color: css("--sk-accent"), lw: 1.5, label: fmtHour(D1.hour) }].concat(crossHours().map(c => ({ x: c, color: css("--role-warn"), dash: true }))),
+      series: ser.map(s => ({ color: s.color, dash: s.dash, pts: hs.map(h => [h, s.f(h)]) })) });
+    legend($("lgCross"), ser.map(s => ({ name: s.name, color: s.color })).concat([{ name: "열 교차 시각", color: css("--role-warn") }]));
+    const c = crossHours(), h = D1.hour;
+    $("crossOut").innerHTML = `사람–아스팔트 열 교차 시각: <b>[${c.map(v => nf(v, 1)).join(" ")}] 시</b> (실습 노트북 [11.2 18.5]) · 지금 ${fmtHour(h)}: 사람 ${personT(h).toFixed(1)}°C, 아스팔트 ${asphaltT(h).toFixed(1)}°C, 대비 ${(personT(h) - asphaltT(h)).toFixed(1)}°C`;
+  }
+  const fmtHour = h => `${String(Math.floor(h)).padStart(2, "0")}:${String(Math.round((h % 1) * 60)).padStart(2, "0")}`;
+  function barsHTML(el, rows, max, fmtv) { el.innerHTML = rows.map(r => `<span class="lb">${r.l}</span><span class="bar" style="--c:${r.c || "var(--sk-accent)"}"><i style="width:${(r.v / max * 100).toFixed(1)}%"></i></span><span class="v">${fmtv ? fmtv(r.v) : r.v}</span>`).join(""); }
+  function d1Eda() {
+    barsHTML($("barsCls"), [{ l: "Person", v: 2402, c: "var(--role-img)" }, { l: "Car", v: 1593, c: "var(--role-img)" }, { l: "Bicycle", v: 1195, c: "var(--role-img)" }, { l: "OtherVehicle", v: 37, c: "var(--role-warn)" }], 2402, v => v.toLocaleString("ko-KR"));
+    const alts = [60, 70, 80, 90, 100, 110, 120, 130], day = [26, 23, 18, 0, 36, 23, 36, 28], night = [143, 36, 35, 35, 34, 23, 38, 66];
+    $("barsAlt").innerHTML = alts.map((a, i) => `<span class="lb">${a}m</span><span class="bar bar--two"><i style="width:${(day[i] / 143 * 100).toFixed(1)}%;background:var(--c-day)"></i><i style="width:${(night[i] / 143 * 100).toFixed(1)}%;background:var(--c-night)"></i></span><span class="v">${day[i]} · ${night[i]}</span>`).join("");
+    barsHTML($("barsCon"), [{ l: "야간 사람", v: 88.0, c: "var(--c-night)" }, { l: "주간 사람", v: 52.0, c: "var(--c-day)" }, { l: "야간 차량", v: 27.4, c: "var(--c-night)" }, { l: "주간 차량", v: 61.7, c: "var(--c-day)" }], 88, v => v.toFixed(1));
+  }
+  function d1Height() {
+    const alts = [60, 70, 80, 90, 100, 110, 120, 130], med = { 60: 21, 70: 21, 80: 20, 90: 18, 100: 18, 110: 17, 120: 13, 130: 15 };
+    const th = alts.map(a => [a, 1.7 / gsdMpp(a, 90, 45)]);
+    lineChart($("cvHeight"), { xmin: 55, xmax: 135, ymin: 0, ymax: 30, xticks: alts, yticks: [0, 5, 10, 15, 20, 25, 30], xlabel: "비행 고도(m)", ylabel: "사람 박스 높이(px)",
+      hlines: [], series: [{ color: css("--role-img"), dots: 4, pts: alts.map(a => [a, med[a]]) }, { color: css("--role-gt"), dash: true, dots: 3, pts: th }] });
+    legend($("lgHeight"), [{ name: "관측 중앙값 {60:21, …, 120:13, 130:15}", color: css("--role-img") }, { name: `이론 1.7/GSD (60m: ${th[0][1].toFixed(1)}px, 130m: ${th[7][1].toFixed(1)}px)`, color: css("--role-gt") }]);
+  }
+  function d1All() { d1Draw(); d1Cross(); d1Height(); }
+  $("sHour").addEventListener("input", e => { D1.hour = +e.target.value; $("vHour").textContent = fmtHour(D1.hour); d1Cross(); d1BuildDeb(); });
+  $("sAlt1").addEventListener("input", e => { D1.alt = +e.target.value; $("vAlt1").textContent = D1.alt + " m"; d1BuildDeb(); });
+  $("sRefl").addEventListener("input", e => { D1.tRefl = +e.target.value; $("vRefl").textContent = (D1.tRefl < 0 ? "−" + (-D1.tRefl) : D1.tRefl) + " °C"; d1Tables(); d1BuildDeb(); });
+  const d1BuildDeb = debounce(d1Build, 60);
+  seg("segPal", v => { D1.pal = v; d1Render(); });
+  seg("segAgc", v => { D1.agc = v; d1Render(); });
+  $("chkGen").addEventListener("change", e => { D1.gen = e.target.checked; d1Render(); });
+  $("chkRun").addEventListener("change", e => { D1.run = e.target.checked; d1Build(); });
+  $("chkGt1").addEventListener("change", e => { D1.gt = e.target.checked; d1Draw(); });
+  $("btnNewScene").addEventListener("click", () => { D1.seed++; d1Build(); });
+  $("cvScene").addEventListener("pointermove", d1Hover);
+
+  /* =====================================================================
+     2. 모형 구조 (SVG)
+     ===================================================================== */
+  const DIA = {
+    all: { vb: [1000, 400], groups: [], blocks: [
+      { id: "in", x: 20, y: 30, w: 175, h: 62, r: "img", t: "열화상 프레임", s: "1×512×640 uint8", io: "센서 → 1×512×640 (8bit, AGC 적용)", d: "8bit 값은 장면 안의 상대 순위입니다. 팔레트는 보기 방식일 뿐이고 모델 입력은 항상 1채널 white-hot으로 통일합니다.", f: "8bit = clip((T − P_lo) / (P_hi − P_lo) × 255)" },
+      { id: "det", x: 215, y: 30, w: 175, h: 62, r: "img", t: "검출기", s: "2단계 / YOLOv8n", io: "1×512×640 → k×6", d: "열점 후보 + 32×32 패치 CNN 검증기(2단계) 또는 HIT-UAV로 미세조정한 YOLOv8n. 실습 노트북 Person AP@0.5: 열점만 0.047, 열점+CNN 0.246, YOLOv8n 미세조정 0.776.", f: "박스 = (x, y, w, h, cls, score)" },
+      { id: "dets", x: 410, y: 30, w: 175, h: 62, r: "img", t: "검출 결과", s: "k×6", io: "k×6 → 사람 k′×4 (추적) · 차량 수 (보고)", d: "사람 박스만 추적기에 넣습니다. 차량 수는 보고서의 E(장비) 항목에 씁니다.", f: "VDET = [d[d[:,4]==0] for d in VDET_ALL]" },
+      { id: "sort", x: 605, y: 30, w: 175, h: 62, r: "time", t: "SORT 추적기", s: "칼만 + 헝가리안", io: "(k′×4)ₜ → (n×5)ₜ", d: "등속 칼만 필터로 다음 위치를 예측하고, 예측 박스와 검출 박스를 비용 행렬 위에서 헝가리안으로 1:1 짝짓습니다. min_hits·max_age로 궤적 수명을 관리합니다.", f: "MOTA = 1 − (FN + FP + IDSW) / GT" },
+      { id: "traj", x: 800, y: 30, w: 180, h: 62, r: "time", t: "궤적", s: "(frame, id, x, y, w, h)", io: "프레임별 확정 궤적 → MOT 형식 긴 표", d: "같은 사람에게 같은 번호가 끝까지 붙어야 계수·정지 시간 측정이 맞습니다(IDF1).", f: "IDF1 = 2·IDTP / (GT + 예측)" },
+      { id: "video", x: 20, y: 170, w: 175, h: 62, r: "time", t: "영상 = 시간축 텐서", s: "T×512×640 · 7.5 fps", io: "프레임 T장 → (T, 512, 640)", d: "낮은 프레임률(9 Hz 이하 흔함), AGC 출렁임, FFC/NUC 셔터 멈춤, 드론 자기운동이 프레임 차분과 추적을 흔듭니다. 실습 노트북 영상 130m-60_3: 259×512×640, 84.9 MB.", f: "용량 = T × 512 × 640 바이트" },
+      { id: "shift", x: 215, y: 170, w: 175, h: 62, r: "time", t: "전역 이동 추정", s: "(dx, dy, 신뢰도)", io: "프레임 쌍 → 화면 전체 평행이동", d: "위상 상관(cv2.phaseCorrelate)으로 화면 내용이 얼마나 이동했는지 추정합니다. 칼만 예측에 더하면 카메라 운동 보정(CMC). 노트북: 보정 전 변화 픽셀 6.54% → 보정 후 0.31%.", f: "예측 위치 += (dx, dy)" },
+      { id: "world", x: 410, y: 170, w: 175, h: 62, r: "fuse", t: "지면 좌표 궤적", s: "wx, wy (px)", io: "궤적 + 누적 이동 → 첫 프레임 좌표계", d: "프레임별 누적 화면 이동을 빼서 카메라 운동을 지운 궤적. 영상(궤적)과 카메라 운동 정보의 결합입니다.", f: "wx = cx − Σdx, wy = cy − Σdy" },
+      { id: "meta", x: 20, y: 310, w: 175, h: 62, r: "fuse", t: "드론 메타데이터", s: "고도·각도·화각", io: "파일명 60m-30_1 → 고도 60m, 각도 30°", d: "고도와 카메라 각도는 영상 이름(또는 드론 로그)에서 읽고, 화각 45°는 가정값입니다.", f: "alt, ang = 60, 30 · FOV = 45°(가정)" },
+      { id: "gsd", x: 215, y: 310, w: 175, h: 62, r: "fuse", t: "GSD", s: "m / px", io: "고도·각도·화각·해상도 → m/px", d: "비스듬히 볼수록 거리가 멀어 한 픽셀이 더 넓은 땅을 덮습니다. 원근 효과는 무시한 1차 근사.", f: "GSD = 2·(H / sin θ)·tan(FOV/2) / 640" },
+      { id: "speed", x: 410, y: 310, w: 175, h: 62, r: "fuse", t: "속도·상태", s: "m/s · 정지/보행/고속", io: "지면 궤적 × GSD → m/s", d: "2초 창 이동 속도의 중앙값으로 상태를 나눕니다: 정지(< 0.3 m/s), 보행·달리기(< 4.5 m/s), 고속(차량 등). 정지 5초 이상이면 경보.", f: "v = ‖Δp‖ / (Δf / fps) × GSD" },
+      { id: "report", x: 605, y: 310, w: 175, h: 62, r: "txt", t: "SALUTE 보고문", s: "텍스트 (템플릿)", io: "측정값 표 → 8줄 보고문", d: "Size·Activity·Location·Unit·Time·Equipment 각 항목을 측정된 값만으로 채웁니다. LLM은 문장 다듬기에만 한정합니다.", f: "U(소속) = 식별 불가 (열화상만으로 판별 불가)" },
+      { id: "human", x: 800, y: 310, w: 180, h: 62, r: "warn", t: "사람 검토·판단", s: "확인 우선순위", io: "경보 → 운용자 확인", d: "오래 움직이지 않는 열원은 부상자, 휴식·경계 인원, 따뜻한 물체(오탐) 모두 가능합니다. 판단은 사람이 합니다.", f: "경보 기준(속도·시간)은 운용 부서가 정함" }],
+      arrows: [["video", "in", "프레임"], ["in", "det"], ["det", "dets"], ["dets", "sort"], ["sort", "traj"], ["video", "shift"], ["shift", "sort", "CMC", false, "t", "b"], ["shift", "world"], ["traj", "world", "", false, "b", "r"], ["meta", "gsd"], ["gsd", "speed"], ["world", "speed"], ["speed", "report"], ["report", "human"]],
+      order: ["video", "in", "det", "dets", "sort", "traj", "shift", "world", "meta", "gsd", "speed", "report", "human"] },
+    two: { vb: [1000, 290], groups: [{ x: 10, y: 10, w: 980, h: 112, t: "① 후보 생성 — 형태학 연산(학습 없음), 이미지당 약 10ms" }, { x: 10, y: 160, w: 980, h: 112, t: "② 후보 분류 — 32×32 패치 CNN, 후보 수 × 수 ms (파라미터 93,860)" }], blocks: [
+      { id: "img", x: 22, y: 42, w: 170, h: 62, r: "img", t: "원본", s: "512×640 uint8", io: "열화상 프레임 (1채널)", d: "사람은 대부분 주변보다 뜨겁고 작다 — 이 두 성질만 쓰면 학습 없이 후보를 찾을 수 있습니다.", f: "im = X[k]" },
+      { id: "open", x: 215, y: 42, w: 170, h: 62, r: "img", t: "열림(opening)", s: "15×15 타원 → 512×640", io: "512×640 → 512×640 (배경 추정)", d: "침식 후 팽창. 구조요소보다 작은 밝은 구조(사람)가 지워져 넓은 배경 온도 변화만 남습니다.", f: "opened = dilate(erode(im, SE), SE)" },
+      { id: "top", x: 408, y: 42, w: 170, h: 62, r: "img", t: "white top-hat", s: "원본 − 열림", io: "512×640 → 512×640", d: "작은 밝은 구조만 남기고 넓은 배경 온도 변화를 지웁니다.", f: "tophat = im − opened" },
+      { id: "thr", x: 601, y: 42, w: 170, h: 62, r: "img", t: "적응 임계값", s: "max(20, μ+4σ)", io: "top-hat → 이진 영상", d: "장면 통계 기반이라 AGC로 장면마다 스케일이 달라도 동작합니다. 실습 노트북 야간 장면: 평균 8.5, 표준편차 15.3 → 임계값 69.6.", f: "thr = max(20, mean + 4·std)" },
+      { id: "cc", x: 794, y: 42, w: 180, h: 62, r: "img", t: "연결요소 → 후보", s: "n×6", io: "이진 영상 → 후보 박스 n×6", d: "덩어리마다 박스를 만들고 너무 작거나 큰 것은 지웁니다. 노트북 장면: 후보 117개 vs 정답 사람 30명 — 사람은 잘 잡지만 오탐이 많다(이미지당 후보 77.1).", f: "(x, y, w, h, cls, score)" },
+      { id: "crop", x: 22, y: 192, w: 120, h: 62, r: "img", t: "패치 자르기", s: "n×32×32×1", io: "후보 n개 → n×32×32×1, 0~1", d: "학습 패치: 정답 박스 = 양성, 정답과 IoU<0.1인 열점 후보 = 어려운 음성(양성의 3배까지). train (20908, 32, 32, 1) [15681 2402 1630 1195].", f: "x = crop / 255" },
+      { id: "c1", x: 160, y: 192, w: 120, h: 62, r: "img", t: "Conv 32 블록", s: "16×16×32", io: "32×32×1 → 16×16×32", d: "3×3 합성곱(편향 없음) + 배치 정규화(momentum 0.9) + ReLU + 최대풀링. 학습 때만 반전·회전·밝기·대비 증강.", f: "파라미터 288 + BN 128" },
+      { id: "c2", x: 298, y: 192, w: 120, h: 62, r: "img", t: "Conv 64 블록", s: "8×8×64", io: "16×16×32 → 8×8×64", d: "채널 32 → 64.", f: "파라미터 3·3·32·64 = 18,432 + BN 256" },
+      { id: "c3", x: 436, y: 192, w: 120, h: 62, r: "img", t: "Conv 128 블록", s: "4×4×128", io: "8×8×64 → 4×4×128", d: "채널 64 → 128.", f: "파라미터 3·3·64·128 = 73,728 + BN 512" },
+      { id: "gap", x: 574, y: 192, w: 120, h: 62, r: "img", t: "GAP·Dropout", s: "128", io: "4×4×128 → 128", d: "공간 평균으로 128차원 벡터를 만들고 과적합을 막기 위해 30%를 끕니다.", f: "g_c = 평균(feature_c)" },
+      { id: "dense", x: 712, y: 192, w: 120, h: 62, r: "img", t: "Dense softmax", s: "4 클래스", io: "128 → 4 확률", d: "OtherVehicle은 Car로 병합. 검증 정확도 0.9012. 혼동행렬에서 사람 행: 사람 0.739, 배경 0.220.", f: "파라미터 128·4 + 4 = 516 · 합계 93,860" },
+      { id: "out", x: 850, y: 192, w: 124, h: 62, r: "gt", t: "박스·점수", s: "→ AP", io: "배경 제외 최고 클래스 → 점수", d: "점수 = 그 클래스 확률. AP 계산을 위해 점수 필터 없이 전부 반환. 노트북: 이미지당 34 ms, Person AP@0.3 야간 0.167 → 0.546, 주간 0.019 → 0.23.", f: "k = argmax p[1:], score = p[k+1]" }],
+      arrows: [["img", "open"], ["open", "top"], ["img", "top", "", true], ["top", "thr"], ["thr", "cc"], ["cc", "crop", "n개"], ["crop", "c1"], ["c1", "c2"], ["c2", "c3"], ["c3", "gap"], ["gap", "dense"], ["dense", "out"]],
+      order: ["img", "open", "top", "thr", "cc", "crop", "c1", "c2", "c3", "gap", "dense", "out"] },
+    yolo: { vb: [1000, 420], groups: [{ x: 10, y: 8, w: 980, h: 110, t: "Backbone — stride 2 합성곱 5번, 640 → 20" }, { x: 10, y: 150, w: 980, h: 110, t: "Neck — FPN(위→아래) + PAN(아래→위), Concat 건너뛰기 연결" }, { x: 10, y: 292, w: 980, h: 118, t: "Head — 세 스케일 분리형 검출 헤드 → 디코딩 → NMS" }], blocks: [
+      { id: "yin", x: 20, y: 40, w: 140, h: 62, r: "img", t: "입력", s: "3×640×640", io: "640×512 열화상 → 3×640×640", d: "ultralytics 기본 imgsz=640. 1채널 열화상을 3채널로 복제하고 위아래 여백을 채웁니다. HIT-UAV 이름 5개(Person, Car, Bicycle, OtherVehicle, DontCare)를 그대로 유지합니다.", f: "imgsz = 640" },
+      { id: "b1", x: 177, y: 40, w: 140, h: 62, r: "img", t: "Conv ×2 + C2f", s: "32×160×160", io: "3×640×640 → 16×320×320 → 32×160×160", d: "3×3, stride 2 합성곱 두 번과 C2f 블록. 가장자리·질감 같은 낮은 수준 특징.", f: "출력 = ⌈입력 / 2⌉" },
+      { id: "p3", x: 334, y: 40, w: 140, h: 62, r: "img", t: "Conv·C2f → P3", s: "64×80×80", io: "32×160×160 → 64×80×80", d: "stride 8 특성맵. 10~20px 소형 열화상 사람을 담당할 스케일입니다. Neck에서 다시 쓰입니다(Concat).", f: "stride 8" },
+      { id: "p4", x: 491, y: 40, w: 140, h: 62, r: "img", t: "Conv·C2f → P4", s: "128×40×40", io: "64×80×80 → 128×40×40", d: "stride 16 특성맵.", f: "stride 16" },
+      { id: "p5", x: 648, y: 40, w: 160, h: 62, r: "img", t: "Conv·C2f·SPPF", s: "256×20×20", io: "128×40×40 → 256×20×20", d: "stride 32. SPPF는 같은 5×5 최대풀링을 세 번 연달아 적용해 여러 크기의 주변 정보를 모읍니다.", f: "stride 32" },
+      { id: "n1", x: 648, y: 182, w: 160, h: 62, r: "img", t: "Up·Concat·C2f", s: "128×40×40", io: "P5 ↑ + P4 → 128×40×40", d: "깊은 특징을 키워 P4와 이어 붙입니다(FPN).", f: "concat(up(P5), P4)" },
+      { id: "n2", x: 491, y: 182, w: 140, h: 62, r: "img", t: "Up·Concat·C2f", s: "64×80×80 (P3′)", io: "↑ + P3 → 64×80×80", d: "P3 출력. 작은 물체 담당.", f: "concat(up(·), P3)" },
+      { id: "n3", x: 334, y: 182, w: 140, h: 62, r: "img", t: "Down·Concat·C2f", s: "128×40×40 (P4′)", io: "P3′ ↓ + ·  → 128×40×40", d: "다시 줄여 내려가며(PAN) 위치 정보를 깊은 층에 전달.", f: "concat(conv_s2(P3′), ·)" },
+      { id: "n4", x: 177, y: 182, w: 140, h: 62, r: "img", t: "Down·Concat·C2f", s: "256×20×20 (P5′)", io: "P4′ ↓ + SPPF → 256×20×20", d: "큰 물체 담당 출력.", f: "concat(conv_s2(P4′), SPPF)" },
+      { id: "head", x: 20, y: 326, w: 200, h: 62, r: "img", t: "Detect ×3 스케일", s: "박스 64 · 클래스 5", io: "P3′·P4′·P5′ → 칸마다 (64 + 5)", d: "분리형 헤드: 박스 가지는 4변 × 16구간 분포(DFL), 클래스 가지는 5개 시그모이드 점수.", f: "64 = 4 × reg_max 16" },
+      { id: "dec", x: 245, y: 326, w: 200, h: 62, r: "img", t: "디코딩 (DFL)", s: "1×9×8400", io: "→ 1×(4 + 5)×8400", d: "칸(anchor point) 하나가 예측 하나. 80² + 40² + 20² = 8,400칸, 칸마다 박스 4값 + 클래스 5점수.", f: "8400 = 6400 + 1600 + 400" },
+      { id: "nms", x: 470, y: 326, w: 200, h: 62, r: "img", t: "conf 필터 + NMS", s: "conf 0.25 · IoU 0.7", io: "8400 후보 → 최종 박스", d: "점수가 낮은 칸을 버리고, 같은 클래스에서 많이 겹치는 박스 중 점수가 가장 높은 것만 남깁니다(③ 탐지 탭에서 직접 조절).", f: "IoU(a, b) > 임계값 → 낮은 쪽 제거" },
+      { id: "yout", x: 695, y: 326, w: 285, h: 62, r: "gt", t: "박스 (x, y, w, h, cls, score)", s: "AP@0.5 P 0.776 · C 0.877 · B 0.610", io: "최종 검출 → 층화 평가", d: "실습 노트북 HIT-UAV 미세조정 결과, mAP(3클래스) 0.754. COCO 사전학습 그대로는 Person 0.033, Car 0.193, mAP 0.075 — 도메인 격차.", f: "mAP = 평균(AP_Person, AP_Car, AP_Bicycle)" }],
+      arrows: [["yin", "b1"], ["b1", "p3"], ["p3", "p4"], ["p4", "p5"], ["p5", "n1"], ["p4", "n1", "", true], ["n1", "n2"], ["p3", "n2", "", true], ["n2", "n3"], ["n3", "n4"], ["n2", "head", "P3′"], ["n3", "head", "P4′"], ["n4", "head", "P5′"], ["head", "dec"], ["dec", "nms"], ["nms", "yout"]],
+      order: ["yin", "b1", "p3", "p4", "p5", "n1", "n2", "n3", "n4", "head", "dec", "nms", "yout"] },
+    sort: { vb: [1050, 370], groups: [], blocks: [
+      { id: "D", x: 420, y: 30, w: 170, h: 62, r: "img", t: "검출 D (프레임 t)", s: "m×4", io: "검출기 → m×4 (x, y, w, h)", d: "tracking-by-detection: 매 프레임 검출 → 기존 궤적과 짝짓기 → 궤적 갱신.", f: "D = detect(frame_t)" },
+      { id: "trk", x: 20, y: 160, w: 160, h: 62, r: "time", t: "궤적 목록", s: "n개 · 상태 6차원", io: "각 궤적: 칼만 상태 x, P, id, miss, hits", d: "상태 = [cx, cy, w, h, vx, vy]. 첫 검출로 시작하며 속도는 0, 불확실성 P = diag(4,4,4,4,25,25).", f: "x = [cx, cy, w, h, vx, vy]" },
+      { id: "pred", x: 215, y: 160, w: 170, h: 62, r: "time", t: "① 칼만 예측", s: "n×4 (+CMC)", io: "x, P → 예측 박스 n×4", d: "등속 가정으로 한 프레임 앞으로. 카메라 운동 보정 시 화면 이동량 (dx, dy)을 위치에 더합니다. 모든 궤적의 miss += 1.", f: "x ← F·x (+dx, dy) · P ← F·P·Fᵀ + Q, Q = diag(.5,.5,.1,.1,.3,.3)" },
+      { id: "cost", x: 420, y: 160, w: 170, h: 62, r: "fuse", t: "② 비용 행렬", s: "n×m", io: "예측 n×4 × 검출 m×4 → n×m", d: "1−IoU (IoU ≥ iou_thr만 허용) 또는 중심거리/허용반경(허용반경 = gate × max(w, h, 6)). 기준 밖은 1e6 = 짝 금지.", f: "C_ij = 1 − IoU(p_i, d_j)  또는  ‖c_i − c_j‖ / lim" },
+      { id: "hung", x: 625, y: 160, w: 140, h: 62, r: "fuse", t: "③ 헝가리안 할당", s: "1:1 짝", io: "n×m → 비용 합 최소 짝", d: "scipy.optimize.linear_sum_assignment. 허용된 짝(C < 1e5)만 채택합니다.", f: "min Σ C_{i,σ(i)}" },
+      { id: "upd", x: 820, y: 30, w: 160, h: 62, r: "time", t: "④ 칼만 갱신", s: "짝지어진 궤적", io: "예측 + 관측 → 보정된 상태", d: "칼만 이득 K가 예측과 관측 중 누구를 믿을지 정합니다. miss = 0, hits += 1. R = diag(2, 2, 4, 4).", f: "K = P·Hᵀ(H·P·Hᵀ + R)⁻¹ · x ← x + K(z − H·x)" },
+      { id: "new", x: 820, y: 160, w: 160, h: 62, r: "time", t: "⑤ 새 궤적", s: "짝 없는 검출", io: "남은 검출 → 새 id 발급", d: "새로 나타난 사람(또는 오탐). hits = 1에서 시작하므로 min_hits = 2면 다음 프레임부터 출력됩니다.", f: "id = next_id++" },
+      { id: "del", x: 820, y: 290, w: 160, h: 62, r: "warn", t: "⑥ 삭제", s: "miss > max_age", io: "오래 못 본 궤적 제거", d: "가림이 길면 끊기고, 다시 보이면 새 번호 → ID switch. max_age를 길게 하면 재연결은 좋아지지만 엉뚱한 연결 위험.", f: "tracks = [t for t if t.miss ≤ max_age]" },
+      { id: "out", x: 330, y: 290, w: 260, h: 62, r: "gt", t: "출력 (확정 궤적)", s: "(x, y, w, h, id)", io: "miss = 0 이고 hits ≥ min_hits", d: "이번 프레임에 확정·갱신된 궤적만 내보냅니다. 평가: MOTA·IDF1·IDSW (IoU ≥ 0.3 매칭).", f: "out = [(box, id) for t if t.miss == 0 and t.hits ≥ min_hits]" },
+      { id: "next", x: 20, y: 290, w: 160, h: 62, r: "time", t: "다음 프레임 t+1", s: "7.5 fps", io: "궤적 목록 유지 → 반복", d: "프레임 간격 0.133초. 저프레임률일수록 프레임 사이 이동이 커져 매칭이 어렵습니다.", f: "t ← t + 1" }],
+      arrows: [["trk", "pred"], ["pred", "cost", "P"], ["D", "cost", "D"], ["cost", "hung"], ["hung", "upd", "짝"], ["hung", "new", "남은 검출"], ["upd", "del", "", false, "r", "r"], ["new", "del"], ["del", "out"], ["out", "next"], ["next", "trk", "반복"]],
+      order: ["D", "trk", "pred", "cost", "hung", "upd", "new", "del", "out", "next"] }
+  };
+  const DS = { key: "all", step: -1, sel: null, timer: null, speed: 1000 };
+  function anchor(b, side) { return side === "r" ? [b.x + b.w, b.y + b.h / 2] : side === "l" ? [b.x, b.y + b.h / 2] : side === "t" ? [b.x + b.w / 2, b.y] : [b.x + b.w / 2, b.y + b.h]; }
+  const NRM = { r: [1, 0], l: [-1, 0], t: [0, -1], b: [0, 1] };
+  function arrowPath(a, b, fs, ts) {
+    if (fs && ts) { const p = anchor(a, fs), q = anchor(b, ts), k = clamp(0.45 * Math.hypot(q[0] - p[0], q[1] - p[1]), 30, 70), c1 = [p[0] + NRM[fs][0] * k, p[1] + NRM[fs][1] * k], c2 = [q[0] + NRM[ts][0] * k, q[1] + NRM[ts][1] * k];
+      return { d: `M${p[0]},${p[1]} C${c1[0]},${c1[1]} ${c2[0]},${c2[1]} ${q[0]},${q[1]}`, m: [(p[0] + q[0]) / 2 + 6, (p[1] + q[1]) / 2 - 6] }; }
+    const ax = a.x + a.w / 2, ay = a.y + a.h / 2, bx = b.x + b.w / 2, by = b.y + b.h / 2, dx = bx - ax, dy = by - ay;
+    let p, q;
+    if (Math.abs(dy) < 20) { p = anchor(a, dx > 0 ? "r" : "l"); q = anchor(b, dx > 0 ? "l" : "r"); return { d: `M${p[0]},${p[1]} L${q[0]},${q[1]}`, m: [(p[0] + q[0]) / 2, p[1] - 5] }; }
+    if (Math.abs(dx) < 20) { p = anchor(a, dy > 0 ? "b" : "t"); q = anchor(b, dy > 0 ? "t" : "b"); return { d: `M${p[0]},${p[1]} L${q[0]},${q[1]}`, m: [p[0] + 6, (p[1] + q[1]) / 2] }; }
+    p = anchor(a, dy > 0 ? "b" : "t"); q = anchor(b, dy > 0 ? "t" : "b");
+    const c1 = [p[0], (p[1] + q[1]) / 2], c2 = [q[0], (p[1] + q[1]) / 2];
+    return { d: `M${p[0]},${p[1]} C${c1[0]},${c1[1]} ${c2[0]},${c2[1]} ${q[0]},${q[1]}`, m: [(p[0] + q[0]) / 2 + 4, (p[1] + q[1]) / 2 - 4] };
+  }
+  function diaRender() {
+    const D = DIA[DS.key], B = {}; D.blocks.forEach(b => (B[b.id] = b));
+    let s = `<svg class="th-dia" viewBox="0 0 ${D.vb[0]} ${D.vb[1]}" role="group" aria-label="모형 구조도: 블록을 눌러 설명 보기"><defs>`;
+    ["muted", "sk-accent"].forEach(c => { s += `<marker id="mk-${c}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--${c})"/></marker>`; });
+    s += `</defs>`;
+    D.groups.forEach(g => { s += `<rect class="grpbox" x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="10"/><text class="grp" x="${g.x + 10}" y="${g.y + 17}">${g.t}</text>`; });
+    D.arrows.forEach((a, i) => { const p = arrowPath(B[a[0]], B[a[1]], a[4], a[5]); s += `<path class="ar" data-from="${a[0]}" data-to="${a[1]}" d="${p.d}" style="stroke:var(--muted)${a[3] ? ";stroke-dasharray:5 4" : ""}" marker-end="url(#mk-muted)"/>`; if (a[2]) s += `<text class="alab" x="${p.m[0]}" y="${p.m[1]}">${a[2]}</text>`; });
+    D.blocks.forEach(b => { s += `<g class="blk r-${b.r}" tabindex="0" role="button" data-id="${b.id}" aria-label="${b.t}: ${b.s}"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="9"/><text class="t1" x="${b.x + b.w / 2}" y="${b.y + 26}" text-anchor="middle">${b.t}</text><text class="t2" x="${b.x + b.w / 2}" y="${b.y + 45}" text-anchor="middle">${b.s}</text></g>`; });
+    s += `</svg>`; $("diaBox").innerHTML = s;
+    $("diaBox").querySelectorAll(".blk").forEach(g => { g.addEventListener("click", () => diaSelect(g.dataset.id, true)); g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); diaSelect(g.dataset.id, true); } }); });
+    diaSelect(DS.sel && B[DS.sel] ? DS.sel : D.order[0], false);
+  }
+  const ROLE_NAME = { img: "영상", time: "시간축·추적", fuse: "결합", txt: "문장", gt: "정답·평가", warn: "사람 판단·경고" };
+  function diaSelect(id, fromClick) {
+    const D = DIA[DS.key], b = D.blocks.find(x => x.id === id); if (!b) return; DS.sel = id;
+    if (fromClick) { DS.step = D.order.indexOf(id); diaStop(); }
+    const idx = D.order.indexOf(id), seen = new Set(D.order.slice(0, Math.max(idx, 0) + 1));
+    $("diaBox").querySelectorAll(".blk").forEach(g => { g.classList.toggle("on", g.dataset.id === id); g.classList.toggle("dim", DS.step >= 0 && !seen.has(g.dataset.id)); });
+    $("diaBox").querySelectorAll(".ar").forEach(p => { const on = p.dataset.to === id; p.classList.toggle("on", on); p.style.stroke = on ? "var(--sk-accent)" : "var(--muted)"; p.setAttribute("marker-end", on ? "url(#mk-sk-accent)" : "url(#mk-muted)"); });
+    $("diaDetail").innerHTML = `<h3 class="r-${b.r}">${b.t} <span class="sk-pill">${ROLE_NAME[b.r]}</span></h3><div class="th-io">${b.io}</div><p>${b.d}</p><div class="sk-formula">${b.f}</div>`;
+    $("dStepOut").textContent = DS.step >= 0 ? `단계 ${DS.step + 1} / ${D.order.length}` : `${D.order.length}단계`;
+  }
+  function diaGo(i) { const D = DIA[DS.key]; DS.step = clamp(i, 0, D.order.length - 1); diaSelect(D.order[DS.step], false); }
+  function diaStop() { if (DS.timer) clearInterval(DS.timer); DS.timer = null; $("dPlay").textContent = "재생"; }
+  function diaPlay() {
+    if (DS.timer) { diaStop(); return; } const D = DIA[DS.key]; if (DS.step >= D.order.length - 1) DS.step = -1;
+    $("dPlay").textContent = "멈춤"; diaGo(DS.step + 1);
+    DS.timer = setInterval(() => { if (DS.step >= D.order.length - 1) { diaStop(); return; } diaGo(DS.step + 1); }, RM.matches ? Math.max(DS.speed, 1600) : DS.speed);
+  }
+  seg("segDia", v => { diaStop(); DS.key = v; DS.step = -1; DS.sel = null; diaRender(); });
+  seg("segDSpeed", v => { DS.speed = +v; if (DS.timer) { diaStop(); diaPlay(); } });
+  $("dFirst").onclick = () => { diaStop(); diaGo(0); };
+  $("dPrev").onclick = () => { diaStop(); diaGo(DS.step - 1); };
+  $("dNext").onclick = () => { diaStop(); diaGo(DS.step + 1); };
+  $("dPlay").onclick = diaPlay;
+  $("diaCard").addEventListener("keydown", e => { if (e.target.closest(".sk-seg, button")) return; if (e.key === "ArrowRight") { e.preventDefault(); diaStop(); diaGo(DS.step + 1); } else if (e.key === "ArrowLeft") { e.preventDefault(); diaStop(); diaGo(DS.step - 1); } });
+
+  /* =====================================================================
+     공통: IoU · NMS · AP · 형태학 · 헝가리안
+     ===================================================================== */
+  function iou4(ax, ay, aw, ah, bx, by, bw, bh) { const ix = Math.max(0, Math.min(ax + aw, bx + bw) - Math.max(ax, bx)), iy = Math.max(0, Math.min(ay + ah, by + bh) - Math.max(ay, by)), inter = ix * iy; return inter / (aw * ah + bw * bh - inter); }
+  const iouO = (a, b) => iou4(a.x, a.y, a.w, a.h, b.x, b.y, b.w, b.h);
+  const iouA = (a, b) => iou4(a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3]);
+  function nms(dets, thr) {
+    const out = [], byC = {}; dets.forEach(d => (byC[d.cls] = byC[d.cls] || []).push(d));
+    Object.values(byC).forEach(L => { L.sort((a, b) => b.score - a.score); const keep = []; L.forEach(d => { if (!keep.some(k => iouO(k, d) > thr)) keep.push(d); }); out.push(...keep); });
+    return out;
+  }
+  /* 실습 노트북 my_ap 그대로: 점수순 TP/FP → 정밀도 포락선 → Σ(Δrecall × precision) */
+  function myAP(dets, gts, cls, thr) {
+    const scored = []; let npos = 0;
+    for (let i = 0; i < gts.length; i++) {
+      const g = gts[i].filter(b => b.cls === cls); npos += g.length; const used = g.map(() => false);
+      const d = dets[i].filter(b => b.cls === cls).slice().sort((a, b) => b.score - a.score);
+      d.forEach(b => { let j = -1, best = -1; g.forEach((gg, k) => { const o = iouO(b, gg); if (o > best) { best = o; j = k; } }); const ok = j >= 0 && best >= thr && !used[j]; if (ok) used[j] = true; scored.push([b.score, ok ? 1 : 0]); });
+    }
+    scored.sort((a, b) => b[0] - a[0]);
+    const rec = [], prec = []; let tp = 0, fp = 0;
+    scored.forEach(s => { tp += s[1]; fp += 1 - s[1]; rec.push(tp / Math.max(npos, 1)); prec.push(tp / Math.max(tp + fp, 1)); });
+    const env = prec.slice(); for (let i = env.length - 2; i >= 0; i--) env[i] = Math.max(env[i], env[i + 1]);
+    let ap = 0, pr = 0; for (let i = 0; i < rec.length; i++) { ap += (rec[i] - pr) * env[i]; pr = rec[i]; }
+    return { ap, rec, prec, env, scores: scored.map(s => s[0]), npos };
+  }
+  /* cv2.getStructuringElement(MORPH_ELLIPSE, (k,k)) 의 행별 반폭 */
+  function seRows(k) { const r = k >> 1, rows = []; for (let i = 0; i < k; i++) { const dy = i - r; rows.push([dy, r ? Math.round(r * Math.sqrt((r * r - dy * dy) / (r * r))) : 0]); } return rows; }
+  function hRun(src, W, H, hw, isMin) {
+    const out = new Int16Array(W * H); if (hw === 0) { out.set(src); return out; }
+    const L = 2 * hw + 1, n = W + 2 * hw, NEU = isMin ? 32767 : -32768, a = new Int16Array(n), g = new Int16Array(n), h = new Int16Array(n);
+    for (let y = 0; y < H; y++) {
+      const o = y * W; for (let i = 0; i < n; i++) a[i] = i < hw || i >= hw + W ? NEU : src[o + i - hw];
+      for (let i = 0; i < n; i++) g[i] = i % L === 0 ? a[i] : isMin ? Math.min(g[i - 1], a[i]) : Math.max(g[i - 1], a[i]);
+      for (let i = n - 1; i >= 0; i--) h[i] = i % L === L - 1 || i === n - 1 ? a[i] : isMin ? Math.min(h[i + 1], a[i]) : Math.max(h[i + 1], a[i]);
+      for (let x = 0; x < W; x++) { const p = h[x], q = g[x + L - 1]; out[o + x] = isMin ? Math.min(p, q) : Math.max(p, q); }
+    }
+    return out;
+  }
+  function morph(src, W, H, rows, isMin) {
+    const cache = new Map(); rows.forEach(r => { if (!cache.has(r[1])) cache.set(r[1], hRun(src, W, H, r[1], isMin)); });
+    const out = new Int16Array(W * H).fill(isMin ? 32767 : -32768);
+    rows.forEach(([dy, dx]) => { const A = cache.get(dx), y0 = Math.max(0, -dy), y1 = Math.min(H, H - dy);
+      for (let y = y0; y < y1; y++) { const o = y * W, s = (y + dy) * W; if (isMin) for (let x = 0; x < W; x++) { const v = A[s + x]; if (v < out[o + x]) out[o + x] = v; } else for (let x = 0; x < W; x++) { const v = A[s + x]; if (v > out[o + x]) out[o + x] = v; } } });
+    return out;
+  }
+  function hotspot(gray, W, H, k, z) {
+    const src = Int16Array.from(gray), rows = seRows(k), opened = morph(morph(src, W, H, rows, true), W, H, rows, false);
+    const top = new Uint8Array(W * H); let s1 = 0, s2 = 0;
+    for (let i = 0; i < top.length; i++) { const v = Math.max(0, src[i] - opened[i]); top[i] = v; s1 += v; s2 += v * v; }
+    const mean = s1 / top.length, std = Math.sqrt(Math.max(0, s2 / top.length - mean * mean)), thr = Math.max(20, mean + z * std);
+    const bin = new Uint8Array(W * H); for (let i = 0; i < bin.length; i++) bin[i] = top[i] > thr ? 1 : 0;
+    const lab = new Int32Array(W * H), cands = [], stack = []; let nl = 0;
+    for (let i = 0; i < bin.length; i++) { if (!bin[i] || lab[i]) continue; nl++; lab[i] = nl; stack.push(i); let x0 = W, y0 = H, x1 = -1, y1 = -1, area = 0, peak = 0;
+      while (stack.length) { const p = stack.pop(), px = p % W, py = (p / W) | 0; area++; peak = Math.max(peak, top[p]); if (px < x0) x0 = px; if (px > x1) x1 = px; if (py < y0) y0 = py; if (py > y1) y1 = py;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const qx = px + dx, qy = py + dy; if (qx < 0 || qy < 0 || qx >= W || qy >= H) continue; const q = qy * W + qx; if (bin[q] && !lab[q]) { lab[q] = nl; stack.push(q); } } }
+      if (area >= 3 && area <= 1500) cands.push({ x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1, cls: 0, score: peak / 255, area, peak });
+    }
+    return { opened, top, bin, mean, std, thr, cands };
+  }
+  /* 직사각 헝가리안 (최소 비용, 짝 수 = min(n, m)) — scipy linear_sum_assignment 와 같은 최적해 */
+  function hungarian(C) {
+    const n = C.length, m = n ? C[0].length : 0; if (!n || !m) return [];
+    const tr = n > m, A = tr ? C[0].map((_, j) => C.map(r => r[j])) : C, N = A.length, M = A[0].length;
+    const u = new Float64Array(N + 1), v = new Float64Array(M + 1), p = new Int32Array(M + 1), way = new Int32Array(M + 1);
+    for (let i = 1; i <= N; i++) {
+      p[0] = i; let j0 = 0; const minv = new Float64Array(M + 1).fill(Infinity), used = new Uint8Array(M + 1);
+      do { used[j0] = 1; const i0 = p[j0]; let delta = Infinity, j1 = 0;
+        for (let j = 1; j <= M; j++) if (!used[j]) { const cur = A[i0 - 1][j - 1] - u[i0] - v[j]; if (cur < minv[j]) { minv[j] = cur; way[j] = j0; } if (minv[j] < delta) { delta = minv[j]; j1 = j; } }
+        for (let j = 0; j <= M; j++) if (used[j]) { u[p[j]] += delta; v[j] -= delta; } else minv[j] -= delta;
+        j0 = j1; } while (p[j0] !== 0);
+      do { const j1 = way[j0]; p[j0] = p[j1]; j0 = j1; } while (j0);
+    }
+    const out = []; for (let j = 1; j <= M; j++) if (p[j]) out.push(tr ? [j - 1, p[j] - 1] : [p[j] - 1, j - 1]);
+    return out.sort((a, b) => a[0] - b[0]);
+  }
+
+  /* =====================================================================
+     3. 탐지
+     ===================================================================== */
+  const CM = [[0.98499, 0.00778, 0.00667, 0.00056], [0.22027, 0.73879, 0.03314, 0.00780], [0.12874, 0.02695, 0.82635, 0.01796], [0.14489, 0.04830, 0.45455, 0.35227]];
+  const D3 = { cond: "night", alt: 60, idx: 0, method: "cnn", stage: "img", k: 15, z: 4, conf: 0.25, nms: 0.7, thr: 0.5, scenes: [], sel: null };
+  const NS = 6;
+  function d3Build() {
+    D3.scenes = [];
+    for (let i = 0; i < NS; i++) {
+      const seed = 5000 + i * 17 + (D3.cond === "day" ? 300 : 0) + D3.alt;
+      const S = buildStatic(seed, { hour: D3.cond === "day" ? 13 : 2, alt: D3.alt, tRefl: -20, epsRoof: 0.1, pRun: 0.5, nP: 11 });
+      const [lo, hi] = percentiles(S.T, 0, 100); S.gray = agc8(S.T, lo, hi); S.seed = seed; D3.scenes.push(S);
+    }
+    d3Detect();
+  }
+  function mockCNN(cands, gt, seed) {
+    const r = mulberry32(seed);
+    return cands.map((c, i) => {
+      let best = 0, bc = -1; gt.forEach(g => { const o = iouO(c, g); if (o > best) { best = o; bc = g.cls; } });
+      const truth = best >= 0.1 ? [1, 2, 3][bc] : 0, row = CM[truth];
+      let u = r(), pred = 0; for (let k = 0; k < 4; k++) { u -= row[k]; if (u <= 0) { pred = k; break; } pred = k; }
+      const p = [0, 0, 0, 0], pp = 0.5 + 0.5 * r(); p[pred] = pp; const rest = [0, 1, 2, 3].filter(k => k !== pred), w = rest.map(() => r() + 0.05), sw = w.reduce((a, b) => a + b, 0);
+      rest.forEach((k, j) => (p[k] = (1 - pp) * w[j] / sw));
+      let kk = 1; for (let k = 2; k < 4; k++) if (p[k] > p[kk]) kk = k;
+      return { x: c.x, y: c.y, w: c.w, h: c.h, cls: kk - 1, score: p[kk], truth };
+    });
+  }
+  function mockYOLO(S, seed) {
+    const r = mulberry32(seed), day = D3.cond === "day", out = [], hi = D3.alt >= 110;
+    S.gt.forEach(g => {
+      let rc = g.cls === 0 ? (day ? 0.88 : 0.93) : g.cls === 1 ? 0.96 : (day ? 0.8 : 0.85); if (hi && g.cls === 0) rc -= day ? 0.15 : 0.06;
+      if (r() > rc) return;
+      const cls = g.cls === 2 && r() < 0.15 ? 0 : g.cls, sc = 0.55 + 0.42 * r(), jit = (s, f) => gauss(r) * Math.max(0.6, f * s);
+      const main = { x: g.x + jit(g.w, 0.06), y: g.y + jit(g.h, 0.06), w: g.w * (1 + gauss(r) * 0.06), h: g.h * (1 + gauss(r) * 0.06), cls, score: sc };
+      out.push(main);
+      const nd = 2 + ((r() * 3) | 0); for (let d = 0; d < nd; d++) out.push({ x: g.x + jit(g.w, 0.2), y: g.y + jit(g.h, 0.2), w: g.w * (1 + gauss(r) * 0.15), h: g.h * (1 + gauss(r) * 0.15), cls, score: sc * (0.3 + 0.6 * r()) });
+    });
+    S.distract.slice(0, day ? 4 : 2).forEach(b => out.push({ x: b.x - 2, y: b.y - 3, w: b.w + 4, h: b.h * 2 + 2, cls: 0, score: 0.05 + 0.35 * r() }));
+    return out;
+  }
+  function d3Detect() {
+    D3.scenes.forEach(S => {
+      S.hs = hotspot(S.gray, S.W, S.H, D3.k, D3.z);
+      S.raw = { hot: S.hs.cands.map(c => ({ x: c.x, y: c.y, w: c.w, h: c.h, cls: 0, score: c.score })), cnn: mockCNN(S.hs.cands, S.gt, S.seed + 11), yolo: mockYOLO(S, S.seed + 23) };
+      S.off = null;
+    });
+    D3.sel = null; d3Eval();
+  }
+  function d3Eval() {
+    D3.scenes.forEach(S => { S.post = {}; ["hot", "cnn", "yolo"].forEach(m => (S.post[m] = nms(S.raw[m].filter(d => d.score >= 0.001), D3.nms))); });
+    const gts = D3.scenes.map(S => S.gt), res = {};
+    ["hot", "cnn", "yolo"].forEach(m => { const dets = D3.scenes.map(S => S.post[m]); res[m] = { pr: myAP(dets, gts, 0, D3.thr), cls: [0, 1, 2].map(c => myAP(dets, gts, c, 0.5).ap) }; });
+    D3.res = res; d3Tables(); d3PR(); d3Draw(); d3Code();
+  }
+  const MNAME = { hot: "열점만", cnn: "열점+CNN 검증기 (모의)", yolo: "YOLOv8n 미세조정 (모의)" };
+  const mColor = m => css(m === "hot" ? "--role-gt" : m === "cnn" ? "--role-img" : "--sk-accent");
+  function d3Draw() {
+    const S = D3.scenes[D3.idx]; if (!S) return; const cv = $("cvDet"), P = prep(cv); if (!P) return; const { ctx, w } = P, s = w / 640;
+    if (!S.off || S.offStage !== D3.stage) {
+      let g = S.gray; if (D3.stage === "open") g = Uint8Array.from(S.hs.opened); else if (D3.stage === "top") g = S.hs.top.map(v => Math.min(255, v * 3)); else if (D3.stage === "bin") g = S.hs.bin.map(v => v * 255);
+      S.off = toCanvas(g, S.W, S.H, "white", S.off); S.offStage = D3.stage;
+    }
+    ctx.imageSmoothingEnabled = s < 1; ctx.drawImage(S.off, 0, 0, w, w * 512 / 640);
+    const dets = S.post[D3.method].filter(d => d.score >= D3.conf).sort((a, b) => b.score - a.score), used = S.gt.map(() => false);
+    const st = dets.map(d => { let j = -1, best = -1; S.gt.forEach((g, k) => { if (g.cls !== d.cls) return; const o = iouO(d, g); if (o > best) { best = o; j = k; } }); const ok = j >= 0 && best >= D3.thr && !used[j]; if (ok) used[j] = true; return ok; });
+    S.gt.forEach((g, k) => boxPath(ctx, g, s, used[k] ? css("--img-gt") : css("--img-fn"), false, used[k] ? 1.2 : 1.8));
+    dets.forEach((d, i) => { boxPath(ctx, d, s, st[i] ? css("--img-tp") : css("--img-fp"), true, D3.sel === d ? 2.6 : 1.5); });
+    if (D3.sel && dets.includes(D3.sel)) tagText(ctx, D3.sel.score.toFixed(2), D3.sel.x * s, D3.sel.y * s - 1, css("--img-tp"));
+    const tp = st.filter(Boolean).length, nP = S.gt.filter(g => g.cls === 0).length;
+    $("detStatus").textContent = `장면 ${D3.idx + 1}: 열점 후보 ${S.hs.cands.length}개 · 정답 ${S.gt.length}개(사람 ${nP}) · conf ≥ ${D3.conf.toFixed(2)} 예측 ${dets.length}개 → TP ${tp} · FP ${dets.length - tp} · FN ${S.gt.length - tp} (IoU ≥ ${D3.thr})`;
+    $("fmThr").innerHTML = `top-hat 평균 ${S.hs.mean.toFixed(1)}, 표준편차 ${S.hs.std.toFixed(1)} → 임계값 = max(20, ${S.hs.mean.toFixed(1)} + ${D3.z}×${S.hs.std.toFixed(1)}) = <b>${S.hs.thr.toFixed(1)}</b><br><span style="color:var(--muted)">실습 노트북 야간 장면: 평균 8.5, 표준편차 15.3 → 임계값 69.6 · 후보 117개 vs 정답 사람 30명</span>`;
+    D3.shown = dets;
+  }
+  function d3Click(e) {
+    const r = $("cvDet").getBoundingClientRect(), x = (e.clientX - r.left) / r.width * 640, y = (e.clientY - r.top) / r.height * 512, S = D3.scenes[D3.idx];
+    const hit = (D3.shown || []).filter(d => x >= d.x - 2 && x <= d.x + d.w + 2 && y >= d.y - 2 && y <= d.y + d.h + 2).sort((a, b) => a.w * a.h - b.w * b.h)[0];
+    D3.sel = hit || null; d3Draw();
+    if (!hit) { $("fmIou").textContent = "영상에서 예측 박스를 눌러 보세요."; return; }
+    let best = null, bo = -1; S.gt.forEach(g => { const o = iouO(hit, g); if (o > bo) { bo = o; best = g; } });
+    if (!best || bo <= 0) { $("fmIou").innerHTML = `예측 (${hit.x.toFixed(1)}, ${hit.y.toFixed(1)}, ${hit.w.toFixed(1)}, ${hit.h.toFixed(1)}), 점수 ${hit.score.toFixed(3)}<br>겹치는 정답 없음 → IoU = 0 → <b style="color:var(--role-warn)">FP</b>`; return; }
+    const ix = Math.max(0, Math.min(hit.x + hit.w, best.x + best.w) - Math.max(hit.x, best.x)), iy = Math.max(0, Math.min(hit.y + hit.h, best.y + best.h) - Math.max(hit.y, best.y)), inter = ix * iy, uni = hit.w * hit.h + best.w * best.h - inter;
+    const cn = ["Person", "Car", "Bicycle"];
+    $("fmIou").innerHTML = `예측 ${cn[hit.cls]} (x ${hit.x.toFixed(1)}, y ${hit.y.toFixed(1)}, w ${hit.w.toFixed(1)}, h ${hit.h.toFixed(1)}), 점수 ${hit.score.toFixed(3)}<br>정답 ${cn[best.cls]} (x ${best.x.toFixed(1)}, y ${best.y.toFixed(1)}, w ${best.w.toFixed(1)}, h ${best.h.toFixed(1)})<br>교집합 = ${ix.toFixed(1)} × ${iy.toFixed(1)} = ${inter.toFixed(1)} · 합집합 = ${(hit.w * hit.h).toFixed(1)} + ${(best.w * best.h).toFixed(1)} − ${inter.toFixed(1)} = ${uni.toFixed(1)}<br>IoU = ${inter.toFixed(1)} / ${uni.toFixed(1)} = <b>${(inter / uni).toFixed(3)}</b> ${inter / uni >= D3.thr ? "≥" : "<"} ${D3.thr}${hit.cls !== best.cls ? " (클래스 다름)" : ""}`;
+  }
+  function d3PR() {
+    const ms = ["hot", "cnn", "yolo"], marks = [];
+    const ser = ms.map(m => { const R = D3.res[m].pr; const pts = [[0, R.env.length ? R.env[0] : 0]].concat(R.rec.map((v, i) => [v, R.env[i]])); return { color: mColor(m), lw: m === D3.method ? 2.8 : 1.6, step: true, pts }; });
+    const R = D3.res[D3.method].pr; let k = -1; R.scores.forEach((sc, i) => { if (sc >= D3.conf) k = i; });
+    if (k >= 0) marks.push({ x: R.rec[k], y: R.prec[k], color: mColor(D3.method) });
+    lineChart($("cvPR"), { xmin: 0, xmax: 1, ymin: 0, ymax: 1.02, xticks: [0, 0.2, 0.4, 0.6, 0.8, 1], yticks: [0, 0.2, 0.4, 0.6, 0.8, 1], xlabel: "재현율 (Recall)", ylabel: "정밀도 (Precision)", series: ser, marks });
+    legend($("lgPR"), ms.map(m => ({ name: `${MNAME[m]} AP@${D3.thr} = ${f3(D3.res[m].pr.ap)}`, color: mColor(m) })).concat(k >= 0 ? [{ name: `● conf ${D3.conf.toFixed(2)} 운영점: 정밀도 ${f3(R.prec[k])}, 재현율 ${f3(R.rec[k])}`, color: mColor(D3.method) }] : []));
+    $("prHint").textContent = `IoU ≥ ${D3.thr} · ${D3.cond === "day" ? "주간" : "야간"} · ${D3.alt}m`;
+  }
+  function d3Tables() {
+    const ms = ["hot", "cnn", "yolo"];
+    $("tblApLive").innerHTML = `<caption>이 화면 6장 (절차 생성 장면, 모의 점수 포함)</caption><thead><tr><th>방법</th><th>Person</th><th>Car</th><th>Bicycle</th><th>mAP(3클래스)</th></tr></thead><tbody>` +
+      ms.map(m => { const c = D3.res[m].cls; return `<tr${m === D3.method ? ' class="cur"' : ""}><td>${MNAME[m]}</td>${c.map(v => `<td class="n">${f3(v)}</td>`).join("")}<td class="n">${f3((c[0] + c[1] + c[2]) / 3)}</td></tr>`; }).join("") + "</tbody>";
+    $("tblApNb").innerHTML = `<caption>실습 노트북 결과 (HIT-UAV test 200장, AP@0.5)</caption><thead><tr><th>방법</th><th>Person</th><th>Car</th><th>Bicycle</th><th>mAP(3클래스)</th></tr></thead><tbody>
+      <tr><td>열점만</td><td class="n">0.047</td><td class="n">0.000</td><td class="n">0.000</td><td class="n">0.016</td></tr>
+      <tr><td>열점+CNN</td><td class="n">0.246</td><td class="n">0.018</td><td class="n">0.003</td><td class="n">0.089</td></tr>
+      <tr><td>YOLOv8n COCO 그대로</td><td class="n">0.033</td><td class="n">0.193</td><td class="n">0.000</td><td class="n">0.075</td></tr>
+      <tr><td>YOLOv8n 미세조정</td><td class="n good">0.776</td><td class="n good">0.877</td><td class="n good">0.610</td><td class="n good">0.754</td></tr></tbody>
+      <tbody><tr><th>Person AP</th><th>@0.3 야간</th><th>@0.3 주간</th><th>@0.5 전체</th><th></th></tr>
+      <tr><td>열점만</td><td class="n">0.167</td><td class="n">0.019</td><td class="n">0.047</td><td></td></tr>
+      <tr><td>열점+CNN</td><td class="n">0.546</td><td class="n">0.23</td><td class="n">0.246</td><td></td></tr></tbody>`;
+  }
+  function d3Code() {
+    $("codeDet").textContent = `import cv2, numpy as np
+from ultralytics import YOLO
+
+# ① 열점 후보: white top-hat + 적응 임계값 + 연결요소
+se = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (${D3.k}, ${D3.k}))   # 구조요소
+opened = cv2.morphologyEx(im, cv2.MORPH_OPEN, se)                   # 배경 추정
+tophat = cv2.subtract(im, opened)                                   # 작은 밝은 구조만
+thr = max(20, tophat.mean() + ${D3.z} * tophat.std())                         # 적응 임계값
+n, lab, stats, _ = cv2.connectedComponentsWithStats((tophat > thr).astype(np.uint8))
+
+# ② YOLOv8n 미세조정 가중치로 예측 (conf·NMS IoU = 현재 슬라이더)
+model = YOLO("hituav_yolov8n.pt")
+res = model.predict(im_path, imgsz=640, conf=${D3.conf.toFixed(2)}, iou=${D3.nms.toFixed(2)}, verbose=False)
+boxes = res[0].boxes.xywh.numpy(), res[0].boxes.cls.numpy(), res[0].boxes.conf.numpy()
+
+# ③ AP: 점수순 TP/FP → 정밀도 포락선 → Σ(Δrecall × precision), IoU 기준 ${D3.thr}
+ap = my_ap(dets, gts, cls=0, thr=${D3.thr})`;
+  }
+  function d3SceneSeg() { $("segScene").innerHTML = Array.from({ length: NS }, (_, i) => `<button type="button" data-v="${i}" aria-pressed="${i === D3.idx}">${i + 1}</button>`).join(""); }
+  seg("segCond", v => { D3.cond = v; d3Build(); });
+  seg("segScene", v => { D3.idx = +v; D3.sel = null; $("fmIou").textContent = "영상에서 예측 박스를 눌러 보세요."; d3Draw(); });
+  seg("segMethod", v => { D3.method = v; D3.sel = null; d3Tables(); d3PR(); d3Draw(); });
+  seg("segStage", v => { D3.stage = v; d3Draw(); });
+  seg("segIou", v => { D3.thr = +v; d3Eval(); });
+  const d3BuildDeb = debounce(d3Build, 120), d3DetectDeb = debounce(d3Detect, 120);
+  $("sAlt3").addEventListener("input", e => { D3.alt = +e.target.value; $("vAlt3").textContent = D3.alt + " m"; d3BuildDeb(); });
+  $("sK").addEventListener("input", e => { D3.k = +e.target.value; $("vK").textContent = D3.k; d3DetectDeb(); });
+  $("sZ").addEventListener("input", e => { D3.z = +e.target.value; $("vZ").textContent = D3.z.toFixed(1); d3DetectDeb(); });
+  $("sConf").addEventListener("input", e => { D3.conf = +e.target.value; $("vConf").textContent = D3.conf.toFixed(2); d3PR(); d3Draw(); d3Code(); });
+  $("sNms").addEventListener("input", e => { D3.nms = +e.target.value; $("vNms").textContent = D3.nms.toFixed(2); d3Eval(); });
+  $("cvDet").addEventListener("click", d3Click);
+
+  /* =====================================================================
+     4. 추적 — 절차 생성 영상 + SORT + MOT 지표
+     ===================================================================== */
+  const NF = 150, FPS = 7.5, VW = 640, VH = 512, PAD = 60, WW = VW + 2 * PAD, WH = VH + 2 * PAD;
+  const SCN = {
+    walk: { key: "night_walk", seed: 101, hour: 2, nP: 10, still: 2, roofs: 0, shake: false, pMiss: 0.02, fp: 0, jit: 0.7, cars: 1, desc: "쉬운 조건: 야간, 정지 비행, 가림 없음. 세 설정 모두 높은 점수가 나와야 정상입니다." },
+    crowd: { key: "night_crowd_occlusion", seed: 202, hour: 3, nP: 16, still: 2, roofs: 2, shake: false, pMiss: 0.04, fp: 0.004, jit: 0.8, cars: 1, desc: "밀집 + 차가운 금속 지붕 밑을 지나가면 사람이 사라집니다(가시율 50% 미만은 평가 제외). max_age로 기다려 줄지 정합니다." },
+    shake: { key: "night_drone_shake", seed: 303, hour: 1, nP: 12, still: 2, roofs: 0, shake: true, pMiss: 0.04, fp: 0.025, jit: 0.8, cars: 1, desc: "바람에 화면이 6~11px씩 튑니다. 10px 사람의 예측·검출 박스가 안 겹쳐 IoU 매칭이 무너집니다 → CMC 또는 중심거리 게이트." },
+    day: { key: "day_lowcontrast", seed: 404, hour: 13, nP: 12, still: 2, roofs: 0, shake: false, pMiss: 0.5, fp: 0.12, jit: 1.4, cars: 2, desc: "주간 저대비: 검출 재현율 자체가 낮아 MOTA가 바닥입니다 — 추적은 검출을 넘지 못합니다." }
+  };
+  let NOISE = null;
+  function noiseField() { if (NOISE) return NOISE; const r = mulberry32(99); NOISE = new Float32Array(1024 * 1024); for (let i = 0; i < NOISE.length; i++) NOISE[i] = gauss(r) * 0.12; return NOISE; }
+  function buildVideo(name) {
+    const sc = SCN[name], r = mulberry32(sc.seed), dr = mulberry32(sc.seed + 7), h = sc.hour, A = asphaltT(h), G = grassT(h), ap = (t, e) => apparent(t, e, -20), day = h >= 7 && h <= 18;
+    const bg = new Float32Array(WW * WH), n1 = valueNoise(WW, WH, 60, r), n2 = valueNoise(WW, WH, 12, r), tG = ap(G, 0.97), tA = ap(A, 0.95);
+    for (let i = 0; i < bg.length; i++) bg[i] = tG + n1[i] * 1.2 + n2[i] * 0.35;
+    const roadY = PAD + 300 + r() * 80, roadW = 46; fillRect(bg, WW, WH, 0, roadY, WW, roadW, tA, n2.map(v => v * 0.3));
+    const roadX = PAD + 120 + r() * 60; fillRect(bg, WW, WH, roadX, 0, 40, WH, tA, n2.map(v => v * 0.3));
+    for (let i = 0; i < 6; i++) fillEllipse(bg, WW, WH, r() * WW, r() * WH, 26, 26, ap(G + 1.2, 0.98));
+    const roofs = [];
+    for (let i = 0; i < sc.roofs; i++) { const b = { x: PAD + 170 + i * 220 + r() * 30, y: PAD + 120 + r() * 60, w: 90, h: 70 }; roofs.push(b); fillRect(bg, WW, WH, b.x - 2, b.y - 2, b.w + 4, b.h + 4, ap((A + G) / 2, 0.92)); fillRect(bg, WW, WH, b.x, b.y, b.w, b.h, ap(A, 0.1)); }
+    const distract = [];
+    for (let i = 0; i < (day ? 9 : 6); i++) { const b = { x: PAD + 20 + r() * (VW - 40), y: PAD + 20 + r() * (VH - 40), w: 6 + r() * 4, h: 6 + r() * 4 }; if (overlaps(b, roofs, 4)) continue; fillEllipse(bg, WW, WH, b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2, day ? ap(A + 5 + r() * 5, 0.95) : ap(G + 12 + r() * 6, 0.95)); distract.push(b); }
+    // 사람 궤적
+    const persons = [];
+    for (let i = 0; i < sc.nP; i++) {
+      const w = 8 + Math.round(r() * 6), hh = 16 + Math.round(r() * 9), still = i < sc.still, stopgo = i === sc.still, runner = i === sc.still + 1 && name !== "crowd";
+      let x = PAD + 30 + r() * (VW - 60 - w), y = PAD + 30 + r() * (VH - 60 - hh), hd = r() * Math.PI * 2, sp = still ? 0 : runner ? 2.6 : 0.6 + r() * 0.7;
+      if (name === "crowd" && !still && roofs.length) { const R = roofs[i % roofs.length]; const side = r() < 0.5 ? -1 : 1; x = R.x + R.w / 2 + side * (110 + r() * 60); y = R.y + R.h / 2 + (r() - 0.5) * 120; hd = Math.atan2(R.y + R.h / 2 - y + (r() - 0.5) * 30, R.x + R.w / 2 - x); }
+      const pos = [];
+      for (let f = 0; f < NF; f++) {
+        let s = sp; if (stopgo) s = f > 45 && f < 115 ? 0 : 0.9;
+        if (!still) { hd += gauss(r) * 0.04; x += Math.cos(hd) * s; y += Math.sin(hd) * s; }
+        else { x += gauss(r) * 0.04; y += gauss(r) * 0.04; }
+        if (x < 8 || x > WW - w - 8) { hd = Math.PI - hd; x = clamp(x, 8, WW - w - 8); }
+        if (y < 8 || y > WH - hh - 8) { hd = -hd; y = clamp(y, 8, WH - hh - 8); }
+        pos.push([x, y]);
+      }
+      persons.push({ id: i + 1, w, h: hh, pos, pDet: clamp(1 - sc.pMiss + gauss(r) * (name === "day" ? 0.18 : 0.01), 0.05, 0.995) });
+    }
+    // 차량
+    const cars = [];
+    for (let i = 0; i < sc.cars; i++) { const dir = i % 2 ? -1 : 1, y0 = roadY + (dir > 0 ? 4 : roadW - 24), x0 = dir > 0 ? -50 - i * 200 : WW + 10 + i * 120; cars.push({ dir, pos: Array.from({ length: NF }, (_, f) => [x0 + dir * 5.5 * f, y0]), w: 46, h: 20 }); }
+    // 카메라 경로 (화면 내용 = 세계 − cam)
+    const cam = [];
+    let cx = PAD, cy = PAD;
+    for (let f = 0; f < NF; f++) {
+      if (sc.shake && f > 0) { if (r() < 0.2) { const m = 6 + r() * 5, a = r() * Math.PI * 2; cx += Math.cos(a) * m; cy += Math.sin(a) * m; } cx += (PAD - cx) * 0.12; cy += (PAD - cy) * 0.12; }
+      cam.push([Math.round(clamp(cx, 0, 2 * PAD)), Math.round(clamp(cy, 0, 2 * PAD))]);
+    }
+    const est = cam.map((c, f) => f === 0 ? [0, 0] : [-(c[0] - cam[f - 1][0]) + gauss(dr) * 0.3, -(c[1] - cam[f - 1][1]) + gauss(dr) * 0.3]);
+    const roofAt = (x, y) => roofs.some(b => x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h);
+    const GT = {}, DET = [], CARN = [], GTall = [];
+    for (let f = 0; f < NF; f++) {
+      const [ox, oy] = cam[f], g = [], d = [], all = [];
+      persons.forEach(p => {
+        const [wx, wy] = p.pos[f], bx = wx - ox, by = wy - oy; let tot = 0, vis = 0;
+        for (let yy = Math.floor(wy); yy < Math.floor(wy) + p.h; yy++) for (let xx = Math.floor(wx); xx < Math.floor(wx) + p.w; xx++) { tot++; const ix = xx - ox, iy = yy - oy; if (ix >= 0 && iy >= 0 && ix < VW && iy < VH && !roofAt(xx, yy)) vis++; }
+        const v = vis / tot; all.push({ id: p.id, b: [bx, by, p.w, p.h], vis: v });
+        if (v >= 0.5) g.push([bx, by, p.w, p.h, p.id]);
+        if (v >= 0.25 && dr() < p.pDet * (v >= 0.5 ? 1 : v)) d.push([bx + gauss(dr) * sc.jit, by + gauss(dr) * sc.jit, Math.max(4, p.w + gauss(dr) * 0.8), Math.max(6, p.h + gauss(dr) * 0.8)]);
+      });
+      distract.forEach(b => { const bx = b.x - ox, by = b.y - oy; if (bx > 0 && by > 0 && bx < VW - 10 && by < VH - 12 && dr() < sc.fp) d.push([bx - 1 + gauss(dr), by - 2 + gauss(dr), b.w + 3, b.h + 5]); });
+      let nc = 0; cars.forEach(c => { const bx = c.pos[f][0] - ox; if (bx > -20 && bx < VW - 20 && dr() < 0.95) nc++; });
+      if (g.length) GT[f + 1] = g; DET.push(d); CARN.push(nc); GTall.push(all);
+    }
+    return { name, sc, bg, roofs, distract, persons, cars, cam, est, GT, DET, CARN, GTall, tBody: ap(personT(h), 0.9), tHead: ap(33, 0.98), tCar: ap(day ? A + 5 : G + 1.5, 0.9), tHood: ap(60, 0.9), tGlass: ap(day ? A + 5 : G + 1.5, 0.85) };
+  }
+  function renderVideoFrame(S, f) {
+    const T = new Float32Array(VW * VH), [ox, oy] = S.cam[f], N = noiseField(), nx = (f * 337) & 1023, ny = (f * 211) & 1023;
+    for (let y = 0; y < VH; y++) T.set(S.bg.subarray((y + oy) * WW + ox, (y + oy) * WW + ox + VW), y * VW);
+    S.cars.forEach(c => { const [wx, wy] = c.pos[f]; drawCar(T, VW, VH, wx - ox, wy - oy, c.w, c.h, S.tCar, S.tHood, S.tGlass, true, c.dir > 0); });
+    S.persons.forEach(p => { const [wx, wy] = p.pos[f]; drawPerson(T, VW, VH, wx - ox, wy - oy, p.w, p.h, S.tBody, S.tHead); });
+    S.roofs.forEach(b => { for (let y = Math.max(0, Math.floor(b.y - oy)); y < Math.min(VH, Math.ceil(b.y + b.h - oy)); y++) for (let x = Math.max(0, Math.floor(b.x - ox)); x < Math.min(VW, Math.ceil(b.x + b.w - ox)); x++) T[y * VW + x] = S.bg[(y + oy) * WW + x + ox]; });
+    for (let y = 0; y < VH; y++) { const o = y * VW, no = ((y + ny) & 1023) * 1024; for (let x = 0; x < VW; x++) T[o + x] += N[no + ((x + nx) & 1023)]; }
+    const [lo, hi] = percentiles(T, 0, 100); return agc8(T, lo, hi);
+  }
+  /* 칼만 필터 (실습 노트북 KalmanBox 그대로) */
+  const eye = n => Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)));
+  const diag = v => v.map((x, i) => v.map((_, j) => (i === j ? x : 0)));
+  const mm = (A, B) => A.map(r => B[0].map((_, j) => r.reduce((s, v, k) => s + v * B[k][j], 0)));
+  const tp = A => A[0].map((_, j) => A.map(r => r[j]));
+  const madd = (A, B) => A.map((r, i) => r.map((v, j) => v + B[i][j]));
+  const msub = (A, B) => A.map((r, i) => r.map((v, j) => v - B[i][j]));
+  const mv = (A, x) => A.map(r => r.reduce((s, v, k) => s + v * x[k], 0));
+  function inv(A) { const n = A.length, M = A.map((r, i) => r.concat(eye(n)[i])); for (let c = 0; c < n; c++) { let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r; [M[c], M[p]] = [M[p], M[c]]; const d = M[c][c]; for (let j = 0; j < 2 * n; j++) M[c][j] /= d; for (let r = 0; r < n; r++) if (r !== c) { const f = M[r][c]; for (let j = 0; j < 2 * n; j++) M[r][j] -= f * M[c][j]; } } return M.map(r => r.slice(n)); }
+  const KF_F = (() => { const F = eye(6); F[0][4] = F[1][5] = 1; return F; })(), KF_H = [[1, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0], [0, 0, 0, 1, 0, 0]];
+  class KalmanBox {
+    constructor(box, qs, rs) { const [x, y, w, h] = box; this.x = [x + w / 2, y + h / 2, w, h, 0, 0]; this.P = diag([4, 4, 4, 4, 25, 25]); this.Q = diag([0.5, 0.5, 0.1, 0.1, 0.3, 0.3].map(v => v * (qs || 1))); this.R = diag([2, 2, 4, 4].map(v => v * (rs || 1))); }
+    predict(shift) { this.x = mv(KF_F, this.x); if (shift) { this.x[0] += shift[0]; this.x[1] += shift[1]; } this.P = madd(mm(mm(KF_F, this.P), tp(KF_F)), this.Q); return this.box(); }
+    update(box) { const [x, y, w, h] = box, z = [x + w / 2, y + h / 2, w, h], S = madd(mm(mm(KF_H, this.P), tp(KF_H)), this.R), K = mm(mm(this.P, tp(KF_H)), inv(S)), yv = z.map((v, i) => v - mv(KF_H, this.x)[i]); const dx = mv(K, yv); this.x = this.x.map((v, i) => v + dx[i]); this.P = mm(msub(eye(6), mm(K, KF_H)), this.P); }
+    box() { const [cx, cy, w, h] = this.x; return [cx - w / 2, cy - h / 2, w, h]; }
+  }
+  function sortCost(P, D, cfg) {
+    return P.map(p => D.map(d => {
+      if (cfg.metric === "iou") { const o = iouA(p, d); return o >= cfg.iou_thr ? 1 - o : 1e6; }
+      const dist = Math.hypot(d[0] + d[2] / 2 - p[0] - p[2] / 2, d[1] + d[3] / 2 - p[1] - p[3] / 2), lim = cfg.gate * Math.max(p[2], p[3], 6); return dist <= lim ? dist / lim : 1e6;
+    }));
+  }
+  function runSORT(S, cfg, record) {
+    let tracks = [], nextId = 1; const hyp = {}, rec = [];
+    for (let i = 0; i < NF; i++) {
+      const D = S.DET[i], shift = cfg.cmc && i > 0 ? S.est[i] : [0, 0], predIds = tracks.map(t => t.id);
+      const P = tracks.map(t => t.kf.predict(shift)); tracks.forEach(t => t.miss++);
+      const matched = new Set(), pairs = []; let C = null;
+      if (P.length && D.length) { C = sortCost(P, D, cfg); hungarian(C).forEach(([a, b]) => { if (C[a][b] < 1e5) { const t = tracks[a]; t.kf.update(D[b]); t.miss = 0; t.hits++; matched.add(b); pairs.push([a, b]); } }); }
+      const newIds = []; D.forEach((d, j) => { if (!matched.has(j)) { tracks.push({ kf: new KalmanBox(d), id: nextId, miss: 0, hits: 1 }); newIds.push(nextId); nextId++; } });
+      const before = tracks.map(t => t.id); tracks = tracks.filter(t => t.miss <= cfg.max_age); const keep = new Set(tracks.map(t => t.id)), deleted = before.filter(id => !keep.has(id));
+      const out = tracks.filter(t => t.miss === 0 && t.hits >= cfg.min_hits).map(t => t.kf.box().concat([t.id]));
+      if (out.length) hyp[i + 1] = out;
+      if (record) rec.push({ predIds, P, D, C, pairs, newIds, deleted, out });
+    }
+    return { hyp, rec };
+  }
+  /* 실습 노트북 mot_metrics 그대로 (IoU ≥ 0.3 매칭) */
+  function motMetrics(gt, hyp, thr) {
+    thr = thr || 0.3;
+    const frames = [...new Set(Object.keys(gt).concat(Object.keys(hyp)).map(Number))].sort((a, b) => a - b);
+    let FN = 0, FP = 0, IDSW = 0, nG = 0, nH = 0; const last = new Map(), pair = new Map(), per = {}, events = [], gidSet = new Set(), hidSet = new Set();
+    Object.values(gt).forEach(v => { nG += v.length; v.forEach(b => gidSet.add(b[4])); }); Object.values(hyp).forEach(v => { nH += v.length; v.forEach(b => hidSet.add(b[4])); });
+    frames.forEach(f => {
+      const G = gt[f] || [], Hh = hyp[f] || [], O = G.map(g => Hh.map(h => iouA(g, h))); let m = [];
+      if (G.length && Hh.length) m = hungarian(O.map(r => r.map(o => (o >= thr ? 1 - o : 1e6)))).filter(([i, j]) => O[i][j] >= thr);
+      FN += G.length - m.length; FP += Hh.length - m.length;
+      const gm = new Set(m.map(x => x[0])), hm = new Set(m.map(x => x[1])); per[f] = { fnIdx: G.map((_, i) => !gm.has(i)), fpIdx: Hh.map((_, j) => !hm.has(j)), sw: [] };
+      m.forEach(([i, j]) => { const g = G[i][4], h = Hh[j][4]; if (last.has(g) && last.get(g) !== h) { IDSW++; events.push({ f, g, from: last.get(g), to: h }); per[f].sw.push(h); } last.set(g, h); });
+      O.forEach((r, i) => r.forEach((o, j) => { if (o >= thr) { const k = G[i][4] + "," + Hh[j][4]; pair.set(k, (pair.get(k) || 0) + 1); } }));
+    });
+    pair.forEach((_, k) => { const [g, h] = k.split(",").map(Number); gidSet.add(g); hidSet.add(h); });
+    const gids = [...gidSet].sort((a, b) => a - b), hids = [...hidSet].sort((a, b) => a - b);
+    let idtp = 0; if (gids.length && hids.length) { const M = gids.map(g => hids.map(h => pair.get(g + "," + h) || 0)); hungarian(M.map(r => r.map(v => -v))).forEach(([i, j]) => (idtp += M[i][j])); }
+    const ntr = new Set(); Object.values(hyp).forEach(v => v.forEach(b => ntr.add(b[4]))); const ngt = new Set(); Object.values(gt).forEach(v => v.forEach(b => ngt.add(b[4])));
+    return { MOTA: 1 - (FN + FP + IDSW) / Math.max(nG, 1), IDF1: 2 * idtp / Math.max(nG + nH, 1), IDSW, FP, FN, ntr: ntr.size, ngt: ngt.size, nG, nH, idtp, per, events };
+  }
+
+  const V = { name: "walk", S: null, cfg: { metric: "iou", iou_thr: 0.3, gate: 1, max_age: 5, min_hits: 2, cmc: false }, f: 30, timer: null, speed: 1, view: "track", showGt: false, showDet: true, showPred: false, showTrail: true, off: null, lastF: -1 };
+  function vBuild() { V.S = buildVideo(V.name); V.lastF = -1; $("seqDesc").textContent = SCN[V.name].desc; vRun(); vTables(); vSweep(); r5Run(); }
+  function vRun() { const R = runSORT(V.S, V.cfg, true); V.res = R; V.met = motMetrics(V.S.GT, R.hyp); vKpi(); vDraw(); vCode(); }
+  function vKpi() {
+    const m = V.met, k = (v, l, cls) => `<div class="sk-stat ${cls || ""}"><b>${v}</b><span>${l}</span></div>`;
+    $("kpiTrack").innerHTML = k(f3(m.MOTA), "MOTA", m.MOTA >= 0.75 ? "th-stat-good" : m.MOTA < 0.4 ? "th-stat-bad" : "") + k(f3(m.IDF1), "IDF1", m.IDF1 >= 0.75 ? "th-stat-good" : m.IDF1 < 0.4 ? "th-stat-bad" : "") + k(m.IDSW, "IDSW", m.IDSW > 5 ? "th-stat-bad" : "") + k(m.FP, "FP") + k(m.FN, "FN") + k(m.ntr, "궤적 수", m.ntr > m.ngt * 1.5 ? "th-stat-bad" : "") + k(m.ngt, "실제 인원");
+    $("fmMota").innerHTML = `MOTA = 1 − (${m.FN} + ${m.FP} + ${m.IDSW}) / ${m.nG} = <b>${f3(m.MOTA)}</b> · IDF1 = 2×${m.idtp} / (${m.nG} + ${m.nH}) = <b>${f3(m.IDF1)}</b>`;
+  }
+  const idColor = id => `hsl(${(id * 137.508) % 360},90%,62%)`;
+  function vDraw() {
+    const cv = $("cvVid"), P = prep(cv); if (!P || !V.S) return; const { ctx, w } = P, s = w / 640, f = V.f, S = V.S;
+    if (V.view === "track") { if (V.lastF !== f || !V.off) { V.gray = renderVideoFrame(S, f); V.off = toCanvas(V.gray, VW, VH, "white", V.off); V.lastF = f; } }
+    else { const d = frameDiff(f, V.view === "comp"); V.off = toCanvas(d.mask, VW, VH, "white", V.off); V.lastF = -1; V.diffInfo = d; }
+    ctx.imageSmoothingEnabled = s < 1; ctx.drawImage(V.off, 0, 0, w, w * 512 / 640);
+    const rec = V.res.rec[f], per = V.met.per[f + 1];
+    if (V.view === "track") {
+      if (V.showGt && S.GT[f + 1]) S.GT[f + 1].forEach((g, i) => boxPath(ctx, { x: g[0], y: g[1], w: g[2], h: g[3] }, s, per && per.fnIdx[i] ? css("--img-fn") : css("--img-gt"), true, 1.2));
+      else if (per) (S.GT[f + 1] || []).forEach((g, i) => { if (per.fnIdx[i]) boxPath(ctx, { x: g[0], y: g[1], w: g[2], h: g[3] }, s, css("--img-fn"), true, 1.3); });
+      if (V.showDet) rec.D.forEach(d => boxPath(ctx, { x: d[0] - 2, y: d[1] - 2, w: d[2] + 4, h: d[3] + 4 }, s, css("--img-det"), false, 1));
+      if (V.showPred) rec.P.forEach((p, i) => boxPath(ctx, { x: p[0], y: p[1], w: p[2], h: p[3] }, s, idColor(rec.predIds[i]), true, 1.2));
+      if (V.showTrail) { const tr = {}; for (let k = Math.max(1, f - 22); k <= f + 1; k++) (V.res.hyp[k] || []).forEach(b => (tr[b[4]] = tr[b[4]] || []).push([b[0] + b[2] / 2, b[1] + b[3] / 2])); ctx.save(); ctx.lineWidth = 2; Object.entries(tr).forEach(([id, pts]) => { if (pts.length < 2) return; ctx.strokeStyle = idColor(+id); ctx.globalAlpha = 0.85; ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p[0] * s, p[1] * s) : ctx.moveTo(p[0] * s, p[1] * s))); ctx.stroke(); }); ctx.restore(); }
+      rec.out.forEach(b => { const c = idColor(b[4]); boxPath(ctx, { x: b[0], y: b[1], w: b[2], h: b[3] }, s, c, false, 1.8); tagText(ctx, "#" + b[4], b[0] * s, b[1] * s - 1, c); });
+      if (per && per.sw.length) rec.out.filter(b => per.sw.includes(b[4])).forEach(b => { ctx.save(); ctx.strokeStyle = css("--img-fn"); ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc((b[0] + b[2] / 2) * s, (b[1] + b[3] / 2) * s, Math.max(b[2], b[3]) * s * 0.9 + 6, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); tagText(ctx, "ID 전환", (b[0] + b[2]) * s + 4, (b[1] + b[3] / 2) * s, css("--img-fn")); });
+    }
+    $("vFrame").textContent = `${f + 1} / ${NF}`; $("sFrame").value = f;
+    const ev = V.met.events.filter(e => e.f === f + 1);
+    if (V.view === "track") $("vidStatus").textContent = `t = ${(f / FPS).toFixed(2)}s · 검출 ${rec.D.length} · 예측(기존 궤적) ${rec.P.length} · 확정 궤적 ${rec.out.length}` + (ev.length ? ` · ID 전환: ${ev.map(e => `사람 ${e.g}: #${e.from} → #${e.to}`).join(", ")}` : "") + (S.est[f] && (Math.abs(S.est[f][0]) > 2 || Math.abs(S.est[f][1]) > 2) ? ` · 화면 이동 (${S.est[f][0].toFixed(1)}, ${S.est[f][1].toFixed(1)})px` : "");
+    else { const d = V.diffInfo; $("vidStatus").textContent = `프레임 ${f + 1}→${f + 4} 차분 (|Δ| > 25) · 추정 이동 (${d.dx.toFixed(1)}, ${d.dy.toFixed(1)})px · 변화 픽셀 비율: 보정 전 ${d.rawPct.toFixed(2)}% → 보정 후 ${d.compPct.toFixed(2)}% (실습 노트북 6.54% → 0.31%)`; }
+    vFrameTable();
+  }
+  function blur5(g) { const k = [0.0625, 0.25, 0.375, 0.25, 0.0625], t = new Float32Array(VW * VH), o = new Float32Array(VW * VH);
+    for (let y = 0; y < VH; y++) for (let x = 0; x < VW; x++) { let s = 0; for (let i = -2; i <= 2; i++) s += k[i + 2] * g[y * VW + clamp(x + i, 0, VW - 1)]; t[y * VW + x] = s; }
+    for (let y = 0; y < VH; y++) for (let x = 0; x < VW; x++) { let s = 0; for (let i = -2; i <= 2; i++) s += k[i + 2] * t[clamp(y + i, 0, VH - 1) * VW + x]; o[y * VW + x] = Math.round(s); } return o; }
+  function frameDiff(f, comp) {
+    f = Math.min(f, NF - 4); const a = blur5(renderVideoFrame(V.S, f)), braw = renderVideoFrame(V.S, f + 3);
+    let dx = 0, dy = 0; for (let k = f + 1; k <= f + 3; k++) { dx += V.S.est[k][0]; dy += V.S.est[k][1]; }
+    const ix = Math.round(dx), iy = Math.round(dy), al = new Uint8Array(VW * VH);
+    for (let y = 0; y < VH; y++) for (let x = 0; x < VW; x++) al[y * VW + x] = braw[clamp(y + iy, 0, VH - 1) * VW + clamp(x + ix, 0, VW - 1)];
+    const b = blur5(braw), b2 = blur5(al), mg = Math.ceil(Math.max(Math.abs(dx), Math.abs(dy))) + 4;
+    const raw = new Uint8Array(VW * VH), cm = new Uint8Array(VW * VH); let nr = 0, nc = 0;
+    for (let y = 0; y < VH; y++) for (let x = 0; x < VW; x++) { const i = y * VW + x; if (Math.abs(a[i] - b[i]) > 25) { raw[i] = 255; nr++; } if (y >= mg && y < VH - mg && x >= mg && x < VW - mg && Math.abs(a[i] - b2[i]) > 25) { cm[i] = 255; nc++; } }
+    return { mask: comp ? cm : raw, dx, dy, rawPct: nr / (VW * VH) * 100, compPct: nc / (VW * VH) * 100 };
+  }
+  function vFrameTable() {
+    const rec = V.res.rec[V.f];
+    $("frameSum").innerHTML = `궤적 ${rec.P.length}개 예측 → 검출 ${rec.D.length}개와 비교 → 짝 <b>${rec.pairs.length}</b>개 · 새 궤적 ${rec.newIds.length ? rec.newIds.map(i => "#" + i).join(" ") : "없음"} · 삭제 ${rec.deleted.length ? rec.deleted.map(i => "#" + i).join(" ") : "없음"}` + (V.cfg.cmc && V.f > 0 ? ` · CMC 이동 (${V.S.est[V.f][0].toFixed(1)}, ${V.S.est[V.f][1].toFixed(1)})` : "");
+    if (!rec.C) { $("tblCost").innerHTML = `<tbody><tr><td>${rec.P.length ? "검출이 없어 비용 행렬이 없습니다." : "기존 궤적이 없습니다 — 모든 검출이 새 궤적이 됩니다."}</td></tr></tbody>`; return; }
+    const pm = new Map(rec.pairs.map(p => [p[0] + "," + p[1], 1]));
+    $("tblCost").innerHTML = `<thead><tr><th>궤적＼검출</th>${rec.D.map((_, j) => `<th>d${j + 1}</th>`).join("")}</tr></thead><tbody>` + rec.C.map((r, i) => `<tr><th style="color:${idColor(rec.predIds[i])}">#${rec.predIds[i]}</th>${r.map((v, j) => `<td class="n ${pm.has(i + "," + j) ? "hit" : v >= 1e5 ? "forb" : ""}">${v >= 1e5 ? "금지" : v.toFixed(2)}</td>`).join("")}</tr>`).join("") + "</tbody>";
+  }
+  function vSet(f) { V.f = clamp(f, 0, NF - 1); vDraw(); }
+  function vStop() { if (V.timer) clearTimeout(V.timer); V.timer = null; $("vPlay").textContent = "재생"; }
+  function vPlay() {
+    if (V.timer) { vStop(); return; } if (V.f >= NF - 1) V.f = 0; $("vPlay").textContent = "멈춤";
+    const tick = () => { if (V.f >= NF - 1) { vStop(); return; } vSet(V.f + 1); V.timer = setTimeout(tick, (RM.matches ? 400 : 1000 / FPS) / V.speed); };
+    V.timer = setTimeout(tick, 10);
+  }
+  const CFG3 = [["IoU 매칭", { metric: "iou", iou_thr: 0.3, cmc: false }], ["IoU + 카메라보정", { metric: "iou", iou_thr: 0.3, cmc: true }], ["중심거리 매칭", { metric: "center", gate: 1, cmc: false }]];
+  function vTables() {
+    const rows = CFG3.map(([n, c]) => [n, motMetrics(V.S.GT, runSORT(V.S, Object.assign({ gate: 1, iou_thr: 0.3 }, c, { max_age: V.cfg.max_age, min_hits: V.cfg.min_hits })).hyp)]);
+    rows.push(["현재 설정", V.met]);
+    $("tblCfg").innerHTML = `<caption>${SCN[V.name].key} · 절차 생성 영상 (직접 계산)</caption><thead><tr><th>설정</th><th>MOTA</th><th>IDF1</th><th>IDSW</th><th>FP</th><th>FN</th><th>궤적수</th><th>실제인원</th></tr></thead><tbody>` +
+      rows.map(([n, m], i) => `<tr${i === 3 ? ' class="cur"' : ""}><td>${n}</td><td class="n">${f3(m.MOTA)}</td><td class="n">${f3(m.IDF1)}</td><td class="n">${m.IDSW}</td><td class="n">${m.FP}</td><td class="n">${m.FN}</td><td class="n">${m.ntr}</td><td class="n">${m.ngt}</td></tr>`).join("") + "</tbody>";
+    const NB = { walk: [[0.987, 0.994, 0, 0, 10, 10], [0.987, 0.994, 0, 0, 10, 10], [0.987, 0.994, 0, 0, 10, 10], 10], crowd: [[0.795, 0.848, 7, 1, 264, 20], [0.792, 0.837, 10, 1, 265, 21], [0.798, 0.847, 6, 1, 261, 20], 16], shake: [[0.621, 0.199, 71, 48, 285, 84], [0.753, 0.766, 10, 46, 207, 22], [0.758, 0.797, 8, 46, 204, 20], 12], day: [[0.196, 0.450, 1, 135, 664, 11], [0.168, 0.370, 3, 159, 666, 19], [0.160, 0.440, 1, 172, 663, 15], 12] }[V.name];
+    $("tblCfgNb").innerHTML = `<caption>실습 노트북 결과 · ${SCN[V.name].key} (max_age 5, min_hits 2)</caption><thead><tr><th>설정</th><th>MOTA</th><th>IDF1</th><th>IDSW</th><th>FP</th><th>FN</th><th>궤적수</th><th>실제인원</th></tr></thead><tbody>` +
+      CFG3.map(([n], i) => `<tr><td>${n}</td>${NB[i].map((v, k) => `<td class="n">${k < 2 ? v.toFixed(3) : v}</td>`).join("")}<td class="n">${NB[3]}</td></tr>`).join("") + "</tbody>";
+  }
+  function vSweep() {
+    const ages = [1, 3, 5, 10, 20, 40], live = ages.map(a => motMetrics(V.S.GT, runSORT(V.S, { metric: "center", gate: 1, max_age: a, min_hits: V.cfg.min_hits, cmc: false }).hyp));
+    V.sweep = live;
+    const nbI = [0.8406524466750314, 0.8393825615352524, 0.8473728106755629, 0.8721366097459392, 0.8922180607573866, 0.893050353724511], nbS = [10, 6, 6, 3, 3, 2];
+    const maxS = Math.max(10, ...live.map(m => m.IDSW)), y2max = Math.ceil(maxS / 5) * 5, lx = a => Math.log(a);
+    lineChart($("cvSweep"), { padR: 34, xmin: lx(0.8), xmax: lx(50), ymin: 0, ymax: 1, xticks: ages.map(lx), xfmt: t => Math.round(Math.exp(t)), yticks: [0, 0.2, 0.4, 0.6, 0.8, 1], xlabel: "max_age (프레임, 로그 눈금)", ylabel: "IDF1",
+      y2: { min: 0, max: y2max, ticks: [0, y2max / 2, y2max] },
+      series: [{ color: css("--role-time"), dots: 3.5, pts: ages.map((a, i) => [lx(a), live[i].IDF1]) }, { color: css("--role-warn"), dots: 3.5, axis2: true, pts: ages.map((a, i) => [lx(a), live[i].IDSW]) },
+        { color: css("--role-time"), dash: true, lw: 1.4, pts: ages.map((a, i) => [lx(a), nbI[i]]) }, { color: css("--role-warn"), dash: true, lw: 1.4, axis2: true, pts: ages.map((a, i) => [lx(a), nbS[i]]) }] });
+    legend($("lgSweep"), [{ name: `IDF1 (이 시퀀스: ${live.map(m => m.IDF1.toFixed(3)).join(", ")})`, color: css("--role-time") }, { name: `IDSW, 오른쪽 축 (${live.map(m => m.IDSW).join(", ")})`, color: css("--role-warn") }, { name: "점선 = 실습 노트북 occlusion 시퀀스 (IDF1 0.841→0.893, IDSW 10→2)", color: css("--faint") }]);
+  }
+  function vCode() {
+    const c = V.cfg;
+    $("codeTrack").textContent = `import numpy as np
+from scipy.optimize import linear_sum_assignment   # 헝가리안
+
+# 칼만 상태 [cx, cy, w, h, vx, vy] · 등속 모형
+F = np.eye(6); F[0, 4] = F[1, 5] = 1
+H = np.eye(4, 6)
+Q = np.diag([.5, .5, .1, .1, .3, .3]); R = np.diag([2., 2., 4., 4.])
+
+tracker = SORT(metric="${c.metric}", ${c.metric === "iou" ? `iou_thr=${c.iou_thr.toFixed(2)}` : `gate=${c.gate.toFixed(2)}`}, max_age=${c.max_age}, min_hits=${c.min_hits})
+hyp = {}
+for i, d in enumerate(DET):                       # 프레임마다
+    s = global_shift(F_[i - 1], F_[i])[:2] if (${c.cmc ? "True" : "False"} and i > 0) else (0., 0.)   # CMC
+    out = tracker.update(d, s)                    # 예측 → 비용 → 헝가리안 → 갱신·생성·삭제
+    if out: hyp[i + 1] = np.array(out, np.float32)
+print(mot_metrics(GT, hyp, thr=0.3))              # MOTA · IDF1 · IDSW`;
+  }
+  seg("segSeq", v => { vStop(); V.name = v; segSet("segSeq5", v); vBuild(); });
+  seg("segMetric", v => { V.cfg.metric = v; vRun(); vTables(); });
+  seg("segVSpeed", v => { V.speed = +v; });
+  seg("segVView", v => { V.view = v; vDraw(); });
+  const vRunDeb = debounce(() => { vRun(); vTables(); vSweep(); }, 80);
+  $("sIouThr").addEventListener("input", e => { V.cfg.iou_thr = +e.target.value; $("vIouThr").textContent = V.cfg.iou_thr.toFixed(2); vRunDeb(); });
+  $("sGate").addEventListener("input", e => { V.cfg.gate = +e.target.value; $("vGate").textContent = V.cfg.gate.toFixed(2); vRunDeb(); });
+  $("sMaxAge").addEventListener("input", e => { V.cfg.max_age = +e.target.value; $("vMaxAge").textContent = V.cfg.max_age; vRunDeb(); });
+  $("sMinHits").addEventListener("input", e => { V.cfg.min_hits = +e.target.value; $("vMinHits").textContent = V.cfg.min_hits; vRunDeb(); });
+  $("chkCmc").addEventListener("change", e => { V.cfg.cmc = e.target.checked; vRun(); vTables(); });
+  $("chkVGt").addEventListener("change", e => { V.showGt = e.target.checked; vDraw(); });
+  $("chkVDet").addEventListener("change", e => { V.showDet = e.target.checked; vDraw(); });
+  $("chkVPred").addEventListener("change", e => { V.showPred = e.target.checked; vDraw(); });
+  $("chkVTrail").addEventListener("change", e => { V.showTrail = e.target.checked; vDraw(); });
+  $("sFrame").addEventListener("input", e => { vStop(); vSet(+e.target.value); });
+  $("vFirst").onclick = () => { vStop(); vSet(0); };
+  $("vPrev").onclick = () => { vStop(); vSet(V.f - 1); };
+  $("vNext").onclick = () => { vStop(); vSet(V.f + 1); };
+  $("vPlay").onclick = vPlay;
+  $("vidCard").addEventListener("keydown", e => { if (e.target.closest("input, .sk-seg, button")) return; if (e.key === "ArrowRight") { e.preventDefault(); vStop(); vSet(V.f + 1); } else if (e.key === "ArrowLeft") { e.preventDefault(); vStop(); vSet(V.f - 1); } });
+
+  /* 칼만 시연: 실습 노트북의 정답 궤적(중심)과 ±2px 잡음 관측 그대로 */
+  const KF_GT = [[571.5,174.5],[572.5,173.5],[573.5,172.5],[574.5,172.5],[574.5,171.5],[575.5,170.5],[575.5,170.5],[576.5,169.5],[577.5,168.5],[577.5,167.5],[578.5,167.5],[579.5,166.5],[580.5,165.5],[580.5,165.5],[581.5,165.5],[582.5,165.5],[582.5,164.5],[583.5,164.5],[584.5,164.5],[585.5,164.5],[585.5,164.5],[586.5,164.5],[587.5,164.5],[588.5,164.5],[589.5,163.5],[590.5,163.5],[591.5,163.5],[591.5,163.5],[592.5,163.5],[593.5,163.5],[594.5,163.5],[595.5,162.5],[596.5,162.5],[597.5,162.5],[598.5,162.5],[598.5,162.5],[599.5,162.5],[600.5,162.5],[602.5,162.5],[603.5,162.5],[604.5,162.5],[605.5,162.5],[606.5,162.5],[608.5,163.5],[609.5,163.5],[610.5,164.5],[611.5,164.5],[612.5,165.5],[613.5,165.5],[614.5,165.5],[616.5,166.5],[617.5,166.5],[618.5,167.5],[619.5,167.5],[620.5,167.5],[621.5,168.5],[622.5,168.5],[623.5,168.5],[624.5,168.5],[625.5,168.5],[626.5,168.5],[627.5,168.5],[628.5,168.5],[629.5,168.5],[630.5,169.5],[631.5,169.5],[632.5,169.5]];
+  const KF_OBS = [[571.751,174.236],[571.429,174.223],[572.093,169.969],[569.85,172.062],[573.411,170.867],[575.243,173.233],[577.307,170.688],[575.585,169.94],[577.182,169.582],[576.192,167.241],[575.982,170.528],[580.029,165.872],[584.103,168.13],[580.491,166.813],[582.36,166.892],[581.627,163.16],[583.158,163.983],[584.767,160.093],[586.508,163.264],[584.177,166.37],[585.877,163.234],[583.945,165.761],[585.991,167.878],[587.634,163.029],[589.822,162.329],[591.505,165.479],[593.246,160.939],[587.0,164.273],[592.349,163.904],[596.342,164.952],[596.075,165.188],[595.23,160.961],[595.363,160.44],[598.217,165.145],[601.305,164.8],[599.179,163.348],[600.139,161.782],[598.893,164.66],[600.801,161.479],[604.101,162.288],[605.526,161.905],[609.133,162.4],[609.795,164.335],[610.333,164.242],[606.552,165.558],[610.091,162.414],[610.626,165.54],[613.203,164.551],[615.674,165.399],[611.935,164.329],[615.173,165.273],[619.112,165.547],[617.556,170.256],[617.926,168.661],[620.486,166.378],[621.345,164.467],[621.5,171.221],[622.556,166.49],[626.909,171.681],[621.963,166.572],[629.094,167.809],[631.021,168.898],[627.851,166.058],[631.633,166.657],[629.165,169.826],[630.092,168.594],[632.488,171.036]];
+  const KS = { rs: 1, qs: 1 };
+  function kfDemo() {
+    const toBox = c => [c[0] - 5, c[1] - 10, 10, 20], kf = new KalmanBox(toBox(KF_OBS[0]), KS.qs, KS.rs), est = [[KF_OBS[0][0], KF_OBS[0][1]]];
+    for (let i = 1; i < KF_OBS.length; i++) { kf.predict(); kf.update(toBox(KF_OBS[i])); est.push([kf.x[0], kf.x[1]]); }
+    const err = A => A.reduce((s, p, i) => s + Math.hypot(p[0] - KF_GT[i][0], p[1] - KF_GT[i][1]), 0) / A.length, eo = err(KF_OBS), ee = err(est);
+    lineChart($("cvKf"), { xmin: 566, xmax: 636, ymin: 176, ymax: 158, xticks: [570, 580, 590, 600, 610, 620, 630], yticks: [160, 165, 170, 175], xlabel: "x (px)", ylabel: "y (px, 아래로 증가)",
+      series: [{ color: css("--role-gt"), lw: 2.5, pts: KF_GT }, { color: css("--c-day"), lw: 1, dots: 2.4, pts: KF_OBS }, { color: css("--role-time"), lw: 2.2, pts: est }] });
+    legend($("lgKf"), [{ name: "정답", color: css("--role-gt") }, { name: "잡음 관측", color: css("--c-day") }, { name: "칼만 추정", color: css("--role-time") }]);
+    $("fmKf").innerHTML = `평균 중심 오차 — 잡음 관측 <b>${eo.toFixed(2)}px</b> → 칼만 추정 <b>${ee.toFixed(2)}px</b> &nbsp;(실습 노트북: 2.30px → 1.65px)<br>R = diag(2, 2, 4, 4) × ${KS.rs.toFixed(2)} · Q = diag(.5, .5, .1, .1, .3, .3) × ${KS.qs.toFixed(2)} — R이 크면 예측을, Q가 크면 관측을 더 믿습니다.`;
+  }
+  $("sRs").addEventListener("input", e => { KS.rs = Math.pow(2, +e.target.value); $("vRs").textContent = KS.rs.toFixed(2); kfDemo(); });
+  $("sQs").addEventListener("input", e => { KS.qs = Math.pow(2, +e.target.value); $("vQs").textContent = KS.qs.toFixed(2); kfDemo(); });
+
+  /* 헝가리안 시연 */
+  const HUNG = { nb: [[0.9, 0.2, 0.8], [0.1, 0.3, 0.9], [0.8, 0.9, 0.4]], greedy: [[0.1, 0.2, 0.9], [0.2, 0.9, 0.9], [0.9, 0.9, 0.3]] };
+  let HM = HUNG.nb.map(r => r.slice());
+  function hungRender() {
+    $("hungGrid").innerHTML = `<span></span>${[0, 1, 2].map(j => `<span>검출${j}</span>`).join("")}` + HM.map((r, i) => `<span>궤적${i}</span>` + r.map((v, j) => `<input type="number" step="0.1" min="0" max="1" value="${v}" data-i="${i}" data-j="${j}" aria-label="궤적${i}·검출${j} 비용">`).join("")).join("");
+    $("hungGrid").querySelectorAll("input").forEach(inp => inp.addEventListener("input", () => { const v = parseFloat(inp.value); if (Number.isFinite(v)) { HM[+inp.dataset.i][+inp.dataset.j] = v; hungSolve(); } }));
+    hungSolve();
+  }
+  function hungSolve() {
+    const pr = hungarian(HM), tot = pr.reduce((s, [i, j]) => s + HM[i][j], 0), usedC = new Set(), gr = [];
+    HM.forEach((r, i) => { let bj = -1; r.forEach((v, j) => { if (!usedC.has(j) && (bj < 0 || v < r[bj])) bj = j; }); usedC.add(bj); gr.push([i, bj]); });
+    const gtot = gr.reduce((s, [i, j]) => s + HM[i][j], 0), pm = new Set(pr.map(p => p.join(","))), gm = new Set(gr.map(p => p.join(",")));
+    $("hungGrid").querySelectorAll("input").forEach(inp => { const k = inp.dataset.i + "," + inp.dataset.j; inp.classList.toggle("sel", pm.has(k)); inp.classList.toggle("sel2", gm.has(k)); });
+    $("fmHung").innerHTML = `헝가리안 짝: ${pr.map(([i, j]) => `(${i}, ${j})`).join(", ")} | 총비용: <b>${npRound(tot, 2)}</b> &nbsp;(실습 노트북 예: (0,1), (1,0), (2,2) | 0.7)<br>탐욕 짝: ${gr.map(([i, j]) => `(${i}, ${j})`).join(", ")} | 총비용: ${npRound(gtot, 2)}${gtot > tot + 1e-9 ? ` — 탐욕이 <b style="color:var(--role-warn)">${npRound(gtot - tot, 2)}</b> 더 비쌉니다` : " — 이 행렬에서는 같은 답"}`;
+  }
+  seg("segHung", v => { HM = HUNG[v].map(r => r.slice()); hungRender(); });
+
+  /* =====================================================================
+     5. 궤적·GSD·상황 보고
+     ===================================================================== */
+  const R5 = { alt: 60, ang: 30, fov: 45, stillV: 0.3, stillS: 5 };
+  const SECT = (x, y) => "ABCD"[Math.min(Math.max(0, Math.trunc(x / 640 * 4)), 3)] + (Math.min(Math.max(0, Math.trunc(y / 512 * 4)), 3) + 1);
+  function median(a) { const s = a.slice().sort((x, y) => x - y), n = s.length; return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2; }
+  function r5Run() {
+    const S = V.S, hyp = runSORT(S, { metric: "iou", iou_thr: 0.2, cmc: true, max_age: 8, min_hits: 3 }).hyp, cum = [[0, 0]];
+    for (let i = 1; i < NF; i++) cum.push([cum[i - 1][0] + S.est[i][0], cum[i - 1][1] + S.est[i][1]]);
+    const T = []; Object.keys(hyp).map(Number).sort((a, b) => a - b).forEach(f => hyp[f].forEach(b => { const cx = b[0] + b[2] / 2, cy = b[1] + b[3] / 2; T.push({ frame: f, id: b[4], cx, cy, wx: cx - cum[f - 1][0], wy: cy - cum[f - 1][1] }); }));
+    R5.T = T; r5Stats();
+  }
+  function r5Stats() {
+    const g = gsdMpp(R5.alt, R5.ang, R5.fov), T = R5.T, win = 2, k = Math.trunc(win * FPS), byId = new Map();
+    T.forEach(r => { if (!byId.has(r.id)) byId.set(r.id, []); byId.get(r.id).push(r); });
+    const out = [], shortTr = [];
+    [...byId.keys()].sort((a, b) => a - b).forEach(id => {
+      const G = byId.get(id); if (G.length < win * FPS) { shortTr.push(G); return; }
+      const v = []; for (let i = 0; i + k < G.length; i++) v.push(Math.hypot(G[i + k].wx - G[i].wx, G[i + k].wy - G[i].wy) / ((G[i + k].frame - G[i].frame) / FPS) * g);
+      const med = median(v), still = v.filter(x => x < R5.stillV).length / v.length, state = med < R5.stillV ? "정지" : med < 4.5 ? "보행·달리기" : "고속(차량 등)", L = G[G.length - 1];
+      out.push({ id, start: npRound(G[0].frame / FPS, 1), len: npRound((L.frame - G[0].frame) / FPS, 1), med: npRound(med, 2), medRaw: med, still: npRound(still, 2), state, last: [Math.trunc(L.cx), Math.trunc(L.cy)], G });
+    });
+    R5.S = out; R5.short = shortTr; R5.alerts = out.filter(s => s.state === "정지" && s.len >= R5.stillS); R5.gsd = g;
+    r5Gsd(); r5Table(); r5Map(); r5Report(); r5Code();
+  }
+  function r5Gsd() {
+    const g = R5.gsd, D = R5.alt / Math.sin(R5.ang * Math.PI / 180);
+    $("fmGsd").innerHTML = `경사 거리 D = H / sin θ = ${R5.alt} / sin ${R5.ang}° = ${D.toFixed(1)} m<br>지면 폭 = 2·D·tan(FOV/2) = 2 × ${D.toFixed(1)} × tan ${(R5.fov / 2).toFixed(1)}° = ${(g * 640).toFixed(1)} m<br>GSD = 지면 폭 / 640 = <b>${g.toFixed(3)} m/px</b>`;
+    const k = (v, l) => `<div class="sk-stat"><b>${v}</b><span>${l}</span></div>`;
+    $("gsdStats").innerHTML = k(g.toFixed(3), "GSD (m/px)") + k((0.5 / g).toFixed(1), "어깨너비 0.5m (px)") + k((1.7 / g).toFixed(1), "키 1.7m (px)") + k((1 / g / FPS).toFixed(2), "1 m/s = px/프레임") + k((1.7 / gsdMpp(R5.alt, 90, R5.fov)).toFixed(1), "수직 촬영 시 1.7m (px)");
+  }
+  const stColor = st => css(st === "정지" ? "--role-warn" : st === "보행·달리기" ? "--role-time" : "--role-fuse");
+  function r5Table() {
+    $("tblStats").innerHTML = `<thead><tr><th>id</th><th>시작(s)</th><th>길이(s)</th><th>중앙속도(m/s)</th><th>정지비율</th><th>상태</th><th>마지막 위치</th></tr></thead><tbody>` +
+      R5.S.map(s => `<tr${R5.alerts.includes(s) ? ' class="cur"' : ""}><td style="color:${stColor(s.state)};font-weight:700">#${s.id}</td><td class="n">${s.start.toFixed(1)}</td><td class="n">${s.len.toFixed(1)}</td><td class="n">${s.med.toFixed(2)}</td><td class="n">${s.still.toFixed(2)}</td><td>${s.state}${R5.alerts.includes(s) ? " · 경보" : ""}</td><td class="n">(${s.last[0]}, ${s.last[1]}) ${SECT(s.last[0], s.last[1])}</td></tr>`).join("") + "</tbody>";
+  }
+  function r5Map() {
+    const cv = $("cvMap"), P = prep(cv); if (!P) return; const { ctx, w, h } = P, pad = 6, sx = (w - 2 * pad) / 640, sy = (h - 2 * pad) / 512, s = Math.min(sx, sy), ox = (w - 640 * s) / 2, oy = (h - 512 * s) / 2;
+    ctx.clearRect(0, 0, w, h); ctx.fillStyle = css("--surface-2"); ctx.fillRect(ox, oy, 640 * s, 512 * s);
+    ctx.strokeStyle = css("--line-strong"); ctx.lineWidth = 1; ctx.font = "600 11px " + css("--mono"); ctx.fillStyle = css("--faint");
+    for (let i = 0; i <= 4; i++) { ctx.beginPath(); ctx.moveTo(ox + i * 160 * s, oy); ctx.lineTo(ox + i * 160 * s, oy + 512 * s); ctx.stroke(); ctx.beginPath(); ctx.moveTo(ox, oy + i * 128 * s); ctx.lineTo(ox + 640 * s, oy + i * 128 * s); ctx.stroke(); }
+    for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) ctx.fillText("ABCD"[c] + (r + 1), ox + c * 160 * s + 5, oy + r * 128 * s + 14);
+    ctx.save(); ctx.beginPath(); ctx.rect(ox, oy, 640 * s, 512 * s); ctx.clip();
+    const line = (G, col, lw) => { ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath(); G.forEach((p, i) => (i ? ctx.lineTo(ox + p.wx * s, oy + p.wy * s) : ctx.moveTo(ox + p.wx * s, oy + p.wy * s))); ctx.stroke(); };
+    R5.short.forEach(G => line(G, css("--role-gt"), 1));
+    R5.S.forEach(t => { line(t.G, stColor(t.state), 2.2); const L = t.G[t.G.length - 1]; ctx.fillStyle = stColor(t.state); ctx.beginPath(); ctx.arc(ox + L.wx * s, oy + L.wy * s, 3, 0, Math.PI * 2); ctx.fill(); ctx.fillText("#" + t.id, ox + L.wx * s + 5, oy + L.wy * s - 4); });
+    R5.alerts.forEach(t => { const L = t.G[t.G.length - 1]; ctx.strokeStyle = css("--role-warn"); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ox + L.wx * s, oy + L.wy * s, 11, 0, Math.PI * 2); ctx.stroke(); });
+    ctx.restore();
+  }
+  function r5Report() {
+    const S = R5.S, moving = S.filter(s => s.state !== "정지"), still = S.filter(s => s.state === "정지"), zc = new Map();
+    S.forEach(s => { const z = SECT(s.last[0], s.last[1]); zc.set(z, (zc.get(z) || 0) + 1); });
+    const zones = [...zc.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3), perF = new Map(); R5.T.forEach(r => perF.set(r.frame, (perF.get(r.frame) || 0) + 1));
+    const maxN = perF.size ? Math.max(...perF.values()) : 0, nCar = Math.trunc(median(V.S.CARN)), dur = (NF / FPS).toFixed(0), src = `${SCN[V.name].key} (절차 생성 모의 영상)`;
+    const lines = [
+      `[관측 보고] 출처: ${src} / 드론 열화상 (고도 ${R5.alt}m, 경사 ${R5.ang}°), 관측 ${dur}초`,
+      `S(규모)  : 동시 관측 최대 ${maxN}명 (프레임 기준) / 2초 이상 궤적 ${S.length}개 (끊긴 궤적·드나든 인원 포함)`,
+      `A(활동)  : 이동 궤적 ${moving.length}개 (중앙 속도 ${(moving.length ? median(moving.map(m => m.med)) : 0).toFixed(1)} m/s), 정지 궤적 ${still.length}개`,
+      `L(위치)  : 궤적 집중 구역 ${zones.map(([z, n]) => `${z}(${n})`).join(", ")} — 화면 4×4 격자, 궤적 마지막 위치 기준`,
+      `U(소속)  : 식별 불가 (열화상만으로는 피아·소속 판별 불가)`,
+      `T(시간)  : 영상 시작 후 0–${dur}초 구간`,
+      `E(장비)  : 차량 약 ${nCar}대 식별 (검출기 기준, 무장·장비 식별 불가)`,
+      R5.alerts.length ? `※ 정지 ${R5.stillS}초 이상 인원 ${R5.alerts.length}명 → 확인 요망 (위치: ${R5.alerts.map(a => SECT(a.last[0], a.last[1])).join(", ")})` : "※ 장시간 정지 인원 없음"];
+    $("salute").textContent = lines.join("\n");
+  }
+  function r5Code() {
+    $("codeRep").textContent = `import numpy as np
+
+def gsd_m_per_px(alt, angle_deg=90, fov_deg=${R5.fov}, width=640):
+    """경사 거리 × 화각으로 한 픽셀이 덮는 땅의 폭 (원근 무시 1차 근사)."""
+    d = alt / np.sin(np.radians(angle_deg))                 # 카메라–지면 거리
+    return 2 * d * np.tan(np.radians(fov_deg / 2)) / width
+
+GSD = gsd_m_per_px(${R5.alt}, angle_deg=${R5.ang})                     # ≈ ${R5.gsd.toFixed(3)} m/px
+k = int(2.0 * 7.5)                                          # 2초 창 = 15프레임
+v = np.linalg.norm(p[k:] - p[:-k], axis=1) / ((f[k:] - f[:-k]) / 7.5) * GSD   # m/s
+state = "정지" if np.median(v) < ${R5.stillV.toFixed(2)} else ("보행·달리기" if np.median(v) < 4.5 else "고속(차량 등)")
+alerts = S[(S["상태"] == "정지") & (S["길이(s)"] >= ${R5.stillS})]          # 정지 경보`;
+  }
+  seg("segSeq5", v => { vStop(); V.name = v; segSet("segSeq", v); vBuild(); });
+  $("sAlt5").addEventListener("input", e => { R5.alt = +e.target.value; $("vAlt5").textContent = R5.alt + " m"; r5Stats(); });
+  $("sAng5").addEventListener("input", e => { R5.ang = +e.target.value; $("vAng5").textContent = R5.ang + "°"; r5Stats(); });
+  $("sFov5").addEventListener("input", e => { R5.fov = +e.target.value; $("vFov5").textContent = R5.fov + "°"; r5Stats(); });
+  $("sStillV").addEventListener("input", e => { R5.stillV = +e.target.value; $("vStillV").textContent = R5.stillV.toFixed(2) + " m/s"; r5Stats(); });
+  $("sStillS").addEventListener("input", e => { R5.stillS = +e.target.value; $("vStillS").textContent = R5.stillS + " s"; r5Stats(); });
+
+  /* =====================================================================
+     6. 한계와 안전장치
+     ===================================================================== */
+  function d6() {
+    $("tblShift").innerHTML = `<thead><tr><th>학습</th><th>평가</th><th>정확도</th><th>사람 민감도</th></tr></thead><tbody>
+      <tr><td>day</td><td>day</td><td class="n">0.858</td><td class="n">0.403</td></tr>
+      <tr><td>day</td><td>night</td><td class="n">0.773</td><td class="n warn">0.158</td></tr>
+      <tr><td>night</td><td>day</td><td class="n">0.800</td><td class="n warn">0.424</td></tr>
+      <tr><td>night</td><td>night</td><td class="n">0.922</td><td class="n good">0.866</td></tr></tbody>`;
+    const rows = [["60–70m", 0.763, 0.783], ["80–100m", 0.809, 0.868], ["110–130m", 0.774, 0.66]];
+    $("barsStrat").innerHTML = rows.map(r => `<span class="lb">${r[0]}</span><span class="bar bar--two"><i style="width:${r[1] * 100}%;background:var(--c-night)"></i><i style="width:${r[2] * 100}%;background:var(--c-day)"></i></span><span class="v">${r[1].toFixed(3)} · ${r[2].toFixed(3)}</span>`).join("");
+  }
+
+  /* =====================================================================
+     탭 · 다시 그리기 · 테마
+     ===================================================================== */
+  const tabs = [...document.querySelectorAll(".sk-tab")];
+  const DRAW = { data: d1All, arch: () => { }, detect: () => { d3PR(); d3Draw(); }, track: () => { vDraw(); vSweep(); kfDemo(); }, report: r5Map, limits: () => { }, diagram: () => { } };
+  let cur = "data";
+  function show(t) {
+    tabs.forEach(b => { const on = b === t; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1; $(b.getAttribute("aria-controls")).hidden = !on; });
+    cur = t.id.replace("tab-", ""); history.replaceState(null, "", "#" + cur);
+    if (cur !== "track") vStop(); if (cur !== "arch") diaStop();
+    requestAnimationFrame(() => DRAW[cur]());
+  }
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => show(b));
+    b.addEventListener("keydown", e => { const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return; const n = tabs[(i + d + tabs.length) % tabs.length]; show(n); n.focus(); e.preventDefault(); });
+  });
+  const redraw = () => { V.off = null; V.lastF = -1; DRAW[cur](); };
+  new MutationObserver(redraw).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", redraw);
+  let lastW = 0; new ResizeObserver(debounce(() => { const w = $("main").clientWidth; if (w !== lastW) { lastW = w; DRAW[cur](); } }, 120)).observe($("main"));
+
+  /* 초기화 */
+  d1Tables(); d1Eda(); d1Build();
+  diaRender();
+  d3SceneSeg(); d3Build();
+  vBuild(); kfDemo(); hungRender();
+  d6();
+  const start = $("tab-" + location.hash.slice(1)); show(start || tabs[0]);
+})();
+</script>
+</body>
+</html>

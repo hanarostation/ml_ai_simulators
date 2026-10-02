@@ -8,8 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
-<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 /* 역할 색: Skip-gram 파랑 · CBOW 주황 · 주변 단어 주황 · 정답 초록 · 오답 빨강 · 히트맵(양수 주황 / 음수 파랑) · 단어 범주 6색 */
@@ -223,6 +224,8 @@ details.wv-more[open] summary{margin-bottom:8px}
       <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)" aria-current="page">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -258,6 +261,7 @@ details.wv-more[open] summary{margin-bottom:8px}
     <button type="button" class="sk-tab" role="tab" id="tab-train" aria-controls="pane-train" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>학습 진행</button>
     <button type="button" class="sk-tab" role="tab" id="tab-predict" aria-controls="pane-predict" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>단어 예측 · 유사도</button>
     <button type="button" class="sk-tab" role="tab" id="tab-compare" aria-controls="pane-compare" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>Skip-gram vs CBOW</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>알고리즘 구성도</button>
   </nav>
 
   <!-- ================= 1. 학습 데이터 만들기 ================= -->
@@ -580,6 +584,11 @@ details.wv-more[open] summary{margin-bottom:8px}
       </div>
     </div>
   </section>
+
+  <!-- ================= 6. 알고리즘 구성도 ================= -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">강의 도식 3장 · 밀집 표현과 윈도 샘플 → 두 구조 비교 → 한 샘플의 학습 계산 (기본 코퍼스 숫자 그대로)</span></div><div data-ds-diagrams="word2vec"></div></section>
+  </section>
 </main>
 
 <!-- ===== 공통 푸터 ===== -->
@@ -596,7 +605,9 @@ details.wv-more[open] summary{margin-bottom:8px}
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/word2vec.js?v=20261002c"></script>
 <script>
 (function(){
 "use strict";
@@ -712,7 +723,7 @@ const CATS=[
 ];
 const catOf=w=>CATS.find(c=>c.words.includes(w))||CATS.find(c=>c.id==="other");
 const MODES={skipgram:{name:"Skip-gram",cls:"sg",v:"--sg"},cbow:{name:"CBOW",cls:"cb",v:"--cb"}};
-const TABS=["data","step","train","predict","compare"];
+const TABS=["data","step","train","predict","compare","diagram"];
 
 /* ================= 상태 ================= */
 const ST={mode:"skipgram",tab:"data",w:2,N:8,lr:0.05,loss:"softmax",k:3,seed:160,epochs:100,both:false,hide:false,src:"after",epf:1};
@@ -745,7 +756,7 @@ const vmax=(...arrs)=>arrs.reduce((m,a)=>Math.max(m,...Array.from(a).map(Math.ab
 
 /* ================= 모드 · 탭 · 해시 ================= */
 const tabBtns=TABS.map(t=>$("tab-"+t));
-function setHash(){try{history.replaceState(null,"","#"+ST.mode+(ST.tab!=="data"?"/"+ST.tab:""));}catch(e){}}
+function setHash(){try{history.replaceState(null,"",ST.tab==="diagram"?"#diagram":"#"+ST.mode+(ST.tab!=="data"?"/"+ST.tab:""));}catch(e){}}
 function parseHash(){const out={};(location.hash||"").slice(1).split(/[\/&,]/).forEach(p=>{p=p.toLowerCase();if(p==="skipgram"||p==="sg")out.m="skipgram";else if(p==="cbow")out.m="cbow";else if(TABS.includes(p))out.t=p;});return out;}
 function showTab(t,focus){ST.tab=t;tabBtns.forEach(b=>{const on=b.id==="tab-"+t;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;$(b.getAttribute("aria-controls")).hidden=!on;if(on&&focus)b.focus();});
   if(t!=="data")dStop();if(t!=="step")sStop();setHash();render();}
@@ -758,7 +769,7 @@ function setMode(m){ST.mode=m;segSet($("modeSeg"),m);
   dStop();sStop();setHash();render();}
 segInit($("modeSeg"),v=>setMode(v));
 window.addEventListener("hashchange",()=>{const h=parseHash();if(h.m&&h.m!==ST.mode)setMode(h.m);if(h.t&&h.t!==ST.tab)showTab(h.t);});
-function render(){({data:dRender,step:sRender,train:tRender,predict:pRender,compare:cRender})[ST.tab]();}
+function render(){({data:dRender,step:sRender,train:tRender,predict:pRender,compare:cRender,diagram:function(){}})[ST.tab]();}
 
 /* ================= 공유 조작 (여러 탭에 같은 값) ================= */
 const OUTF={w:v=>String(v),lr:v=>v.toFixed(3),k:v=>String(v),epochs:v=>String(v)};

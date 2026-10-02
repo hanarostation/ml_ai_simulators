@@ -1,0 +1,163 @@
+/* =====================================================================
+   알고리즘 구성도 — 공통 스타일 (assets/js/diagram-kit.js 와 함께 사용)
+   - 도식은 1280×720(16:9) SVG 한 장 = 슬라이드 한 장
+   - 색은 톤 클래스(dg-t-blue 등)로만 지정하고, 밝은/어두운 화면 값을 여기서 정의
+   ===================================================================== */
+
+:root {
+  --dg-bg: #FFFFFF;
+  --dg-ink: #1C2230;
+  --dg-text: #343C4C;
+  --dg-muted: #6A7385;
+  --dg-faint: #9AA2B1;
+  --dg-line: #DDE2EA;
+  --dg-soft: #F4F6FA;
+  --dg-code: #F3F5F8;
+  --dg-on-solid: #FFFFFF;
+
+  --dg-blue: #2563EB;   --dg-blue-f: #E8F0FE;   --dg-blue-m: #BFD3FB;
+  --dg-green: #16A34A;  --dg-green-f: #E7F6EC;  --dg-green-m: #B5E3C4;
+  --dg-orange: #EA580C; --dg-orange-f: #FFF0E5; --dg-orange-m: #FBCFAF;
+  --dg-purple: #7C3AED; --dg-purple-f: #F2ECFE; --dg-purple-m: #D6C5FB;
+  --dg-red: #DC2626;    --dg-red-f: #FDECEC;    --dg-red-m: #F6C1C1;
+  --dg-teal: #0D9488;   --dg-teal-f: #E3F5F3;   --dg-teal-m: #AEE1DB;
+  --dg-amber: #B7791F;  --dg-amber-f: #FDF4DC;  --dg-amber-m: #F0D79A;
+  --dg-pink: #C2255C;   --dg-pink-f: #FCE8EF;   --dg-pink-m: #F3B9CD;
+  --dg-gray: #5B6578;   --dg-gray-f: #F1F3F7;   --dg-gray-m: #D3D8E1;
+  --dg-ink-f: #EEF0F4;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --dg-bg: #141922; --dg-ink: #E8EBF2; --dg-text: #CBD2DE; --dg-muted: #9AA3B5; --dg-faint: #6E788C;
+    --dg-line: #2C3443; --dg-soft: #1A202B; --dg-code: #10151D; --dg-on-solid: #0F131A;
+    --dg-blue: #79A6F6;   --dg-blue-f: #172540;   --dg-blue-m: #2C4778;
+    --dg-green: #5CCB82;  --dg-green-f: #132A1D;  --dg-green-m: #24553A;
+    --dg-orange: #F59A5C; --dg-orange-f: #2E1C10; --dg-orange-m: #6A3A1C;
+    --dg-purple: #B597FF; --dg-purple-f: #231A3B; --dg-purple-m: #45337A;
+    --dg-red: #F07A7A;    --dg-red-f: #321717;    --dg-red-m: #6E2B2B;
+    --dg-teal: #45CFBF;   --dg-teal-f: #102A28;   --dg-teal-m: #1F5651;
+    --dg-amber: #E3B455;  --dg-amber-f: #2C2410;  --dg-amber-m: #5E4A1C;
+    --dg-pink: #F27AA3;   --dg-pink-f: #311622;   --dg-pink-m: #6B2944;
+    --dg-gray: #A3ACBD;   --dg-gray-f: #1E2430;   --dg-gray-m: #384152;
+    --dg-ink-f: #1E2430;
+  }
+}
+:root[data-theme="dark"] {
+  --dg-bg: #141922; --dg-ink: #E8EBF2; --dg-text: #CBD2DE; --dg-muted: #9AA3B5; --dg-faint: #6E788C;
+  --dg-line: #2C3443; --dg-soft: #1A202B; --dg-code: #10151D; --dg-on-solid: #0F131A;
+  --dg-blue: #79A6F6;   --dg-blue-f: #172540;   --dg-blue-m: #2C4778;
+  --dg-green: #5CCB82;  --dg-green-f: #132A1D;  --dg-green-m: #24553A;
+  --dg-orange: #F59A5C; --dg-orange-f: #2E1C10; --dg-orange-m: #6A3A1C;
+  --dg-purple: #B597FF; --dg-purple-f: #231A3B; --dg-purple-m: #45337A;
+  --dg-red: #F07A7A;    --dg-red-f: #321717;    --dg-red-m: #6E2B2B;
+  --dg-teal: #45CFBF;   --dg-teal-f: #102A28;   --dg-teal-m: #1F5651;
+  --dg-amber: #E3B455;  --dg-amber-f: #2C2410;  --dg-amber-m: #5E4A1C;
+  --dg-pink: #F27AA3;   --dg-pink-f: #311622;   --dg-pink-m: #6B2944;
+  --dg-gray: #A3ACBD;   --dg-gray-f: #1E2430;   --dg-gray-m: #384152;
+  --dg-ink-f: #1E2430;
+}
+
+/* 톤: --t 선·글자 / --tf 옅은 채움 / --tm 중간 채움 */
+.dg-t-blue   { --t: var(--dg-blue);   --tf: var(--dg-blue-f);   --tm: var(--dg-blue-m); }
+.dg-t-green  { --t: var(--dg-green);  --tf: var(--dg-green-f);  --tm: var(--dg-green-m); }
+.dg-t-orange { --t: var(--dg-orange); --tf: var(--dg-orange-f); --tm: var(--dg-orange-m); }
+.dg-t-purple { --t: var(--dg-purple); --tf: var(--dg-purple-f); --tm: var(--dg-purple-m); }
+.dg-t-red    { --t: var(--dg-red);    --tf: var(--dg-red-f);    --tm: var(--dg-red-m); }
+.dg-t-teal   { --t: var(--dg-teal);   --tf: var(--dg-teal-f);   --tm: var(--dg-teal-m); }
+.dg-t-amber  { --t: var(--dg-amber);  --tf: var(--dg-amber-f);  --tm: var(--dg-amber-m); }
+.dg-t-pink   { --t: var(--dg-pink);   --tf: var(--dg-pink-f);   --tm: var(--dg-pink-m); }
+.dg-t-gray   { --t: var(--dg-gray);   --tf: var(--dg-gray-f);   --tm: var(--dg-gray-m); }
+.dg-t-ink    { --t: var(--dg-ink);    --tf: var(--dg-ink-f);    --tm: var(--dg-gray-m); }
+
+/* ---------- SVG 요소 ---------- */
+svg.dg-svg { display: block; width: 100%; height: auto; font-family: var(--sans); background: var(--dg-bg); }
+.dg-svg text { font-family: var(--sans); fill: var(--dg-text); }
+.dg-svg .dg-mono { font-family: var(--mono); }
+.dg-bg { fill: var(--dg-bg); }
+.dg-title { fill: var(--dg-ink) !important; font-weight: 800; }
+.dg-sub { fill: var(--dg-muted) !important; }
+.dg-label { fill: var(--dg-ink) !important; font-weight: 700; opacity: .9; }
+.dg-badge { fill: var(--dg-ink); }
+.dg-badge-t { fill: var(--dg-bg) !important; font-weight: 800; }
+.dg-rule { stroke: var(--dg-line); stroke-width: 1.2; }
+.dg-ink { fill: var(--dg-ink) !important; }
+.dg-muted { fill: var(--dg-muted) !important; }
+.dg-faint { fill: var(--dg-faint) !important; }
+.dg-tc { fill: var(--t) !important; }
+.dg-on { fill: var(--dg-on-solid) !important; }
+
+.dg-sec-bar { fill: var(--dg-ink); }
+.dg-sec-t { fill: var(--dg-ink) !important; font-weight: 800; }
+.dg-sec-n { fill: var(--dg-blue) !important; font-weight: 800; }
+
+.dg-box { fill: var(--tf); stroke: var(--t); stroke-width: 1.6; }
+.dg-box--plain { fill: var(--dg-bg); }
+.dg-box--solid { fill: var(--t); }
+.dg-box--mid { fill: var(--tm); }
+.dg-box--soft { fill: var(--dg-soft); stroke: var(--dg-line); }
+.dg-box--ghost { fill: none; }
+.dg-box--dash { stroke-dasharray: 6 5; }
+.dg-box--thick { stroke-width: 2.6; }
+.dg-panel { fill: var(--dg-bg); stroke: var(--dg-line); stroke-width: 1.4; }
+.dg-panel--tone { fill: color-mix(in srgb, var(--tf) 55%, var(--dg-bg)); stroke: var(--tm); }
+.dg-panel-head { fill: var(--t); }
+.dg-panel-head--soft { fill: var(--tf); }
+.dg-note-bar { fill: var(--t); }
+.dg-note { fill: var(--dg-bg); stroke: var(--dg-line); stroke-width: 1.2; }
+
+.dg-line { stroke: var(--t, var(--dg-gray)); stroke-width: 2; fill: none; }
+.dg-line--dash { stroke-dasharray: 6 5; }
+.dg-head { fill: var(--t, var(--dg-gray)); }
+
+.dg-cell { stroke: var(--dg-bg); stroke-width: 1.5; fill: var(--dg-soft); }
+.dg-cell--tone { fill: var(--tf); }
+.dg-cell--mid { fill: var(--tm); }
+.dg-cell--solid { fill: var(--t); }
+.dg-cell--plain { fill: var(--dg-bg); stroke: var(--dg-line); }
+.dg-grid { fill: none; stroke: var(--dg-line); stroke-width: 1.2; }
+.dg-hl { fill: none; stroke: var(--t); stroke-width: 2.6; }
+
+.dg-th { fill: var(--dg-soft); }
+.dg-tr { stroke: var(--dg-line); stroke-width: 1; }
+.dg-code-bg { fill: var(--dg-code); stroke: var(--dg-line); stroke-width: 1; }
+.dg-chip { fill: var(--tf); stroke: var(--t); stroke-width: 1.4; }
+.dg-chip--solid { fill: var(--t); }
+.dg-dot { fill: var(--t); }
+.dg-shape { fill: var(--tm); stroke: var(--t); stroke-width: 1.6; }
+.dg-shape--f { fill: var(--tf); }
+.dg-shape--solid { fill: var(--t); stroke: none; }
+.dg-stroke { fill: none; stroke: var(--t); stroke-width: 2; }
+.dg-axis { stroke: var(--dg-faint); stroke-width: 1.4; fill: none; }
+
+/* ---------- 뷰어 (시뮬레이터 탭 · 모음 페이지 공통) ---------- */
+.dgv { display: flex; flex-direction: column; gap: 12px; }
+.dgv__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dgv__list { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; flex: 1; }
+.dgv__pick {
+  appearance: none; font: inherit; cursor: pointer; border: 1px solid var(--line); background: var(--surface);
+  color: var(--muted); border-radius: 999px; padding: 5px 12px; font-size: 13px; font-weight: 700; max-width: 100%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dgv__pick:hover { color: var(--ink); }
+.dgv__pick[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
+.dgv__tools { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.dgv__btn {
+  appearance: none; font: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 8px;
+  padding: 6px 11px; font-size: 13px; font-weight: 700; text-decoration: none; white-space: nowrap;
+}
+.dgv__btn:hover { background: var(--surface-2); color: var(--ink); }
+.dgv__btn svg { width: 15px; height: 15px; }
+.dgv__pick:focus-visible, .dgv__btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.dgv__stage {
+  border: 1px solid var(--line); border-radius: 12px; overflow: auto; background: var(--dg-bg);
+  -webkit-overflow-scrolling: touch;
+}
+.dgv__stage svg.dg-svg { min-width: 880px; }
+.dgv__stage:fullscreen { display: grid; place-items: center; border: 0; border-radius: 0; background: var(--dg-bg); }
+.dgv__stage:fullscreen svg.dg-svg { width: min(100vw, calc(100vh * 16 / 9)); min-width: 0; }
+.dgv__meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+.dgv__meta b { color: var(--ink); }
+.dgv__hint { font-size: 12px; color: var(--faint); }
+.dgv__empty { padding: 40px 20px; text-align: center; color: var(--muted); border: 1.5px dashed var(--line-strong); border-radius: 12px; }
+@media (min-width: 761px) { .dgv__hint--mobile { display: none; } }

@@ -8,8 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
-<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 /* 역할 색 (강의 도식): 파랑 데이터 / 청록 대치 / 보라 학습·후보 / 주황 평가 / 빨강 한계·가지치기 / 초록 활용·통과
@@ -287,6 +288,8 @@
       <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -326,6 +329,7 @@
     <button type="button" class="sk-tab" role="tab" id="tab-fp" aria-controls="pane-fp" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>FP-Growth</button>
     <button type="button" class="sk-tab" role="tab" id="tab-support" aria-controls="pane-support" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>최소 지지도 정하기</button>
     <button type="button" class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>코드</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>알고리즘 구성도</button>
   </nav>
 
   <!-- ================= 1. 지표 이해 ================= -->
@@ -581,6 +585,10 @@
       </div>
     </div>
   </section>
+  <!-- ================= 7. 알고리즘 구성도 ================= -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">강의용 도식 · 세 지표 · Apriori · FP-Growth (기본 12건)</span></div><div data-ds-diagrams="association-rules"></div></section>
+  </section>
 </main>
 
 <!-- ===== 공통 푸터 ===== -->
@@ -597,7 +605,9 @@
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/association-rules.js?v=20261002c"></script>
 <script>
 (function () {
 "use strict";
@@ -851,7 +861,7 @@ const liftFill=l=>{if(!isFinite(l))return"var(--faint)";if(l>=1){const t=Math.mi
 /* ============================================================
    탭
    ============================================================ */
-const TABS=["metric","apriori","rules","fp","support","code"];let curTab="metric";
+const TABS=["metric","apriori","rules","fp","support","code","diagram"];let curTab="metric";
 function showTab(k,focus){
   if(!TABS.includes(k))k="metric";
   TABS.forEach(t=>{const b=$("tab-"+t),p=$("pane-"+t),on=t===k;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;p.hidden=!on;});
@@ -872,7 +882,7 @@ document.addEventListener("keydown",e=>{
   if(curTab==="apriori"){AP.next();e.preventDefault();}
   else if(curTab==="fp"){FP.next();e.preventDefault();}
 });
-function renderCur(){({metric:renderMetric,apriori:()=>AP.render(),rules:renderRules,fp:()=>FP.render(),support:renderSupport,code:renderCode})[curTab]();}
+function renderCur(){({metric:renderMetric,apriori:()=>AP.render(),rules:renderRules,fp:()=>FP.render(),support:renderSupport,code:renderCode,diagram:()=>{}})[curTab]();}
 
 /* ============================================================
    1. 지표 이해

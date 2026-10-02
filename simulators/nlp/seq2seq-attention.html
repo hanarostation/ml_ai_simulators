@@ -8,7 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 :root{
@@ -131,6 +132,12 @@ canvas.hm{display:block;image-rendering:pixelated;border-radius:3px;border:1px s
 .scaleleg span.sw{display:inline-block;width:60px;height:10px;border-radius:3px;background:linear-gradient(90deg,#2563EB,#fff,#EA580C);border:1px solid var(--line)}
 .empty{color:var(--sub);font-size:14px;padding:30px;text-align:center}
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+/* 안쪽 탭: 시뮬레이터 / 알고리즘 구성도 */
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:16px;overflow-x:auto}
+.tabs .tab{appearance:none;border:0;border-radius:0;background:none;font:inherit;font-weight:700;color:var(--sub);padding:10px 16px 9px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
+.tabs .tab:hover:not(:disabled){background:none;color:var(--ink)}
+.tabs .tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--att)}
+.dg-card .lead{margin:0 0 12px}
 </style>
 <!-- TensorFlow.js (공용 파일) -->
 <script src="../../assets/vendor/tf.min.js"></script>
@@ -155,6 +162,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)" aria-current="page">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -177,6 +186,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 <!-- ===== 시뮬레이터 본문 ===== -->
 <main class="wrap" id="main">
 
+<nav class="tabs" role="tablist" aria-label="시뮬레이터 탭">
+  <button class="tab" role="tab" id="tab-sim" aria-controls="pane-sim" aria-selected="true">시뮬레이터</button>
+  <button class="tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false">알고리즘 구성도</button>
+</nav>
+
+<div id="pane-sim" role="tabpanel" aria-labelledby="tab-sim">
 <section class="card">
   <h2><span class="n">1</span>데이터</h2>
   <p class="lead">한 줄에 한 쌍: <code>영어 | 한국어</code> (탭으로 구분해도 됩니다). 수정 후 <b>데이터 적용</b>을 누르면 글자 사전을 다시 만들고 모델을 초기화합니다.</p>
@@ -258,6 +273,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     <div class="panel" id="attPanel"><h3>Attention 가중치 α (디코더 시점 × 입력 글자)</h3><div class="empty">Attention 모델을 실행하면 표시됩니다.</div></div>
   </div>
 </section>
+</div>
+
+<div id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+<section class="card dg-card">
+  <h2>알고리즘 구성도</h2>
+  <p class="lead">강의 도식 4장 — Seq2Seq 구조 · Teacher Forcing과 한계 · Attention 개념 · Score 계산 숫자</p>
+  <div data-ds-diagrams="seq2seq-attention"></div>
+</section>
+</div>
 </main>
 
 <!-- ===== 공통 푸터 ===== -->
@@ -274,7 +298,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/seq2seq-attention.js?v=20261002c"></script>
 <script>
 "use strict";
 const PAD = 0, SOS = 1, EOS = 2;
@@ -865,6 +891,7 @@ function init() {
   $("#speed").oninput = () => { if (playTimer) { stopPlay(); $("#bPlay").click(); } };
   document.addEventListener("keydown", e => {
     if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") return;
+    if ($("#pane-sim").hidden) return;   // 구성도 탭에서는 시뮬레이터 단계 이동 안 함
     if (e.key === "ArrowRight") { stopPlay(); goStep(step + 1); }
     if (e.key === "ArrowLeft") { stopPlay(); goStep(step - 1); }
   });
@@ -876,6 +903,24 @@ window.addEventListener("load", () => {
   if (typeof tf === "undefined") { document.body.insertAdjacentHTML("afterbegin", '<div style="background:var(--red-l);color:var(--red);padding:12px;text-align:center">TensorFlow.js 를 불러오지 못했습니다.</div>'); return; }
   init();
 });
+</script>
+<script>
+/* 안쪽 탭 (시뮬레이터 / 알고리즘 구성도) — 해시 #diagram 으로 바로 열기 */
+(function () {
+  var TABS = { sim: "tab-sim", diagram: "tab-diagram" };
+  function showTab(key, push) {
+    Object.keys(TABS).forEach(function (k) {
+      var on = k === key;
+      document.getElementById(TABS[k]).setAttribute("aria-selected", on ? "true" : "false");
+      document.getElementById("pane-" + k).hidden = !on;
+    });
+    if (push) { try { history.replaceState(null, "", key === "sim" ? location.pathname + location.search : "#" + key); } catch (e) { } }
+  }
+  Object.keys(TABS).forEach(function (k) { document.getElementById(TABS[k]).addEventListener("click", function () { showTab(k, true); }); });
+  function fromHash() { var h = (location.hash || "").replace("#", ""); showTab(TABS[h] ? h : "sim", false); }
+  window.addEventListener("hashchange", fromHash);
+  fromHash();
+})();
 </script>
 </body>
 </html>

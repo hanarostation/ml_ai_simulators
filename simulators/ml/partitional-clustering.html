@@ -8,8 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
-<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 /* 군집 색 k0~k9 · 데이터/밀도 파랑 · 튜닝 보라 · 평가 주황 · 한계 빨강 · 활용 초록 */
@@ -144,6 +145,8 @@
       <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -179,6 +182,7 @@
     <button type="button" class="sk-tab" role="tab" id="tab-pick" aria-controls="pane-pick" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>군집 수 고르기</button>
     <button type="button" class="sk-tab" role="tab" id="tab-compare" aria-controls="pane-compare" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>알고리즘 비교</button>
     <button type="button" class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>코드</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>알고리즘 구성도</button>
   </nav>
 
   <!-- ================= 1. 단계별 실행 ================= -->
@@ -446,6 +450,10 @@
       <p class="sk-note" id="cNote"></p>
     </div>
   </section>
+  <!-- ================= 5. 알고리즘 구성도 ================= -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">강의용 도식 · K-means · K-medoids · DBSCAN · Mean Shift · GMM</span></div><div data-ds-diagrams="partitional-clustering"></div></section>
+  </section>
 </main>
 
 <!-- ===== 공통 푸터 ===== -->
@@ -462,7 +470,9 @@
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/partitional-clustering.js?v=20261002c"></script>
 <script>
 (function(){
 "use strict";
@@ -638,7 +648,7 @@ function silDetail(D,n,L,i){if(L[i]<0)return null;const lab=[...new Set(Array.fr
 /* ================= 상태 ================= */
 const ALGOS=["kmeans","kpp","pam","dbscan","meanshift","gmm"];
 const ANAME={kmeans:"K-means",kpp:"K-means++",pam:"K-medoids (PAM)",dbscan:"DBSCAN",meanshift:"Mean Shift",gmm:"GMM (EM)"};
-const TABS=["run","pick","compare","code"];
+const TABS=["run","pick","compare","code","diagram"];
 const S={algo:"kmeans",tab:"run",preset:"blobs",dseed:1,n:150,edited:false,X:[],ver:0,
   k:3,seed:0,kmInit:"random",manual:[],nInit:10,eps:.4,minS:5,bw:1.2,msView:"all",
   cov:"full",gInit:"kmeans",gView:"mix",g2s:true,gBg:false,vor:true,trail:true,pamKm:true,dbAll:false,kde:true,
@@ -730,7 +740,7 @@ function lineChart(host,o){const W=Math.max(260,Math.round(host.clientWidth||520
   return{toData(evt){const svg=host.querySelector("svg");const rc=svg.getBoundingClientRect();const px=(evt.clientX-rc.left)*W/rc.width,py=(evt.clientY-rc.top)*H/rc.height;return{x:x0+(px-mL)/pw*(x1-x0),y:lo+(1-(py-mT)/ph)*(hi-lo),inside:px>=mL&&px<=mL+pw&&py>=mT&&py<=mT+ph};}};}
 
 /* ================= 탭 · 해시 ================= */
-function setHash(){const h="#"+S.algo+(S.tab!=="run"?"-"+S.tab:"");if(location.hash!==h)history.replaceState(null,"",h);}
+function setHash(){const h=S.tab==="diagram"?"#diagram":"#"+S.algo+(S.tab!=="run"?"-"+S.tab:"");if(location.hash!==h)history.replaceState(null,"",h);}
 function showTab(t,focus){if(!TABS.includes(t))t="run";S.tab=t;
   TABS.forEach(k=>{const b=$("tab-"+k),on=k===t;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;$("pane-"+k).hidden=!on;});
   if(focus)$("tab-"+t).focus();if(t!=="run")stopPlay();setHash();renderTab();}
@@ -745,7 +755,7 @@ function setAlgo(a,keepFrame){if(!ALGOS.includes(a))a="kmeans";const changed=a!=
   $("aKl").textContent=a==="gmm"?"성분 수 k (n_components)":"군집 수 k";
   stopPlay();setHash();rebuild(changed&&!keepFrame?"start":"keep");renderTab();}
 segInit($("algoSeg"),v=>setAlgo(v));
-window.addEventListener("hashchange",()=>{const [a,t]=location.hash.slice(1).split("-");if(ALGOS.includes(a)&&a!==S.algo)setAlgo(a);if(TABS.includes(t||"run")&&(t||"run")!==S.tab)showTab(t||"run");});
+window.addEventListener("hashchange",()=>{if(location.hash==="#diagram"){if(S.tab!=="diagram")showTab("diagram");return;}const [a,t]=location.hash.slice(1).split("-");if(ALGOS.includes(a)&&a!==S.algo)setAlgo(a);if(TABS.includes(t||"run")&&(t||"run")!==S.tab)showTab(t||"run");});
 
 /* ================= 데이터 조작 ================= */
 function dataChanged(){S.ver++;S.probe=clamp(S.probe,0,S.X.length-1);$("dInfo").textContent=`${PRE[S.preset].name}${S.edited?" (편집함)":""} · 점 ${S.X.length}개 · 정답 라벨 없음`;rebuild("keep");renderTab();}
@@ -1229,7 +1239,7 @@ function renderCode(){codeTxt=genCode();$("cCode").innerHTML=hl(codeTxt);
 $("cCopy").onclick=async()=>{try{await navigator.clipboard.writeText(codeTxt);$("cCopy").textContent="복사됨";}catch(e){const r=document.createRange();r.selectNodeContents($("cCode"));const s=getSelection();s.removeAllRanges();s.addRange(r);$("cCopy").textContent="선택됨";}setTimeout(()=>$("cCopy").textContent="복사",1400);};
 
 /* ================= 탭 그리기 · 테마 ================= */
-function renderTab(){if(S.tab==="run")renderRun();else if(S.tab==="pick")renderPick();else if(S.tab==="compare")renderCompare();else renderCode();}
+function renderTab(){if(S.tab==="run")renderRun();else if(S.tab==="pick")renderPick();else if(S.tab==="compare")renderCompare();else if(S.tab==="code")renderCode();}
 function redraw(){if(S.tab==="run"){drawMain();if(S.algo==="pam")renderPamKm();if(S.algo==="dbscan")renderDbKm();if(S.algo==="gmm")renderGmmSoft();}
   else if(S.tab==="pick")drawPick();else if(S.tab==="compare")renderCompare();}
 new MutationObserver(redraw).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
@@ -1237,7 +1247,7 @@ try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",redraw)
 let rzT,lastW=window.innerWidth;window.addEventListener("resize",()=>{if(window.innerWidth===lastW)return;lastW=window.innerWidth;clearTimeout(rzT);rzT=setTimeout(()=>{if(S.tab==="run"){renderRun();extrasDirty=true;renderExtras();}else redraw();},160);});
 
 /* ================= 시작 ================= */
-(function start(){const [a,t]=(location.hash||"").slice(1).split("-");S.algo=ALGOS.includes(a)?a:"kmeans";S.tab=TABS.includes(t||"")?t:"run";
+(function start(){const [a,t]=(location.hash||"").slice(1).split("-");S.algo=ALGOS.includes(a)?a:"kmeans";S.tab=a==="diagram"?"diagram":TABS.includes(t||"")?t:"run";
   S.X=makeData(S.preset,S.dseed,S.n);S.ver=1;$("dInfo").textContent=`${PRE[S.preset].name} · 점 ${S.X.length}개 · 정답 라벨 없음`;syncParamUI();
   segSet($("algoSeg"),S.algo);document.querySelectorAll("[data-for]").forEach(el=>{el.hidden=!el.dataset.for.split(" ").includes(S.algo);});document.querySelectorAll("[data-x]").forEach(el=>{el.hidden=el.dataset.x!==S.algo;});
   $("aKl").textContent=S.algo==="gmm"?"성분 수 k (n_components)":"군집 수 k";

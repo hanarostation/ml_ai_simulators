@@ -8,8 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
-<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 :root{
@@ -167,6 +168,8 @@
       <a href="../../index.html#cv" style="--c:var(--cat-cv)" aria-current="page">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -193,6 +196,7 @@
     <button class="sk-tab" type="button" role="tab" id="tab-b" aria-controls="pane-b" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>한 배치 미리보기</button>
     <button class="sk-tab" type="button" role="tab" id="tab-c" aria-controls="pane-c" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>기법 한눈에</button>
     <button class="sk-tab" type="button" role="tab" id="tab-d" aria-controls="pane-d" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>파이프라인과 코드</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>알고리즘 구성도</button>
   </nav>
 
   <!-- ========== 1. 증강 실험실 ========== -->
@@ -403,6 +407,10 @@
       </div>
     </div>
   </section>
+  <!-- ========== 알고리즘 구성도 ========== -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">강의 도식 2장 · 개념과 기법 / 증강 Layer와 계산</span></div><div data-ds-diagrams="image-augmentation"></div></section>
+  </section>
 </main>
 
 <!-- ===== 공통 푸터 ===== -->
@@ -419,7 +427,9 @@
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/image-augmentation.js?v=20261002c"></script>
 <script>
 (function(){
 "use strict";
@@ -684,7 +694,7 @@ function buildControls(){
     if(f[0]==="int")h+='<p class="fam-hint">순서: 감마·윈도 → 대비 → 밝기 → 블러 → 노이즈. 매 단계 0~255로 자릅니다.</p>';
     if(f[0]==="reg")h+='<p class="fam-hint">Mixup·CutMix는 "섞을 영상 B"와 섞고, 라벨도 같은 비율로 섞습니다.</p>';
     TECH.filter(t=>t.fam===f[0]).forEach(t=>{
-      h+='<div class="tq" data-t="'+t.id+'"><div class="tq-top"><label class="sk-check"><input type="checkbox" data-on="'+t.id+'"> '+t.name+'</label><span class="tq-en">'+t.en+'</span>'+(t.nb?'<span class="tq-nb" title="Day04 노트북에서 쓴 Layer">노트북</span>':'')+'</div>';
+      h+='<div class="tq" data-t="'+t.id+'"><div class="tq-top"><label class="sk-check"><input type="checkbox" data-on="'+t.id+'"> '+t.name+'</label><span class="tq-en">'+t.en+'</span>'+(t.nb?'<span class="tq-nb" title="실습 노트북에서 쓴 Layer">노트북</span>':'')+'</div>';
       if(t.params.length){
         h+='<div class="'+(t.params.length>1?"tq-2":"")+'">';
         t.params.forEach(p=>{const id="s-"+t.id+"-"+p.k;
@@ -973,8 +983,8 @@ $("#btnCopy").addEventListener("click",()=>{
 });
 
 /* ---------- 탭 전환 (URL 해시 동기화, ←/→) ---------- */
-const TABS=["a","b","c","d"];let cur="a";
-function renderCurrent(){if(cur==="a")renderLab();else if(cur==="b")renderBatch();else if(cur==="c")renderCards();else renderCode();}
+const TABS=["a","b","c","d","diagram"];let cur="a";
+function renderCurrent(){if(cur==="a")renderLab();else if(cur==="b")renderBatch();else if(cur==="c")renderCards();else if(cur==="d")renderCode();}
 function showTab(id,focus){
   if(TABS.indexOf(id)<0)id="a";cur=id;
   TABS.forEach(t=>{const tb=$("#tab-"+t),on=t===id;tb.setAttribute("aria-selected",on);tb.tabIndex=on?0:-1;$("#pane-"+t).hidden=!on;});

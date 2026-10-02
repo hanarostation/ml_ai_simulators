@@ -8,14 +8,18 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 :root{
   --sunk:var(--surface-2);
   --t1:#D9622B; --t1-soft:#FDEADF; --t2:#2F6FDB; --t2-soft:#E2EBFB; --on-t:#FFFFFF;
   --hot:#D6336C; --hot-soft:#FCE4EC;
+  --sk-accent:var(--cat-nlp);
 }
+.pane{display:flex;flex-direction:column;gap:16px}
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --t1:#F0874A; --t1-soft:#3A2519; --t2:#6C9BF2; --t2-soft:#1B2A45; --on-t:#10131A;
@@ -163,6 +167,8 @@ svg.chart{width:100%;height:auto;display:block}
       <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)" aria-current="page">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -185,6 +191,12 @@ svg.chart{width:100%;height:auto;display:block}
 <!-- ===== 시뮬레이터 본문 ===== -->
 <main class="wrap" id="main">
 
+  <nav class="sk-tabs" role="tablist" aria-label="화면 선택">
+    <button type="button" class="sk-tab" role="tab" id="tab-sim" aria-controls="pane-sim" aria-selected="true"><span class="sk-num">1</span>깁스 샘플링 시뮬레이터</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>알고리즘 구성도</button>
+  </nav>
+
+  <div class="pane" id="pane-sim" role="tabpanel" aria-labelledby="tab-sim">
   <section class="controls" aria-label="조작">
     <div class="group">
       <button class="btn primary" id="btnPlay" type="button">▶ 재생</button>
@@ -250,6 +262,11 @@ svg.chart{width:100%;height:auto;display:block}
       <p class="note">주제 번호에는 뜻이 없습니다. 어느 쪽이 과일이 될지는 우연이고, 이름은 사람이 붙입니다. 샘플링이라 다 정리된 뒤에도 가끔 흔들립니다.</p>
     </div>
   </section>
+  </div>
+
+  <section class="pane" id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">강의 도식 2장 · 깁스 샘플링 4단계(처음 배정 · 문서3의 '바나나') → 개수표와 α · β의 역할</span></div><div data-ds-diagrams="lda-gibbs-sampling"></div></section>
+  </section>
 </main>
 
 <!-- ===== 공통 푸터 ===== -->
@@ -266,7 +283,9 @@ svg.chart{width:100%;height:auto;display:block}
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/lda-gibbs-sampling.js?v=20261002c"></script>
 <script>
 (function(){
 const DOCS=[["사과","바나나","과일","사과"],["축구","골","경기","축구"],["바나나","축구","과일","골"]];
@@ -372,7 +391,7 @@ document.querySelectorAll('input[name="sm"]').forEach(el=>el.onchange=()=>{
   render();
 });
 document.addEventListener("keydown",e=>{
-  if(e.key==="ArrowRight"&&!(e.target&&/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))){e.preventDefault();stopPlay();advance();}
+  if(e.key==="ArrowRight"&&!$("pane-sim").hidden&&!(e.target&&/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))){e.preventDefault();stopPlay();advance();}
 });
 $("docs").addEventListener("click",e=>{const b=e.target.closest(".chip");if(b)jumpTo(+b.dataset.d,+b.dataset.i);});
 
@@ -513,8 +532,27 @@ function renderTops(){
   $("tops").innerHTML=h;
 }
 
+/* ---------- 탭 (시뮬레이터 / 알고리즘 구성도) · 해시 #diagram ---------- */
+const TABS=["sim","diagram"];
+function showTab(t,focus){
+  if(!TABS.includes(t)) t="sim";
+  TABS.forEach(k=>{const b=$("tab-"+k),on=k===t;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;$("pane-"+k).hidden=!on;});
+  if(focus) $("tab-"+t).focus();
+  if(t!=="sim") stopPlay();
+  const h=t==="diagram"?"#diagram":"";
+  if(location.hash!==h){try{history.replaceState(null,"",h||location.pathname+location.search);}catch(e){}}
+}
+TABS.forEach(t=>$("tab-"+t).addEventListener("click",()=>showTab(t)));
+document.querySelector(".sk-tabs").addEventListener("keydown",e=>{
+  if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft") return; e.preventDefault(); e.stopPropagation();
+  const cur=TABS.findIndex(k=>$("tab-"+k).getAttribute("aria-selected")==="true");
+  showTab(TABS[(cur+(e.key==="ArrowRight"?1:-1)+TABS.length)%TABS.length],true);
+});
+window.addEventListener("hashchange",()=>showTab(location.hash==="#diagram"?"diagram":"sim"));
+
 S.preset="fig";
 reset(false);render();
+showTab(location.hash==="#diagram"?"diagram":"sim");
 })();
 </script>
 </body>

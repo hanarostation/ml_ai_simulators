@@ -8,8 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
-<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 /* 역할 색: 파랑 = 학습 데이터 · 주황 = 예측·예측 구간 · 회색 = 실제 미래(검증)
@@ -126,6 +127,8 @@ details.pr-more[open]>summary{margin-bottom:10px}
       <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)" aria-current="page">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -195,6 +198,7 @@ details.pr-more[open]>summary{margin-bottom:10px}
     <button class="sk-tab" role="tab" id="tab-holiday" aria-controls="pane-holiday" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>휴일·이벤트 효과</button>
     <button class="sk-tab" role="tab" id="tab-forecast" aria-controls="pane-forecast" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>예측·교차검증</button>
     <button class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>코드</button>
+    <button class="sk-tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>알고리즘 구성도</button>
   </nav>
 
   <!-- ========== 1. 구성 요소로 쌓기 ========== -->
@@ -416,6 +420,11 @@ details.pr-more[open]>summary{margin-bottom:10px}
       <pre class="sk-formula pr-code" id="codeOut" tabindex="0" aria-label="파이썬 코드"></pre>
     </div>
   </section>
+
+  <!-- ========== 7. 알고리즘 구성도 ========== -->
+  <section class="pr-pane" id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">성분 쌓기 · 변화점과 푸리에 계절성 · 휴일 효과와 교차검증을 강의 슬라이드로 정리</span></div><div data-ds-diagrams="prophet"></div></section>
+  </section>
 </main>
 
 <!-- ===== 공통 푸터 ===== -->
@@ -432,7 +441,9 @@ details.pr-more[open]>summary{margin-bottom:10px}
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/prophet.js?v=20261002c"></script>
 <script>
 (function () {
   "use strict";
@@ -1521,7 +1532,7 @@ details.pr-more[open]>summary{margin-bottom:10px}
   function render() {
     renderDataInfo(); syncAll();
     const t = activeTab();
-    try { ({ stack: renderStack, trend: renderTrend, season: renderSeason, holiday: renderHoliday, forecast: renderForecast, code: renderCode })[t](); }
+    try { (({ stack: renderStack, trend: renderTrend, season: renderSeason, holiday: renderHoliday, forecast: renderForecast, code: renderCode })[t] || function () {})(); }
     catch (err) { console.error(err); }
   }
   function redrawAll() { document.querySelectorAll("canvas.pr-cv").forEach(cv => { if (cv._o && cv.offsetParent) drawPlot(cv); }); if (activeTab() === "season") renderSeasonTop(); }

@@ -8,8 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
-<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 /* 역할 색: 클래스 정상 파랑 · 당뇨 주황 · 전단계 자홍 / 거리 원·모델 보라 · 검증 청록 · 학습 파랑 · 한계 빨강 · 최적 초록 */
@@ -152,6 +153,8 @@
       <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -180,6 +183,7 @@
     <button type="button" class="sk-tab" role="tab" id="tab-reg" aria-controls="pane-reg" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>KNN 회귀</button>
     <button type="button" class="sk-tab" role="tab" id="tab-cost" aria-controls="pane-cost" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>계산 비용과 차원의 저주</button>
     <button type="button" class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>코드</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>알고리즘 구성도</button>
   </nav>
 
   <!-- ================= 1. 한 점 예측하기 ================= -->
@@ -423,6 +427,11 @@
       <p class="sk-note" id="k6note">맨 아래 주석은 이 페이지가 같은 데이터로 계산한 값입니다. 코드를 실행하면 같은 숫자가 나와야 합니다. 교차검증은 이 페이지와 똑같이 나누도록 <span class="sk-mono">PredefinedSplit</span>에 폴드 번호를 그대로 넣었습니다.</p>
     </div>
   </section>
+
+  <!-- ================= 알고리즘 구성도 ================= -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">다수결 분류 · k와 스케일링 · 회귀와 계산 비용 3장 · 강의용 도식</span></div><div data-ds-diagrams="knn"></div></section>
+  </section>
 </main>
 
 <!-- ===== 공통 푸터 ===== -->
@@ -439,7 +448,9 @@
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/knn.js?v=20261002c"></script>
 <script>
 (function () {
 "use strict";
@@ -576,7 +587,7 @@ function curves(X,Y,lab,nc,fold,scaler,m,w,kcap){
 }
 
 /* ================= 탭 ================= */
-const TABS=["predict","boundary","scale","reg","cost","code"];let curTab="predict";
+const TABS=["predict","boundary","scale","reg","cost","code","diagram"];let curTab="predict";
 const onShow={};
 function showTab(k,focus){
   if(!TABS.includes(k))k="predict";

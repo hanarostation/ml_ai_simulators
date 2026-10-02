@@ -8,8 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
-<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 /* 모형 색(강의 도식과 동일): RNN 회색 · LSTM 초록 · GRU 주황 · 양방향 보라 · Stacked 청록
@@ -186,6 +187,8 @@ details.rf-more summary:focus-visible{outline:2px solid var(--focus);outline-off
       <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)" aria-current="page">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -294,6 +297,7 @@ details.rf-more summary:focus-visible{outline:2px solid var(--focus);outline-off
       <button type="button" class="sk-tab" role="tab" id="tab-param" aria-controls="pane-param" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>파라미터 계산기</button>
       <button type="button" class="sk-tab" role="tab" id="tab-shape" aria-controls="pane-shape" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>출력 모양</button>
       <button type="button" class="sk-tab" role="tab" id="tab-table" aria-controls="pane-table" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>다섯 모형 비교표</button>
+      <button type="button" class="sk-tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>알고리즘 구성도</button>
     </nav>
 
     <section id="pane-mem" role="tabpanel" aria-labelledby="tab-mem" style="display:flex;flex-direction:column;gap:14px">
@@ -361,6 +365,10 @@ details.rf-more summary:focus-visible{outline:2px solid var(--focus);outline-off
       <div class="sk-scroll"><table class="sk-table rf-cmp" id="cmpTable"></table></div>
       <p class="sk-note">모든 RNN 계열은 앞 시점의 h가 있어야 다음 시점을 계산하므로 <b>시점 방향으로는 병렬 처리가 안 됩니다</b>. 긴 문장에서 느린 이유이고, 이 한계를 없앤 것이 Attention과 Transformer입니다.</p>
     </section>
+
+    <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+      <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">강의 도식 4장 · SimpleRNN → LSTM → GRU 셀 회로, 양방향 · Stacked와 다섯 모형 비교 (위 모형 선택과 상관없이 모두 표시)</span></div><div data-ds-diagrams="rnn-family"></div></section>
+    </section>
   </div>
 </main>
 
@@ -378,7 +386,9 @@ details.rf-more summary:focus-visible{outline:2px solid var(--focus);outline-off
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/rnn-family.js?v=20261002c"></script>
 <script>
 (function () {
 "use strict";
@@ -476,7 +486,7 @@ function runChain(cell,seq,reverse,force,mask){
 
 /* ---------------- 상태 ---------------- */
 const ALGS=["rnn","lstm","gru","bi","stack"];
-const TABS=["mem","param","shape","table"];
+const TABS=["mem","param","shape","table","diagram"];
 const NAME={rnn:"SimpleRNN",lstm:"LSTM",gru:"GRU",bi:"양방향 RNN",stack:"Stacked RNN"};
 const CELL={rnn:"SimpleRNN",lstm:"LSTM",gru:"GRU"};
 const EXAMPLES=["태아 기형 유발 가능성","초음파 진단 보조 장치","흉부 CT 판독 결과 이상 소견 없음","혈압 상승 후 두통 호소","수술 부위 감염 징후 관찰"];
@@ -1119,7 +1129,7 @@ function renderShape(){
   $("shCode").textContent=code.join("\n");
   // 입출력 4종
   const mode=err?"":(is3?"m2m":"m2o");
-  const io=[["m2o","many-to-one","문장 → 하나 (분류 실습, 감성·의료 문장 분류)"],["m2m","many-to-many","토큰마다 하나 (품사·개체명 태깅)"],["o2m","one-to-many","하나 → 여러 개 (이미지 캡션 생성)"],["s2s","seq2seq","인코더 → 디코더 (번역·요약, Day10)"]];
+  const io=[["m2o","many-to-one","문장 → 하나 (분류 실습, 감성·의료 문장 분류)"],["m2m","many-to-many","토큰마다 하나 (품사·개체명 태깅)"],["o2m","one-to-many","하나 → 여러 개 (이미지 캡션 생성)"],["s2s","seq2seq","인코더 → 디코더 (번역·요약)"]];
   $("ioBox").innerHTML=io.map(([k,t,dsc])=>`<div class="it${k===mode?" on":""}"><h3>${t}</h3>${ioSvg(k)}<p>${dsc}</p></div>`).join("");
 }
 function ioSvg(k){
@@ -1157,14 +1167,14 @@ function renderTable(){
 }
 
 /* ---------------- 탭 / 해시 ---------------- */
-function setHash(){ const h="#"+S.alg+(S.tab!=="mem"?"/"+S.tab:""); if(location.hash!==h) history.replaceState(null,"",h); }
+function setHash(){ const h=S.tab==="diagram"?"#diagram":"#"+S.alg+(S.tab!=="mem"?"/"+S.tab:""); if(location.hash!==h) history.replaceState(null,"",h); }
 function showTab(t,focus){
   if(!TABS.includes(t)) t="mem"; S.tab=t;
   TABS.forEach(k=>{const b=$("tab-"+k),on=k===t;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;$("pane-"+k).hidden=!on;});
   if(focus) $("tab-"+t).focus();
   setHash(); renderTab();
 }
-function renderTab(){ if(S.tab==="mem") drawMem(); else if(S.tab==="param") renderParams(); else if(S.tab==="shape") renderShape(); else renderTable(); }
+function renderTab(){ if(S.tab==="mem") drawMem(); else if(S.tab==="param") renderParams(); else if(S.tab==="shape") renderShape(); else if(S.tab==="table") renderTable(); }
 TABS.forEach(t=>$("tab-"+t).addEventListener("click",()=>showTab(t)));
 document.querySelector(".sk-tabs").addEventListener("keydown",e=>{
   if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft") return; e.preventDefault(); e.stopPropagation();
@@ -1187,7 +1197,7 @@ $("algoSeg").addEventListener("keydown",e=>{
   if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft") return; e.preventDefault(); e.stopPropagation();
   const i=ALGS.indexOf(S.alg); setAlg(ALGS[(i+(e.key==="ArrowRight"?1:-1)+ALGS.length)%ALGS.length],true);
 });
-window.addEventListener("hashchange",()=>{ const [a,t]=location.hash.slice(1).split("/"); if(ALGS.includes(a)&&a!==S.alg) setAlg(a); if(t&&TABS.includes(t)&&t!==S.tab) showTab(t); });
+window.addEventListener("hashchange",()=>{ const [a,t]=location.hash.slice(1).split("/"); if(a==="diagram"){ if(S.tab!=="diagram") showTab("diagram"); return; } if(ALGS.includes(a)&&a!==S.alg) setAlg(a); if(t&&TABS.includes(t)&&t!==S.tab) showTab(t); });
 
 /* ---------------- 입력 ---------------- */
 EXAMPLES.forEach(e=>{const o=document.createElement("option");o.value=e;o.textContent=e;$("sentEx").appendChild(o);});
@@ -1267,7 +1277,7 @@ let rt; window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(red
 /* ---------------- 시작 ---------------- */
 readTokens();
 const [h0,h1]=(location.hash||"").slice(1).split("/");
-S.tab=TABS.includes(h1)?h1:"mem";
+S.tab=h0==="diagram"?"diagram":TABS.includes(h1)?h1:"mem";
 TABS.forEach(k=>{const b=$("tab-"+k),on=k===S.tab;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;$("pane-"+k).hidden=!on;});
 setAlg(ALGS.includes(h0)?h0:"rnn");
 })();

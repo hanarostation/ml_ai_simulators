@@ -8,8 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
-<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 /* 역할 색: 순전파 파랑 · 역전파 빨강 · 양수 가중치 파랑 / 음수 주황 · 비교 계열 s1~s5 */
@@ -25,7 +26,7 @@
   --s1:#6AA5FF; --s2:#FF914D; --s3:#33D1BD; --s4:#B294FF; --s5:#F2678F; --heat:#B294FF; }
 
 /* 기법 선택 (큰 세그먼트) */
-.op-tech{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));border-radius:12px;width:100%}
+.op-tech{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-radius:12px;width:100%}
 .op-tech button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 14px;font-size:15px;font-weight:700;color:var(--muted);text-align:left;white-space:normal;line-height:1.3;min-width:0}
 .op-tech button small{font-size:12px;font-weight:600;color:var(--faint);font-family:var(--mono)}
 .op-tech button[aria-pressed="true"]{background:var(--ink);color:var(--on-ink)}
@@ -33,11 +34,13 @@
 .op-tech button .n{font-family:var(--mono);font-size:12px;opacity:.75;margin-right:4px}
 @media (max-width:1080px){.op-tech{grid-template-columns:repeat(3,minmax(0,1fr))}
   .op-tech button:nth-child(4){border-left:0}
-  .op-tech button:nth-child(n+4){border-top:1px solid var(--line-strong)}}
+  .op-tech button:nth-child(n+4){border-top:1px solid var(--line-strong)}
+  .op-tech button:nth-child(7){border-left:0;grid-column:1/-1}}
 @media (max-width:560px){.op-tech{grid-template-columns:repeat(2,minmax(0,1fr))}
   .op-tech button{padding:8px 10px;font-size:14px}
   .op-tech button:nth-child(odd){border-left:0} .op-tech button:nth-child(4){border-left:1px solid var(--line-strong)}
-  .op-tech button:nth-child(n+3){border-top:1px solid var(--line-strong)}}
+  .op-tech button:nth-child(n+3){border-top:1px solid var(--line-strong)}
+  .op-tech button:nth-child(7){grid-column:1/-1}}
 .op-pane{display:flex;flex-direction:column;gap:16px}
 
 /* 강의 도식 요약 */
@@ -165,6 +168,8 @@
       <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -193,6 +198,7 @@
     <button type="button" data-v="optimizer" aria-pressed="false"><span><span class="n">4</span>옵티마이저</span><small>SGD · Adam</small></button>
     <button type="button" data-v="clip" aria-pressed="false"><span><span class="n">5</span>Gradient Clipping</span><small>clipnorm</small></button>
     <button type="button" data-v="regularize" aria-pressed="false"><span><span class="n">6</span>조기 종료 · 규제</span><small>EarlyStopping · l2</small></button>
+    <button type="button" data-v="diagram" aria-pressed="false"><span><span class="n">7</span>알고리즘 구성도</span><small>Diagram</small></button>
   </div>
 
   <!-- ================= 1. 가중치 초기화 ================= -->
@@ -615,6 +621,11 @@
     </div>
   </section>
 
+  <!-- ================= 알고리즘 구성도 ================= -->
+  <section class="op-pane" id="pane-diagram" aria-label="알고리즘 구성도" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">강의 슬라이드 4장 · 초기화·BN → 드롭아웃·Clipping → 옵티마이저 → 조기 종료·L2·정리</span></div><div data-ds-diagrams="nn-optimization"></div></section>
+  </section>
+
   <!-- ================= 공통: 요약표 · 코드 ================= -->
   <div class="sk-card">
     <div class="sk-head"><h2>기법 비교 요약</h2><span class="sk-hint">강조된 줄 = 지금 보고 있는 기법</span></div>
@@ -648,7 +659,9 @@
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/nn-optimization.js?v=20261002c"></script>
 <script>
 (function () {
 "use strict";
@@ -1747,7 +1760,7 @@ const CODE=(function(){
 })();
 
 /* ================= 기법 선택 (해시 동기화 · ←/→) ================= */
-const TECH=["init","bn","dropout","optimizer","clip","regularize"];let cur=null;const shown={};
+const TECH=["init","bn","dropout","optimizer","clip","regularize","diagram"];let cur=null;const shown={};
 const techBtns=[...$("techSeg").querySelectorAll("button")];
 function pauseAll(){IN.pause();BS.stop();MV.stop();BT.pause();DP.stop();DO.pause();OP.stop();CE.pause();ES.pause();L2.pause();}
 function drawPane(k){

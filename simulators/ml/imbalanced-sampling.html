@@ -8,8 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
-<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 /* 역할 색: 정상(다수)=파랑 · 질환(소수)=주황(샘플링) · 검증=청록 · 교차검증/이웃=보라 · 누수/위험=빨강 · 안전/활용=초록 */
@@ -152,6 +153,7 @@
   .im-wbar{grid-template-columns:40px minmax(0,1fr) 78px}
 }
 @media (prefers-reduced-motion: reduce){ .im-progress i,.im-bars .fl{transition:none} }
+.im-modes{grid-template-columns:repeat(4,minmax(0,1fr))}
 </style>
 </head>
 <body>
@@ -174,6 +176,8 @@
       <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -199,6 +203,7 @@
     <button type="button" role="tab" id="tab-over" aria-controls="pane-main" aria-selected="true">Over Sampling<span class="sub">소수 클래스 늘리기</span></button>
     <button type="button" role="tab" id="tab-under" aria-controls="pane-main" aria-selected="false" tabindex="-1">Under Sampling<span class="sub">다수 클래스 줄이기</span></button>
     <button type="button" role="tab" id="tab-combine" aria-controls="pane-main" aria-selected="false" tabindex="-1">Combine<span class="sub">늘린 뒤 경계 청소</span></button>
+    <button type="button" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1">알고리즘 구성도<span class="sub">강의 도식 3장</span></button>
   </div>
 
   <section id="pane-main" role="tabpanel" aria-labelledby="tab-over" style="display:flex;flex-direction:column;gap:16px">
@@ -346,6 +351,11 @@
     <p class="sk-hint" style="margin:0">브라우저의 난수는 numpy와 달라 합성 점의 정확한 위치는 파이썬 결과와 다를 수 있습니다. 개수 규칙과 판정 규칙(Tomek, NearMiss, ENN, 위험 점)은 같습니다.</p>
   </div>
   </section>
+
+  <!-- ================= 알고리즘 구성도 ================= -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">Over · Under · Combine 샘플링과 올바른 사용 순서를 강의 도식 3장으로</span></div><div data-ds-diagrams="imbalanced-sampling"></div></section>
+  </section>
 </main>
 
 <!-- ===== 공통 푸터 ===== -->
@@ -362,7 +372,9 @@
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/imbalanced-sampling.js?v=20261002c"></script>
 <script>
 (function () {
 "use strict";
@@ -971,15 +983,20 @@ function tick(){
 function play(){if(S.playing){stop();renderStep();return;}if(S.step>=R.ev.length)setStep(0);S.playing=true;$("stPlay").textContent="멈춤";tick();}
 
 /* ---------- 방식 탭 ---------- */
-const MODES=["over","under","combine"];
-function showMode(m,focus){if(!MODES.includes(m))m="over";S.mode=m;
+const MODES=["over","under","combine"];let diagOn=false;
+function setDiagTab(on){diagOn=on;const d=$("tab-diagram");d.setAttribute("aria-selected",on?"true":"false");d.tabIndex=on?0:-1;$("pane-diagram").hidden=!on;$("pane-main").style.display=on?"none":"flex";}
+function showDiagram(focus){stop();MODES.forEach(k=>{const b=$("tab-"+k);b.setAttribute("aria-selected","false");b.tabIndex=-1;});setDiagTab(true);
+  if(focus)$("tab-diagram").focus();if(location.hash!=="#diagram")history.replaceState(null,"","#diagram");}
+function showMode(m,focus){if(!MODES.includes(m))m="over";S.mode=m;setDiagTab(false);
   MODES.forEach(k=>{const b=$("tab-"+k),on=k===m;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;});
   $("pane-main").setAttribute("aria-labelledby","tab-"+m);if(focus)$("tab-"+m).focus();
   if(location.hash!=="#"+m)history.replaceState(null,"","#"+m);recompute(true);}
 MODES.forEach(k=>$("tab-"+k).addEventListener("click",()=>showMode(k)));
+$("tab-diagram").addEventListener("click",()=>showDiagram());
 document.querySelector(".im-modes").addEventListener("keydown",e=>{if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;e.preventDefault();e.stopPropagation();
-  const i=MODES.indexOf(S.mode);showMode(MODES[(i+(e.key==="ArrowRight"?1:-1)+3)%3],true);});
-window.addEventListener("hashchange",()=>{const k=location.hash.slice(1);if(MODES.includes(k)&&k!==S.mode)showMode(k);});
+  const ALL=MODES.concat("diagram"),i=diagOn?3:MODES.indexOf(S.mode),n=ALL[(i+(e.key==="ArrowRight"?1:-1)+4)%4];
+  if(n==="diagram")showDiagram(true);else showMode(n,true);});
+window.addEventListener("hashchange",()=>{const k=location.hash.slice(1);if(k==="diagram"){if(!diagOn)showDiagram();}else if(MODES.includes(k)&&(k!==S.mode||diagOn))showMode(k);});
 
 /* ---------- 조작 연결 ---------- */
 $("ratio").oninput=e=>{S.ratio=+e.target.value;full();};
@@ -1005,7 +1022,7 @@ $("stLast").onclick=()=>{stop();setStep(R.ev.length);};
 $("stPlay").onclick=play;
 $("spd").oninput=e=>{S.speed=+e.target.value;$("spdV").textContent=SPEEDS[S.speed]+"×";};
 document.addEventListener("keydown",e=>{
-  if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;const a=document.activeElement;
+  if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;if(diagOn)return;const a=document.activeElement;
   if(a&&(a.closest('[role="tablist"]')||/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)))return;
   if(e.altKey||e.ctrlKey||e.metaKey)return;e.preventDefault();stop();setStep(S.step+(e.key==="ArrowRight"?1:-1));});
 $("cvOrig").addEventListener("click",e=>{
@@ -1029,6 +1046,7 @@ renderFolds();regen();
 const h0=location.hash.slice(1);S.mode=MODES.includes(h0)?h0:"over";
 MODES.forEach(k=>{const b=$("tab-"+k),on=k===S.mode;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;});
 full();
+if(h0==="diagram")showDiagram();
 })();
 </script>
 </body>

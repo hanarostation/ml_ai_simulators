@@ -26,6 +26,7 @@
   --cat-cv: #0D9488;
   --cat-nlp: #2F6FDB;
   --cat-ts: #2B8A3E;
+  --cat-mm: #C2255C;
 
   --sans: "IBM Plex Sans KR", "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --mono: "IBM Plex Mono", "D2Coding", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
@@ -45,7 +46,7 @@
     --bg: #0F1319; --surface: #171C25; --surface-2: #1E2430; --ink: #E7EAF1; --text: #CDD3DE;
     --muted: #A0A8B8; --faint: #737D90; --line: #2B3240; --line-strong: #3B4454; --on-ink: #10131A;
     --accent: #6C9BF2; --accent-soft: #1B2A45; --focus: #6C9BF2;
-    --cat-ml: #F0874A; --cat-nn: #B294FF; --cat-cv: #33D1BD; --cat-nlp: #6C9BF2; --cat-ts: #51CF66;
+    --cat-ml: #F0874A; --cat-nn: #B294FF; --cat-cv: #33D1BD; --cat-nlp: #6C9BF2; --cat-ts: #51CF66; --cat-mm: #F06595;
     --shadow: 0 1px 2px rgba(0, 0, 0, .3); --shadow-lift: 0 10px 28px rgba(0, 0, 0, .45);
   }
 }
@@ -54,7 +55,7 @@
   --bg: #0F1319; --surface: #171C25; --surface-2: #1E2430; --ink: #E7EAF1; --text: #CDD3DE;
   --muted: #A0A8B8; --faint: #737D90; --line: #2B3240; --line-strong: #3B4454; --on-ink: #10131A;
   --accent: #6C9BF2; --accent-soft: #1B2A45; --focus: #6C9BF2;
-  --cat-ml: #F0874A; --cat-nn: #B294FF; --cat-cv: #33D1BD; --cat-nlp: #6C9BF2; --cat-ts: #51CF66;
+  --cat-ml: #F0874A; --cat-nn: #B294FF; --cat-cv: #33D1BD; --cat-nlp: #6C9BF2; --cat-ts: #51CF66; --cat-mm: #F06595;
   --shadow: 0 1px 2px rgba(0, 0, 0, .3); --shadow-lift: 0 10px 28px rgba(0, 0, 0, .45);
 }
 
@@ -114,6 +115,9 @@ img { max-width: 100%; }
 .ds-nav a::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--c, var(--faint)); opacity: .9; }
 .ds-nav a:hover { background: var(--surface-2); color: var(--ink); }
 .ds-nav a[aria-current="page"] { background: var(--surface-2); color: var(--ink); }
+.ds-nav a.ds-nav__dg { margin-left: 6px; border: 1px solid var(--line); color: var(--ink); }
+.ds-nav a.ds-nav__dg::before { content: none; }
+.ds-nav a.ds-nav__dg:hover, .ds-nav a.ds-nav__dg[aria-current="page"] { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
 
 .ds-theme {
   flex: none; display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 9px;

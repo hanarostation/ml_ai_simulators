@@ -1,0 +1,1752 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>[Case Study] MRI 데이터 객체 탐지 및 문장 생성 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+:root{
+  --sk-accent: var(--cat-mm);
+  --role-img:#0B8A80; --role-txt:#2F6FDB; --role-fuse:#C2255C; --role-time:#2B8A3E; --role-gt:#6B7484; --role-warn:#D63A3A;
+  --g0:#2B8A3E; --g1:#B7791F; --g2:#E8590C; --g3:#D63A3A;
+  --c-train:#2F6FDB; --c-val:#D9622B;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --role-img:#3CCFBF; --role-txt:#6C9BF2; --role-fuse:#F06595; --role-time:#51CF66; --role-gt:#9AA3B2; --role-warn:#FF6B6B;
+  --g0:#51CF66; --g1:#F2C94C; --g2:#FF922B; --g3:#FF6B6B; --c-train:#6C9BF2; --c-val:#F0874A;
+} }
+:root[data-theme="dark"]{
+  --role-img:#3CCFBF; --role-txt:#6C9BF2; --role-fuse:#F06595; --role-time:#51CF66; --role-gt:#9AA3B2; --role-warn:#FF6B6B;
+  --g0:#51CF66; --g1:#F2C94C; --g2:#FF922B; --g3:#FF6B6B; --c-train:#6C9BF2; --c-val:#F0874A;
+}
+
+.sk-controls .sk-seg { flex-wrap:wrap; max-width:100%; }
+.sk-controls .sk-seg button { flex:1 0 auto; }
+.mr-row { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(0,1fr); gap:16px; align-items:start; }
+.mr-row--even { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.mr-row--diag { grid-template-columns:minmax(0,1fr); }
+@media (max-width: 960px){ .mr-row, .mr-row--even, .mr-row--diag { grid-template-columns:minmax(0,1fr); } }
+.mr-stack { display:flex; flex-direction:column; gap:12px; min-width:0; }
+
+/* MRI 패널 */
+.mr-mri3 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; min-width:560px; }
+.mr-mri3 figure { margin:0; display:flex; flex-direction:column; gap:4px; }
+.mr-mri3 figcaption { font-size:12.5px; font-weight:600; color:var(--muted); text-align:center; }
+.mr-mri3 canvas, .mr-thumbs canvas { width:100%; height:auto; display:block; border-radius:8px; background:#111; }
+.mr-mri3 canvas.click { cursor:pointer; }
+.mr-gtab select { min-width:64px; }
+.mr-gtab td, .mr-gtab th { text-align:center; }
+.mr-gdot { display:inline-block; width:10px; height:10px; border-radius:3px; vertical-align:-1px; margin-right:4px; }
+
+.mr-report { font-size:14px; line-height:1.75; background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:10px 13px; color:var(--text); word-break:keep-all; overflow-wrap:anywhere; }
+.mr-report b { color:var(--ink); }
+.mr-report .tag { font-weight:700; color:var(--role-txt); }
+.mr-report .miss { color:var(--role-warn); font-weight:600; }
+.mr-report .fake { text-decoration: underline wavy var(--role-warn); text-underline-offset:3px; color:var(--role-warn); }
+.mr-report .ok { background: color-mix(in srgb, var(--role-fuse) 16%, transparent); border-radius:3px; }
+.mr-report .bad { text-decoration: line-through; text-decoration-color: var(--role-warn); color:var(--role-warn); font-weight:600; }
+.mr-report .eng { font-family:var(--mono); font-size:13.5px; }
+
+.mr-code { position:relative; }
+.mr-code pre { margin:0; font-family:var(--mono); font-size:12.5px; line-height:1.6; background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:11px 13px; overflow-x:auto; color:var(--ink); white-space:pre; }
+.mr-code .mr-copy { position:absolute; top:7px; right:7px; }
+.mr-code summary { cursor:pointer; font-size:13.5px; font-weight:600; color:var(--muted); margin-bottom:6px; }
+
+.mr-mock { display:inline-flex; align-items:center; gap:4px; font-size:11.5px; font-weight:700; color:var(--role-warn); border:1px solid currentColor; border-radius:999px; padding:1px 8px; white-space:nowrap; }
+.mr-src { display:inline-flex; align-items:center; font-size:11.5px; font-weight:700; color:var(--muted); border:1px solid var(--line-strong); border-radius:999px; padding:1px 8px; white-space:nowrap; }
+
+/* 행렬 */
+.mr-mats { display:flex; flex-wrap:wrap; gap:14px 22px; align-items:flex-start; }
+.mr-mats .sk-mat .c { cursor:pointer; }
+.mr-mats .sk-mat .c.diag { border-color: var(--role-fuse); }
+.mr-mats .sk-mat .c.rowsel { outline:2px solid var(--focus); outline-offset:-2px; }
+.mr-mats .sk-mat .h { font-size:11.5px; font-weight:700; color:var(--muted); display:grid; place-items:center; min-width:30px; height:30px; }
+.mr-mats .sk-mat .h.i { color:var(--role-img); }
+.mr-mats .sk-mat .h.t { color:var(--role-txt); }
+
+.mr-heat td.n { border-radius:4px; }
+.mr-heat td.best { outline:2px solid var(--role-fuse); outline-offset:-2px; font-weight:700; }
+
+.mr-circle { width:100%; max-width:330px; height:auto; display:block; margin:0 auto; }
+.mr-split canvas { width:100%; max-width:420px; height:auto; display:block; }
+
+/* SVG 구조도 */
+.mr-diag { width:100%; min-width:780px; height:auto; display:block; }
+.mr-diag .lane { fill: var(--surface-2); stroke: var(--line); }
+.mr-diag .lane-t { font: 700 12.5px var(--sans); fill: var(--muted); }
+.mr-diag .note { font: 500 11.5px var(--sans); fill: var(--faint); }
+.mr-blk { cursor:pointer; outline:none; }
+.mr-blk rect { fill: var(--surface); stroke: currentColor; stroke-width:1.6; transition: fill .2s, stroke-width .2s, opacity .2s; }
+.mr-blk .t1 { font: 600 12.5px var(--sans); fill: var(--ink); }
+.mr-blk .t2 { font: 500 11px var(--mono); fill: var(--muted); }
+.mr-blk.r-img { color: var(--role-img); } .mr-blk.r-txt { color: var(--role-txt); } .mr-blk.r-fuse { color: var(--role-fuse); }
+.mr-blk.r-gt { color: var(--role-gt); } .mr-blk.r-warn { color: var(--role-warn); }
+.mr-blk:hover rect { stroke-width:2.4; }
+.mr-blk:focus-visible rect { stroke: var(--focus); stroke-width:3; }
+.mr-blk.on rect { fill: color-mix(in srgb, currentColor 18%, var(--surface)); stroke-width:3; }
+.mr-blk.sel rect { stroke-dasharray: 5 3; stroke-width:3; }
+.mr-blk.fut { opacity:.38; }
+.mr-ar { fill:none; stroke-width:1.8; stroke: currentColor; transition: opacity .2s; }
+.mr-ar.r-img { color: var(--role-img); } .mr-ar.r-txt { color: var(--role-txt); } .mr-ar.r-fuse { color: var(--role-fuse); }
+.mr-ar.r-gt { color: var(--role-gt); } .mr-ar.r-warn { color: var(--role-warn); }
+.mr-ar.dash { stroke-dasharray: 5 4; }
+.mr-ar.fut { opacity:.25; }
+.mr-ar.on { stroke-width:3; }
+.mr-ah-img { fill: var(--role-img); } .mr-ah-txt { fill: var(--role-txt); } .mr-ah-fuse { fill: var(--role-fuse); }
+.mr-ah-gt { fill: var(--role-gt); } .mr-ah-warn { fill: var(--role-warn); }
+.mr-panel h3 { margin:0; }
+.mr-panel .sk-kv dd { text-align:left; white-space:normal; }
+.mr-panel p { margin:0; font-size:14px; color:var(--text); }
+
+/* 막대 그래프 */
+.mr-chart { width:100%; height:auto; display:block; }
+.mr-chart .ax { stroke: var(--line-strong); }
+.mr-chart .grid { stroke: var(--line); }
+.mr-chart text { font: 500 11.5px var(--sans); fill: var(--muted); }
+.mr-chart text.v { font: 600 12px var(--mono); fill: var(--ink); }
+
+.mr-toks { display:flex; flex-wrap:wrap; gap:4px; }
+.mr-toks span { font-size:12.5px; padding:1px 6px; border-radius:5px; border:1px solid var(--line); background:var(--surface); color:var(--muted); }
+.mr-toks span.hit { border-color: var(--role-fuse); color: var(--ink); background: color-mix(in srgb, var(--role-fuse) 14%, var(--surface)); }
+
+.mr-thumbs { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px; }
+.mr-thumbs figure { margin:0; display:flex; flex-direction:column; gap:3px; font-size:12px; text-align:center; color:var(--muted); }
+.mr-thumbs figure b { color:var(--ink); font-family:var(--mono); font-weight:600; }
+.mr-thumbs figure.q canvas { outline:3px solid var(--role-fuse); outline-offset:-3px; }
+@media (max-width: 700px){ .mr-thumbs { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+
+.mr-warns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+@media (max-width: 760px){ .mr-warns { grid-template-columns:minmax(0,1fr); } }
+.mr-warns .sk-note { font-size:13.5px; }
+.mr-badge { display:inline-block; font-size:12px; font-weight:700; padding:2px 9px; border-radius:6px; background:var(--role-warn); color:var(--on-ink); margin-bottom:6px; }
+.mr-ev { font-size:12.5px; color:var(--muted); font-family:var(--mono); }
+.mr-txt { width:100%; min-height:92px; resize:vertical; font:inherit; font-size:13.5px; line-height:1.6; color:var(--ink); background:var(--surface); border:1px solid var(--line-strong); border-radius:8px; padding:8px 10px; }
+.mr-txt:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+.mr-list { margin:0; padding-left:20px; font-size:14px; display:grid; gap:4px; }
+.mr-ok { color: var(--role-time); font-weight:700; }
+.mr-no { color: var(--role-warn); font-weight:700; }
+.sk-table td.wrap, .sk-table th.wrap { white-space:normal; min-width:180px; }
+.mr-spark { width:100%; height:70px; display:block; }
+.mr-spark .ln { fill:none; stroke: var(--role-fuse); stroke-width:2; vector-effect:non-scaling-stroke; }
+.mr-spark .ln2 { fill:none; stroke: var(--role-txt); stroke-width:2; }
+.mr-spark .ax { stroke: var(--line-strong); vector-effect:non-scaling-stroke; }
+.mr-spark text { font: 500 10.5px var(--mono); fill: var(--faint); }
+.mr-strip { width:100%; height:auto; display:block; }
+.mr-strip text { font: 500 11px var(--sans); fill: var(--muted); }
+@media (prefers-reduced-motion: reduce){ .mr-blk rect, .mr-ar { transition:none; } }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+      <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)" aria-current="page">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">[Case Study] MRI 데이터 객체 탐지 및 문장 생성 시뮬레이터</h1>
+      <p class="ds-hero__lede">요추 MRI 추간공 협착 사례로 "탐지 박스 → 구조화 소견 → 판독 리포트" 흐름을 따라갑니다. CLIP 대조학습·제로샷·선형 프로빙·검색을 직접 계산해 보고, 리포트 생성 3방식(템플릿·검색·BLIP)을 같은 지표로 채점합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button class="sk-tab" type="button" role="tab" id="tab-a" aria-controls="pane-a" aria-selected="true"><span class="sk-num">1</span>문제·데이터</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-b" aria-controls="pane-b" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>모형 구조</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-c" aria-controls="pane-c" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>대조학습</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-d" aria-controls="pane-d" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>제로샷·선형 프로빙</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-e" aria-controls="pane-e" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>검색·리포트 생성</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-f" aria-controls="pane-f" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>한계와 안전장치</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>알고리즘 구성도</button>
+  </nav>
+
+  <!-- ================= 1. 문제·데이터 ================= -->
+  <section id="pane-a" role="tabpanel" aria-labelledby="tab-a">
+    <div class="sk-wrap" style="padding:0;gap:16px">
+    <div class="sk-card">
+      <div class="sk-head"><h2>요추 MRI 모사 영상과 추간공 탐지 박스</h2><span class="sk-hint">영상은 코드로 그린 모사 영상입니다</span></div>
+      <p class="sk-lead">분절(L1-L2 … L5-S1)마다 좌·우 추간공이 있고, 각 추간공의 협착 등급(0~3)이 소견이 됩니다. 탐지 박스는 "어느 분절, 어느 쪽"인지 위치를 보여 주는 근거입니다. 좌·우 시상면의 박스를 누르면 그 추간공의 등급이 하나씩 올라갑니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">예시 케이스</span>
+          <div class="sk-seg" id="presetSeg" role="group" aria-label="예시 케이스">
+            <button type="button" data-v="r0" aria-pressed="true">중증 (예시 1)</button>
+            <button type="button" data-v="r100" aria-pressed="false">경도 (예시 2)</button>
+            <button type="button" data-v="r300" aria-pressed="false">중증 (예시 3)</button>
+            <button type="button" data-v="q" aria-pressed="false">검증 질의</button>
+            <button type="button" data-v="n" aria-pressed="false">정상</button>
+          </div>
+        </div>
+        <button class="sk-btn sk-btn--sm" type="button" id="btnNewImg">다른 영상 모양</button>
+      </div>
+      <div class="sk-controls">
+        <label class="sk-check"><input type="checkbox" id="chkBoxes" checked>탐지 박스 표시</label>
+        <label class="sk-check"><input type="checkbox" id="chkMissL">좌측 측정 누락</label>
+        <label class="sk-check"><input type="checkbox" id="chkMissR">우측 측정 누락</label>
+        <div class="sk-legend" aria-label="등급 색">
+          <span><i style="background:var(--g0)"></i>0 정상</span><span><i style="background:var(--g1)"></i>1 경도</span>
+          <span><i style="background:var(--g2)"></i>2 중등도</span><span><i style="background:var(--g3)"></i>3 중증</span>
+        </div>
+      </div>
+      <div class="mr-row">
+        <div class="sk-scroll">
+          <div class="mr-mri3">
+            <figure><canvas id="mriL" class="click" aria-label="좌측 부정중 시상면 모사 영상과 추간공 탐지 박스"></canvas><figcaption>좌측 부정중 시상면 (추간공)</figcaption></figure>
+            <figure><canvas id="mriM" aria-label="정중 시상면 모사 영상과 분절 탐지 박스"></canvas><figcaption>정중 시상면 (분절)</figcaption></figure>
+            <figure><canvas id="mriR" class="click" aria-label="우측 부정중 시상면 모사 영상과 추간공 탐지 박스"></canvas><figcaption>우측 부정중 시상면 (추간공)</figcaption></figure>
+          </div>
+        </div>
+        <div class="mr-stack">
+          <div class="sk-scroll">
+            <table class="sk-table mr-gtab" aria-label="분절별 좌우 추간공 협착 등급">
+              <thead><tr><th>분절</th><th>좌측</th><th>우측</th><th>분절 최대</th></tr></thead>
+              <tbody id="gradeBody"></tbody>
+            </table>
+          </div>
+          <p class="sk-note" id="presetNote"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>구조화 소견 → 정답 리포트</h2><span class="sk-hint">실습 노트북의 make_report 규칙을 그대로 옮김</span></div>
+      <div class="mr-row mr-row--even">
+        <div class="mr-stack">
+          <dl class="sk-kv" id="findKv"></dl>
+          <p class="sk-note"><b>결측은 두 종류</b> — 좌·우 등급 결측은 <b>측정 누락</b>이라 "측정되지 않음"으로 드러내고, 침범 분절 결측(96건)은 정상(등급 0)이라 <b>해당 없음</b>("침범 분절 없음")입니다. 결측을 0으로 채우면 "정상"을 지어내는 셈입니다. 이상 추간공 수는 이 화면에서 등급 1 이상인 추간공 개수로 셉니다.</p>
+        </div>
+        <div class="mr-stack">
+          <div class="mr-report" id="refReport" aria-live="polite"></div>
+          <div class="sk-stats">
+            <div class="sk-stat"><b id="repLen">0</b><span>이 리포트 길이(글자)</span></div>
+            <div class="sk-stat"><b>150.2</b><span>노트북 평균 길이</span></div>
+            <div class="sk-stat"><b>131 / 181</b><span>노트북 최소 / 최대</span></div>
+            <div class="sk-stat"><b>203 / 469</b><span>서로 다른 리포트 수</span></div>
+          </div>
+          <p class="sk-hint" style="margin:0">리포트가 규칙으로 만들어졌으므로 길이가 등급과 상관됩니다(침범 분절이 많을수록 길어짐). 텍스트 유사도 지표에서 "길이만 맞춰도 점수가 오르는" 원인이 됩니다.</p>
+        </div>
+      </div>
+      <details class="mr-code"><summary>파이썬 코드 (현재 소견)</summary><button class="sk-btn sk-btn--sm mr-copy" type="button" id="copy1">복사</button><pre id="code1"></pre></details>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>세 표를 "영상 1장 = 1행"으로 병합하고 환자 단위로 나누기</h2><span class="mr-src">실습 노트북 출력</span></div>
+      <div class="mr-row mr-row--even">
+        <div class="mr-stack">
+          <div class="sk-scroll"><table class="sk-table" aria-label="원본 표">
+            <thead><tr><th>파일</th><th>단위</th><th>모양</th><th class="wrap">내용</th></tr></thead>
+            <tbody>
+              <tr><td>02_Disc_image.csv</td><td>case (영상 1장)</td><td class="n">(469, 10)</td><td class="wrap">영상 경로, 협착 등급, 침범 분절, 이상 추간공 수</td></tr>
+              <tr><td>02_Patient_Data.csv</td><td>환자</td><td class="n">(216, 11)</td><td class="wrap">성별·연령·체중·신장·ODI·통증 정도</td></tr>
+              <tr><td>02_Patient_Diagnosis.csv</td><td>환자</td><td class="n">(216, 26)</td><td class="wrap">동반 질환·수술 기법·입원 기간·재발 여부</td></tr>
+              <tr><td><b>병합 후 (키: 환자ID)</b></td><td>영상</td><td class="n"><b>(469, 45)</b></td><td class="wrap">행 수 469 그대로 : True</td></tr>
+            </tbody></table></div>
+          <div class="sk-stats">
+            <div class="sk-stat"><b>109</b><span>영상 3장 환자</span></div>
+            <div class="sk-stat"><b>35</b><span>영상 2장 환자</span></div>
+            <div class="sk-stat"><b>72</b><span>영상 1장 환자</span></div>
+            <div class="sk-stat"><b id="chkSum">469</b><span>3×109 + 2×35 + 72</span></div>
+          </div>
+          <h3>label_3class 의 실제 값은 4종류</h3>
+          <div class="sk-scroll"><table class="sk-table" aria-label="fs_grade_max 와 label_3class 교차표">
+            <thead><tr><th>fs_grade_max</th><th>normal</th><th>mild</th><th>moderate</th><th>severe</th></tr></thead>
+            <tbody>
+              <tr><td>0.0</td><td class="n"><b>96</b></td><td class="n">0</td><td class="n">0</td><td class="n">0</td></tr>
+              <tr><td>1.0</td><td class="n">0</td><td class="n"><b>124</b></td><td class="n">0</td><td class="n">0</td></tr>
+              <tr><td>2.0</td><td class="n">0</td><td class="n">0</td><td class="n"><b>110</b></td><td class="n">0</td></tr>
+              <tr><td>3.0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n"><b>139</b></td></tr>
+            </tbody></table></div>
+          <p class="sk-note sk-note--warn">컬럼 이름은 <b>label_3class</b>인데 값은 normal / mild / moderate / severe 4종류이고 fs_grade_max 0~3과 1:1로 대응합니다. 이름을 믿고 3클래스 분류기를 만들었다면 조용히 틀렸을 것입니다. <b>이름이 아니라 값을 확인합니다.</b></p>
+          <div class="sk-scroll"><table class="sk-table" aria-label="결측 상위 5개 컬럼">
+            <thead><tr><th>결측 상위 컬럼</th><th>결측 수</th><th class="wrap">의미</th></tr></thead>
+            <tbody>
+              <tr><td>ODI</td><td class="n">398</td><td class="wrap">환자 설문 미수집</td></tr>
+              <tr><td>직업</td><td class="n">135</td><td class="wrap">환자 정보 미기재</td></tr>
+              <tr><td>affected_levels</td><td class="n">96</td><td class="wrap">정상(등급 0) 케이스 → 해당 없음</td></tr>
+              <tr><td>fs_grade_right_max</td><td class="n">30</td><td class="wrap">한쪽만 측정 → 측정 누락</td></tr>
+              <tr><td>fs_grade_left_max</td><td class="n">24</td><td class="wrap">한쪽만 측정 → 측정 누락</td></tr>
+            </tbody></table></div>
+        </div>
+        <div class="mr-stack">
+          <h3>분할 실험: 환자 단위 vs 영상 단위</h3>
+          <p class="sk-lead">216명의 환자(영상 1~3장)를 30% 비율로 검증에 보냅니다. 영상 단위로 섞으면 한 환자의 영상이 학습·검증에 나뉘어 들어갑니다(빨간 테두리). 같은 환자의 리포트도 거의 같으므로 검색 기반 리포트가 정답을 베끼게 됩니다.</p>
+          <div class="sk-controls">
+            <div class="sk-seg" id="splitSeg" role="group" aria-label="분할 방식">
+              <button type="button" data-v="patient" aria-pressed="true">환자 단위</button>
+              <button type="button" data-v="image" aria-pressed="false">영상 단위 무작위</button>
+            </div>
+            <label class="sk-slider" style="min-width:150px"><span class="sk-sl-head">seed <b id="splitSeedV">1234</b></span><input type="range" id="splitSeed" min="1" max="2000" value="1234"></label>
+          </div>
+          <div class="mr-split"><canvas id="splitCv" aria-label="환자 216명의 학습·검증 분할 그림"></canvas></div>
+          <div class="sk-legend"><span><i style="background:var(--c-train)"></i>학습 영상</span><span><i style="background:var(--c-val)"></i>검증 영상</span><span><i style="background:transparent;border:2px solid var(--role-warn)"></i>양쪽에 걸친 환자</span></div>
+          <div class="sk-stats" id="splitStats"></div>
+          <div class="sk-scroll"><table class="sk-table" aria-label="실습 노트북 분할 결과">
+            <thead><tr><th>실습 노트북 (seed 1234)</th><th>환자</th><th>영상</th><th>겹친 환자</th></tr></thead>
+            <tbody>
+              <tr><td>환자 단위 · 학습</td><td class="n">152</td><td class="n">322</td><td class="n" rowspan="2">0</td></tr>
+              <tr><td>환자 단위 · 검증</td><td class="n">64</td><td class="n">147</td></tr>
+              <tr><td>영상 단위 무작위</td><td class="n">216</td><td class="n">469</td><td class="n"><b>76</b></td></tr>
+            </tbody></table></div>
+          <div class="sk-scroll"><table class="sk-table" aria-label="분할별 등급 분포">
+            <thead><tr><th>split</th><th>mild</th><th>moderate</th><th>normal</th><th>severe</th></tr></thead>
+            <tbody><tr><td>train</td><td class="n">89</td><td class="n">74</td><td class="n">65</td><td class="n">94</td></tr>
+            <tr><td>val</td><td class="n">35</td><td class="n">36</td><td class="n">31</td><td class="n">45</td></tr></tbody></table></div>
+          <p class="sk-hint" style="margin:0">이 화면의 환자 구성(1~3장)은 노트북 분포를 따르지만 환자 순서는 모사이므로, 영상 수·겹친 환자 수는 seed에 따라 노트북 값과 조금 다릅니다.</p>
+        </div>
+      </div>
+    </div>
+    </div>
+  </section>
+
+  <!-- ================= 2. 모형 구조 ================= -->
+  <section id="pane-b" role="tabpanel" aria-labelledby="tab-b" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>모형 구조도</h2><span class="sk-hint">블록을 누르거나 [다음]으로 데이터 흐름을 따라가세요 (도식 위에서 ←/→ 키)</span></div>
+      <div class="sk-controls">
+        <div class="sk-seg" id="diagSeg" role="group" aria-label="구조도 선택">
+          <button type="button" data-v="clip" aria-pressed="true">CLIP 듀얼 인코더</button>
+          <button type="button" data-v="blip" aria-pressed="false">BLIP 캡션 생성</button>
+          <button type="button" data-v="pipe" aria-pressed="false">리포트 생성 3방식</button>
+        </div>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button class="sk-btn sk-btn--sm" type="button" id="dFirst">처음</button>
+          <button class="sk-btn sk-btn--sm" type="button" id="dPrev">이전</button>
+          <button class="sk-btn sk-btn--sm sk-btn--primary" type="button" id="dNext">다음</button>
+          <button class="sk-btn sk-btn--sm" type="button" id="dPlay">재생</button>
+        </div>
+        <label class="sk-slider" style="min-width:150px"><span class="sk-sl-head">속도 <b id="dSpeedV">1.0초</b></span><input type="range" id="dSpeed" min="4" max="25" value="10"></label>
+        <span class="sk-hint" id="dStepLbl"></span>
+      </div>
+      <div class="mr-row mr-row--diag">
+        <div class="sk-scroll" id="diagWrap" tabindex="0" aria-label="구조도 (←/→ 로 단계 이동)"><svg class="mr-diag" id="diagSvg" role="img" aria-label="모형 구조도"></svg></div>
+        <div class="sk-card sk-card--sunk mr-panel" id="diagPanel" aria-live="polite"></div>
+      </div>
+      <div class="sk-legend">
+        <span><i style="background:var(--role-img)"></i>영상(Vision) 경로</span><span><i style="background:var(--role-txt)"></i>문장(Text) 경로</span>
+        <span><i style="background:var(--role-fuse)"></i>결합·공동 임베딩</span><span><i style="background:var(--role-gt)"></i>추론·채점</span><span><i style="background:var(--role-warn)"></i>위험 지점</span>
+      </div>
+      <div class="sk-scroll"><table class="sk-table" aria-label="사례에 쓰인 모형">
+        <thead><tr><th>모형</th><th>체크포인트</th><th class="wrap">실습 노트북에서 확인한 값 / 쓰임</th></tr></thead>
+        <tbody>
+          <tr><td>CLIP</td><td>openai/clip-vit-base-patch32</td><td class="wrap">파라미터 151.3M · 임베딩 차원 512 · 이미지-설명문 4억 쌍으로 학습</td></tr>
+          <tr><td>BiomedCLIP</td><td>microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224</td><td class="wrap">PubMed 그림-캡션 1,500만 쌍 · 텍스트 인코더 PubMedBERT (노트북 환경에 open_clip 이 없어 건너뜀)</td></tr>
+          <tr><td>BLIP</td><td>Salesforce/blip-image-captioning-base</td><td class="wrap">자연 영상 캡션으로 학습 · 프롬프트 "a medical image of" · max_new_tokens=30</td></tr>
+          <tr><td>선형 프로빙</td><td>LogisticRegression(max_iter=2000)</td><td class="wrap">CLIP 임베딩(512) → 협착 등급 0~3</td></tr>
+        </tbody></table></div>
+    </div>
+  </section>
+
+  <!-- ================= 3. 대조학습 ================= -->
+  <section id="pane-c" role="tabpanel" aria-labelledby="tab-c" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>대조학습: N×N 유사도 행렬과 대칭 InfoNCE</h2><span class="sk-hint">2차원 장난감 임베딩으로 실제 계산 (CLIP은 512차원)</span></div>
+      <p class="sk-lead">배치에 영상-문장 N쌍이 들어오면 N×N 코사인 유사도 행렬을 만들고, <b>대각선(짝이 맞는 쌍)</b>을 정답으로 하는 분류 문제 두 개(행 방향 = 영상→문장, 열 방향 = 문장→영상)를 풉니다. 사람이 라벨을 붙이지 않고, 짝지어져 있다는 사실 자체가 라벨입니다. [다음]을 누르면 손실의 기울기로 임베딩을 한 걸음 옮깁니다.</p>
+      <div class="sk-controls">
+        <label class="sk-slider"><span class="sk-sl-head">배치 크기 N <b id="cNV">4</b></span><input type="range" id="cN" min="2" max="6" value="4"></label>
+        <label class="sk-slider"><span class="sk-sl-head">온도 τ <b id="cTauV">0.07</b></span><input type="range" id="cTau" min="0" max="11" value="4"></label>
+        <button class="sk-btn sk-btn--sm" type="button" id="cInit">무작위 초기화</button>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button class="sk-btn sk-btn--sm" type="button" id="cFirst">처음</button>
+          <button class="sk-btn sk-btn--sm" type="button" id="cPrev">이전</button>
+          <button class="sk-btn sk-btn--sm sk-btn--primary" type="button" id="cNext">다음 (학습 1스텝)</button>
+          <button class="sk-btn sk-btn--sm" type="button" id="cPlay">재생</button>
+        </div>
+        <label class="sk-slider" style="min-width:150px"><span class="sk-sl-head">속도 <b id="cSpeedV">보통</b></span><input type="range" id="cSpeed" min="1" max="5" value="3"></label>
+        <span class="sk-hint" id="cStepLbl">스텝 0</span>
+      </div>
+      <div class="mr-row">
+        <div class="mr-stack">
+          <div class="mr-mats" id="cMats"></div>
+          <div class="sk-formula" id="cFormula"></div>
+        </div>
+        <div class="mr-stack">
+          <canvas class="mr-circle" id="cCircle" aria-label="단위원 위의 영상 임베딩과 문장 임베딩"></canvas>
+          <div class="sk-legend"><span><i style="background:var(--role-img)"></i>영상 임베딩 I</span><span><i style="background:var(--role-txt);border-radius:50%"></i>문장 임베딩 T</span><span><i style="background:var(--role-fuse)"></i>짝(정답 쌍)</span></div>
+          <div class="sk-stats" id="cStats"></div>
+          <svg class="mr-spark" id="cSpark" viewBox="0 0 320 70" preserveAspectRatio="none" role="img" aria-label="학습 스텝별 손실 곡선"></svg>
+          <span class="sk-hint">손실 곡선 (점선 = log N, 모든 쌍을 같은 확률로 고를 때의 손실)</span>
+        </div>
+      </div>
+      <div class="sk-scroll"><table class="sk-table" aria-label="배치의 영상-문장 쌍"><thead><tr><th>쌍</th><th>영상</th><th>문장 (실습 노트북의 확인용 문장)</th></tr></thead><tbody id="cPairs"></tbody></table></div>
+      <p class="sk-note">흉부 X-ray 문장 세 개(2·5·6번)는 서로 비슷한 <b>어려운 음성(hard negative)</b>입니다. N을 6으로 올리면 대각선 확률이 쉽게 커지지 않는 것을 볼 수 있습니다. 온도 τ가 작을수록 softmax가 날카로워져 작은 유사도 차이도 큰 확률 차이가 됩니다.</p>
+      <details class="mr-code"><summary>파이썬 코드 (현재 τ)</summary><button class="sk-btn sk-btn--sm mr-copy" type="button" id="copy3">복사</button><pre id="code3"></pre></details>
+    </div>
+  </section>
+
+  <!-- ================= 4. 제로샷·선형 프로빙 ================= -->
+  <section id="pane-d" role="tabpanel" aria-labelledby="tab-d" hidden>
+    <div class="sk-wrap" style="padding:0;gap:16px">
+    <div class="sk-card">
+      <div class="sk-head"><h2>먼저 확인: CLIP은 우리 데이터의 무엇을 아는가</h2><span class="mr-src">실습 노트북 출력 (실제 CLIP 코사인 유사도)</span></div>
+      <p class="sk-lead">네 종류의 영상 다섯 장과 여섯 문장의 코사인 유사도입니다. softmax로 바꾸면 CLIP이 학습한 logit scale(최대 100)을 곱하므로 작은 차이도 크게 벌어집니다. 행마다 가장 큰 값에 테두리를 칩니다.</p>
+      <div class="sk-controls">
+        <div class="sk-seg" id="probeSeg" role="group" aria-label="표시 값">
+          <button type="button" data-v="cos" aria-pressed="true">코사인 유사도</button>
+          <button type="button" data-v="soft" aria-pressed="false">행별 softmax</button>
+        </div>
+        <label class="sk-slider"><span class="sk-sl-head">logit scale <b id="lsV">100</b></span><input type="range" id="ls" min="1" max="100" value="100"></label>
+      </div>
+      <div class="sk-scroll"><table class="sk-table mr-heat" id="probeTbl" aria-label="영상과 문장의 유사도 표"></table></div>
+      <div class="mr-warns">
+        <p class="sk-note"><b>1. 양식(modality)은 대체로 맞힌다</b> — X-ray / MRI / CT / 일반 사진을 구분합니다. 요추 MRI → "a sagittal MRI scan of the lumbar spine"(0.319).</p>
+        <p class="sk-note sk-note--warn"><b>2. 병변은 맞히지 못한다</b> — 정상 X-ray와 폐렴 X-ray가 <b>둘 다</b> "pneumonia" 문장에 더 가깝습니다(0.335, 0.348). 의학 용어가 든 문장이 X-ray와 통째로 가까울 뿐입니다.</p>
+        <p class="sk-note"><b>3. 유사도의 절대값에는 의미가 없다</b> — 값이 전부 0.2~0.35 사이에 몰려 있습니다. <b>같은 영상 안에서 문장 간 상대 순위</b>만 의미가 있습니다.</p>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>제로샷 분류: 프롬프트만 바꿔 보기 (OrganAMNIST 11개 장기)</h2><span class="mr-src">정확도는 실습 노트북 출력</span></div>
+      <p class="sk-lead">클래스 이름을 문장으로 만들어 각 영상과의 유사도를 재고, 가장 가까운 문장의 클래스를 답으로 합니다. 시험 영상 330장(클래스당 30장), 무작위 정답률 9.1%.</p>
+      <div class="sk-controls">
+        <div class="sk-seg" id="tplSeg" role="group" aria-label="프롬프트 틀">
+          <button type="button" data-v="name" aria-pressed="false">이름만</button>
+          <button type="button" data-v="photo" aria-pressed="false">일반 문장</button>
+          <button type="button" data-v="ct" aria-pressed="true">도메인 문장</button>
+          <button type="button" data-v="custom" aria-pressed="false">직접 입력</button>
+        </div>
+        <input class="sk-input" id="tplInput" style="flex:1 1 240px" aria-label="프롬프트 틀 직접 입력 ({organ} 자리에 장기 이름)" value="a CT image showing the {organ}">
+      </div>
+      <div class="mr-row">
+        <div class="mr-stack">
+          <div class="mr-toks" id="tplList" aria-label="생성된 11개 프롬프트"></div>
+          <p class="sk-note" id="tplNote"></p>
+          <details class="mr-code"><summary>파이썬 코드 (현재 프롬프트 틀)</summary><button class="sk-btn sk-btn--sm mr-copy" type="button" id="copy4">복사</button><pre id="code4"></pre></details>
+        </div>
+        <svg class="mr-chart" id="zsChart" viewBox="0 0 420 230" role="img" aria-label="프롬프트별 제로샷 정확도 막대 그래프"></svg>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>정확도 하나만 보면 놓치는 것: 흉부 X-ray 이진 제로샷</h2><span class="mr-mock">모의 출력</span></div>
+      <p class="sk-lead">실습 노트북에서 정상 100장·폐렴 100장을 두 문장("a chest X-ray of a healthy lung" / "a chest X-ray showing pneumonia")으로 분류했더니 <b>정확도 50.0%, 예측은 200장 모두 pneumonia</b>였습니다. 아래는 같은 현상을 만드는 모의 점수입니다: 점수 = 공통값 + <b>단어 편향</b> + <b>병변 신호</b> + 잡음.</p>
+      <div class="sk-controls">
+        <label class="sk-slider"><span class="sk-sl-head">"pneumonia" 단어 편향 <b id="pbV">0.015</b></span><input type="range" id="pb" min="0" max="30" value="15"></label>
+        <label class="sk-slider"><span class="sk-sl-head">병변 신호 <b id="plV">0.000</b></span><input type="range" id="pl" min="0" max="30" value="0"></label>
+      </div>
+      <div class="mr-row">
+        <svg class="mr-strip" id="pnStrip" viewBox="0 0 520 150" role="img" aria-label="영상별 두 문장 점수 차이 분포"></svg>
+        <div class="mr-stack">
+          <div class="sk-stats" id="pnStats"></div>
+          <div class="sk-scroll"><table class="sk-table" id="pnCm" aria-label="혼동 행렬"></table></div>
+        </div>
+      </div>
+      <p class="sk-note sk-note--warn">한쪽으로 쏠린 예측은 <b>모형이 판단을 하지 않은 것</b>입니다. 유사도 차이가 병변이 아니라 단어 자체의 편향에서 옵니다. 의료 데이터의 제로샷 결과는 <b>혼동 행렬·예측 분포를 반드시 함께</b> 보고합니다.</p>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>선형 프로빙: 임베딩은 그대로, 분류기만 학습</h2><span class="mr-mock">합성 임베딩으로 실제 학습</span></div>
+      <p class="sk-lead">CLIP을 특성 추출기로만 쓰고 그 위에 로지스틱 회귀(softmax) 한 층을 얹습니다. 아래는 32차원 합성 임베딩(강한 "CT 양식" 성분 + 약한 장기 성분 + 촬영 조건 잡음)으로 브라우저에서 직접 학습한 결과입니다. 숫자는 합성 데이터의 결과이고 실습 노트북 값과는 다릅니다.</p>
+      <div class="sk-controls">
+        <label class="sk-slider"><span class="sk-sl-head">클래스당 라벨 수 <b id="lpNV">40</b></span><input type="range" id="lpN" min="1" max="40" value="40"></label>
+        <label class="sk-slider"><span class="sk-sl-head">장기 정보 강도 <b id="lpSV">0.70</b></span><input type="range" id="lpS" min="0" max="150" value="70"></label>
+        <label class="sk-slider"><span class="sk-sl-head">잡음 <b id="lpZV">1.5</b></span><input type="range" id="lpZ" min="5" max="40" value="15"></label>
+        <button class="sk-btn sk-btn--primary" type="button" id="lpRun">학습 실행</button>
+      </div>
+      <div class="mr-row mr-row--even">
+        <div class="mr-stack">
+          <div class="sk-stats" id="lpStats"></div>
+          <svg class="mr-spark" id="lpSpark" viewBox="0 0 320 70" preserveAspectRatio="none" role="img" aria-label="선형 프로빙 학습 손실 곡선"></svg>
+          <span class="sk-hint">학습 손실 곡선 (점선 = log 11, 무작위 수준)</span>
+          <p class="sk-hint" style="margin:0" id="lpInfo"></p>
+        </div>
+        <div class="mr-stack">
+          <h3>실습 노트북의 비교 (OrganAMNIST 330장)</h3>
+          <svg class="mr-chart" id="cmpChart" viewBox="0 0 420 240" role="img" aria-label="무작위, 제로샷, 선형 프로빙, 전이학습 정확도 비교"></svg>
+        </div>
+      </div>
+      <p class="sk-note">라벨 <b>0장</b>: 제로샷은 무작위보다 조금 나은 수준이라 쓸 수 없습니다. 라벨 <b>수십 장</b>: 선형 프로빙이 현실적(학습 몇 초). 라벨 <b>수백 장 이상</b>: 도메인에 맞춘 전이학습이 여전히 가장 정확합니다. CLIP의 가치는 "제로샷 진단"이 아니라 <b>라벨이 거의 없을 때의 출발점</b>과 <b>검색 능력</b>입니다.</p>
+      <details class="mr-code"><summary>파이썬 코드 (현재 라벨 수)</summary><button class="sk-btn sk-btn--sm mr-copy" type="button" id="copy4b">복사</button><pre id="code4b"></pre></details>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>의료 도메인 CLIP</h2></div>
+      <div class="sk-scroll"><table class="sk-table" aria-label="의료 도메인 CLIP 비교">
+        <thead><tr><th>모형</th><th class="wrap">학습 데이터</th><th class="wrap">특징</th></tr></thead>
+        <tbody>
+          <tr><td><b>BiomedCLIP</b> (Microsoft, 2023)</td><td class="wrap">PubMed 논문의 그림-캡션 1,500만 쌍</td><td class="wrap">텍스트 인코더가 PubMedBERT</td></tr>
+          <tr><td><b>PubMedCLIP</b></td><td class="wrap">의학 VQA 데이터</td><td class="wrap">의료 VQA 보조용으로 미세조정</td></tr>
+          <tr><td><b>MedCLIP</b></td><td class="wrap">흉부 X-ray + 판독문</td><td class="wrap">이미지-텍스트 짝이 없어도 학습 (라벨 기반 짝짓기)</td></tr>
+          <tr><td><b>CheXzero</b></td><td class="wrap">MIMIC-CXR 판독문</td><td class="wrap">흉부 X-ray 제로샷 성능이 전문의 수준에 근접</td></tr>
+        </tbody></table></div>
+      <p class="sk-note">핵심은 모두 같습니다: <b>의료 텍스트와 짝지어진 의료 영상으로 다시 학습</b>. 실습 노트북 환경에는 open_clip 이 없어 BiomedCLIP 셀은 건너뛰었고(ModuleNotFoundError), 대신 선형 프로빙으로 같은 목적을 달성했습니다.</p>
+    </div>
+    </div>
+  </section>
+
+  <!-- ================= 5. 검색·리포트 생성 ================= -->
+  <section id="pane-e" role="tabpanel" aria-labelledby="tab-e" hidden>
+    <div class="sk-wrap" style="padding:0;gap:16px">
+    <div class="sk-card">
+      <div class="sk-head"><h2>검색: 요추 MRI 469장에서 비슷한 케이스 찾기</h2><span class="mr-src">환자ID·등급·유사도는 실습 노트북 출력 · 영상은 모사</span></div>
+      <p class="sk-lead">검증 케이스 한 장(질의)을 학습 케이스 임베딩과 내적(= 코사인 유사도)해 가장 비슷한 5건을 찾았습니다. 유사도는 0.96대로 높은데 <b>등급은 제각각</b>입니다.</p>
+      <div class="mr-thumbs" id="thumbs"></div>
+      <div class="mr-row mr-row--even">
+        <div class="mr-stack">
+          <h3>검증 147장: 최근접 1건의 등급 일치</h3>
+          <div class="sk-scroll"><table class="sk-table" id="nnCt" aria-label="실제 등급과 최근접 케이스 등급의 교차표"></table></div>
+          <div class="sk-stats" id="nnStats"></div>
+        </div>
+        <div class="mr-stack">
+          <h3>CLIP 임베딩 + 로지스틱 회귀 등급 예측기</h3>
+          <div class="sk-scroll"><table class="sk-table" id="lrCt" aria-label="실제 등급과 예측 등급의 교차표"></table></div>
+          <div class="sk-stats" id="lrStats"></div>
+        </div>
+      </div>
+      <p class="sk-note sk-note--warn">일치율이 무작위(25.0%)와 비슷합니다. CLIP 임베딩은 협착 등급과 무관한 것(촬영 각도·밝기·체형)을 보고 있습니다. 예측기는 <b>0등급을 한 번도 예측하지 않습니다</b>. 임상에 쓸 수 없는 수준이며, 이 절의 목적은 정확도가 아니라 <b>예측이 틀렸을 때 리포트가 어떻게 틀리는지</b> 보는 것입니다.</p>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>리포트 생성 3방식을 같은 지표로 채점</h2><span class="sk-hint">ROUGE-1·정밀도·등급 추출을 이 화면에서 직접 계산</span></div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">케이스</span>
+          <div class="sk-seg" id="caseSeg" role="group" aria-label="채점할 케이스">
+            <button type="button" data-v="0" aria-pressed="true">검증 1</button>
+            <button type="button" data-v="1" aria-pressed="false">검증 2</button>
+            <button type="button" data-v="2" aria-pressed="false">검증 3</button>
+            <button type="button" data-v="u" aria-pressed="false">1번 화면 케이스</button>
+          </div>
+        </div>
+      </div>
+      <div class="sk-controls" id="customCtl" hidden>
+        <div class="sk-group"><span class="sk-label">템플릿: 예측 등급</span>
+          <div class="sk-seg" id="predSeg" role="group" aria-label="예측 등급">
+            <button type="button" data-v="0" aria-pressed="false">0</button><button type="button" data-v="1" aria-pressed="false">1</button>
+            <button type="button" data-v="2" aria-pressed="false">2</button><button type="button" data-v="3" aria-pressed="true">3</button>
+          </div>
+        </div>
+        <label class="sk-group"><span class="sk-label">검색: 가져올 과거 리포트</span><select class="sk-select" id="bankSel"></select></label>
+        <label class="sk-group"><span class="sk-label">BLIP 캡션</span><select class="sk-select" id="blipSel"></select></label>
+      </div>
+      <div class="sk-scroll"><table class="sk-table" id="scoreTbl" aria-label="세 방식의 채점 결과"></table></div>
+      <div class="mr-stack" id="cmpReports"></div>
+      <p class="sk-hint" style="margin:0">색칠된 부분은 정답 리포트에도 있는 단어(ROUGE-1 겹침), 취소선은 정답과 다른 등급입니다. BLIP 문장은 실습 노트북에서 관찰된 캡션입니다.</p>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>숫자 하나만 바뀌면? ROUGE의 함정</h2></div>
+      <div class="mr-row mr-row--even">
+        <label class="mr-stack"><span class="sk-label">정답 문장 (reference)</span><textarea class="mr-txt" id="trapA">최대 협착 등급은 3등급 이며 침범 분절은 L4-L5 임</textarea></label>
+        <label class="mr-stack"><span class="sk-label">생성 문장 (hypothesis)</span><textarea class="mr-txt" id="trapB">최대 협착 등급은 1등급 이며 침범 분절은 L4-L5 임</textarea></label>
+      </div>
+      <div class="sk-stats" id="trapStats"></div>
+      <div class="sk-formula" id="trapFormula"></div>
+      <p class="sk-note sk-note--warn">등급 3과 등급 1은 임상적으로 전혀 다른 결론인데 ROUGE-1은 거의 떨어지지 않습니다. 그래서 리포트에서 <b>등급을 뽑아 비교하는 임상 사실 정확도</b>(extract_grade)를 따로 잽니다. CheXbert F1 · RadGraph F1 계열 지표의 가장 단순한 형태입니다.</p>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>검증 전체 채점 결과</h2><span class="mr-src">실습 노트북 출력</span></div>
+      <div class="mr-row">
+        <div class="mr-stack">
+          <div class="sk-scroll"><table class="sk-table" aria-label="세 방식의 검증 전체 채점표">
+            <thead><tr><th>방식</th><th>n</th><th>ROUGE1</th><th>정밀도</th><th>등급 정확도</th><th>등급 미언급</th></tr></thead>
+            <tbody>
+              <tr><td>템플릿 (예측 기반)</td><td class="n">147</td><td class="n">0.434</td><td class="n">0.539</td><td class="n">0.327</td><td class="n">0.0</td></tr>
+              <tr><td>검색 (최근접 케이스)</td><td class="n">147</td><td class="n"><b>0.799</b></td><td class="n"><b>0.781</b></td><td class="n">0.299</td><td class="n">0.0</td></tr>
+              <tr><td>BLIP 생성</td><td class="n">40</td><td class="n">0.000</td><td class="n">0.000</td><td class="n">0.000</td><td class="n">1.0</td></tr>
+            </tbody></table></div>
+          <p class="sk-formula" id="fullCheck"></p>
+          <div class="sk-scroll"><table class="sk-table" aria-label="두 지표 해석">
+            <thead><tr><th>방식</th><th>ROUGE-1</th><th>등급 정확도</th><th class="wrap">해석</th></tr></thead>
+            <tbody>
+              <tr><td>템플릿</td><td>높음</td><td>예측 정확도와 정확히 같음</td><td class="wrap">문장이 예측을 그대로 반영 → 채점이 곧 모형 평가</td></tr>
+              <tr><td>검색</td><td><b>가장 높을 수 있음</b></td><td>낮음</td><td class="wrap">같은 틀의 문장이라 단어는 많이 겹침. <b>내용은 남의 환자 것</b></td></tr>
+              <tr><td>BLIP</td><td>거의 0</td><td>0 (등급 미언급)</td><td class="wrap">한국어도 아니고 소견도 아님</td></tr>
+            </tbody></table></div>
+        </div>
+        <svg class="mr-chart" id="fullChart" viewBox="0 0 420 250" role="img" aria-label="세 방식의 ROUGE-1과 등급 정확도 막대 그래프"></svg>
+      </div>
+      <details class="mr-code"><summary>파이썬 코드 (BLIP 캡션 + 채점)</summary><button class="sk-btn sk-btn--sm mr-copy" type="button" id="copy5">복사</button><pre id="code5"></pre></details>
+    </div>
+    </div>
+  </section>
+
+  <!-- ================= 6. 한계와 안전장치 ================= -->
+  <section id="pane-f" role="tabpanel" aria-labelledby="tab-f" hidden>
+    <div class="sk-wrap" style="padding:0;gap:16px">
+    <div class="sk-card">
+      <div class="sk-head"><h2>한계</h2></div>
+      <div class="mr-warns">
+        <p class="sk-note sk-note--warn"><b>환각(hallucination)</b> — BLIP은 요추 영상에 무릎(knee)·경추(cervical) 같은 다른 부위와 있지도 않은 골절(fracture)을 붙이고, "mri mri mri …" 반복도 냅니다. 부위와 진단명이 둘 다 틀렸는데 문장은 완벽하게 자연스럽습니다. 모형은 "모른다"를 출력하도록 학습되지 않았고, 유창할수록 믿기 쉬워 더 위험합니다.</p>
+        <p class="sk-note sk-note--warn"><b>검색 방식 = 남의 환자 소견</b> — 텍스트 지표(ROUGE-1 0.799)는 가장 높지만 등급 정확도는 0.299입니다. 다른 환자의 소견을 그대로 붙여 넣은 것이므로 임상적으로 허용될 수 없습니다.</p>
+        <p class="sk-note sk-note--warn"><b>등급 불일치</b> — CLIP + 로지스틱 회귀 예측기의 정확도는 32.65%(무작위 25%)이고 0등급을 예측하지 않습니다. 템플릿 리포트는 문장이 아무리 반듯해도 예측만큼만 맞습니다.</p>
+        <p class="sk-note sk-note--warn"><b>텍스트 지표의 한계</b> — 숫자 하나가 바뀌어도 ROUGE-1은 0.8889로 거의 떨어지지 않습니다. BLEU·ROUGE·METEOR는 필요조건일 뿐입니다.</p>
+        <p class="sk-note sk-note--warn"><b>CLIP이 아는 것</b> — 양식(X-ray·MRI·CT)은 구분하지만 병변은 구분하지 못합니다. 유사도 절대값(0.2~0.35)은 의미가 없고 같은 영상 안에서의 순위만 의미가 있습니다.</p>
+        <p class="sk-note sk-note--warn"><b>데이터 누수·라벨 함정</b> — 영상 단위로 나누면 76명의 환자가 학습·검증에 걸칩니다. label_3class 의 값은 4종류입니다. 정답 리포트는 표에서 규칙으로 만든 단순한 판본이라 실제 판독문의 다양성이 없습니다.</p>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>의료 리포트 생성 시스템의 안전장치</h2><span class="sk-hint">켜고 끄면서 초안이 어떻게 바뀌는지 보세요 (1번 화면 케이스 기준)</span></div>
+      <div class="mr-row">
+        <div class="mr-stack">
+          <div class="sk-scroll"><table class="sk-table" aria-label="안전장치 원칙">
+            <thead><tr><th>적용</th><th>원칙</th><th class="wrap">구체적으로</th></tr></thead>
+            <tbody id="safeBody"></tbody></table></div>
+          <div class="sk-controls">
+            <div class="sk-group"><span class="sk-label">모형 예측 등급</span>
+              <div class="sk-seg" id="sfPredSeg" role="group" aria-label="모형 예측 등급">
+                <button type="button" data-v="0" aria-pressed="false">0</button><button type="button" data-v="1" aria-pressed="false">1</button>
+                <button type="button" data-v="2" aria-pressed="false">2</button><button type="button" data-v="3" aria-pressed="true">3</button>
+              </div>
+            </div>
+            <label class="sk-slider"><span class="sk-sl-head">예측 확률 <b id="sfProbV">0.45</b></span><input type="range" id="sfProb" min="25" max="99" value="45"></label>
+          </div>
+        </div>
+        <div class="mr-stack">
+          <div class="mr-report" id="sfDraft" aria-live="polite"></div>
+          <p class="sk-hint" style="margin:0">물결 밑줄 = 근거 없이 채워 넣은(지어낸) 내용. 확률 0.60 미만이면 불확실성 문구를 씁니다(이 화면의 기준값).</p>
+        </div>
+      </div>
+      <p class="sk-note sk-note--warn"><b>규제</b> — 진단을 내리는 소프트웨어는 의료기기(SaMD)로 분류되어 허가 대상입니다. 자동 생성된 문장을 <b>판독의 확인 없이</b> 의무기록에 남기는 것은 허용되지 않습니다. 학습 데이터의 출처·합성 데이터 사용 여부를 문서화해야 합니다.</p>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>현실적인 사용처: 누락 점검 보조</h2></div>
+      <p class="sk-lead">판독의가 쓴 리포트와 모형의 구조화 소견(1번 화면)을 대조해 빠뜨린 항목을 알려 줍니다. 리포트를 고쳐 보세요. 분절(L1-L2 … L5-S1)과 첫 "n등급"을 정규식으로 뽑아 비교합니다.</p>
+      <div class="mr-row mr-row--even">
+        <label class="mr-stack"><span class="sk-label">판독의 리포트</span><textarea class="mr-txt" id="radTxt"></textarea></label>
+        <div class="mr-stack"><span class="sk-label">대조 결과</span><ul class="mr-list" id="radOut"></ul></div>
+      </div>
+      <p class="sk-note">현재 현실적인 사용처는 <b>초안 작성 보조</b>와 <b>누락 점검</b>입니다. 최종 판단과 서명은 판독의가 합니다. 이 시뮬레이터의 영상·점수는 교육용 모사이며 임상 판단을 대신하지 않습니다.</p>
+    </div>
+    </div>
+  </section>
+
+  <!-- ================= 7. 알고리즘 구성도 ================= -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">강의 슬라이드 3장 · 사례 흐름 · CLIP 대조 학습 · 리포트 채점</span></div><div data-ds-diagrams="mri-detection-report"></div></section>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/mri-detection-report.js?v=20261002c"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const f3 = x => Number.isFinite(x) ? x.toFixed(3) : "—";
+  const f4 = x => Number.isFinite(x) ? x.toFixed(4) : "—";
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const SVGNS = "http://www.w3.org/2000/svg";
+
+  /* ---------- 안쪽 탭 (URL 해시 연동, ←/→ 키 이동) ---------- */
+  const tabs = [...document.querySelectorAll(".sk-tab")];
+  const onShow = {};
+  function show(t) {
+    tabs.forEach(b => { const on = b === t; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1;
+      document.getElementById(b.getAttribute("aria-controls")).hidden = !on; });
+    history.replaceState(null, "", "#" + t.id.replace("tab-", ""));
+    const k = t.id.replace("tab-", ""); if (onShow[k]) onShow[k]();
+  }
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => show(b));
+    b.addEventListener("keydown", e => {
+      const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return;
+      const n = tabs[(i + d + tabs.length) % tabs.length]; show(n); n.focus(); e.preventDefault();
+    });
+  });
+
+  /* ---------- 공통 도구 ---------- */
+  function rng(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function randn(r) { let u = 0; while (u === 0) u = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * r()); }
+  function shuffle(a, r) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+  function setupCanvas(cv, w, h) { const d = window.devicePixelRatio || 1; cv.width = Math.round(w * d); cv.height = Math.round(h * d); const c = cv.getContext("2d"); c.setTransform(d, 0, 0, d, 0, 0); return c; }
+  const redrawers = [];
+  function redrawAll() { redrawers.forEach(f => f()); }
+  new MutationObserver(redrawAll).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", redrawAll);
+  function segInit(el, cb) {
+    el.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+      el.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); cb(b.dataset.v);
+    }));
+  }
+  function segSet(el, v) { el.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x.dataset.v === String(v))); }
+  function copyInit(btn, getText) {
+    btn.addEventListener("click", async () => {
+      const t = getText();
+      try { await navigator.clipboard.writeText(t); }
+      catch (e) { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (_) {} ta.remove(); }
+      btn.textContent = "복사됨"; setTimeout(() => { btn.textContent = "복사"; }, 1200);
+    });
+  }
+  function softmax(arr) { const m = Math.max(...arr); const e = arr.map(v => Math.exp(v - m)); const z = e.reduce((a, b) => a + b, 0); return e.map(v => v / z); }
+  function heatBg(p) { p = Math.max(0, Math.min(1, p)); return `color-mix(in srgb, var(--role-fuse) ${Math.round(p * 85)}%, var(--surface-2))`; }
+  function heatFg(p) { return p > 0.55 ? "var(--on-ink)" : "var(--ink)"; }
+
+  /* ---------- 리포트 규칙 (실습 노트북 make_report 이식) ---------- */
+  const LEVELS = ["L1-L2", "L2-L3", "L3-L4", "L4-L5", "L5-S1"];
+  const GRADE_NAME = { 0: "정상", 1: "경도", 2: "중등도", 3: "중증" };
+  const LABEL4 = ["normal", "mild", "moderate", "severe"];
+  const IMPRESSION = ["유의한 추간공 협착 소견 없음.", "경도 추간공 협착. 경과 관찰 권고.", "중등도 추간공 협착. 임상 증상과의 연관성 확인 필요.", "중증 추간공 협착. 신경 압박 여부에 대한 추가 평가 권고."];
+  const gradeText = v => (v === null || Number.isNaN(v)) ? "측정되지 않음" : String(v) + "등급";
+  function makeReport(f) {
+    const g = f.fs_grade_max;
+    const levelText = f.affected === null ? "침범 분절 없음" : "침범 분절은 " + f.affected.split("|").join(", ") + " 임";
+    const findings = "요추 MRI 에서 추간공 협착을 평가함. " + "최대 협착 등급은 " + g + "등급(" + GRADE_NAME[g] + ") 이며, " +
+      "좌측 최대 " + gradeText(f.left) + " / 우측 최대 " + gradeText(f.right) + " 임. " + levelText + ". " +
+      "이상 소견을 보이는 추간공은 총 " + f.n_abnormal + "개 임.";
+    return "[소견] " + findings + " [결론] " + IMPRESSION[g];
+  }
+  function makeReportFromPrediction(g) {
+    return "[소견] 요추 MRI 에서 추간공 협착을 평가함. 최대 협착 등급은 " + g + "등급(" + GRADE_NAME[g] + ") 으로 추정됨. 좌우 구분 및 침범 분절은 본 자동 판독에서 확인되지 않음. [결론] " + IMPRESSION[g];
+  }
+  const tokenizeKo = t => t.replace(/[\[\]().,]/g, " ").split(/\s+/).filter(x => x.length > 0);
+  function counter(a) { const m = new Map(); a.forEach(x => m.set(x, (m.get(x) || 0) + 1)); return m; }
+  function overlapCount(ref, hyp) {
+    const R = counter(tokenizeKo(ref)), H = counter(tokenizeKo(hyp)); let o = 0, nR = 0, nH = 0;
+    H.forEach((c, k) => { o += Math.min(c, R.get(k) || 0); nH += c; }); R.forEach(c => { nR += c; });
+    return { o, nR, nH };
+  }
+  function rouge1(ref, hyp) { const s = overlapCount(ref, hyp); return s.nR === 0 ? 0 : s.o / s.nR; }
+  function precision1(ref, hyp) { const s = overlapCount(ref, hyp); return s.nH === 0 ? 0 : s.o / s.nH; }
+  function extractGrade(t) { const m = t.match(/([0-9])\s*등급/); return m ? +m[1] : -1; }
+  function reportHtml(text, refForHit) {
+    // [소견]/[결론] 강조, 정답과 겹치는 단어 색칠(Counter 클리핑)
+    let remain = refForHit ? counter(tokenizeKo(refForHit)) : null;
+    const refGrade = refForHit ? extractGrade(refForHit) : -1, hypGrade = extractGrade(text);
+    let gradeMarked = false;
+    return text.split(/(\s+)/).map(part => {
+      if (/^\s+$/.test(part)) return part;
+      const toks = tokenizeKo(part);
+      let cls = "";
+      if (remain && toks.length) {
+        const allHit = toks.every(t => (remain.get(t) || 0) > 0);
+        if (allHit) { toks.forEach(t => remain.set(t, remain.get(t) - 1)); cls = "ok"; }
+      }
+      let h = esc(part).replace(/\[(소견|결론)\]/g, '<span class="tag">[$1]</span>').replace(/측정되지 않음|확인되지 않음/g, m => `<span class="miss">${m}</span>`);
+      if (refForHit && !gradeMarked && /[0-9]\s*등급/.test(part)) { gradeMarked = true; if (hypGrade !== refGrade) cls = "bad"; }
+      return cls ? `<span class="${cls}">${h}</span>` : h;
+    }).join("");
+  }
+
+  /* =====================================================================
+     1. 요추 MRI 모사 영상
+     ===================================================================== */
+  const MW = 240, MH = 400;
+  const GEO = (() => {
+    const v = [];
+    for (let i = 0; i < 6; i++) {
+      const t = i / 5, cy = 44 + i * 62, cx = 100 - 16 * Math.sin(Math.PI * t * 0.95);
+      const dx = -16 * Math.PI * 0.95 / 5 * Math.cos(Math.PI * t * 0.95);
+      let a = -Math.atan2(dx, 62); if (i === 5) a -= 0.42;
+      v.push({ cx, cy, a, w: i === 5 ? 66 : 60, h: i === 5 ? 54 : 42 });
+    }
+    const L2W = (b, lx, ly) => { const c = Math.cos(b.a), s = Math.sin(b.a); return [b.cx + lx * c - ly * s, b.cy + lx * s + ly * c]; };
+    const discs = [];
+    for (let i = 0; i < 5; i++) {
+      const p = L2W(v[i], 0, v[i].h / 2), q = L2W(v[i + 1], 0, -v[i + 1].h / 2);
+      const a = (v[i].a + v[i + 1].a) / 2;
+      const gap = Math.hypot(q[0] - p[0], q[1] - p[1]);
+      discs.push({ cx: (p[0] + q[0]) / 2, cy: (p[1] + q[1]) / 2, a, w: (v[i].w + Math.min(v[i + 1].w, 62)) / 2, gap });
+    }
+    const ped = v.map(b => L2W(b, b.w / 2 + 11, -b.h * 0.14));
+    const foram = [];
+    for (let i = 0; i < 5; i++) {
+      const d = discs[i];
+      const m = [(ped[i][0] + ped[i + 1][0]) / 2, (ped[i][1] + ped[i + 1][1]) / 2];
+      foram.push({ cx: m[0] + 4 * Math.cos(d.a), cy: m[1] + 4 * Math.sin(d.a) + 2, a: d.a });
+    }
+    return { v, discs, ped, foram, L2W };
+  })();
+  const FR = { rx: [9.5, 7.5, 5.2, 3.0], ry: [15, 12, 8.5, 4.6], fat: [205, 182, 150, 112], nr: [3.4, 3.1, 2.5, 1.7] };
+  const mriCache = new Map();
+  function gray(c, g) { g = Math.round(Math.max(0, Math.min(255, g))); c.fillStyle = `rgb(${g},${g},${g})`; }
+  function ell(c, x, y, rx, ry, a) { c.beginPath(); c.ellipse(x, y, Math.max(0.3, rx), Math.max(0.3, ry), a || 0, 0, Math.PI * 2); c.fill(); }
+  function rrect(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+  // view: 'mid' | 'L' | 'R'; grades: 길이 5 배열 (해당 view의 등급; mid는 분절 최대)
+  function renderMRI(view, grades, seed) {
+    const key = view + "|" + grades.join("") + "|" + seed + "|" + (window.devicePixelRatio || 1);
+    if (mriCache.has(key)) return mriCache.get(key);
+    const d = window.devicePixelRatio || 1;
+    const off = document.createElement("canvas"); off.width = Math.round(MW * d); off.height = Math.round(MH * d);
+    const c = off.getContext("2d"); c.setTransform(d, 0, 0, d, 0, 0);
+    const r = rng(seed * 131 + (view === "mid" ? 1 : view === "L" ? 2 : 3));
+    const r2 = rng(seed * 7 + 5);  // 해부 모양(세 view 공통)
+    gray(c, 16); c.fillRect(0, 0, MW, MH);
+    c.filter = "blur(0.9px)";
+    // 앞쪽 복부(장 고리)
+    gray(c, 44); c.fillRect(0, 0, 58, MH);
+    for (let k = 0; k < 26; k++) { gray(c, 30 + r2() * 90); ell(c, r2() * 56, r2() * MH, 6 + r2() * 10, 5 + r2() * 9, r2() * 3); }
+    if (view === "mid") { gray(c, 8); c.fillRect(46, 0, 11, MH); }
+    // 뒤쪽 근육·피하지방
+    gray(c, 70); c.beginPath(); c.moveTo(150, 0); c.lineTo(222, 0); c.lineTo(226, MH); c.lineTo(160, MH); c.closePath(); c.fill();
+    for (let k = 0; k < 40; k++) { gray(c, 55 + r2() * 35); c.fillRect(152 + r2() * 68, r2() * MH, 1.2, 20 + r2() * 40); }
+    gray(c, 168); c.beginPath(); c.moveTo(222, 0); c.lineTo(MW, 0); c.lineTo(MW, MH); c.lineTo(226, MH); c.closePath(); c.fill();
+    const { v, discs, ped, foram, L2W } = GEO;
+    if (view === "mid") {
+      // 척추관(뇌척수액, 밝음)
+      c.strokeStyle = "rgb(205,205,205)"; c.lineWidth = 15; c.lineCap = "round"; c.lineJoin = "round"; c.beginPath();
+      v.forEach((b, i) => { const p = L2W(b, b.w / 2 + 13, 0); i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1] - 30); });
+      c.stroke();
+      c.strokeStyle = "rgb(120,120,120)"; c.lineWidth = 0.8;
+      for (let k = -2; k <= 2; k++) { c.beginPath(); v.forEach((b, i) => { const p = L2W(b, b.w / 2 + 13 + k * 2.2, 0); i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1] - 30); }); c.stroke(); }
+      // 극돌기
+      v.slice(0, 5).forEach(b => {
+        c.save(); c.translate(b.cx, b.cy); c.rotate(b.a); gray(c, 104);
+        c.beginPath(); c.moveTo(b.w / 2 + 25, -b.h * 0.36); c.lineTo(b.w / 2 + 66, -b.h * 0.2); c.lineTo(b.w / 2 + 68, b.h * 0.22); c.lineTo(b.w / 2 + 25, b.h * 0.16); c.closePath(); c.fill(); c.restore();
+      });
+    } else {
+      // 관절 기둥(후관절)
+      v.forEach(b => { const p = L2W(b, b.w / 2 + 31, 2); gray(c, 98); ell(c, p[0], p[1], 14, 23, b.a); });
+    }
+    // 척추체
+    v.forEach((b, i) => {
+      c.save(); c.translate(b.cx, b.cy); c.rotate(b.a);
+      gray(c, view === "mid" ? 128 : 118); rrect(c, -b.w / 2, -b.h / 2, b.w, b.h, 6); c.fill();
+      for (let k = 0; k < 14; k++) { gray(c, 105 + r2() * 45); ell(c, (r2() - 0.5) * b.w * 0.8, (r2() - 0.5) * b.h * 0.8, 2 + r2() * 4, 2 + r2() * 3); }
+      c.strokeStyle = "rgb(46,46,46)"; c.lineWidth = 2.4; rrect(c, -b.w / 2, -b.h / 2, b.w, b.h, 6); c.stroke();
+      c.restore();
+      if (view !== "mid") { gray(c, 112); ell(c, ped[i][0], ped[i][1], 9, 11, b.a); c.strokeStyle = "rgb(52,52,52)"; c.lineWidth = 1.6; c.beginPath(); c.ellipse(ped[i][0], ped[i][1], 9, 11, b.a, 0, Math.PI * 2); c.stroke(); }
+    });
+    // 디스크
+    discs.forEach((dk, i) => {
+      const g = grades[i];
+      c.save(); c.translate(dk.cx, dk.cy); c.rotate(dk.a);
+      gray(c, 62); ell(c, 0, 0, dk.w / 2 - 1, dk.gap / 2 + 1.5);
+      gray(c, view === "mid" ? 205 - 32 * g : 150 - 24 * g); ell(c, -2, 0, dk.w * 0.28, Math.max(1.3, dk.gap / 2 - 2.6 - g * 0.5));
+      if (view === "mid" && g > 0) {
+        gray(c, 56); ell(c, dk.w / 2 + 2 + g * 1.6, 0, 3 + g * 2.3, dk.gap / 2 + 2);      // 디스크 후방 돌출
+        gray(c, 48); ell(c, dk.w / 2 + 23, 0, 1.5 + g * 1.7, 8);                       // 황색인대 비후
+      }
+      c.restore();
+    });
+    // 추간공 (좌/우 view)
+    if (view !== "mid") {
+      foram.forEach((fo, i) => {
+        const g = grades[i];
+        c.save(); c.translate(fo.cx, fo.cy); c.rotate(fo.a);
+        gray(c, FR.fat[g]); ell(c, 0, 0, FR.rx[g], FR.ry[g]);
+        gray(c, 66); ell(c, 0, -FR.ry[g] * 0.42, FR.nr[g], FR.nr[g] * (g === 3 ? 0.7 : 1));
+        gray(c, 60); ell(c, -FR.rx[g] - 2.5 + g * 1.9, FR.ry[g] * 0.35, 3 + g * 1.7, 4 + g * 1.1);  // 디스크 돌출(앞)
+        gray(c, 96); ell(c, FR.rx[g] + 3.5 - g * 1.9, FR.ry[g] * 0.45, 4 + g * 1.5, 6 + g * 1.3); // 상관절돌기(뒤)
+        c.restore();
+      });
+    }
+    c.filter = "none";
+    // 잡음 + 밝기 불균일
+    const img = c.getImageData(0, 0, off.width, off.height), px = img.data, W = off.width, H = off.height;
+    for (let y = 0; y < H; y++) {
+      const bias = 0.86 + 0.2 * Math.cos((y / H - 0.45) * 2.2);
+      for (let x = 0; x < W; x++) {
+        const k = (y * W + x) * 4;
+        let val = px[k] * bias * (0.94 + 0.1 * Math.cos(x / W * 3)) + randn(r) * 7;
+        val = Math.max(0, Math.min(255, val)); px[k] = px[k + 1] = px[k + 2] = val;
+      }
+    }
+    c.putImageData(img, 0, 0);
+    if (mriCache.size > 60) mriCache.clear();
+    mriCache.set(key, off);
+    return off;
+  }
+
+  /* ---------- 1번 화면 상태 ---------- */
+  const PRESETS = {
+    r0:   { L: [0, 0, 1, 0, 0], R: [0, 0, 3, 2, 0], missL: false, missR: false, note: "실습 노트북 리포트 예시 1 (df_case 0번 행): 3등급(중증), 좌 1 / 우 3, L3-L4·L4-L5, 이상 추간공 3개." },
+    r100: { L: [0, 0, 0, 0, 0], R: [0, 0, 0, 0, 1], missL: false, missR: false, note: "실습 노트북 리포트 예시 2 (100번 행): 1등급(경도), 좌 0 / 우 1, L5-S1, 이상 추간공 1개." },
+    r300: { L: [0, 0, 2, 0, 0], R: [0, 0, 0, 3, 1], missL: false, missR: false, note: "실습 노트북 리포트 예시 3 (300번 행): 3등급(중증), 좌 2 / 우 3, L3-L4·L4-L5·L5-S1, 이상 추간공 3개." },
+    q:    { L: [0, 0, 1, 1, 0], R: [0, 0, 1, 1, 0], missL: false, missR: false, note: "검증 질의 케이스 (1417PT, mild): 1등급(경도), 좌 1 / 우 1, L3-L4·L4-L5, 이상 추간공 4개." },
+    n:    { L: [0, 0, 0, 0, 0], R: [0, 0, 0, 0, 0], missL: false, missR: false, note: "정상 케이스: 0등급, 침범 분절 없음 (affected_levels 결측 = 해당 없음)." }
+  };
+  const st1 = { L: [], R: [], missL: false, missR: false, seed: 3, boxes: true, preset: "r0" };
+  function loadPreset(k) { const p = PRESETS[k]; st1.L = p.L.slice(); st1.R = p.R.slice(); st1.missL = p.missL; st1.missR = p.missR; st1.preset = k; }
+  loadPreset("r0");
+  function findings(s) {
+    const vals = [...(s.missL ? [] : s.L), ...(s.missR ? [] : s.R)];
+    const gmax = Math.max(...vals);
+    const levels = LEVELS.filter((_, i) => (!s.missL && s.L[i] > 0) || (!s.missR && s.R[i] > 0));
+    return {
+      fs_grade_max: gmax, left: s.missL ? NaN : Math.max(...s.L), right: s.missR ? NaN : Math.max(...s.R),
+      affected: levels.length ? levels.join("|") : null, n_abnormal: vals.filter(x => x > 0).length, label: LABEL4[gmax]
+    };
+  }
+  const levelMax = s => LEVELS.map((_, i) => Math.max(s.missL ? 0 : s.L[i], s.missR ? 0 : s.R[i]));
+  const boxHits = { L: [], R: [] };
+  function drawMRI(cvId, view) {
+    const cv = $(cvId); const c = setupCanvas(cv, MW, MH);
+    const grades = view === "mid" ? levelMax(st1) : (view === "L" ? st1.L : st1.R);
+    c.drawImage(renderMRI(view, grades, st1.seed), 0, 0, MW, MH);
+    const miss = view === "L" ? st1.missL : view === "R" ? st1.missR : false;
+    const gcol = [cssv("--g0"), cssv("--g1"), cssv("--g2"), cssv("--g3")];
+    const gt = cssv("--role-gt");
+    if (view !== "mid") boxHits[view] = [];
+    // 척추 이름
+    c.font = "600 10px " + cssv("--mono"); c.textBaseline = "middle";
+    ["L1", "L2", "L3", "L4", "L5", "S1"].forEach((n, i) => { const b = GEO.v[i]; c.fillStyle = "rgba(255,255,255,.75)"; c.fillText(n, b.cx - 9, b.cy); });
+    if (!st1.boxes) return;
+    c.lineWidth = 2;
+    if (view === "mid") {
+      GEO.discs.forEach((d, i) => {
+        const g = grades[i], x = d.cx - 38, y = d.cy - 13;
+        c.strokeStyle = gcol[g]; c.setLineDash([]); c.strokeRect(x, y, 76, 26);
+        chip(c, LEVELS[i], x + 2, y - 1, gcol[g], "left");
+      });
+    } else {
+      GEO.foram.forEach((fo, i) => {
+        const g = grades[i], x = fo.cx - 14, y = fo.cy - 19;
+        c.strokeStyle = miss ? gt : gcol[g]; c.setLineDash(miss ? [4, 3] : []); c.strokeRect(x, y, 28, 38); c.setLineDash([]);
+        chip(c, miss ? LEVELS[i] + " 누락" : LEVELS[i] + " · " + g, x + 30, y + 2, miss ? gt : gcol[g], "left");
+        boxHits[view].push({ x: x - 4, y: y - 4, w: 36, h: 46, i });
+      });
+    }
+  }
+  function chip(c, text, x, y, col, align) {
+    c.font = "600 10px " + cssv("--mono"); const w = c.measureText(text).width + 8;
+    let bx = align === "left" ? x : x - w; bx = Math.min(MW - w - 1, Math.max(1, bx));
+    c.fillStyle = col; c.globalAlpha = 0.92; c.fillRect(bx, y - 13, w, 13); c.globalAlpha = 1;
+    c.fillStyle = cssv("--on-ink"); c.textBaseline = "middle"; c.fillText(text, bx + 4, y - 6.5);
+  }
+  function renderGradeTable() {
+    const sel = (side, i) => {
+      const dis = side === "L" ? st1.missL : st1.missR;
+      return `<select class="sk-select" data-side="${side}" data-i="${i}" aria-label="${LEVELS[i]} ${side === "L" ? "좌측" : "우측"} 등급" ${dis ? "disabled" : ""}>` +
+        [0, 1, 2, 3].map(g => `<option value="${g}" ${st1[side][i] === g ? "selected" : ""}>${g} ${GRADE_NAME[g]}</option>`).join("") + "</select>";
+    };
+    const lm = levelMax(st1);
+    $("gradeBody").innerHTML = LEVELS.map((lv, i) =>
+      `<tr><td><b>${lv}</b></td><td>${sel("L", i)}</td><td>${sel("R", i)}</td><td><span class="mr-gdot" style="background:var(--g${lm[i]})"></span>${lm[i]}</td></tr>`).join("");
+    $("gradeBody").querySelectorAll("select").forEach(s => s.addEventListener("change", () => {
+      st1[s.dataset.side][+s.dataset.i] = +s.value; st1.preset = null; segSet($("presetSeg"), ""); update1();
+    }));
+  }
+  function update1() {
+    renderGradeTable();
+    drawMRI("mriL", "L"); drawMRI("mriM", "mid"); drawMRI("mriR", "R");
+    const f = findings(st1);
+    const nanS = v => Number.isNaN(v) ? "NaN (측정 누락)" : v.toFixed(1);
+    $("findKv").innerHTML =
+      `<dt>fs_grade_max</dt><dd>${f.fs_grade_max.toFixed(1)}</dd>` +
+      `<dt>label_3class (값)</dt><dd>${f.label}</dd>` +
+      `<dt>fs_grade_left_max</dt><dd>${nanS(f.left)}</dd>` +
+      `<dt>fs_grade_right_max</dt><dd>${nanS(f.right)}</dd>` +
+      `<dt>affected_levels</dt><dd>${f.affected === null ? "NaN (해당 없음)" : esc(f.affected)}</dd>` +
+      `<dt>n_abnormal_foramina</dt><dd>${f.n_abnormal}</dd>`;
+    const rep = makeReport(f);
+    $("refReport").innerHTML = reportHtml(rep);
+    $("repLen").textContent = rep.length;
+    $("presetNote").innerHTML = st1.preset ? esc(PRESETS[st1.preset].note) + " <span class='sk-hint'>분절별 배치는 집계값에 맞춘 예시입니다.</span>" : "직접 고친 케이스입니다. 소견과 리포트가 즉시 다시 계산됩니다.";
+    const py = v => Number.isNaN(v) ? "np.nan" : v.toFixed(1);
+    $("code1").textContent =
+`import numpy as np, pandas as pd
+
+GRADE_NAME = {0: '정상', 1: '경도', 2: '중등도', 3: '중증'}
+# make_report(row) : 실습 노트북의 함수 (결측은 '측정되지 않음' / '침범 분절 없음'으로 드러냄)
+
+row = pd.Series({'fs_grade_max': ${f.fs_grade_max.toFixed(1)},
+                 'fs_grade_left_max': ${py(f.left)},
+                 'fs_grade_right_max': ${py(f.right)},
+                 'affected_levels': ${f.affected === null ? "np.nan" : "'" + f.affected + "'"},
+                 'n_abnormal_foramina': ${f.n_abnormal}})
+print(make_report(row))
+# ${rep}`;
+    $("chkMissL").checked = st1.missL; $("chkMissR").checked = st1.missR;
+    if (typeof refreshDependents === "function") refreshDependents();
+  }
+  let refreshDependents = null;
+  segInit($("presetSeg"), v => { loadPreset(v); update1(); });
+  $("btnNewImg").addEventListener("click", () => { st1.seed = (st1.seed * 7 + 3) % 997; update1(); });
+  $("chkBoxes").addEventListener("change", e => { st1.boxes = e.target.checked; update1(); });
+  $("chkMissL").addEventListener("change", e => { st1.missL = e.target.checked; if (st1.missL) st1.missR = false; st1.preset = null; segSet($("presetSeg"), ""); update1(); });
+  $("chkMissR").addEventListener("change", e => { st1.missR = e.target.checked; if (st1.missR) st1.missL = false; st1.preset = null; segSet($("presetSeg"), ""); update1(); });
+  ["L", "R"].forEach(side => {
+    $(side === "L" ? "mriL" : "mriR").addEventListener("click", e => {
+      if (!st1.boxes || (side === "L" ? st1.missL : st1.missR)) return;
+      const rc = e.currentTarget.getBoundingClientRect(); const x = (e.clientX - rc.left) * MW / rc.width, y = (e.clientY - rc.top) * MH / rc.height;
+      const hit = boxHits[side].find(b => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);
+      if (!hit) return;
+      st1[side][hit.i] = (st1[side][hit.i] + 1) % 4; st1.preset = null; segSet($("presetSeg"), ""); update1();
+    });
+  });
+  copyInit($("copy1"), () => $("code1").textContent);
+  redrawers.push(() => { drawMRI("mriL", "L"); drawMRI("mriM", "mid"); drawMRI("mriR", "R"); });
+
+  /* ---------- 분할 실험 ---------- */
+  const PAT = (() => { const r = rng(7); return shuffle([...Array(109).fill(3), ...Array(72).fill(1), ...Array(35).fill(2)], r); })();
+  $("chkSum").textContent = PAT.reduce((a, b) => a + b, 0);
+  const IMGS = []; PAT.forEach((n, p) => { for (let k = 0; k < n; k++) IMGS.push({ p, k }); });
+  const st1s = { mode: "patient", seed: 1234 };
+  function splitCompute() {
+    const r = rng(st1s.seed);
+    const isVal = new Array(IMGS.length).fill(false);
+    if (st1s.mode === "patient") {
+      const order = shuffle(PAT.map((_, i) => i), r); const nVal = Math.floor(PAT.length * 0.3); const vs = new Set(order.slice(0, nVal));
+      IMGS.forEach((im, j) => { isVal[j] = vs.has(im.p); });
+    } else {
+      const order = shuffle(IMGS.map((_, j) => j), r); const nVal = Math.floor(IMGS.length * 0.3);
+      order.slice(0, nVal).forEach(j => { isVal[j] = true; });
+    }
+    const pv = new Set(), pt = new Set();
+    IMGS.forEach((im, j) => (isVal[j] ? pv : pt).add(im.p));
+    const both = [...pv].filter(p => pt.has(p));
+    return { isVal, pv, pt, both: new Set(both), nValImg: isVal.filter(Boolean).length };
+  }
+  function drawSplit() {
+    const res = splitCompute(); const cols = 24, rows = 9, cw = 17, ch = 17, W = cols * cw + 4, H = rows * ch + 4;
+    const c = setupCanvas($("splitCv"), W, H);
+    c.fillStyle = cssv("--surface"); c.fillRect(0, 0, W, H);
+    const ct = cssv("--c-train"), cvl = cssv("--c-val"), cw2 = cssv("--role-warn"), ln = cssv("--line");
+    let j = 0;
+    PAT.forEach((n, p) => {
+      const x = 2 + (p % cols) * cw, y = 2 + Math.floor(p / cols) * ch;
+      c.fillStyle = cssv("--surface-2"); c.fillRect(x + 1, y + 1, cw - 2, ch - 2);
+      for (let k = 0; k < n; k++, j++) {
+        c.fillStyle = res.isVal[j] ? cvl : ct;
+        const sx = x + 2.5 + (k % 2) * 6, sy = y + 2.5 + Math.floor(k / 2) * 6; c.fillRect(sx, sy, 5, 5);
+      }
+      if (res.both.has(p)) { c.strokeStyle = cw2; c.lineWidth = 2; c.strokeRect(x + 1, y + 1, cw - 2, ch - 2); }
+      else { c.strokeStyle = ln; c.lineWidth = 0.6; c.strokeRect(x + 1, y + 1, cw - 2, ch - 2); }
+    });
+    const pOnlyTrain = [...res.pt].filter(p => !res.pv.has(p)).length, pOnlyVal = [...res.pv].filter(p => !res.pt.has(p)).length;
+    $("splitStats").innerHTML =
+      `<div class="sk-stat"><b>${st1s.mode === "patient" ? pOnlyTrain : res.pt.size}</b><span>학습 환자</span></div>` +
+      `<div class="sk-stat"><b>${st1s.mode === "patient" ? pOnlyVal : res.pv.size}</b><span>검증 환자</span></div>` +
+      `<div class="sk-stat"><b>${IMGS.length - res.nValImg} / ${res.nValImg}</b><span>학습 / 검증 영상</span></div>` +
+      `<div class="sk-stat"><b style="color:${res.both.size ? "var(--role-warn)" : "var(--role-time)"}">${res.both.size}</b><span>양쪽에 걸친 환자</span></div>`;
+    $("splitCv").setAttribute("aria-label", `환자 216명 분할 그림: 양쪽에 걸친 환자 ${res.both.size}명`);
+  }
+  segInit($("splitSeg"), v => { st1s.mode = v; drawSplit(); });
+  $("splitSeed").addEventListener("input", e => { st1s.seed = +e.target.value; $("splitSeedV").textContent = st1s.seed; drawSplit(); });
+  redrawers.push(drawSplit);
+
+  /* =====================================================================
+     2. 모형 구조도
+     ===================================================================== */
+  const DIAGS = {
+    clip: {
+      vb: [1000, 400],
+      lanes: [{ x: 8, y: 26, w: 780, h: 112, t: "영상 인코더 (ViT-B/32)" }, { x: 8, y: 226, w: 780, h: 112, t: "텍스트 인코더 (Transformer)" }],
+      blocks: [
+        { id: "img", x: 20, y: 52, w: 125, h: 62, r: "img", s: 0, t: "요추 MRI 영상", u: "3×224×224", name: "입력 영상", io: ["PNG 영상 (흑백 → RGB 3채널)", "3×224×224 텐서"], d: "CLIPProcessor 가 짧은 변을 224로 맞추고 가운데를 잘라 정규화합니다. 흑백 MRI도 RGB 3채널로 복제해서 넣습니다.", f: "x ∈ R^{3×224×224}" },
+        { id: "patch", x: 165, y: 52, w: 150, h: 62, r: "img", s: 1, t: "패치 임베딩 32×32", u: "50×768", name: "패치 분할 + 선형 임베딩", io: ["3×224×224", "50×768 (패치 49 + CLS 1)"], d: "224÷32 = 7 → 7×7 = 49개 패치를 각각 768차원 벡터로 바꾸고, 맨 앞에 CLS 토큰과 위치 임베딩을 더합니다.", f: "z₀ = [x_cls; x₁E; …; x₄₉E] + E_pos" },
+        { id: "vit", x: 335, y: 52, w: 165, h: 62, r: "img", s: 2, t: "ViT 인코더 ×12층", u: "50×768", name: "Vision Transformer", io: ["50×768", "50×768"], d: "셀프 어텐션 + MLP 블록 12층. 모든 패치가 서로를 참조합니다.", f: "z_l = z_l' + MLP(LN(z_l')),  z_l' = z_{l−1} + MSA(LN(z_{l−1}))" },
+        { id: "iproj", x: 520, y: 52, w: 130, h: 62, r: "img", s: 3, t: "CLS → 투영 W_i", u: "768 → 512", name: "영상 투영층", io: ["CLS 토큰 768", "512"], d: "CLS 토큰 출력만 꺼내 선형 투영으로 공동 임베딩 공간(512차원)에 옮깁니다. get_image_features 의 출력입니다.", f: "e_img = W_i · LN(z_L[CLS]),  W_i ∈ R^{512×768}" },
+        { id: "inorm", x: 668, y: 52, w: 112, h: 62, r: "fuse", s: 4, t: "L2 정규화", u: "I : N×512", name: "영상 임베딩 정규화", io: ["512", "512 (길이 1)"], d: "길이를 1로 맞추면 두 벡터의 내적이 곧 코사인 유사도가 됩니다(노트북의 emb / emb.norm).", f: "I = e_img / ‖e_img‖₂" },
+        { id: "txt", x: 20, y: 252, w: 125, h: 62, r: "txt", s: 0, t: "판독 문장 N개", u: "\"a sagittal MRI …\"", name: "입력 문장", io: ["문자열 N개", "문자열"], d: "배치 안에서 각 영상과 짝지어진 설명문. 제로샷에서는 클래스 이름으로 만든 프롬프트가 들어갑니다.", f: "예: 'a sagittal MRI scan of the lumbar spine'" },
+        { id: "tok", x: 165, y: 252, w: 150, h: 62, r: "txt", s: 1, t: "토큰화 (BPE)", u: "N×L (L ≤ 77)", name: "토큰화 + 토큰 임베딩", io: ["문자열", "N×L 토큰 → N×L×512"], d: "BPE 토큰화 후 [SOS] … [EOS]로 감쌉니다. 최대 길이 77, padding=True 면 배치에서 가장 긴 문장에 맞춥니다.", f: "h₀ = TokenEmb(w) + PosEmb" },
+        { id: "ttf", x: 335, y: 252, w: 165, h: 62, r: "txt", s: 2, t: "텍스트 인코더 ×12층", u: "N×L×512", name: "텍스트 인코더", io: ["N×L×512", "N×L×512"], d: "인과적 마스크를 쓴 Transformer 12층(폭 512).", f: "h_l = Block_l(h_{l−1})" },
+        { id: "tproj", x: 520, y: 252, w: 130, h: 62, r: "txt", s: 3, t: "EOS → 투영 W_t", u: "512 → 512", name: "문장 투영층", io: ["EOS 토큰 512", "512"], d: "문장 끝(EOS) 토큰의 출력을 선형 투영해 영상과 같은 512차원 공간에 놓습니다. get_text_features 의 출력입니다.", f: "e_txt = W_t · LN(h_L[EOS]),  W_t ∈ R^{512×512}" },
+        { id: "tnorm", x: 668, y: 252, w: 112, h: 62, r: "fuse", s: 4, t: "L2 정규화", u: "T : N×512", name: "문장 임베딩 정규화", io: ["512", "512 (길이 1)"], d: "영상과 같은 방식으로 길이 1로 맞춥니다.", f: "T = e_txt / ‖e_txt‖₂" },
+        { id: "sim", x: 812, y: 40, w: 176, h: 62, r: "fuse", s: 5, t: "코사인 유사도 행렬", u: "S = I·Tᵀ : N×N", name: "유사도 행렬", io: ["I: N×512, T: N×512", "N×N"], d: "영상 i 와 문장 j 의 코사인 유사도를 모두 계산합니다. 대각선이 짝이 맞는 쌍입니다. CLIP의 값은 보통 0.2~0.35에 몰립니다.", f: "S_ij = I_i · T_j" },
+        { id: "temp", x: 812, y: 130, w: 176, h: 62, r: "fuse", s: 6, t: "× logit scale (1/τ)", u: "N×N 로짓", name: "온도", io: ["N×N", "N×N 로짓"], d: "학습되는 온도 τ로 나눕니다. CLIP은 logit scale = exp(t) 를 학습하고 100으로 상한을 둡니다(초깃값 τ = 0.07).", f: "logits = S / τ" },
+        { id: "loss", x: 812, y: 220, w: 176, h: 62, r: "fuse", s: 7, t: "대칭 InfoNCE 손실", u: "스칼라", name: "대칭 교차 엔트로피", io: ["N×N 로짓", "손실 1개"], d: "행 방향(영상→문장)과 열 방향(문장→영상) 교차 엔트로피의 평균. 정답은 대각선이므로 사람이 붙인 라벨이 필요 없습니다. 3번 탭에서 직접 계산합니다.", f: "L = ½[ −1/N Σ_i log softmax_j(S_ij/τ)_i  −1/N Σ_j log softmax_i(S_ij/τ)_j ]" },
+        { id: "inf", x: 812, y: 310, w: 176, h: 62, r: "gt", s: 8, t: "추론: argmax · top-k", u: "제로샷 · 검색", name: "학습 후 쓰임", io: ["N×N 또는 1×K", "클래스 / 유사 케이스"], d: "제로샷 = 영상 1장 대 클래스 문장 K개의 행별 argmax. 검색 = 질의 영상과 학습 영상 임베딩의 내적 top-k. 선형 프로빙 = I 위에 로지스틱 회귀.", f: "ŷ = argmax_k (I · T_kᵀ)" }
+      ],
+      arrows: [
+        { p: [[145, 83], [165, 83]], r: "img", s: 1 }, { p: [[315, 83], [335, 83]], r: "img", s: 2 }, { p: [[500, 83], [520, 83]], r: "img", s: 3 }, { p: [[650, 83], [668, 83]], r: "img", s: 4 },
+        { p: [[145, 283], [165, 283]], r: "txt", s: 1 }, { p: [[315, 283], [335, 283]], r: "txt", s: 2 }, { p: [[500, 283], [520, 283]], r: "txt", s: 3 }, { p: [[650, 283], [668, 283]], r: "txt", s: 4 },
+        { p: [[780, 75], [812, 75]], r: "fuse", s: 5 }, { p: [[780, 283], [798, 283], [798, 90], [812, 90]], r: "fuse", s: 5 },
+        { p: [[900, 102], [900, 130]], r: "fuse", s: 6 }, { p: [[900, 192], [900, 220]], r: "fuse", s: 7 }, { p: [[900, 282], [900, 310]], r: "gt", s: 8, dash: true }
+      ],
+      notes: [{ x: 20, y: 172, t: "같은 쌍은 가깝게, 다른 쌍은 멀게 → 영상과 문장이 같은 512차원 공간의 벡터가 됨" }, { x: 20, y: 192, t: "학습: 이미지-설명문 4억 쌍 · 파라미터 151.3M (실습 노트북 확인)" }],
+      steps: ["입력: 영상 N장과 짝지어진 문장 N개", "패치 임베딩 / 토큰화", "인코더 12층 통과", "CLS·EOS 토큰을 512차원으로 투영", "L2 정규화 → 내적 = 코사인", "N×N 유사도 행렬", "온도로 나눠 로짓으로", "대칭 InfoNCE 손실", "학습 후: 제로샷·검색"]
+    },
+    blip: {
+      vb: [1000, 400],
+      lanes: [{ x: 8, y: 26, w: 520, h: 112, t: "영상 인코더 (ViT-B/16)" }, { x: 8, y: 216, w: 820, h: 150, t: "텍스트 디코더 (BERT-base 구조, 12층)" }],
+      blocks: [
+        { id: "img", x: 20, y: 52, w: 125, h: 62, r: "img", s: 0, t: "요추 MRI 영상", u: "3×384×384", name: "입력 영상", io: ["PNG 영상", "3×384×384"], d: "BlipProcessor 가 384×384로 맞춥니다. BLIP은 자연 영상 캡션으로 학습되었고 의료 영상은 본 적이 없습니다.", f: "x ∈ R^{3×384×384}" },
+        { id: "patch", x: 165, y: 52, w: 150, h: 62, r: "img", s: 1, t: "패치 임베딩 16×16", u: "577×768", name: "패치 분할", io: ["3×384×384", "577×768 (24×24 패치 + CLS)"], d: "384÷16 = 24 → 576개 패치 + CLS 1개.", f: "z₀ = [x_cls; x₁E; …; x₅₇₆E] + E_pos" },
+        { id: "vit", x: 335, y: 52, w: 180, h: 62, r: "img", s: 2, t: "ViT 인코더 ×12층", u: "577×768 영상 토큰", name: "Vision Transformer", io: ["577×768", "577×768"], d: "출력 토큰 577개 전체가 디코더의 교차 어텐션 Key·Value 로 쓰입니다(CLIP처럼 한 벡터로 줄이지 않음).", f: "V = ViT(x) ∈ R^{577×768}" },
+        { id: "prompt", x: 16, y: 244, w: 139, h: 62, r: "txt", s: 0, t: "프롬프트", u: "a medical image of", name: "유도 프롬프트", io: ["문자열 (선택)", "문자열"], d: "프롬프트를 주면 그 뒤를 이어 씁니다. 실습 노트북의 채점은 프롬프트 'a medical image of' 결과를 썼습니다.", f: "w_{1:k} = [DEC] a medical image of" },
+        { id: "tok", x: 165, y: 244, w: 120, h: 62, r: "txt", s: 1, t: "토큰 임베딩", u: "t×768", name: "토큰화", io: ["문자열", "t×768"], d: "BERT WordPiece 토큰화. 시작 토큰 [DEC] 뒤에 프롬프트 토큰이 붙습니다.", f: "h₀ = TokEmb(w_{1:t}) + PosEmb" },
+        { id: "sa", x: 305, y: 244, w: 120, h: 62, r: "txt", s: 3, t: "인과적 셀프 어텐션", u: "t×768", name: "Causal Self-Attention", io: ["t×768", "t×768"], d: "각 위치는 자기보다 앞의 토큰만 봅니다(다음 단어를 미리 보지 않도록 마스크).", f: "softmax(QKᵀ/√d + M_causal)V" },
+        { id: "ca", x: 440, y: 244, w: 140, h: 62, r: "fuse", s: 4, t: "교차 어텐션", u: "Q=문장 · K,V=영상", name: "Cross-Attention", io: ["문장 t×768, 영상 577×768", "t×768"], d: "문장의 각 위치가 영상 토큰 577개 중 어디를 볼지 정합니다. 영상 정보가 문장으로 들어오는 유일한 통로입니다.", f: "softmax(Q_txt K_imgᵀ/√d) V_img" },
+        { id: "ffn", x: 595, y: 244, w: 90, h: 62, r: "txt", s: 5, t: "FFN", u: "t×768", name: "피드포워드", io: ["t×768", "t×768"], d: "셀프 어텐션 → 교차 어텐션 → FFN 을 12층 반복합니다.", f: "FFN(h) = W₂ GELU(W₁h)" },
+        { id: "lm", x: 700, y: 244, w: 120, h: 62, r: "txt", s: 6, t: "LM 헤드", u: "768 → 30524", name: "언어모형 헤드", io: ["마지막 위치 768", "어휘 30524개의 확률"], d: "다음 토큰의 확률분포. 모형은 '모른다'를 낼 수 없고 언제나 가장 그럴듯한 다음 단어를 냅니다.", f: "p(w_{t+1} | w_{≤t}, 영상) = softmax(W_vocab h_t)" },
+        { id: "next", x: 845, y: 244, w: 140, h: 62, r: "gt", s: 7, t: "다음 토큰 선택", u: "최대 30 토큰 반복", name: "자기회귀 생성", io: ["확률분포", "토큰 1개 → 입력에 덧붙임"], d: "선택한 토큰을 입력 뒤에 붙여 다시 디코더를 돌립니다. max_new_tokens=30 에서 멈춥니다. 반복 억제가 없으면 'mri mri mri …' 같은 반복이 나옵니다.", f: "w_{t+1} = argmax p(·)  → 반복" },
+        { id: "cap", x: 845, y: 52, w: 140, h: 62, r: "warn", s: 8, t: "캡션 출력", u: "환각 위험", name: "생성 결과", io: ["토큰 열", "영문 문장"], d: "실습 노트북 결과: 'a medical image of a knee with a fracture' — 요추인데 무릎, 없는 골절. 문장은 완벽하게 자연스럽습니다.", f: "출력 예: a radiograph of the knee showing the fracture" },
+        { id: "loss", x: 640, y: 52, w: 180, h: 62, r: "fuse", s: 9, t: "학습: LM 손실", u: "다음 토큰 교차 엔트로피", name: "언어모형 손실", io: ["정답 캡션", "스칼라"], d: "정답 캡션의 각 다음 토큰 확률을 높이도록 학습합니다(teacher forcing). 의료 판독문으로 학습된 적이 없으므로 의료 영상에 맞는 문장을 낼 근거가 없습니다.", f: "L_LM = −Σ_t log p(w_t | w_{<t}, 영상)" }
+      ],
+      arrows: [
+        { p: [[145, 83], [165, 83]], r: "img", s: 1 }, { p: [[315, 83], [335, 83]], r: "img", s: 2 },
+        { p: [[155, 275], [165, 275]], r: "txt", s: 1 }, { p: [[285, 275], [305, 275]], r: "txt", s: 3 }, { p: [[425, 275], [440, 275]], r: "txt", s: 4 },
+        { p: [[510, 114], [510, 244]], r: "fuse", s: 4 },
+        { p: [[580, 275], [595, 275]], r: "txt", s: 5 }, { p: [[685, 275], [700, 275]], r: "txt", s: 6 }, { p: [[820, 275], [845, 275]], r: "txt", s: 7 },
+        { p: [[915, 306], [915, 352], [225, 352], [225, 306]], r: "gt", s: 7, dash: true },
+        { p: [[915, 244], [915, 114]], r: "warn", s: 8 },
+        { p: [[760, 244], [760, 114]], r: "fuse", s: 9, dash: true }
+      ],
+      notes: [{ x: 250, y: 345, t: "생성한 토큰을 입력에 덧붙여 반복 (자기회귀)" }, { x: 20, y: 172, t: "체크포인트: Salesforce/blip-image-captioning-base · 자연 영상 캡션으로 학습" }],
+      steps: ["입력: 영상과 프롬프트", "패치 임베딩 / 토큰 임베딩", "ViT 12층 → 영상 토큰 577개", "인과적 셀프 어텐션", "교차 어텐션: 문장이 영상을 봄", "FFN (12층 반복)", "LM 헤드: 다음 토큰 확률", "토큰 선택 → 입력에 덧붙여 반복", "캡션 출력 (환각 주의)", "학습 시: LM 손실"]
+    },
+    pipe: {
+      vb: [1000, 400],
+      lanes: [{ x: 8, y: 20, w: 852, h: 104, t: "" }, { x: 8, y: 144, w: 852, h: 104, t: "" }, { x: 8, y: 268, w: 852, h: 104, t: "" }],
+      blocks: [
+        { id: "l1", x: 16, y: 40, w: 86, h: 62, r: "gt", s: 0, t: "① 템플릿", u: "규칙", name: "템플릿 (규칙) 방식", io: ["영상", "리포트"], d: "영상 → 구조화된 소견(등급 예측) → 정해진 문장 틀. 예측과 문장이 항상 일치하고 검증 가능하지만 표현이 단조롭고 틀 밖의 소견을 못 씁니다.", f: "영상 → 소견 → 문장" },
+        { id: "a1", x: 112, y: 40, w: 100, h: 62, r: "img", s: 0, t: "MRI 영상", u: "검증 147장", name: "입력", io: ["영상", "3×224×224"], d: "환자 단위로 나눈 검증 영상 147장.", f: "" },
+        { id: "a2", x: 228, y: 40, w: 140, h: 62, r: "img", s: 1, t: "CLIP 영상 인코더", u: "→ 512", name: "CLIP 영상 임베딩", io: ["3×224×224", "512"], d: "CLIP은 고정(특성 추출기).", f: "I = normalize(f_img(x))" },
+        { id: "a3", x: 384, y: 40, w: 150, h: 62, r: "fuse", s: 2, t: "로지스틱 회귀", u: "512 → 4 등급", name: "선형 프로빙 등급 예측기", io: ["512", "등급 0~3"], d: "학습 322장으로 학습. 검증 정확도 32.65%, 0등급을 예측하지 않음.", f: "ŷ = argmax softmax(W·I + b)" },
+        { id: "a4", x: 550, y: 40, w: 150, h: 62, r: "txt", s: 3, t: "문장 틀 채우기", u: "등급만 · 나머지 비움", name: "문장 틀", io: ["등급", "문장"], d: "예측하지 않은 좌우 등급·침범 분절은 '확인되지 않음'으로 남깁니다. 지어내지 않는 것이 핵심입니다.", f: "'최대 협착 등급은 {g}등급(…) 으로 추정됨.'" },
+        { id: "a5", x: 716, y: 40, w: 136, h: 62, r: "txt", s: 4, t: "리포트", u: "등급 정확도 = 예측", name: "템플릿 리포트", io: ["", "한국어 리포트"], d: "등급 정확도 0.327 = 예측기 정확도 그대로. 채점이 곧 모형 평가가 됩니다.", f: "ROUGE1 0.434 · 등급 정확도 0.327" },
+        { id: "l2", x: 16, y: 164, w: 86, h: 62, r: "gt", s: 0, t: "② 검색", u: "retrieval", name: "검색 방식", io: ["영상", "리포트"], d: "가장 비슷한 과거 케이스의 리포트를 가져옵니다. 문장은 자연스럽고 실제 표현이지만 남의 환자 소견을 그대로 씁니다.", f: "" },
+        { id: "b1", x: 112, y: 164, w: 100, h: 62, r: "img", s: 0, t: "MRI 영상", u: "질의", name: "입력", io: ["영상", "3×224×224"], d: "검증 케이스 = 질의.", f: "" },
+        { id: "b2", x: 228, y: 164, w: 140, h: 62, r: "img", s: 1, t: "CLIP 영상 인코더", u: "→ 512", name: "CLIP 영상 임베딩", io: ["3×224×224", "512"], d: "학습 322장도 같은 방식으로 미리 임베딩해 둡니다.", f: "" },
+        { id: "b3", x: 384, y: 164, w: 150, h: 62, r: "fuse", s: 2, t: "학습 322장과 코사인", u: "argmax → 최근접 1건", name: "최근접 검색", io: ["512 · 322×512", "인덱스 1개"], d: "최근접 1건의 등급 일치율 29.93% (무작위 25.0%).", f: "j* = argmax_j I_q · I_j" },
+        { id: "b4", x: 550, y: 164, w: 150, h: 62, r: "txt", s: 3, t: "그 케이스 리포트 복사", u: "report[j*]", name: "리포트 복사", io: ["인덱스", "문장"], d: "예: 질의 1417PT(경도) → 979PT(중등도) 리포트를 그대로 가져옴.", f: "" },
+        { id: "b5", x: 716, y: 164, w: 136, h: 62, r: "warn", s: 4, t: "리포트", u: "남의 환자 소견", name: "검색 리포트", io: ["", "한국어 리포트"], d: "ROUGE1 0.799로 가장 높지만 등급 정확도 0.299. 텍스트 지표만 보면 '가장 좋은 모형'으로 보이는 가장 위험한 방식입니다.", f: "ROUGE1 0.799 · 등급 정확도 0.299" },
+        { id: "l3", x: 16, y: 288, w: 86, h: 62, r: "gt", s: 0, t: "③ 생성", u: "VLM", name: "생성 방식", io: ["영상", "문장"], d: "영상을 보고 문장을 직접 생성합니다. 유연하지만 환각이 생기고 검증할 수 없습니다.", f: "" },
+        { id: "c1", x: 112, y: 288, w: 100, h: 62, r: "img", s: 0, t: "MRI 영상", u: "40장", name: "입력", io: ["영상", "3×384×384"], d: "BLIP은 느려서 검증 앞쪽 40장만 채점(n_blip = 40, 16.9초).", f: "" },
+        { id: "c2", x: 228, y: 288, w: 140, h: 62, r: "img", s: 1, t: "BLIP ViT", u: "→ 577×768", name: "BLIP 영상 인코더", io: ["3×384×384", "577×768"], d: "", f: "" },
+        { id: "c3", x: 384, y: 288, w: 150, h: 62, r: "fuse", s: 2, t: "텍스트 디코더", u: "교차 어텐션", name: "BLIP 디코더", io: ["영상 토큰 + 프롬프트", "토큰 열"], d: "프롬프트 'a medical image of' 뒤를 이어 씀.", f: "" },
+        { id: "c4", x: 550, y: 288, w: 150, h: 62, r: "txt", s: 3, t: "캡션 생성", u: "max_new_tokens=30", name: "생성", io: ["", "영문 캡션"], d: "", f: "" },
+        { id: "c5", x: 716, y: 288, w: 136, h: 62, r: "warn", s: 4, t: "영문 캡션", u: "환각 · 등급 미언급", name: "BLIP 출력", io: ["", "영문 문장"], d: "ROUGE1 0.000, 등급 미언급 1.0. 한국어도 아니고 소견도 아닙니다.", f: "ROUGE1 0.000 · 등급 미언급 1.0" },
+        { id: "sc", x: 872, y: 40, w: 118, h: 310, r: "gt", s: 5, t: "같은 지표로 채점", u: "ROUGE-1", name: "공통 채점", io: ["정답 리포트 · 생성 리포트", "4개 지표"], d: "ROUGE-1(정답 단어의 재현율), 정밀도(생성 단어 중 정답에 있는 비율), 등급 정확도(extract_grade 일치), 등급 미언급 비율. 5번 탭에서 직접 계산합니다.", f: "ROUGE1 = |ref ∩ hyp| / |ref|,  정밀도 = |ref ∩ hyp| / |hyp|" }
+      ],
+      arrows: [
+        { p: [[212, 71], [228, 71]], r: "img", s: 1 }, { p: [[368, 71], [384, 71]], r: "img", s: 2 }, { p: [[534, 71], [550, 71]], r: "fuse", s: 3 }, { p: [[700, 71], [716, 71]], r: "txt", s: 4 }, { p: [[852, 71], [872, 71]], r: "gt", s: 5 },
+        { p: [[212, 195], [228, 195]], r: "img", s: 1 }, { p: [[368, 195], [384, 195]], r: "img", s: 2 }, { p: [[534, 195], [550, 195]], r: "fuse", s: 3 }, { p: [[700, 195], [716, 195]], r: "txt", s: 4 }, { p: [[852, 195], [872, 195]], r: "gt", s: 5 },
+        { p: [[212, 319], [228, 319]], r: "img", s: 1 }, { p: [[368, 319], [384, 319]], r: "img", s: 2 }, { p: [[534, 319], [550, 319]], r: "fuse", s: 3 }, { p: [[700, 319], [716, 319]], r: "txt", s: 4 }, { p: [[852, 319], [872, 319]], r: "gt", s: 5 }
+      ],
+      notes: [{ x: 16, y: 390, t: "안전한 순서는 영상 → 구조화 소견 → 문장. 문장 단계에서 새 사실이 생기면 안 됨" }],
+      extraText: [{ x: 931, y: 112, t: ["정밀도", "등급 정확도", "등급 미언급"] }],
+      steps: ["입력 영상 (세 방식 공통)", "영상 인코더", "예측 / 검색 / 디코딩", "문장 만들기", "결과 리포트", "같은 지표로 채점"]
+    }
+  };
+  const stD = { key: "clip", step: -1, sel: "img", timer: null };
+  function buildDiagram() {
+    const D = DIAGS[stD.key], svg = $("diagSvg");
+    svg.setAttribute("viewBox", `0 0 ${D.vb[0]} ${D.vb[1]}`);
+    let h = "<defs>" + ["img", "txt", "fuse", "gt", "warn"].map(r => `<marker id="ah-${r}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mr-ah-${r}"/></marker>`).join("") + "</defs>";
+    D.lanes.forEach(l => { h += `<rect class="lane" x="${l.x}" y="${l.y}" width="${l.w}" height="${l.h}" rx="10"/>`; if (l.t) h += `<text class="lane-t" x="${l.x + 10}" y="${l.y + 17}">${esc(l.t)}</text>`; });
+    D.arrows.forEach((a, i) => { h += `<path class="mr-ar r-${a.r}${a.dash ? " dash" : ""}" data-s="${a.s}" d="M${a.p.map(q => q.join(",")).join(" L")}" marker-end="url(#ah-${a.r})"/>`; });
+    D.blocks.forEach(b => {
+      h += `<g class="mr-blk r-${b.r}" data-id="${b.id}" data-s="${b.s}" tabindex="0" role="button" aria-label="${esc(b.t + " " + b.u)}">` +
+        `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="9"/>` +
+        `<text class="t1" x="${b.x + b.w / 2}" y="${b.y + (b.h > 100 ? 26 : b.h / 2 - 3)}" text-anchor="middle">${esc(b.t)}</text>` +
+        `<text class="t2" x="${b.x + b.w / 2}" y="${b.y + (b.h > 100 ? 46 : b.h / 2 + 15)}" text-anchor="middle">${esc(b.u)}</text></g>`;
+    });
+    (D.extraText || []).forEach(e => e.t.forEach((line, k) => { h += `<text class="note" x="${e.x}" y="${e.y + k * 20}" text-anchor="middle" style="font-size:12px;fill:var(--muted)">${esc(line)}</text>`; }));
+    (D.notes || []).forEach(n => { h += `<text class="note" x="${n.x}" y="${n.y}">${esc(n.t)}</text>`; });
+    svg.innerHTML = h;
+    svg.setAttribute("aria-label", { clip: "CLIP 듀얼 인코더 구조도", blip: "BLIP 캡션 생성 구조도", pipe: "리포트 생성 3방식 파이프라인 구조도" }[stD.key]);
+    svg.querySelectorAll(".mr-blk").forEach(g => {
+      g.addEventListener("click", () => { stD.sel = g.dataset.id; paintDiagram(); });
+      g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); stD.sel = g.dataset.id; paintDiagram(); } });
+    });
+    paintDiagram();
+  }
+  function paintDiagram() {
+    const D = DIAGS[stD.key], svg = $("diagSvg"), cur = stD.step;
+    svg.querySelectorAll(".mr-blk").forEach(g => {
+      const s = +g.dataset.s;
+      g.classList.toggle("on", cur >= 0 && s === cur); g.classList.toggle("fut", cur >= 0 && s > cur); g.classList.toggle("sel", g.dataset.id === stD.sel);
+    });
+    svg.querySelectorAll(".mr-ar").forEach(a => { const s = +a.dataset.s; a.classList.toggle("on", cur >= 0 && s === cur); a.classList.toggle("fut", cur >= 0 && s > cur); });
+    $("dStepLbl").textContent = cur < 0 ? `전체 보기 · 단계 0 / ${D.steps.length}` : `단계 ${cur + 1} / ${D.steps.length} : ${D.steps[cur]}`;
+    const b = D.blocks.find(x => x.id === stD.sel) || D.blocks[0];
+    $("diagPanel").innerHTML = `<h3 style="color:var(--role-${b.r})">${esc(b.name)}</h3>` +
+      `<dl class="sk-kv"><dt>입력</dt><dd>${esc(b.io[0] || "—")}</dd><dt>출력</dt><dd>${esc(b.io[1] || "—")}</dd></dl>` +
+      (b.d ? `<p>${esc(b.d)}</p>` : "") + (b.f ? `<div class="sk-formula">${esc(b.f)}</div>` : "");
+  }
+  function diagStep(d) {
+    const n = DIAGS[stD.key].steps.length;
+    stD.step = Math.max(-1, Math.min(n - 1, stD.step + d));
+    if (stD.step >= 0) { const b = DIAGS[stD.key].blocks.find(x => x.s === stD.step); if (b) stD.sel = b.id; }
+    paintDiagram();
+  }
+  function diagStop() { if (stD.timer) { clearInterval(stD.timer); stD.timer = null; } $("dPlay").textContent = "재생"; }
+  function diagPlay() {
+    if (stD.timer) { diagStop(); return; }
+    const n = DIAGS[stD.key].steps.length; if (stD.step >= n - 1) stD.step = -1;
+    $("dPlay").textContent = "멈춤";
+    const ms = +$("dSpeed").value * 100;
+    diagStep(1);
+    stD.timer = setInterval(() => { if (stD.step >= DIAGS[stD.key].steps.length - 1) { diagStop(); return; } diagStep(1); }, reduceMotion ? Math.max(ms, 1500) : ms);
+  }
+  segInit($("diagSeg"), v => { diagStop(); stD.key = v; stD.step = -1; stD.sel = DIAGS[v].blocks[0].id; buildDiagram(); });
+  $("dFirst").addEventListener("click", () => { diagStop(); stD.step = -1; paintDiagram(); });
+  $("dPrev").addEventListener("click", () => { diagStop(); diagStep(-1); });
+  $("dNext").addEventListener("click", () => { diagStop(); diagStep(1); });
+  $("dPlay").addEventListener("click", diagPlay);
+  $("dSpeed").addEventListener("input", e => { $("dSpeedV").textContent = (e.target.value / 10).toFixed(1) + "초"; if (stD.timer) { diagStop(); diagPlay(); } });
+  $("diagWrap").addEventListener("keydown", e => {
+    if (e.target.closest && e.target.closest(".mr-blk") && (e.key === "Enter" || e.key === " ")) return;
+    if (e.key === "ArrowRight") { diagStop(); diagStep(1); e.preventDefault(); }
+    else if (e.key === "ArrowLeft") { diagStop(); diagStep(-1); e.preventDefault(); }
+  });
+
+  /* =====================================================================
+     3. 대조학습
+     ===================================================================== */
+  const PAIRS = [
+    ["요추 MRI", "a sagittal MRI scan of the lumbar spine"],
+    ["흉부 X-ray", "a chest X-ray image"],
+    ["복부 CT", "an axial CT scan of the abdomen"],
+    ["의료 도구 사진", "a photograph of medical tools on a tray"],
+    ["정상 흉부 X-ray", "a normal healthy chest X-ray"],
+    ["폐렴 흉부 X-ray", "a chest X-ray showing pneumonia"]
+  ];
+  const TAUS = [0.01, 0.02, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.3, 0.5, 0.7, 1.0];
+  const stC = { N: 4, tau: 0.07, seed: 11, th: [], ph: [], hist: [], losses: [], row: 0, timer: null };
+  function cInit() {
+    const r = rng(stC.seed); stC.th = []; stC.ph = [];
+    for (let i = 0; i < 6; i++) { stC.th.push(r() * Math.PI * 2); stC.ph.push(r() * Math.PI * 2); }
+    stC.hist = []; stC.losses = [cCompute().L]; stC.row = Math.min(stC.row, stC.N - 1);
+  }
+  function cCompute() {
+    const N = stC.N, tau = stC.tau, th = stC.th.slice(0, N), ph = stC.ph.slice(0, N);
+    const S = th.map(a => ph.map(b => Math.cos(a - b)));
+    const Z = S.map(r => r.map(v => v / tau));
+    const P = Z.map(softmax);
+    const Q = Z.map(r => r.slice());
+    for (let j = 0; j < N; j++) { const col = softmax(Z.map(r => r[j])); for (let i = 0; i < N; i++) Q[i][j] = col[i]; }
+    let li = 0, lt = 0; for (let i = 0; i < N; i++) { li -= Math.log(P[i][i]); lt -= Math.log(Q[i][i]); }
+    li /= N; lt /= N;
+    return { S, Z, P, Q, Li: li, Lt: lt, L: (li + lt) / 2 };
+  }
+  function cStepOnce() {
+    const N = stC.N, tau = stC.tau, R = cCompute();
+    const gt = new Array(N).fill(0), gp = new Array(N).fill(0);
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      const G = ((R.P[i][j] - (i === j ? 1 : 0)) + (R.Q[i][j] - (i === j ? 1 : 0))) / (2 * N * tau);
+      const s = Math.sin(stC.th[i] - stC.ph[j]); gt[i] += G * (-s); gp[j] += G * s;
+    }
+    stC.hist.push([stC.th.slice(), stC.ph.slice()]);
+    const lr = 0.4 * tau;
+    for (let i = 0; i < N; i++) { stC.th[i] -= lr * gt[i]; stC.ph[i] -= lr * gp[i]; }
+    stC.losses.push(cCompute().L);
+  }
+  function matHtml(M, title, kind, fmt) {
+    const N = M.length;
+    let h = `<div><div class="sk-mat-label">${title}</div><div class="sk-mat sk-mat--sm" style="grid-template-columns:repeat(${N + 1},auto)"><div class="h"></div>`;
+    for (let j = 0; j < N; j++) h += `<div class="h t">T${j + 1}</div>`;
+    for (let i = 0; i < N; i++) {
+      h += `<div class="h i">I${i + 1}</div>`;
+      for (let j = 0; j < N; j++) {
+        const v = M[i][j]; const p = kind === "cos" ? (v + 1) / 2 : v;
+        const sel = (kind === "P" && i === stC.row) || (kind === "Q" && j === stC.row);
+        h += `<div class="c${i === j ? " diag" : ""}${sel ? " rowsel" : ""}" data-r="${kind === "Q" ? j : i}" style="background:${heatBg(p)};color:${heatFg(p)}" title="${kind === "cos" ? "S" : kind}${i + 1}${j + 1} = ${v.toFixed(4)}">${fmt(v)}</div>`;
+      }
+    }
+    return h + "</div></div>";
+  }
+  function cRender() {
+    const R = cCompute(), N = stC.N, r = stC.row;
+    $("cMats").innerHTML = matHtml(R.S, "코사인 유사도 S = I·Tᵀ", "cos", v => v.toFixed(2)) +
+      matHtml(R.P, "행 softmax P (영상→문장)", "P", v => v.toFixed(2)) +
+      matHtml(R.Q, "열 softmax Q (문장→영상)", "Q", v => v.toFixed(2));
+    $("cMats").querySelectorAll(".c").forEach(c => c.addEventListener("click", () => { stC.row = +c.dataset.r; cRender(); }));
+    const zrow = R.Z[r].map(v => v.toFixed(2));
+    const zcol = R.Z.map(rr => rr[r].toFixed(2));
+    $("cFormula").innerHTML =
+      `선택한 쌍 ${r + 1} (행·열을 눌러 바꿈), τ = ${stC.tau}<br>` +
+      `로짓 행 ${r + 1} : S/τ = [${zrow.join(", ")}]<br>` +
+      `영상→문장 : −log P<sub>${r + 1}${r + 1}</sub> = −log( e<sup>${R.Z[r][r].toFixed(2)}</sup> / Σ<sub>j</sub> e<sup>S<sub>${r + 1}j</sub>/τ</sup> ) = −log(${R.P[r][r].toFixed(4)}) = <b>${(-Math.log(R.P[r][r])).toFixed(4)}</b><br>` +
+      `로짓 열 ${r + 1} : [${zcol.join(", ")}]<br>` +
+      `문장→영상 : −log Q<sub>${r + 1}${r + 1}</sub> = −log(${R.Q[r][r].toFixed(4)}) = <b>${(-Math.log(R.Q[r][r])).toFixed(4)}</b><br>` +
+      `L = ½ ( 1/N Σ<sub>i</sub> −log P<sub>ii</sub> + 1/N Σ<sub>j</sub> −log Q<sub>jj</sub> ) = ½ ( ${R.Li.toFixed(4)} + ${R.Lt.toFixed(4)} ) = <b>${R.L.toFixed(4)}</b>`;
+    const acc = R.P.filter((row, i) => row.indexOf(Math.max(...row)) === i).length;
+    $("cStats").innerHTML =
+      `<div class="sk-stat"><b>${R.L.toFixed(3)}</b><span>대칭 손실 L</span></div>` +
+      `<div class="sk-stat"><b>${Math.log(N).toFixed(3)}</b><span>무작위 기준 log N</span></div>` +
+      `<div class="sk-stat"><b>${acc} / ${N}</b><span>행 argmax = 대각선</span></div>`;
+    $("cStepLbl").textContent = `스텝 ${stC.hist.length}`;
+    $("cPairs").innerHTML = PAIRS.slice(0, N).map((p, i) => `<tr><td class="n">${i + 1}</td><td style="color:var(--role-img);font-weight:600">I${i + 1} ${esc(p[0])}</td><td style="color:var(--role-txt)"><span class="sk-mono">T${i + 1}</span> ${esc(p[1])}</td></tr>`).join("");
+    spark($("cSpark"), [stC.losses], ["ln"], Math.log(N));
+    cDrawCircle();
+    $("code3").textContent =
+`import torch
+import torch.nn.functional as F
+
+# img_emb, txt_emb : 배치의 영상 N개, 문장 N개 인코더 출력 (N x 512)
+I = F.normalize(img_emb, dim=-1)
+T = F.normalize(txt_emb, dim=-1)
+
+tau    = ${stC.tau}                       # 온도 (CLIP은 logit_scale = 1/tau 를 학습)
+logits = I @ T.T / tau                  # N x N
+labels = torch.arange(logits.shape[0])  # 정답 = 대각선
+
+loss_i2t = F.cross_entropy(logits,   labels)   # 행: 영상 -> 문장
+loss_t2i = F.cross_entropy(logits.T, labels)   # 열: 문장 -> 영상
+loss = (loss_i2t + loss_t2i) / 2               # 현재 화면 값 ${R.L.toFixed(4)}`;
+  }
+  function cDrawCircle() {
+    const S = 320, c = setupCanvas($("cCircle"), S, S), cx = S / 2, cy = S / 2, rad = 118, N = stC.N;
+    c.fillStyle = cssv("--surface"); c.fillRect(0, 0, S, S);
+    c.strokeStyle = cssv("--line-strong"); c.lineWidth = 1; c.beginPath(); c.arc(cx, cy, rad, 0, Math.PI * 2); c.stroke();
+    c.strokeStyle = cssv("--line"); c.beginPath(); c.moveTo(cx - rad - 10, cy); c.lineTo(cx + rad + 10, cy); c.moveTo(cx, cy - rad - 10); c.lineTo(cx, cy + rad + 10); c.stroke();
+    const ci = cssv("--role-img"), ct = cssv("--role-txt"), cf = cssv("--role-fuse"), ink = cssv("--ink");
+    const pos = a => [cx + rad * Math.cos(a), cy - rad * Math.sin(a)];
+    for (let i = 0; i < N; i++) {
+      const a = pos(stC.th[i]), b = pos(stC.ph[i]);
+      c.strokeStyle = cf; c.lineWidth = 1.6; c.setLineDash([4, 3]); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); c.setLineDash([]);
+    }
+    c.font = "600 11px " + cssv("--mono"); c.textBaseline = "middle"; c.textAlign = "center";
+    for (let i = 0; i < N; i++) {
+      const a = pos(stC.th[i]), b = pos(stC.ph[i]);
+      c.fillStyle = ci; c.fillRect(a[0] - 6, a[1] - 6, 12, 12);
+      c.fillStyle = ct; c.beginPath(); c.arc(b[0], b[1], 6.5, 0, Math.PI * 2); c.fill();
+      const la = [cx + (rad + 20) * Math.cos(stC.th[i]), cy - (rad + 20) * Math.sin(stC.th[i])];
+      const lb = [cx + (rad - 20) * Math.cos(stC.ph[i]), cy - (rad - 20) * Math.sin(stC.ph[i])];
+      c.fillStyle = ci; c.fillText("I" + (i + 1), la[0], la[1]);
+      c.fillStyle = ct; c.fillText("T" + (i + 1), lb[0], lb[1]);
+    }
+    c.textAlign = "left"; c.fillStyle = cssv("--faint"); c.font = "500 10.5px " + cssv("--sans"); c.fillText("단위원 = 길이 1로 정규화된 2차원 임베딩", 8, S - 10);
+    $("cCircle").setAttribute("aria-label", `단위원 위의 영상·문장 임베딩 ${N}쌍, 손실 ${cCompute().L.toFixed(3)}`);
+  }
+  function spark(svg, series, cls, refLine) {
+    const W = 320, H = 70, all = series.flat().filter(Number.isFinite);
+    if (!all.length) { svg.innerHTML = ""; return; }
+    let mx = Math.max(...all, refLine || 0), mn = Math.min(...all, 0);
+    if (mx - mn < 1e-9) mx = mn + 1;
+    const n = Math.max(...series.map(s => s.length));
+    const X = i => 4 + (W - 8) * (n <= 1 ? 0 : i / (n - 1)), Y = v => H - 4 - (H - 10) * (v - mn) / (mx - mn);
+    let h = `<line class="ax" x1="0" y1="${H - 4}" x2="${W}" y2="${H - 4}"/>`;
+    if (refLine) h += `<line class="ax" stroke-dasharray="4 4" x1="0" y1="${Y(refLine)}" x2="${W}" y2="${Y(refLine)}"/>`;
+    series.forEach((s, k) => { if (s.length) h += `<polyline class="${cls[k]}" points="${s.map((v, i) => X(i).toFixed(1) + "," + Y(v).toFixed(1)).join(" ")}"/>`; });
+    svg.innerHTML = h;
+  }
+  function cStop() { if (stC.timer) { clearInterval(stC.timer); stC.timer = null; } $("cPlay").textContent = "재생"; }
+  $("cN").addEventListener("input", e => { stC.N = +e.target.value; $("cNV").textContent = stC.N; stC.row = Math.min(stC.row, stC.N - 1); stC.hist = []; stC.losses = [cCompute().L]; cRender(); });
+  $("cTau").addEventListener("input", e => { stC.tau = TAUS[+e.target.value]; $("cTauV").textContent = stC.tau; stC.losses.push(cCompute().L); cRender(); });
+  $("cInit").addEventListener("click", () => { cStop(); stC.seed = (stC.seed * 13 + 7) % 10007; cInit(); cRender(); });
+  $("cFirst").addEventListener("click", () => { cStop(); if (stC.hist.length) { [stC.th, stC.ph] = stC.hist[0]; } stC.hist = []; stC.losses = [cCompute().L]; cRender(); });
+  $("cPrev").addEventListener("click", () => { cStop(); if (stC.hist.length) { [stC.th, stC.ph] = stC.hist.pop(); stC.losses.pop(); } cRender(); });
+  $("cNext").addEventListener("click", () => { cStop(); cStepOnce(); cRender(); });
+  const C_SPEED = [0, 600, 350, 180, 90, 40], C_SPEED_L = ["", "아주 느림", "느림", "보통", "빠름", "아주 빠름"];
+  $("cSpeed").addEventListener("input", e => { $("cSpeedV").textContent = C_SPEED_L[+e.target.value]; if (stC.timer) { cStop(); $("cPlay").click(); } });
+  $("cPlay").addEventListener("click", () => {
+    if (stC.timer) { cStop(); return; }
+    $("cPlay").textContent = "멈춤";
+    const ms = reduceMotion ? 600 : C_SPEED[+$("cSpeed").value];
+    stC.timer = setInterval(() => { cStepOnce(); cRender(); if (stC.hist.length >= 300) cStop(); }, ms);
+  });
+  copyInit($("copy3"), () => $("code3").textContent);
+  redrawers.push(cDrawCircle);
+
+  /* =====================================================================
+     4. 제로샷 · 선형 프로빙
+     ===================================================================== */
+  const PROBE_IMG = ["X-ray (정상)", "X-ray (폐렴)", "요추 MRI", "복부 CT (간)", "TCCC 사진"];
+  const PROBE_TXT = ["a chest X-ray image", "a sagittal MRI scan of the lumbar spine", "an axial CT scan of the abdomen", "a photograph of medical tools on a tray", "a normal healthy chest X-ray", "a chest X-ray showing pneumonia"];
+  const PROBE_SIM = [[0.321, 0.255, 0.257, 0.213, 0.314, 0.335], [0.329, 0.253, 0.273, 0.221, 0.318, 0.348], [0.243, 0.319, 0.269, 0.187, 0.221, 0.237], [0.281, 0.299, 0.315, 0.199, 0.251, 0.279], [0.220, 0.182, 0.197, 0.240, 0.206, 0.216]];
+  const stP = { mode: "cos", ls: 100 };
+  function renderProbe() {
+    let h = `<thead><tr><th>영상 \\ 문장</th>${PROBE_TXT.map(t => `<th class="wrap" style="min-width:110px;font-size:12px">${esc(t)}</th>`).join("")}<th>가장 가까운 문장</th></tr></thead><tbody>`;
+    PROBE_SIM.forEach((row, i) => {
+      const sm = softmax(row.map(v => v * stP.ls)); const best = row.indexOf(Math.max(...row));
+      h += `<tr><td><b>${PROBE_IMG[i]}</b></td>` + row.map((v, j) => {
+        const val = stP.mode === "cos" ? v : sm[j]; const p = stP.mode === "cos" ? (v - 0.18) / 0.17 : sm[j];
+        return `<td class="n${j === best ? " best" : ""}" style="background:${heatBg(p)};color:${heatFg(p)}">${val.toFixed(3)}</td>`;
+      }).join("") + `<td style="font-size:12.5px">${esc(PROBE_TXT[best])} (${row[best].toFixed(3)})</td></tr>`;
+    });
+    $("probeTbl").innerHTML = h + "</tbody>";
+  }
+  segInit($("probeSeg"), v => { stP.mode = v; renderProbe(); });
+  $("ls").addEventListener("input", e => { stP.ls = +e.target.value; $("lsV").textContent = stP.ls; if (stP.mode !== "soft") { stP.mode = "soft"; segSet($("probeSeg"), "soft"); } renderProbe(); });
+
+  const ORGANS = ["bladder", "femur-left", "femur-right", "heart", "kidney-left", "kidney-right", "liver", "lung-left", "lung-right", "pancreas", "spleen"];
+  const TPL = { name: { t: "{organ}", acc: 9.39, lab: "이름만" }, photo: { t: "a photo of a {organ}", acc: 8.48, lab: "일반 문장" }, ct: { t: "an axial CT scan of the {organ}", acc: 14.24, lab: "도메인 문장" } };
+  const stZ = { k: "ct" };
+  function renderZS() {
+    const tpl = stZ.k === "custom" ? $("tplInput").value : TPL[stZ.k].t;
+    const has = tpl.includes("{organ}");
+    const prompts = ORGANS.map(o => has ? tpl.split("{organ}").join(o.replace("-", " ")) : tpl);
+    $("tplList").innerHTML = prompts.map(p => `<span>${esc(p)}</span>`).join("");
+    if (stZ.k === "custom") {
+      $("tplNote").innerHTML = has ? "직접 만든 프롬프트의 정확도는 실습 노트북에서 실제 CLIP으로 돌려야 알 수 있습니다. 아래 코드를 복사해 실행해 보세요. 프롬프트를 바꾸면 결과가 흔들리므로 <b>재현성을 위해 프롬프트를 고정하고 기록</b>합니다."
+        : "<b>{organ}</b> 자리가 없으면 11개 프롬프트가 모두 같아져 분류가 불가능합니다.";
+    } else {
+      $("tplNote").innerHTML = `${TPL[stZ.k].lab} 정확도 <b>${TPL[stZ.k].acc.toFixed(2)}%</b> (예시 프롬프트: <span class="sk-mono">${esc(prompts[0])}</span>). 어느 프롬프트도 무작위(9.1%)보다 조금 나은 수준입니다. CLIP은 "CT 스캔처럼 생겼다"까지만 알고, 어느 장기인지는 학습한 적이 없습니다.`;
+    }
+    $("tplInput").disabled = stZ.k !== "custom";
+    barChart($("zsChart"), [
+      { l: "무작위", v: 100 / 11, c: "--role-gt" }, { l: "이름만", v: 9.39, c: "--role-txt", on: stZ.k === "name" },
+      { l: "일반 문장", v: 8.48, c: "--role-txt", on: stZ.k === "photo" }, { l: "도메인 문장", v: 14.24, c: "--role-txt", on: stZ.k === "ct" }
+    ], 20, "%", "제로샷 정확도 (%)");
+    $("code4").textContent =
+`organ_list = ${JSON.stringify(ORGANS).replace(/,/g, ", ")}
+
+template  = ${JSON.stringify(tpl).replace(/"/g, "'")}
+text_list = [template.replace('{organ}', o.replace('-', ' ')) for o in organ_list]
+
+E_t  = embed_texts(text_list)                  # 11 x 512, 정규화됨
+pred = (E_organ_test @ E_t.T).argmax(axis=1)   # E_organ_test : 330 x 512
+print('정확도', round(float((pred == organ_test_y).mean()) * 100, 2), '%')
+print('예측 분포', np.bincount(pred, minlength=len(organ_list)))   # 분포도 함께 확인`;
+  }
+  segInit($("tplSeg"), v => { stZ.k = v; renderZS(); if (v === "custom") $("tplInput").focus(); });
+  $("tplInput").addEventListener("input", renderZS);
+  copyInit($("copy4"), () => $("code4").textContent);
+
+  function barChart(svg, data, ymax, unit, ylab, groups) {
+    const W = 420, H = +svg.getAttribute("viewBox").split(" ")[3], L = 40, B = 34, T = 18, Rm = 8;
+    const ph = H - B - T, n = data.length, bw = Math.min(64, (W - L - Rm) / n * 0.62);
+    let h = "";
+    const ticks = 4;
+    for (let k = 0; k <= ticks; k++) { const v = ymax * k / ticks, y = T + ph - ph * k / ticks; h += `<line class="grid" x1="${L}" y1="${y}" x2="${W - Rm}" y2="${y}"/><text x="${L - 5}" y="${y + 4}" text-anchor="end">${+v.toFixed(2)}</text>`; }
+    h += `<line class="ax" x1="${L}" y1="${T + ph}" x2="${W - Rm}" y2="${T + ph}"/>`;
+    data.forEach((d, i) => {
+      const cxm = L + (W - L - Rm) * (i + 0.5) / n, hh = ph * Math.min(1, d.v / ymax), y = T + ph - hh;
+      const col = `var(${d.c})`;
+      h += `<rect x="${cxm - bw / 2}" y="${y}" width="${bw}" height="${hh}" rx="3" style="fill:${col};opacity:${d.on === false ? 0.45 : d.on ? 1 : 0.85}"/>`;
+      if (d.on) h += `<rect x="${cxm - bw / 2 - 3}" y="${y - 3}" width="${bw + 6}" height="${hh + 3}" rx="4" style="fill:none;stroke:var(--ink);stroke-width:1.5"/>`;
+      h += `<text class="v" x="${cxm}" y="${y - 5}" text-anchor="middle">${d.v.toFixed(2)}${unit}</text>`;
+      const lines = Array.isArray(d.l) ? d.l : [d.l];
+      lines.forEach((ln, k) => { h += `<text x="${cxm}" y="${T + ph + 15 + k * 13}" text-anchor="middle">${esc(ln)}</text>`; });
+    });
+    h += `<text x="4" y="11">${esc(ylab)}</text>`;
+    svg.innerHTML = h;
+  }
+
+  /* 흉부 X-ray 이진 제로샷 (모의) */
+  const PN = (() => { const r = rng(99); const a = []; for (let i = 0; i < 200; i++) a.push({ y: i < 100 ? 0 : 1, base: 0.30 + randn(r) * 0.01, n0: randn(r) * 0.002, n1: randn(r) * 0.002 }); return a; })();
+  function renderPN() {
+    const bias = +$("pb").value / 1000, les = +$("pl").value / 1000;
+    $("pbV").textContent = bias.toFixed(3); $("plV").textContent = les.toFixed(3);
+    const cm = [[0, 0], [0, 0]]; const diffs = [];
+    PN.forEach(p => {
+      const sh = p.base + p.n0 + (p.y === 0 ? les : 0), sp = p.base + bias + p.n1 + (p.y === 1 ? les : 0);
+      const pred = sp > sh ? 1 : 0; cm[p.y][pred]++; diffs.push({ d: sp - sh, y: p.y });
+    });
+    const acc = (cm[0][0] + cm[1][1]) / 200;
+    $("pnStats").innerHTML =
+      `<div class="sk-stat"><b>${(acc * 100).toFixed(1)}%</b><span>정확도</span></div>` +
+      `<div class="sk-stat"><b>${cm[0][0] + cm[1][0]} / ${cm[0][1] + cm[1][1]}</b><span>예측 normal / pneumonia</span></div>` +
+      `<div class="sk-stat"><b>100 / 100</b><span>실제 normal / pneumonia</span></div>` +
+      `<div class="sk-stat"><b>${(cm[0][0] / 100 * 100).toFixed(0)}%</b><span>정상 재현율</span></div>`;
+    $("pnCm").innerHTML = `<thead><tr><th>실제 \\ 예측</th><th>normal</th><th>pneumonia</th></tr></thead><tbody>` +
+      `<tr><td>normal</td><td class="n">${cm[0][0]}</td><td class="n">${cm[0][1]}</td></tr><tr><td>pneumonia</td><td class="n">${cm[1][0]}</td><td class="n">${cm[1][1]}</td></tr></tbody>`;
+    const W = 520, H = 150, L = 20, Rr = 20, lo = -0.04, hi = 0.06, X = v => L + (W - L - Rr) * (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo);
+    let h = `<line x1="${X(0)}" y1="10" x2="${X(0)}" y2="${H - 24}" style="stroke:var(--ink);stroke-dasharray:4 3"/>`;
+    h += `<text x="${X(0) - 6}" y="20" text-anchor="end">← normal 로 예측</text><text x="${X(0) + 6}" y="20">pneumonia 로 예측 →</text>`;
+    diffs.forEach((d, i) => {
+      const y = (d.y === 0 ? 50 : 95) + ((i * 37) % 30) - 15;
+      h += `<circle cx="${X(d.d).toFixed(1)}" cy="${y}" r="3" style="fill:var(${d.y === 0 ? "--role-img" : "--role-warn"});opacity:.75"/>`;
+    });
+    h += `<text x="${L}" y="${H - 8}">점수 차이 s(pneumonia 문장) − s(healthy 문장)</text>`;
+    h += `<text x="${W - Rr}" y="54" text-anchor="end" style="fill:var(--role-img)">실제 normal</text><text x="${W - Rr}" y="99" text-anchor="end" style="fill:var(--role-warn)">실제 pneumonia</text>`;
+    $("pnStrip").innerHTML = h;
+  }
+  $("pb").addEventListener("input", renderPN); $("pl").addEventListener("input", renderPN);
+
+  /* 선형 프로빙 (합성 임베딩, 실제 학습) */
+  const D_EMB = 32, K_ORG = 11;
+  const unit = v => { const n = Math.hypot(...v) || 1; return v.map(x => x / n); };
+  const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
+  const orth = (v, u) => { const d = dot(v, u); return v.map((x, i) => x - d * u[i]); };
+  function makeOrganData(s, noise, nPer) {
+    const r = rng(42); const rv = () => Array.from({ length: D_EMB }, () => randn(r));
+    const mod = unit(rv()); const C = []; for (let k = 0; k < K_ORG; k++) C.push(unit(orth(rv(), mod)));
+    const nu = [0, 1, 2].map(() => unit(orth(rv(), mod)));
+    const img = k => { const g = rv(); const a = nu.map(() => randn(r) * 0.6); return unit(mod.map((m, i) => 2.5 * m + s * C[k][i] + noise * g[i] / Math.sqrt(D_EMB) + a[0] * nu[0][i] + a[1] * nu[1][i] + a[2] * nu[2][i])); };
+    const txt = C.map(c => { const b = unit(rv()); return unit(mod.map((m, i) => 2.5 * m + 0.18 * c[i] + 0.9 * b[i])); });
+    const tr = [], te = [];
+    for (let k = 0; k < K_ORG; k++) { for (let j = 0; j < 40; j++) { const x = img(k); if (j < nPer) tr.push([x, k]); } for (let j = 0; j < 30; j++) te.push([img(k), k]); }
+    return { tr, te, txt };
+  }
+  const stL = { job: null };
+  function lpRun() {
+    if (stL.job) cancelAnimationFrame(stL.job);
+    const nPer = +$("lpN").value, s = +$("lpS").value / 100, nz = +$("lpZ").value / 10;
+    const data = makeOrganData(s, nz, nPer);
+    let zc = 0; data.te.forEach(([x, y]) => { let b = -1e9, bi = 0; data.txt.forEach((t, k) => { const v = dot(x, t); if (v > b) { b = v; bi = k; } }); zc += bi === y; });
+    const zsAcc = zc / data.te.length;
+    const W = Array.from({ length: K_ORG }, () => new Float64Array(D_EMB + 1));
+    const m = W.map(() => new Float64Array(D_EMB + 1)), v = W.map(() => new Float64Array(D_EMB + 1));
+    const lr = 0.05, b1 = 0.9, b2 = 0.999, lam = 1e-3, ITERS = 300; let it = 0; const losses = [];
+    const logits = x => W.map(w => { let z = w[D_EMB]; for (let i = 0; i < D_EMB; i++) z += w[i] * x[i]; return z; });
+    const accOf = set => set.filter(([x, y]) => { const z = logits(x); return z.indexOf(Math.max(...z)) === y; }).length / set.length;
+    function chunk() {
+      for (let q = 0; q < 15 && it < ITERS; q++) {
+        it++;
+        const G = W.map(() => new Float64Array(D_EMB + 1)); let loss = 0;
+        for (const [x, y] of data.tr) {
+          const p = softmax(logits(x)); loss -= Math.log(Math.max(p[y], 1e-12));
+          for (let k = 0; k < K_ORG; k++) { const g = p[k] - (k === y ? 1 : 0); for (let i = 0; i < D_EMB; i++) G[k][i] += g * x[i]; G[k][D_EMB] += g; }
+        }
+        const n = data.tr.length; losses.push(loss / n);
+        for (let k = 0; k < K_ORG; k++) for (let i = 0; i <= D_EMB; i++) {
+          const g = G[k][i] / n + (i < D_EMB ? lam * W[k][i] : 0);
+          m[k][i] = b1 * m[k][i] + (1 - b1) * g; v[k][i] = b2 * v[k][i] + (1 - b2) * g * g;
+          W[k][i] -= lr * (m[k][i] / (1 - Math.pow(b1, it))) / (Math.sqrt(v[k][i] / (1 - Math.pow(b2, it))) + 1e-8);
+        }
+      }
+      const done = it >= ITERS;
+      const teAcc = accOf(data.te), trAcc = accOf(data.tr);
+      $("lpStats").innerHTML =
+        `<div class="sk-stat"><b>${(100 / 11).toFixed(2)}%</b><span>무작위</span></div>` +
+        `<div class="sk-stat"><b>${(zsAcc * 100).toFixed(2)}%</b><span>합성 제로샷</span></div>` +
+        `<div class="sk-stat"><b style="color:var(--role-fuse)">${(teAcc * 100).toFixed(2)}%</b><span>선형 프로빙 (시험 330)</span></div>` +
+        `<div class="sk-stat"><b>${(trAcc * 100).toFixed(1)}%</b><span>학습 정확도</span></div>`;
+      $("lpInfo").textContent = `학습 ${data.tr.length}장(클래스당 ${nPer}장) · 반복 ${it}/${ITERS} · Adam · L2 ${lam}` + (done ? " · 완료" : " · 학습 중…");
+      spark($("lpSpark"), [losses], ["ln"], Math.log(11));
+      $("code4b").textContent =
+`from sklearn.linear_model import LogisticRegression
+
+organ_train_path, organ_train_y = load_organ('train', ${nPer})   # 클래스당 ${nPer}장
+E_organ_train = embed_images(organ_train_path)               # (${nPer * 11}, 512)
+
+clf_probe = LogisticRegression(max_iter=2000)
+clf_probe.fit(E_organ_train, organ_train_y)
+print('선형 프로빙 정확도 :', round(clf_probe.score(E_organ_test, organ_test_y) * 100, 2), '%')`;
+      if (!done) stL.job = requestAnimationFrame(chunk); else stL.job = null;
+    }
+    chunk();
+  }
+  ["lpN", "lpS", "lpZ"].forEach(id => $(id).addEventListener("input", () => {
+    $("lpNV").textContent = $("lpN").value; $("lpSV").textContent = (+$("lpS").value / 100).toFixed(2); $("lpZV").textContent = (+$("lpZ").value / 10).toFixed(1);
+  }));
+  ["lpN", "lpS", "lpZ"].forEach(id => $(id).addEventListener("change", lpRun));
+  $("lpRun").addEventListener("click", lpRun);
+  copyInit($("copy4b"), () => $("code4b").textContent);
+  function renderCmp() {
+    barChart($("cmpChart"), [
+      { l: ["무작위", "라벨 0"], v: 9.09, c: "--role-gt" }, { l: ["CLIP 제로샷", "라벨 0"], v: 14.24, c: "--role-txt" },
+      { l: ["선형 프로빙", "클래스당 40장"], v: 64.85, c: "--role-fuse" }, { l: ["ResNet50 전이학습", "클래스당 500장"], v: 85.45, c: "--role-img" }
+    ], 100, "%", "정확도 (%)");
+  }
+
+  /* =====================================================================
+     5. 검색 · 리포트 생성
+     ===================================================================== */
+  const QUERY = { id: "1417PT", g: 1 };
+  const TOP5 = [["979PT", 2, 0.9677], ["813PT", 0, 0.9673], ["979PT", 2, 0.9655], ["1331PT", 0, 0.9633], ["1483PT", 1, 0.9625]];
+  const NN_CT = [[5, 11, 5, 10], [1, 8, 12, 14], [6, 4, 11, 15], [4, 6, 15, 20]];
+  const LR_CT = [[0, 13, 2, 16], [0, 17, 6, 12], [0, 13, 5, 18], [0, 14, 5, 26]];
+  function allocGrade(g, seed) { const r = rng(seed); const a = [0, 0, 0, 0, 0]; if (g > 0) { const i = 2 + Math.floor(r() * 3); a[i] = g; if (r() < 0.6) a[Math.max(0, i - 1)] = Math.max(1, g - 1); } return a; }
+  function idSeed(s) { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) % 9973; return h; }
+  function renderThumbs() {
+    const items = [{ id: QUERY.id, g: QUERY.g, sim: null, q: true }].concat(TOP5.map(([id, g, sim]) => ({ id, g, sim })));
+    if (!$("thumbs").children.length) {
+      $("thumbs").innerHTML = items.map((it, k) => `<figure class="${it.q ? "q" : ""}"><canvas id="th${k}" aria-label="${it.q ? "질의" : "검색 " + k + "위"} ${it.id} 모사 영상, 등급 ${it.g}"></canvas>` +
+        `<span>${it.q ? "질의" : "Top " + k}</span><b>${it.id}</b><span>등급 ${it.g} · ${LABEL4[it.g]}</span>${it.sim !== null ? `<span class="sk-mono">유사도 ${it.sim.toFixed(4)}</span>` : "<span>&nbsp;</span>"}</figure>`).join("");
+    }
+    items.forEach((it, k) => {
+      const c = setupCanvas($("th" + k), MW, MH); const sd = idSeed(it.id) % 900 + 1; const a = allocGrade(it.g, sd);
+      c.drawImage(renderMRI("mid", a, sd), 0, 0, MW, MH);
+    });
+  }
+  function ctTable(el, M, colLab, title) {
+    el.innerHTML = `<thead><tr><th>${title}</th>${colLab.map(c => `<th>${c}</th>`).join("")}<th>합계</th></tr></thead><tbody>` +
+      M.map((row, i) => `<tr><td>실제 ${i}</td>${row.map((v, j) => `<td class="n" style="${i === j ? "font-weight:700;color:var(--role-fuse)" : ""}">${v}</td>`).join("")}<td class="n">${row.reduce((a, b) => a + b, 0)}</td></tr>`).join("") + "</tbody>";
+  }
+  function renderRetrieval() {
+    ctTable($("nnCt"), NN_CT, ["NN 0", "NN 1", "NN 2", "NN 3"], "실제 \\ 최근접");
+    ctTable($("lrCt"), LR_CT, ["예측 0", "예측 1", "예측 2", "예측 3"], "실제 \\ 예측");
+    const tr = M => M.reduce((s, r, i) => s + r[i], 0), tot = M => M.flat().reduce((a, b) => a + b, 0);
+    $("nnStats").innerHTML = `<div class="sk-stat"><b>${tr(NN_CT)} / ${tot(NN_CT)}</b><span>대각선 / 전체</span></div><div class="sk-stat"><b>${(tr(NN_CT) / tot(NN_CT) * 100).toFixed(2)}%</b><span>등급 일치율</span></div><div class="sk-stat"><b>25.00%</b><span>무작위 (1/4)</span></div>`;
+    $("lrStats").innerHTML = `<div class="sk-stat"><b>${tr(LR_CT)} / ${tot(LR_CT)}</b><span>대각선 / 전체</span></div><div class="sk-stat"><b>${(tr(LR_CT) / tot(LR_CT) * 100).toFixed(2)}%</b><span>등급 예측 정확도</span></div><div class="sk-stat"><b>${LR_CT.reduce((s, r) => s + r[0], 0)}</b><span>0등급 예측 수</span></div>`;
+    $("fullCheck").innerHTML = `검산 · 템플릿 등급 정확도 = 예측기 정확도 = ${tr(LR_CT)}/${tot(LR_CT)} = <b>${(tr(LR_CT) / tot(LR_CT)).toFixed(4)}</b> → 0.327<br>검산 · 검색 등급 정확도 = 최근접 일치율 = ${tr(NN_CT)}/${tot(NN_CT)} = <b>${(tr(NN_CT) / tot(NN_CT)).toFixed(4)}</b> → 0.299`;
+  }
+
+  const NB_TRUE = [
+    "[소견] 요추 MRI 에서 추간공 협착을 평가함. 최대 협착 등급은 1등급(경도) 이며, 좌측 최대 1등급 / 우측 최대 1등급 임. 침범 분절은 L3-L4, L4-L5 임. 이상 소견을 보이는 추간공은 총 4개 임. [결론] 경도 추간공 협착. 경과 관찰 권고.",
+    "[소견] 요추 MRI 에서 추간공 협착을 평가함. 최대 협착 등급은 1등급(경도) 이며, 좌측 최대 0등급 / 우측 최대 1등급 임. 침범 분절은 L4-L5 임. 이상 소견을 보이는 추간공은 총 1개 임. [결론] 경도 추간공 협착. 경과 관찰 권고.",
+    "[소견] 요추 MRI 에서 추간공 협착을 평가함. 최대 협착 등급은 0등급(정상) 이며, 좌측 최대 0등급 / 우측 최대 0등급 임. 침범 분절 없음. 이상 소견을 보이는 추간공은 총 0개 임. [결론] 유의한 추간공 협착 소견 없음."
+  ];
+  const NB_PRED = [1, 1, 3];
+  const NB_RETR = [
+    "[소견] 요추 MRI 에서 추간공 협착을 평가함. 최대 협착 등급은 2등급(중등도) 이며, 좌측 최대 0등급 / 우측 최대 2등급 임. 침범 분절은 L3-L4, L4-L5 임. 이상 소견을 보이는 추간공은 총 2개 임. [결론] 중등도 추간공 협착. 임상 증상과의 연관성 확인 필요.",
+    "[소견] 요추 MRI 에서 추간공 협착을 평가함. 최대 협착 등급은 3등급(중증) 이며, 좌측 최대 3등급 / 우측 최대 0등급 임. 침범 분절은 L3-L4, L4-L5 임. 이상 소견을 보이는 추간공은 총 2개 임. [결론] 중증 추간공 협착. 신경 압박 여부에 대한 추가 평가 권고.",
+    NB_TRUE[2]
+  ];
+  const NB_BLIP = ["a medical image of a knee with a fracture", "a medical image of a woman ' s knee", "a medical image of a knee with a fracture"];
+  const BLIP_BANK = ["a medical image of a knee with a fracture", "a medical image of a woman ' s knee", "a radiograph of the knee showing the fracture", "a black and white photo of a woman ' s knee", "a mri mri mri mri mri mri mri mri mri mri mri mri mri mri mri mri mri mri mri mri"];
+  const REPORT_BANK = [
+    { lab: "학습 케이스 A · 2등급 (979PT)", t: NB_RETR[0] }, { lab: "학습 케이스 B · 3등급", t: NB_RETR[1] }, { lab: "학습 케이스 C · 0등급", t: NB_TRUE[2] },
+    { lab: "예시 1 · 3등급", t: "[소견] 요추 MRI 에서 추간공 협착을 평가함. 최대 협착 등급은 3등급(중증) 이며, 좌측 최대 1등급 / 우측 최대 3등급 임. 침범 분절은 L3-L4, L4-L5 임. 이상 소견을 보이는 추간공은 총 3개 임. [결론] 중증 추간공 협착. 신경 압박 여부에 대한 추가 평가 권고." },
+    { lab: "예시 2 · 1등급", t: "[소견] 요추 MRI 에서 추간공 협착을 평가함. 최대 협착 등급은 1등급(경도) 이며, 좌측 최대 0등급 / 우측 최대 1등급 임. 침범 분절은 L5-S1 임. 이상 소견을 보이는 추간공은 총 1개 임. [결론] 경도 추간공 협착. 경과 관찰 권고." }
+  ];
+  $("bankSel").innerHTML = REPORT_BANK.map((b, i) => `<option value="${i}">${esc(b.lab)}</option>`).join("");
+  $("blipSel").innerHTML = BLIP_BANK.map((b, i) => `<option value="${i}">${esc(b.length > 44 ? b.slice(0, 42) + "…" : b)}</option>`).join("");
+  const stR = { c: "0", pred: 3 };
+  function currentCase() {
+    if (stR.c === "u") {
+      return { ref: makeReport(findings(st1)), tmpl: makeReportFromPrediction(stR.pred), retr: REPORT_BANK[+$("bankSel").value].t, blip: BLIP_BANK[+$("blipSel").value], note: "1번 화면에서 만든 케이스" };
+    }
+    const k = +stR.c;
+    return { ref: NB_TRUE[k], tmpl: makeReportFromPrediction(NB_PRED[k]), retr: NB_RETR[k], blip: NB_BLIP[k], note: k === 0 ? "검증 케이스 1 (질의 1417PT, 검색 결과 979PT)" : "검증 케이스 " + (k + 1) };
+  }
+  function renderCompare() {
+    const C = currentCase(); const rg = extractGrade(C.ref);
+    const rows = [["템플릿 (예측 기반)", C.tmpl, false], ["검색 (최근접 케이스)", C.retr, false], ["BLIP 생성", C.blip, true]];
+    $("scoreTbl").innerHTML = `<thead><tr><th>방식</th><th>ROUGE-1</th><th>정밀도</th><th>겹침 / 정답·생성 토큰</th><th>추출 등급</th><th>정답 등급</th><th>등급 일치</th><th>등급 미언급</th></tr></thead><tbody>` +
+      rows.map(([n, h]) => {
+        const s = overlapCount(C.ref, h), g = extractGrade(h);
+        return `<tr><td>${n}</td><td class="n"><b>${f3(rouge1(C.ref, h))}</b></td><td class="n">${f3(precision1(C.ref, h))}</td><td class="n">${s.o} / ${s.nR} · ${s.nH}</td><td class="n">${g}</td><td class="n">${rg}</td>` +
+          `<td>${g === rg ? '<span class="mr-ok">일치</span>' : '<span class="mr-no">불일치</span>'}</td><td class="n">${g < 0 ? "1" : "0"}</td></tr>`;
+      }).join("") + "</tbody>";
+    $("cmpReports").innerHTML =
+      `<div><span class="sk-label">정답 리포트 · ${esc(C.note)}</span><div class="mr-report">${reportHtml(C.ref)}</div></div>` +
+      rows.map(([n, h, eng]) => `<div><span class="sk-label">${n}${eng ? ' <span class="mr-mock">모의 출력 (노트북 관찰 캡션)</span>' : ""}</span><div class="mr-report${eng ? " eng" : ""}">${reportHtml(h, C.ref)}</div></div>`).join("");
+    $("code5").textContent =
+`from transformers import BlipProcessor, BlipForConditionalGeneration
+BLIP_ID = 'Salesforce/blip-image-captioning-base'
+blip_processor = BlipProcessor.from_pretrained(BLIP_ID)
+blip_model     = BlipForConditionalGeneration.from_pretrained(BLIP_ID).eval()
+
+inputs = blip_processor(img, 'a medical image of', return_tensors='pt')
+out    = blip_model.generate(**inputs, max_new_tokens=30)
+hyp    = blip_processor.decode(out[0], skip_special_tokens=True)
+
+def tokenize_ko(text):
+    text = re.sub('[\\[\\]().,]', ' ', text)
+    return [t for t in text.split() if len(t) > 0]
+
+def rouge1(ref, hyp):      # 재현율 계열
+    r, h = Counter(tokenize_ko(ref)), Counter(tokenize_ko(hyp))
+    return sum((r & h).values()) / max(sum(r.values()), 1)
+
+def extract_grade(text):   # 임상 사실(등급) 추출
+    m = re.search('([0-9])\\s*등급', text)
+    return -1 if m is None else int(m.group(1))
+# 현재 케이스 : 템플릿 ROUGE-1 ${f4(rouge1(C.ref, C.tmpl))} / 검색 ${f4(rouge1(C.ref, C.retr))} / BLIP ${f4(rouge1(C.ref, C.blip))}`;
+  }
+  segInit($("caseSeg"), v => { stR.c = v; $("customCtl").hidden = v !== "u"; renderCompare(); });
+  segInit($("predSeg"), v => { stR.pred = +v; renderCompare(); });
+  $("bankSel").addEventListener("change", renderCompare); $("blipSel").addEventListener("change", renderCompare);
+  copyInit($("copy5"), () => $("code5").textContent);
+  function renderTrap() {
+    const a = $("trapA").value, b = $("trapB").value, s = overlapCount(a, b);
+    const ga = extractGrade(a), gb = extractGrade(b);
+    $("trapStats").innerHTML = `<div class="sk-stat"><b>${f4(rouge1(a, b))}</b><span>ROUGE-1</span></div><div class="sk-stat"><b>${f4(precision1(a, b))}</b><span>정밀도</span></div>` +
+      `<div class="sk-stat"><b>${ga} → ${gb}</b><span>추출 등급 (정답 → 생성)</span></div><div class="sk-stat"><b style="color:${ga === gb ? "var(--role-time)" : "var(--role-warn)"}">${ga === gb ? "일치" : "불일치"}</b><span>임상 사실</span></div>`;
+    $("trapFormula").innerHTML = `정답 토큰 [${tokenizeKo(a).map(esc).join(", ")}] (${s.nR}개)<br>생성 토큰 [${tokenizeKo(b).map(esc).join(", ")}] (${s.nH}개)<br>` +
+      `ROUGE-1 = 겹친 토큰 / 정답 토큰 = ${s.o} / ${s.nR} = <b>${f4(rouge1(a, b))}</b> · 정밀도 = ${s.o} / ${s.nH} = <b>${f4(precision1(a, b))}</b>`;
+  }
+  $("trapA").addEventListener("input", renderTrap); $("trapB").addEventListener("input", renderTrap);
+  function renderFull() {
+    const W = 420, H = 250, L = 40, B = 40, T = 22, ph = H - B - T, groups = [["템플릿", 0.434, 0.327], ["검색", 0.799, 0.299], ["BLIP", 0.0, 0.0]];
+    let h = "";
+    for (let k = 0; k <= 4; k++) { const y = T + ph - ph * k / 4; h += `<line class="grid" x1="${L}" y1="${y}" x2="${W - 8}" y2="${y}"/><text x="${L - 5}" y="${y + 4}" text-anchor="end">${(k / 4).toFixed(2)}</text>`; }
+    groups.forEach((g, i) => {
+      const cx = L + (W - L - 8) * (i + 0.5) / 3, bw = 42;
+      [[g[1], "--role-txt"], [g[2], "--role-fuse"]].forEach(([v, c], k) => {
+        const x = cx - bw - 3 + k * (bw + 6), hh = ph * v, y = T + ph - hh;
+        h += `<rect x="${x}" y="${y}" width="${bw}" height="${Math.max(hh, 0.5)}" rx="3" style="fill:var(${c})"/><text class="v" x="${x + bw / 2}" y="${y - 5}" text-anchor="middle">${v.toFixed(3)}</text>`;
+      });
+      h += `<text x="${cx}" y="${T + ph + 16}" text-anchor="middle">${g[0]}</text>`;
+    });
+    h += `<line class="ax" x1="${L}" y1="${T + ph}" x2="${W - 8}" y2="${T + ph}"/>`;
+    h += `<rect x="${L + 4}" y="${H - 14}" width="10" height="10" style="fill:var(--role-txt)"/><text x="${L + 18}" y="${H - 5}">ROUGE-1</text><rect x="${L + 90}" y="${H - 14}" width="10" height="10" style="fill:var(--role-fuse)"/><text x="${L + 104}" y="${H - 5}">등급 정확도</text>`;
+    h += `<text x="4" y="12">텍스트 유사도와 임상 사실 정확도는 같은 결론을 주지 않는다</text>`;
+    $("fullChart").innerHTML = h;
+  }
+
+  /* =====================================================================
+     6. 안전장치
+     ===================================================================== */
+  const SAFE = [
+    { k: "sep", n: "예측과 문장을 분리", d: "영상 → 구조화된 소견 → 문장. 문장 단계에서 새 사실이 생기면 안 됨" },
+    { k: "blank", n: "모르는 항목은 비워 둔다", d: "\"확인되지 않음\"을 명시. 채워 넣지 않음" },
+    { k: "evid", n: "근거를 함께 낸다", d: "각 소견에 해당 슬라이스·위치(박스·마스크)를 첨부 (SAM·객체 탐지가 여기서 쓰임)" },
+    { k: "draft", n: "초안임을 표시", d: "판독의가 서명하기 전까지는 기록이 아님" },
+    { k: "unc", n: "불확실성 표현", d: "확률이 낮으면 단정하지 않는 문구로" },
+    { k: "audit", n: "감사 기록", d: "어떤 모형·어떤 버전이 무엇을 생성했는지 남김" }
+  ];
+  const stS = { on: { sep: true, blank: true, evid: true, draft: true, unc: true, audit: true }, pred: 3, prob: 0.45 };
+  $("safeBody").innerHTML = SAFE.map(s => `<tr><td><label class="sk-check"><input type="checkbox" data-k="${s.k}" checked aria-label="${s.n} 적용"></label></td><td><b>${s.n}</b></td><td class="wrap">${esc(s.d)}</td></tr>`).join("");
+  $("safeBody").querySelectorAll("input").forEach(i => i.addEventListener("change", () => { stS.on[i.dataset.k] = i.checked; renderDraft(); }));
+  function renderDraft() {
+    const g = stS.pred, on = stS.on, f = findings(st1);
+    let h = "";
+    if (on.draft) h += `<span class="mr-badge">초안 · 판독의 서명 전 (의무기록 아님)</span><br>`;
+    const unsure = on.unc && stS.prob < 0.6;
+    let gradePhrase = unsure ? `${g}등급(${GRADE_NAME[g]}) 가능성이 있음 (예측 확률 ${stS.prob.toFixed(2)}, 판독의 확인 필요)` : `${g}등급(${GRADE_NAME[g]}) 으로 추정됨`;
+    h += `<span class="tag">[소견]</span> 요추 MRI 에서 추간공 협착을 평가함. 최대 협착 등급은 ${esc(gradePhrase)}. `;
+    if (on.blank) h += `좌우 구분 및 침범 분절은 <span class="miss">본 자동 판독에서 확인되지 않음</span>. `;
+    else h += `<span class="fake">좌측 최대 ${Math.max(0, g - 1)}등급 / 우측 최대 ${g}등급 임.</span> `;
+    if (!on.sep) h += `<span class="fake">침범 분절은 L4-L5, L5-S1 임. 신경근 압박 소견 동반됨.</span> `;
+    h += `<span class="tag">[결론]</span> ${esc(unsure ? IMPRESSION[g].replace(".", " 가능성.") : IMPRESSION[g])}`;
+    if (on.evid) {
+      const ev = []; LEVELS.forEach((lv, i) => { if (!st1.missL && st1.L[i] > 0) ev.push(`좌 ${lv} 박스(${st1.L[i]})`); if (!st1.missR && st1.R[i] > 0) ev.push(`우 ${lv} 박스(${st1.R[i]})`); });
+      h += `<br><span class="mr-ev">근거: ${ev.length ? ev.join(" · ") : "이상 추간공 박스 없음"} — 1번 화면 탐지 박스</span>`;
+    }
+    if (g !== f.fs_grade_max) h += `<br><span class="mr-ev" style="color:var(--role-warn)">참고: 탐지 박스 기준 최대 등급은 ${f.fs_grade_max}등급 — 예측과 근거가 어긋남, 판독의 확인 필요</span>`;
+    if (on.audit) h += `<br><span class="mr-ev">감사 기록: openai/clip-vit-base-patch32 + LogisticRegression(max_iter=2000) · 입력 영상 ID · 생성 문구 틀 make_report_from_prediction</span>`;
+    $("sfDraft").innerHTML = h;
+  }
+  segInit($("sfPredSeg"), v => { stS.pred = +v; renderDraft(); });
+  $("sfProb").addEventListener("input", e => { stS.prob = +e.target.value / 100; $("sfProbV").textContent = stS.prob.toFixed(2); renderDraft(); });
+
+  $("radTxt").value = "[소견] 요추 MRI 에서 추간공 협착을 평가함. 최대 협착 등급은 3등급(중증) 이며, 침범 분절은 L3-L4 임. [결론] 중증 추간공 협착. 신경 압박 여부에 대한 추가 평가 권고.";
+  function renderRad() {
+    const t = $("radTxt").value, f = findings(st1);
+    const mentioned = new Set((t.match(/L[1-5]\s*-\s*(?:L[1-5]|S1)/g) || []).map(s => s.replace(/\s/g, "")));
+    const model = f.affected ? f.affected.split("|") : [];
+    const out = [];
+    const g = extractGrade(t);
+    out.push(g < 0 ? `<li><span class="mr-no">등급 미언급</span> — 모형 소견 최대 ${f.fs_grade_max}등급</li>` :
+      g === f.fs_grade_max ? `<li><span class="mr-ok">등급 일치</span> — ${g}등급</li>` : `<li><span class="mr-no">등급 불일치</span> — 리포트 ${g}등급 / 모형 소견 ${f.fs_grade_max}등급</li>`);
+    model.forEach(lv => out.push(mentioned.has(lv) ? `<li><span class="mr-ok">언급됨</span> ${lv}</li>` : `<li><span class="mr-no">누락 의심</span> ${lv} — 모형 소견에는 있으나 리포트에 없음</li>`));
+    [...mentioned].filter(lv => !model.includes(lv)).forEach(lv => out.push(`<li><span class="mr-no">근거 없음</span> ${lv} — 리포트에는 있으나 모형 소견에 없음 (판독의 판단 우선)</li>`));
+    if (!model.length) out.push(`<li>모형 소견: 침범 분절 없음</li>`);
+    $("radOut").innerHTML = out.join("");
+  }
+  $("radTxt").addEventListener("input", renderRad);
+
+  refreshDependents = () => { if (stR.c === "u") renderCompare(); renderDraft(); renderRad(); };
+
+  /* ---------- 초기화 ---------- */
+  update1(); drawSplit();
+  buildDiagram();
+  cInit(); cRender();
+  renderProbe(); renderZS(); renderPN(); renderCmp();
+  renderThumbs(); renderRetrieval(); renderCompare(); renderTrap(); renderFull();
+  renderDraft(); renderRad();
+  let lpStarted = false;
+  onShow.d = () => { if (!lpStarted) { lpStarted = true; lpRun(); } };
+  redrawers.push(renderThumbs);
+  const start = document.getElementById("tab-" + location.hash.slice(1)); if (start) show(start);
+})();
+</script>
+</body>
+</html>

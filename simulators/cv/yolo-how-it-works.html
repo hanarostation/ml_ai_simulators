@@ -8,8 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
-<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 /* 역할 색: 스케일(P3/P4/P5), 정답 박스, 클래스, 층 종류 — 밝은/어두운 화면 둘 다 정의 */
@@ -167,6 +168,8 @@
       <a href="../../index.html#cv" style="--c:var(--cat-cv)" aria-current="page">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -207,6 +210,7 @@
     <button class="sk-tab" type="button" role="tab" id="tab-c" aria-controls="pane-c" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>헤드와 박스 디코딩(DFL)</button>
     <button class="sk-tab" type="button" role="tab" id="tab-d" aria-controls="pane-d" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>후처리 8,400 → 최종</button>
     <button class="sk-tab" type="button" role="tab" id="tab-e" aria-controls="pane-e" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>학습: 정답 배정과 손실</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>알고리즘 구성도</button>
   </nav>
 
   <!-- ================= 1. 격자 ================= -->
@@ -445,6 +449,10 @@
       </div>
     </div>
   </section>
+  <!-- ========== 알고리즘 구성도 ========== -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">강의 도식 3장 · 네트워크 / Detect Head·DFL / 학습·추론</span></div><div data-ds-diagrams="yolo-how-it-works"></div></section>
+  </section>
 </main>
 
 <!-- ===== 공통 푸터 ===== -->
@@ -461,7 +469,9 @@
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/yolo-how-it-works.js?v=20261002c"></script>
 <script>
 (function () {
 "use strict";
@@ -631,7 +641,7 @@ function postprocess(preds, conf, iouT, maxDet) {
 }
 
 /* ===================== 탭 ===================== */
-const TABS = ["a", "b", "c", "d", "e"];
+const TABS = ["a", "b", "c", "d", "e", "diagram"];
 let cur = "a";
 function showTab(k, focus) {
   if (!TABS.includes(k)) k = "a";

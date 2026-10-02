@@ -8,8 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
-<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 /* 역할 색: 주 경로 F(x) 파랑 · 지름길 주황 · 합(+) 보라 · 음수 자홍 · 데이터 두 부류 */
@@ -137,6 +138,8 @@ details.rs-more summary:focus-visible{outline:2px solid var(--focus);outline-off
       <a href="../../index.html#cv" style="--c:var(--cat-cv)" aria-current="page">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -163,6 +166,7 @@ details.rs-more summary:focus-visible{outline:2px solid var(--focus);outline-off
     <button type="button" class="sk-tab" role="tab" id="tab-deep" aria-controls="pane-deep" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>깊게 쌓으면: 신호와 기울기</button>
     <button type="button" class="sk-tab" role="tab" id="tab-train" aria-controls="pane-train" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>학습해 보기 (퇴화 현상)</button>
     <button type="button" class="sk-tab" role="tab" id="tab-design" aria-controls="pane-design" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>블록 설계와 shape</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>알고리즘 구성도</button>
   </nav>
 
   <!-- ================= 1. 잔차 블록 ================= -->
@@ -171,7 +175,7 @@ details.rs-more summary:focus-visible{outline:2px solid var(--focus);outline-off
       <div class="sk-head"><h2>BasicBlock: 주 경로 F(x)와 지름길 x</h2>
         <div class="sk-legend"><span><i class="rs-dot" style="background:var(--f)"></i>주 경로 F(x)</span><span><i class="rs-dot" style="background:var(--sc)"></i>지름길 (항등, 가중치 없음)</span><span><i class="rs-dot" style="background:var(--sum)"></i>덧셈 → ReLU</span></div>
       </div>
-      <div class="rs-diagram" id="diagram" role="img" aria-label="잔차 블록 구조: 입력 x가 3×3 합성곱, BN, ReLU, 3×3 합성곱, BN을 거친 F(x)와 지름길로 온 x가 더해진 뒤 ReLU를 거쳐 출력된다"></div>
+      <div class="rs-diagram" id="rsDiagram" role="img" aria-label="잔차 블록 구조: 입력 x가 3×3 합성곱, BN, ReLU, 3×3 합성곱, BN을 거친 F(x)와 지름길로 온 x가 더해진 뒤 ReLU를 거쳐 출력된다"></div>
       <div class="sk-controls">
         <div class="sk-slider" style="min-width:230px">
           <div class="sk-sl-head"><label for="sW">F 가중치 크기 s</label><b id="sWv">0.80</b></div>
@@ -363,6 +367,10 @@ details.rs-more summary:focus-visible{outline:2px solid var(--focus);outline-off
       <p class="rs-quote">"ResNet은 더 깊게 만들려고 더하고, U-Net은 어디에 있었는지 되찾으려고 잇는다."</p>
     </div>
   </section>
+  <!-- ========== 알고리즘 구성도 ========== -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">강의 도식 3장 · 잔차 블록 / ResNet-50 / 전이학습</span></div><div data-ds-diagrams="resnet-skip-connection"></div></section>
+  </section>
 </main>
 
 <!-- ===== 공통 푸터 ===== -->
@@ -379,7 +387,9 @@ details.rs-more summary:focus-visible{outline:2px solid var(--focus);outline-off
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/resnet-skip-connection.js?v=20261002c"></script>
 <script>
 (function(){
 "use strict";
@@ -446,7 +456,7 @@ function drawChart(host,o){
 }
 
 /* ================= 탭 ================= */
-const TABS=["block","deep","train","design"];let curTab="block";
+const TABS=["block","deep","train","design","diagram"];let curTab="block";
 const onShow={};
 function showTab(k,focus){
   if(!TABS.includes(k))k="block";
@@ -504,7 +514,7 @@ const BL=(function(){
   function stats(M){let mn=Infinity,mx=-Infinity;M.forEach(r=>r.forEach(v=>{mn=Math.min(mn,v);mx=Math.max(mx,v);}));return{mn,mx};}
   const STEP_ROLE=[0,1,0,2,3];
   function diagram(){
-    const host=$("diagram"),vw=host.clientWidth||800,vert=vw<640;
+    const host=$("rsDiagram"),vw=host.clientWidth||800,vert=vw<640;
     const items=[{l:"3×3 Conv"},{l:"BN"},{l:"ReLU"},{l:"3×3 Conv"},{l:"BN"}];
     if(st.relu==="pre")items.push({l:"ReLU",pre:1});
     const bw=vert?132:78,bh=vert?30:36,sp=vert?44:88;
@@ -904,7 +914,6 @@ function redraw(){
 new MutationObserver(redraw).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
 try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",redraw);}catch(e){}
 let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(redraw,150);});
-window.__rs={BL,DP,TR,DS};
 })();
 </script>
 </body>

@@ -8,8 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
-<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 /* 역할 색: 클래스 0 정상 파랑 · 클래스 1 질환 주황 · 학습 파랑 · 검증 청록 · 선형회귀 보라 · 과적합 빨강 · 최적 초록 · 예측선 주황 */
@@ -146,6 +147,8 @@
       <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -181,6 +184,7 @@
       <button type="button" class="sk-tab" role="tab" id="tab-clf-split" aria-controls="pane-clf-split" aria-selected="true"><span class="sk-num">1</span>분할 하나 고르기</button>
       <button type="button" class="sk-tab" role="tab" id="tab-clf-grow" aria-controls="pane-clf-grow" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>나무 키우기</button>
       <button type="button" class="sk-tab" role="tab" id="tab-clf-prune" aria-controls="pane-clf-prune" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>과적합과 가지치기</button>
+      <button type="button" class="sk-tab" role="tab" id="tab-clf-diagram" aria-controls="pane-clf-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>알고리즘 구성도</button>
     </nav>
 
     <!-- ---------- 분류 1. 분할 하나 ---------- -->
@@ -335,6 +339,11 @@
         </div>
       </div>
     </section>
+
+    <!-- ---------- 알고리즘 구성도 ---------- -->
+    <section class="dt-pane" id="pane-clf-diagram" role="tabpanel" aria-labelledby="tab-clf-diagram" hidden>
+      <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">분류 트리 · 회귀 트리 · 가지치기와 특성 중요도 3장 · 강의용 도식</span></div><div data-ds-diagrams="decision-tree"></div></section>
+    </section>
   </div>
 
   <!-- ================================ 회귀 트리 ================================ -->
@@ -343,6 +352,7 @@
       <button type="button" class="sk-tab" role="tab" id="tab-reg-split" aria-controls="pane-reg-split" aria-selected="true"><span class="sk-num">1</span>분할 하나 고르기</button>
       <button type="button" class="sk-tab" role="tab" id="tab-reg-grow" aria-controls="pane-reg-grow" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>나무 키우기</button>
       <button type="button" class="sk-tab" role="tab" id="tab-reg-over" aria-controls="pane-reg-over" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>과적합</button>
+      <button type="button" class="sk-tab" role="tab" id="tab-reg-diagram" aria-controls="pane-reg-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>알고리즘 구성도</button>
     </nav>
 
     <!-- ---------- 회귀 1. 분할 하나 ---------- -->
@@ -466,6 +476,11 @@
         <p class="sk-note" id="roNote"></p>
       </div>
     </section>
+
+    <!-- ---------- 알고리즘 구성도 ---------- -->
+    <section class="dt-pane" id="pane-reg-diagram" role="tabpanel" aria-labelledby="tab-reg-diagram" hidden>
+      <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">회귀 트리 장부터 · 분류 트리와 함께 3장 · 강의용 도식</span></div><div data-ds-diagrams="decision-tree" id="dgReg" data-dg-mounted="1"></div></section>
+    </section>
   </div>
 
   <!-- ================================ 공통 ================================ -->
@@ -514,7 +529,9 @@
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/decision-tree.js?v=20261002c"></script>
 <script>
 (function () {
 "use strict";
@@ -1320,10 +1337,10 @@ function renderCode(){
 }
 
 /* ================================================================== 파트 · 탭 */
-const TABS={clf:["split","grow","prune"], reg:["split","grow","over"]};
-const RENDER={"clf-split":renderCS,"clf-grow":renderCG,"clf-prune":renderCP,"reg-split":renderRS,"reg-grow":renderRG,"reg-over":renderRO};
+const TABS={clf:["split","grow","prune","diagram"], reg:["split","grow","over","diagram"]};
+const RENDER={"clf-diagram":()=>{},"reg-diagram":()=>{},"clf-split":renderCS,"clf-grow":renderCG,"clf-prune":renderCP,"reg-split":renderRS,"reg-grow":renderRG,"reg-over":renderRO};
 const NOTES={clf:"잎에서 다수 클래스를 예측합니다. 분할 기준은 지니 또는 엔트로피 불순도입니다.",reg:"잎에서 평균을 예측합니다. 분할 기준은 MSE(분산) 감소입니다."};
-function writeHash(){ const t=S.tab[S.part]; history.replaceState(null,"","#"+S.part+(t===TABS[S.part][0]?"":"-"+t)); }
+function writeHash(){ const t=S.tab[S.part]; if(t==="diagram"){ history.replaceState(null,"","#diagram"); return; } history.replaceState(null,"","#"+S.part+(t===TABS[S.part][0]?"":"-"+t)); }
 function redraw(){ stopPlay(); const key=S.part+"-"+S.tab[S.part]; RENDER[key](); renderCode(); }
 function redrawKeep(){ const key=S.part+"-"+S.tab[S.part]; RENDER[key](); renderCode(); }
 function setPart(p,write){
@@ -1352,10 +1369,13 @@ Object.keys(TABS).forEach(p=>{
 });
 function readHash(){
   const h=location.hash.slice(1), [p,t]=h.split("-");
+  if(h==="diagram"){ S.tab[S.part]="diagram"; setPart(S.part,false); return; }
   const part=TABS[p]?p:"clf", tab=(TABS[part].includes(t)?t:TABS[part][0]);
   S.tab[part]=tab; setPart(part,false);
 }
 window.addEventListener("hashchange",readHash);
+/* reg 파트의 구성도 탭은 해당 장부터 보여 줌 */
+(function(){ const el=$("dgReg"); if(!el||!window.DSDiagram) return; const v=DSDiagram.mount(el,"decision-tree"); if(v) v.show(1); })();
 
 /* ================================================================== 조작 연결 */
 function seg(el,cb){ el.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b)); cb(b.dataset.v); })); }

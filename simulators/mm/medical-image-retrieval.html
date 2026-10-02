@@ -1,0 +1,1377 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>[Case Study] 의료 영상 자료 검색 모형 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+:root{
+  --sk-accent: var(--cat-mm);
+  --role-img:#0B8F84; --role-txt:#2563EB; --role-fuse:#B4236A; --role-time:#2B8A3E; --role-gt:#6B7280; --role-warn:#DC2626;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --role-img:#3DD5C3; --role-txt:#6AA5FF; --role-fuse:#F472B6; --role-time:#51CF66; --role-gt:#9CA3AF; --role-warn:#F87171; } }
+:root[data-theme="dark"]{ --role-img:#3DD5C3; --role-txt:#6AA5FF; --role-fuse:#F472B6; --role-time:#51CF66; --role-gt:#9CA3AF; --role-warn:#F87171; }
+
+.mm-c-img{color:var(--role-img)} .mm-c-txt{color:var(--role-txt)} .mm-c-fuse{color:var(--role-fuse)} .mm-c-warn{color:var(--role-warn)} .mm-c-gt{color:var(--role-gt)}
+.mm-mock{display:inline-flex;align-items:center;font-size:11.5px;font-weight:700;color:var(--role-fuse);border:1px solid currentColor;border-radius:999px;padding:1px 8px;white-space:nowrap}
+.mm-nb{display:inline-flex;align-items:center;font-size:11.5px;font-weight:700;color:var(--role-gt);border:1px solid currentColor;border-radius:999px;padding:1px 8px;white-space:nowrap}
+
+/* 흐름 칩 */
+.mm-flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0;padding:0;list-style:none}
+.mm-flow li{font-size:13px;font-weight:600;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:4px 12px;color:var(--text)}
+.mm-flow li+li::before{content:"→";margin-right:8px;color:var(--faint)}
+.mm-mini{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface-2);display:flex;flex-direction:column;gap:6px;border-top:3px solid var(--c)}
+.mm-mini h3{font-size:14.5px}
+.mm-mini p{margin:0;font-size:13.5px;color:var(--muted)}
+
+/* 갤러리 */
+.mm-side{display:grid;gap:16px;align-items:start}
+.mm-side--em{grid-template-columns:minmax(0,1fr) 330px}
+.mm-side--vq{grid-template-columns:200px minmax(0,1fr)}
+@media (max-width:900px){.mm-side--em,.mm-side--vq{grid-template-columns:minmax(0,1fr)}}
+.mm-gal-wrap{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+@media (max-width:900px){.mm-gal-wrap{grid-template-columns:minmax(0,1fr)}}
+.mm-gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px}
+.mm-gal--sm{grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:6px}
+.mm-thumb{appearance:none;font:inherit;border:2px solid transparent;background:var(--surface-2);border-radius:10px;padding:4px;cursor:pointer;display:flex;flex-direction:column;gap:3px;color:var(--muted);font-size:11.5px;font-weight:600;line-height:1.25;text-align:left;min-width:0}
+.mm-thumb canvas{width:100%;height:auto;aspect-ratio:1;display:block;border-radius:6px}
+.mm-thumb:hover{border-color:var(--line-strong)}
+.mm-thumb[aria-pressed="true"]{border-color:var(--sk-accent)}
+.mm-thumb:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.mm-thumb span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mm-big{width:100%;max-width:300px;height:auto;aspect-ratio:1;border-radius:10px;display:block}
+.mm-qa{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:13.5px}
+.mm-qa li{background:var(--surface-2);border-radius:8px;padding:6px 9px}
+.mm-qa code,.mm-code-inline{font-family:var(--mono);font-size:12.5px}
+
+/* 표 스크롤 */
+.mm-tscroll{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.mm-tscroll .sk-table th{z-index:1}
+.sk-table tr.mm-cur td{background:color-mix(in srgb,var(--sk-accent) 14%,var(--surface))}
+.sk-table td.wrap{white-space:normal;min-width:180px}
+
+/* 구조도 */
+.mm-diag svg{display:block;width:100%;min-width:960px;height:auto}
+.mm-blk{cursor:pointer;outline:none}
+.mm-blk rect{fill:color-mix(in srgb,var(--c) 8%,var(--surface));stroke:var(--c);stroke-width:1.5;transition:fill .2s,stroke-width .2s}
+.mm-blk.done rect{fill:color-mix(in srgb,var(--c) 16%,var(--surface))}
+.mm-blk.cur rect{fill:color-mix(in srgb,var(--c) 28%,var(--surface));stroke-width:3.2}
+.mm-blk:hover rect{stroke-width:2.6}
+.mm-blk:focus-visible rect{stroke:var(--focus);stroke-width:3}
+.mm-blk text{fill:var(--ink);font-family:var(--sans);font-size:12.5px;font-weight:700}
+.mm-blk text.sh{font-family:var(--mono);font-size:11px;font-weight:500;fill:var(--muted)}
+.mm-arr{fill:none;stroke:var(--c);stroke-width:1.6;opacity:.42;transition:opacity .2s,stroke-width .2s}
+.mm-arr.on{opacity:1;stroke-width:2.6}
+.mm-arr.dash{stroke-dasharray:5 4}
+.mm-row-lab{font-family:var(--sans);font-size:12.5px;font-weight:700}
+.mm-arr-lab{font-family:var(--sans);font-size:11px;font-weight:600;fill:var(--muted)}
+.mm-info{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px}
+@media (max-width:900px){.mm-info{grid-template-columns:minmax(0,1fr)}}
+.mm-info h3{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mm-info p{margin:0;font-size:14px}
+.sk-kv dd.wrap{white-space:normal;word-break:break-word}
+
+/* 막대 */
+.mm-bars{display:flex;flex-direction:column;gap:7px}
+.mm-barrow{display:grid;grid-template-columns:minmax(0,1fr) 64px;gap:2px 10px;font-size:13px;align-items:center}
+.mm-barrow .lab{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mm-barrow .val{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.mm-barrow .bar{grid-column:1/-1;height:9px;background:var(--surface-2);border-radius:5px;overflow:hidden}
+.mm-barrow .bar i{display:block;height:100%;background:var(--c,var(--role-txt));border-radius:5px}
+.mm-barrow.top .lab{font-weight:700;color:var(--ink)}
+.mm-title{font-family:var(--mono);font-size:12.5px;white-space:pre-wrap;background:var(--surface-2);border-radius:8px;padding:6px 9px;margin:0;color:var(--ink)}
+
+/* 검색 결과 */
+.mm-res{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
+.mm-res .it{border:1px solid var(--line);border-radius:10px;padding:6px;background:var(--surface-2);display:flex;flex-direction:column;gap:4px;font-size:12.5px;min-width:0}
+.mm-res .it canvas{width:100%;height:auto;aspect-ratio:1;border-radius:6px;display:block}
+.mm-res .it b{font-family:var(--mono);font-size:13px}
+.mm-res .it.rel{border-color:var(--role-img)}
+.mm-presets{display:flex;flex-wrap:wrap;gap:6px}
+.mm-q{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.mm-q .sk-input{flex:1 1 260px;font-family:var(--mono)}
+.mm-chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;border-radius:6px;padding:2px 7px;background:var(--surface-2);border:1px solid var(--line)}
+.mm-cv{display:block;width:100%}
+
+/* 행렬 */
+.mm-mt{border-collapse:separate;border-spacing:3px;font-family:var(--mono);font-size:13px}
+.mm-mt th{font-family:var(--sans);font-size:12px;color:var(--muted);font-weight:600;padding:2px 6px;text-align:center;white-space:nowrap}
+.mm-mt th.r{text-align:right}
+.mm-mt td{min-width:64px;height:38px;text-align:center;border-radius:6px;color:var(--ink);font-weight:600;background:color-mix(in srgb,var(--role-fuse) var(--a,0%),var(--surface-2))}
+.mm-mt td.diag{outline:2px solid var(--role-fuse);outline-offset:-2px}
+
+/* 코드 */
+.mm-code{position:relative}
+.mm-code pre{margin:0;white-space:pre;font-size:12.5px;line-height:1.6}
+.mm-code .sk-btn{position:absolute;top:6px;right:6px}
+
+/* 체크리스트 */
+.mm-checks{display:flex;flex-direction:column;gap:8px}
+.mm-warns{display:flex;flex-direction:column;gap:8px}
+.mm-ok{color:var(--role-img);font-weight:700}
+.mm-no{color:var(--role-warn);font-weight:700}
+.mm-empty{font-family:var(--mono);color:var(--role-warn)}
+.mm-tok{display:inline-block;font-family:var(--mono);font-size:12.5px;background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:1px 5px;margin:2px 2px}
+.mm-tok.new{border-color:var(--role-txt);color:var(--role-txt);font-weight:700}
+.mm-acc{display:grid;grid-template-columns:170px minmax(0,1fr) 116px;gap:8px 12px;align-items:center;font-size:14px}
+.mm-acc .bar{height:16px;background:var(--surface-2);border-radius:6px;overflow:hidden}
+.mm-acc .bar i{display:block;height:100%;background:var(--c)}
+.mm-acc .v{font-family:var(--mono);text-align:right}
+@media (max-width:520px){.mm-acc{grid-template-columns:110px minmax(0,1fr) 96px;font-size:13px}}
+.sk-controls>.sk-group{max-width:100%;min-width:0}
+#zsTpl,#dgSel,#capMode,#galFilter,#ntNg{max-width:100%;overflow-x:auto}
+@media (prefers-reduced-motion: reduce){.mm-blk rect,.mm-arr{transition:none}}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+      <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)" aria-current="page">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">[Case Study] 의료 영상 자료 검색 모형 시뮬레이터</h1>
+      <p class="ds-hero__lede">VQA-RAD 방사선 영상으로 CLIP 제로샷 분류, CLIP 임베딩 + 코사인 유사도 검색(텍스트→영상, 영상→영상), BLIP 캡셔닝과 시각 질의응답(VQA)을 따라갑니다. 대형 모형의 출력은 "모의 출력"으로, 코사인·softmax·검색 지표는 화면에서 직접 계산합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button class="sk-tab" type="button" role="tab" id="tab-a" aria-controls="pane-a" aria-selected="true"><span class="sk-num">1</span>문제·데이터</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-b" aria-controls="pane-b" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>모형 구조</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-c" aria-controls="pane-c" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>제로샷 분류</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-d" aria-controls="pane-d" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>임베딩 공간</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-e" aria-controls="pane-e" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>텍스트→영상 검색</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-f" aria-controls="pane-f" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>캡셔닝·VQA</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-g" aria-controls="pane-g" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>한계와 안전장치</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">8</span>알고리즘 구성도</button>
+  </nav>
+
+  <!-- ================= 1. 문제·데이터 ================= -->
+  <section id="pane-a" role="tabpanel" aria-labelledby="tab-a">
+    <div class="sk-card">
+      <div class="sk-head"><h2>문제 정의: 판독문으로 영상을 찾고, 영상으로 문장을 만든다</h2><span class="sk-hint">실습 노트북의 흐름</span></div>
+      <p class="sk-lead">의료 데이터는 본질적으로 멀티모달입니다. 영상(X-ray / CT / MRI) + 판독문(텍스트) + 검사 수치(정형) + 진료 기록. 영상의학과 전문의가 영상을 "보고" 판독문을 "쓰는" 일은 이미지 → 텍스트 변환이고, 판독문으로 유사 증례 영상을 찾는 일은 텍스트 → 이미지 검색입니다.</p>
+      <ol class="mm-flow" aria-label="실습 흐름">
+        <li>문제 정의</li><li>VQA-RAD 데이터</li><li>CLIP 제로샷 분류</li><li>CLIP 임베딩 검색</li><li>BLIP 캡셔닝·VQA</li><li>한계와 안전장치</li>
+      </ol>
+      <div class="sk-grid3">
+        <div class="mm-mini" style="--c:var(--role-fuse)"><h3>Dual Encoder (CLIP)</h3><p>이미지 인코더와 텍스트 인코더가 각각 벡터를 만들고 같은 벡터 공간에서 비교합니다. 제로샷 분류 / 이미지-텍스트 검색.</p></div>
+        <div class="mm-mini" style="--c:var(--role-txt)"><h3>Encoder-Decoder (BLIP)</h3><p>이미지 인코더가 만든 벡터를 텍스트 디코더가 받아 문장을 생성(GPT 방식)합니다. 이미지 캡셔닝 / 시각 질의응답(VQA).</p></div>
+        <div class="mm-mini" style="--c:var(--role-img)"><h3>Vision Encoder + LLM</h3><p>LLaVA / MedGemma처럼 대형 언어 모델에 이미지 인코더를 연결해 대화형 판독을 보조합니다. 모델이 크고 GPU가 필요해 개념만 소개합니다.</p></div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>데이터: VQA-RAD</h2><span class="sk-hint"><span class="mm-code-inline">flaviagiammarino/vqa-rad</span> · 라이선스 CC0</span></div>
+      <p class="sk-lead">방사선 영상(X-ray / CT / MRI) + 질문 + 답변으로 구성된 의료 시각 질의응답 데이터입니다. 실습 노트북은 Test 데이터만 사용하고, 같은 영상에 질문이 여러 개 달려 있어 영상 픽셀값의 해시로 중복을 제거합니다.</p>
+      <div class="sk-stats" id="dsStats"></div>
+      <p class="sk-note" id="dsSumNote"></p>
+      <div class="sk-scroll">
+        <table class="sk-table">
+          <thead><tr><th>질문 유형</th><th>답변 형태</th><th>예 (실습 노트북)</th></tr></thead>
+          <tbody>
+            <tr><td><b>Closed</b></td><td>yes / no</td><td class="wrap"><code class="mm-code-inline">Is there a fracture?</code> → yes / no · Test 451개 중 251개</td></tr>
+            <tr><td><b>Open</b></td><td>자유 답변</td><td class="wrap"><code class="mm-code-inline">What organ is shown?</code> → lung / brain / liver …</td></tr>
+            <tr><td>test[0]</td><td>Closed</td><td class="wrap"><code class="mm-code-inline">is there evidence of an aortic aneurysm?</code> → <b>yes</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="mm-gal-wrap">
+      <div class="sk-card">
+        <div class="sk-head"><h2>모의 영상 갤러리 (24장)</h2><span class="mm-mock">모의 영상 · 코드로 생성</span></div>
+        <p class="sk-lead">VQA-RAD처럼 머리·흉부·복부가 섞인 흑백 방사선 영상을 코드로 그렸습니다(실제 환자 영상 아님). 영상을 누르면 메타데이터와 질의응답 예가 나옵니다. 이 24장이 이후 검색 탭의 갤러리(실습 노트북의 <code class="mm-code-inline">img_list</code> 203장 역할)입니다.</p>
+        <div class="sk-controls"><span class="sk-label">보기</span><div class="sk-seg" id="galFilter" role="group" aria-label="갤러리 필터">
+          <button type="button" data-v="all" aria-pressed="true">전체</button><button type="button" data-v="cxr" aria-pressed="false">흉부 X선</button><button type="button" data-v="bct" aria-pressed="false">뇌 CT</button><button type="button" data-v="bmr" aria-pressed="false">뇌 MRI</button><button type="button" data-v="act" aria-pressed="false">복부 CT</button>
+        </div></div>
+        <div class="mm-gal" id="gal"></div>
+      </div>
+      <div class="sk-card sk-card--sunk" aria-live="polite">
+        <h2 id="galTitle">선택한 영상</h2>
+        <canvas class="mm-big" id="galBig" width="160" height="160" aria-label="선택한 모의 방사선 영상"></canvas>
+        <dl class="sk-kv" id="galKv"></dl>
+        <h3>질의응답 (모의 라벨)</h3>
+        <ul class="mm-qa" id="galQa"></ul>
+      </div>
+    </div>
+
+    <div class="sk-card" id="ddCard">
+      <div class="sk-head"><h2>영상 기준 중복 제거 (해시)</h2><span class="sk-hint">→ 키로 한 행씩 진행</span></div>
+      <p class="sk-lead">질의응답 행을 위에서부터 읽으며 영상 픽셀값으로 해시 키를 만들고, 처음 보는 키일 때만 <code class="mm-code-inline">img_list</code>에 추가합니다. 실습 노트북은 <code class="mm-code-inline">hashlib.md5(img.tobytes())</code>, 여기서는 같은 원리의 FNV-1a 32비트 해시를 모의 영상 픽셀에 직접 계산합니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><button class="sk-btn" type="button" id="ddFirst">처음</button><button class="sk-btn" type="button" id="ddPrev">이전</button><button class="sk-btn" type="button" id="ddNext">다음</button><button class="sk-btn sk-btn--primary" type="button" id="ddPlay" aria-pressed="false">▶ 재생</button></div>
+        <label class="sk-group"><span class="sk-label">속도</span><select class="sk-select" id="ddSpeed"><option value="900">느리게</option><option value="420" selected>보통</option><option value="140">빠르게</option></select></label>
+      </div>
+      <div class="sk-stats" id="ddStats"></div>
+      <div class="mm-tscroll" id="ddScroll"><table class="sk-table"><thead><tr><th>행</th><th>영상</th><th>해시 키</th><th>질문</th><th>답</th><th>처리</th></tr></thead><tbody id="ddBody"></tbody></table></div>
+      <div class="sk-formula">key = hash(img.tobytes())  →  key ∉ seen 이면 seen.add(key), img_list.append(img.convert('RGB'))<br>실습 노트북: Test 451행 → 고유 영상 203장 (평균 451 / 203 = <span id="ddRatioNb"></span> 질문/영상)</div>
+    </div>
+  </section>
+
+  <!-- ================= 2. 모형 구조 ================= -->
+  <section id="pane-b" role="tabpanel" aria-labelledby="tab-b" hidden>
+    <div class="sk-card" id="dgCard">
+      <div class="sk-head"><h2>모형 구조도</h2><span class="sk-hint">블록을 누르거나 단계 버튼 · → 키</span></div>
+      <p class="sk-lead">블록 = 모듈, 화살표 = 데이터 흐름, 블록 아래 글자 = 텐서 모양입니다. 단계를 진행하면 데이터가 흐르는 순서대로 강조됩니다.</p>
+      <div class="sk-controls">
+        <div class="sk-seg" id="dgSel" role="group" aria-label="구조도 선택">
+          <button type="button" data-v="clip" aria-pressed="true">CLIP (Dual Encoder)</button><button type="button" data-v="ret" aria-pressed="false">검색 인덱스 파이프라인</button><button type="button" data-v="vqa" aria-pressed="false">BLIP VQA</button>
+        </div>
+        <div class="sk-group"><button class="sk-btn" type="button" id="dgFirst">처음</button><button class="sk-btn" type="button" id="dgPrev">이전</button><button class="sk-btn" type="button" id="dgNext">다음</button><button class="sk-btn sk-btn--primary" type="button" id="dgPlay" aria-pressed="false">▶ 재생</button></div>
+        <label class="sk-group"><span class="sk-label">속도</span><select class="sk-select" id="dgSpeed"><option value="2200">느리게</option><option value="1300" selected>보통</option><option value="700">빠르게</option></select></label>
+      </div>
+      <div class="sk-legend"><span><i style="background:var(--role-img)"></i>영상(Vision) 경로</span><span><i style="background:var(--role-txt)"></i>문장(Text) 경로</span><span><i style="background:var(--role-fuse)"></i>결합·공동 임베딩</span><span><i style="background:var(--role-gt)"></i>저장·결과</span></div>
+      <div class="sk-scroll mm-diag" id="dgWrap"><svg id="dgSvg" role="group" aria-label="모형 구조도"></svg></div>
+      <div class="mm-info sk-card sk-card--sunk" aria-live="polite">
+        <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+          <h3 id="dgTitle"></h3>
+          <p id="dgDesc"></p>
+          <div class="sk-formula" id="dgFormula"></div>
+        </div>
+        <dl class="sk-kv" id="dgKv"></dl>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>사전 학습 목표와 실습에서 쓴 모형</h2></div>
+      <div class="sk-scroll"><table class="sk-table">
+        <thead><tr><th>모형</th><th>사전 학습 목표</th><th>자연어처리에서 대응되는 개념</th></tr></thead>
+        <tbody>
+          <tr><td><b>CLIP</b> (OpenAI, 2021)</td><td class="wrap">인터넷 이미지-텍스트 약 4억 쌍. 한 배치 N쌍 → N×N 유사도 행렬, 대각선(짝)은 높이고 나머지는 낮추는 대조학습(자기지도학습)</td><td class="wrap">캡션 자체가 학습 신호 = MLM이 문장 자체에서 정답을 만드는 원리</td></tr>
+          <tr><td><b>BLIP</b> ITC (Salesforce, 2022)</td><td class="wrap">Image-Text Contrastive: 이미지-텍스트 대조학습</td><td class="wrap">CLIP과 동일</td></tr>
+          <tr><td>BLIP ITM</td><td class="wrap">Image-Text Matching: 이미지와 문장이 짝인지 이진 분류</td><td class="wrap">NSP와 유사</td></tr>
+          <tr><td>BLIP LM</td><td class="wrap">이미지를 보고 캡션을 다음 단어 예측으로 생성</td><td class="wrap">GPT와 동일한 방식</td></tr>
+          <tr><td>BLIP CapFilt</td><td class="wrap">Captioner가 새 캡션을 만들고 Filter가 부적합한 캡션을 걸러 데이터를 정제한 뒤 다시 학습 (Bootstrapping)</td><td class="wrap">웹 캡션의 노이즈 줄이기</td></tr>
+        </tbody>
+      </table></div>
+      <div class="sk-scroll"><table class="sk-table">
+        <thead><tr><th>실습 노트북의 모형</th><th>용도</th><th class="n">가중치 파일</th><th class="n">로드 텐서 수</th></tr></thead>
+        <tbody>
+          <tr><td class="mm-code-inline">openai/clip-vit-base-patch32</td><td>일반 CLIP 제로샷</td><td class="n">—</td><td class="n">398</td></tr>
+          <tr><td class="mm-code-inline">flaviagiammarino/pubmed-clip-vit-base-patch32</td><td>의료 CLIP 제로샷 · 검색 임베딩</td><td class="n">605M</td><td class="n">398</td></tr>
+          <tr><td class="mm-code-inline">Salesforce/blip-image-captioning-base</td><td>이미지 캡셔닝</td><td class="n">—</td><td class="n">473</td></tr>
+          <tr><td class="mm-code-inline">Salesforce/blip-vqa-base</td><td>일반 VQA</td><td class="n">1.54G</td><td class="n">788</td></tr>
+          <tr><td class="mm-code-inline">ayyuce/blip-vqa-rad</td><td>VQA-RAD Fine-Tuning (커뮤니티)</td><td class="n">990M</td><td class="n">472</td></tr>
+        </tbody>
+      </table></div>
+      <p class="sk-hint">가중치 파일 크기와 텐서 수는 실습 노트북의 다운로드·로드 기록에 나온 값입니다(—: 기록에 크기 없음).</p>
+    </div>
+  </section>
+
+  <!-- ================= 3. 제로샷 분류 ================= -->
+  <section id="pane-c" role="tabpanel" aria-labelledby="tab-c" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>실습 노트북 결과: img_list[0] 영상 종류 분류</h2><span class="mm-nb">실습 노트북 출력</span></div>
+      <p class="sk-lead">후보 문장 4개, 기본 문장 틀 <code class="mm-code-inline">"This is a photo of {}."</code>. 아래 확률은 노트북 출력 그대로입니다. 확률 비율의 로그를 취하면 로짓 차이가, 그것을 logit scale(100)로 나누면 코사인 유사도 차이가 거꾸로 계산됩니다.</p>
+      <div class="sk-scroll"><table class="sk-table" id="zsNb"></table></div>
+      <div class="sk-controls">
+        <div class="sk-slider"><div class="sk-sl-head"><span>logit scale s (CLIP 학습값 100)</span><b id="zsScaleV">100</b></div><input type="range" id="zsScale" min="1" max="100" step="1" value="100" aria-label="logit scale"></div>
+      </div>
+      <div class="sk-formula" id="zsNbFormula"></div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>제로샷 탐색기: 문장 틀과 후보 문장 바꾸기</h2><span class="mm-mock">모의 출력 · softmax는 실제 계산</span></div>
+      <p class="sk-lead">영상을 고르고 후보 문장 묶음과 문장 틀을 바꿔 봅니다. 두 모형의 코사인 유사도는 모의 임베딩에서 계산하고, 확률 = softmax(100 × cos)를 직접 계산합니다. 제목 줄은 실습 노트북의 <code class="mm-code-inline">compare_zero_shot</code> 출력 형식입니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">후보 문장</span><div class="sk-seg" id="zsSet" role="group" aria-label="후보 문장 묶음"><button type="button" data-v="mod" aria-pressed="true">영상 종류 4개</button><button type="button" data-v="find" aria-pressed="false">흉부 소견 4개</button></div></div>
+        <div class="sk-group"><span class="sk-label">문장 틀</span><div class="sk-seg" id="zsTpl" role="group" aria-label="문장 틀"><button type="button" data-v="photo" aria-pressed="true">This is a photo of {}.</button><button type="button" data-v="radio" aria-pressed="false">a radiology image showing {}.</button><button type="button" data-v="plain" aria-pressed="false">{}</button></div></div>
+      </div>
+      <div class="mm-gal mm-gal--sm" id="zsPick" aria-label="영상 선택"></div>
+      <div class="sk-grid3" style="align-items:start">
+        <div style="display:flex;flex-direction:column;gap:8px"><canvas class="mm-big" id="zsBig" width="160" height="160" aria-label="제로샷 분류할 모의 영상"></canvas><pre class="mm-title" id="zsTitleLine"></pre></div>
+        <div class="sk-card sk-card--sunk"><h3>일반 CLIP <span class="sk-hint">openai/clip-vit-base-patch32</span></h3><div class="mm-bars" id="zsGen"></div></div>
+        <div class="sk-card sk-card--sunk"><h3>PubMedCLIP <span class="sk-hint">pubmed-clip-vit-base-patch32</span></h3><div class="mm-bars" id="zsPub"></div></div>
+      </div>
+      <div class="sk-formula" id="zsCalc"></div>
+      <p class="sk-note" id="zsWarn"></p>
+      <div class="mm-code"><pre class="sk-formula" id="zsCode"></pre><button class="sk-btn sk-btn--sm" type="button" data-copy="zsCode">복사</button></div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>의료 제로샷의 한계: 영상 종류 vs 소견 수준</h2><span class="mm-mock">모의 갤러리 전체 · 정확도는 실제 계산</span></div>
+      <p class="sk-lead">영상 종류(X-ray / CT / MRI) 구분은 영상의 전체 모양이 확연히 달라 쉽고, 소견(정상 / 폐렴 / 흉수 / 심비대) 구분은 영상 안의 미세한 차이를 봐야 해 어렵습니다. 현재 문장 틀로 갤러리 전체를 분류한 결과입니다.</p>
+      <div class="sk-scroll"><table class="sk-table" id="zsAll"></table></div>
+      <p class="sk-note" id="zsChest"></p>
+      <p class="sk-note sk-note--warn">사전 학습 데이터에 소견 설명이 충분하지 않으면 제로샷으로는 한계가 있습니다 → 의료 데이터로 Fine-Tuning이 필요합니다. 실습 노트북도 PubMedCLIP이 흉부 X선으로 분류한 영상 4장을 골라 소견 후보(문장 틀 <code class="mm-code-inline">'{}'</code>)로 비교했습니다.</p>
+    </div>
+  </section>
+
+  <!-- ================= 4. 임베딩 공간 ================= -->
+  <section id="pane-d" role="tabpanel" aria-labelledby="tab-d" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>512차원 공동 임베딩 공간 들여다보기</h2><span class="mm-mock">모의 임베딩 · PCA·코사인은 실제 계산</span></div>
+      <p class="sk-lead">영상 24장과 문장 7개를 512차원 모의 임베딩으로 만들고, PCA로 2차원에 투영했습니다. 영상(청록 원)과 문장(파랑 마름모)이 서로 다른 덩어리를 이루는 현상이 <b>모달리티 간격(Modality Gap)</b>입니다. 점을 누르면 코사인 유사도가 가장 높은 이웃이 계산됩니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">모형</span><div class="sk-seg" id="emModel" role="group" aria-label="모형"><button type="button" data-v="pub" aria-pressed="true">PubMedCLIP</button><button type="button" data-v="gen" aria-pressed="false">일반 CLIP</button></div></div>
+        <div class="sk-slider"><div class="sk-sl-head"><span>모달리티 간격 성분 g</span><b id="emGapV">0.85</b></div><input type="range" id="emGap" min="0" max="1.2" step="0.05" value="0.85" aria-label="모달리티 간격 성분"></div>
+        <label class="sk-check"><input type="checkbox" id="emLinks" checked>문장 → 가장 가까운 영상 연결</label>
+        <label class="sk-check"><input type="checkbox" id="emCent" checked>모달리티 중심·간격</label>
+      </div>
+      <div class="mm-side mm-side--em">
+        <div style="min-width:0;display:flex;flex-direction:column;gap:8px">
+          <canvas class="mm-cv" id="emCv" aria-label="임베딩 2차원 투영 산점도" tabindex="0"></canvas>
+          <div class="sk-legend"><span><i style="background:var(--role-img);border-radius:50%"></i>영상 임베딩</span><span><i style="background:var(--role-txt);transform:rotate(45deg) scale(.8)"></i>문장 임베딩</span><span><i style="background:var(--role-fuse)"></i>모달리티 중심 간격 · 최근접 연결</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+          <dl class="sk-kv" id="emStats"></dl>
+          <div class="sk-card sk-card--sunk" aria-live="polite"><h3 id="emSelT">점을 눌러 보세요</h3><div id="emSel" style="font-size:13.5px"></div></div>
+        </div>
+      </div>
+      <div class="sk-formula" id="emCos"></div>
+      <p class="sk-note">L2 정규화된 벡터(‖v‖ = 1)에서는 코사인 유사도 = 내적입니다. 간격 성분 g를 키우면 영상-문장 코사인 값은 전체적으로 낮아지지만, 같은 문장에 대한 영상들의 <b>순위</b>는 거의 그대로입니다. 그래서 검색에서는 절대값보다 순위(top-k)를 봅니다.</p>
+    </div>
+  </section>
+
+  <!-- ================= 5. 검색 ================= -->
+  <section id="pane-e" role="tabpanel" aria-labelledby="tab-e" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>CLIP 임베딩 + 코사인 유사도 검색</h2><span class="mm-mock">모의 임베딩 · 코사인·순위·지표는 실제 계산</span></div>
+      <p class="sk-lead">검색 문장 → 텍스트 벡터, 영상 → 이미지 벡터. 같은 512차원 공간에 있으므로 코사인 유사도가 가장 높은 영상 top_k장을 돌려줍니다(NLP 챗봇의 질문 벡터 검색과 같은 원리). 정답 기준은 검색 문장에서 읽은 부위·영상 종류·소견입니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">검색</span><div class="sk-seg" id="rtMode" role="group" aria-label="검색 방향"><button type="button" data-v="txt" aria-pressed="true">텍스트 → 영상</button><button type="button" data-v="img" aria-pressed="false">영상 → 영상</button></div></div>
+        <div class="sk-group"><span class="sk-label">모형</span><div class="sk-seg" id="rtModel" role="group" aria-label="모형"><button type="button" data-v="pub" aria-pressed="true">PubMedCLIP</button><button type="button" data-v="gen" aria-pressed="false">일반 CLIP</button></div></div>
+        <div class="sk-slider"><div class="sk-sl-head"><span>top_k</span><b id="rtKV">3</b></div><input type="range" id="rtK" min="1" max="10" step="1" value="3" aria-label="top k"></div>
+      </div>
+      <div id="rtTxtBox" style="display:flex;flex-direction:column;gap:8px">
+        <form class="mm-q" id="rtForm"><input class="sk-input" id="rtQ" type="text" value="a chest x-ray" aria-label="검색 문장" autocomplete="off"><button class="sk-btn sk-btn--primary" type="submit">검색</button></form>
+        <div class="mm-presets" id="rtPresets"></div>
+      </div>
+      <div id="rtImgBox" hidden style="display:flex;flex-direction:column;gap:8px">
+        <span class="sk-label">질의 영상 고르기</span>
+        <div class="mm-gal mm-gal--sm" id="rtPick"></div>
+        <label class="sk-check"><input type="checkbox" id="rtFind">소견까지 같아야 정답으로 인정</label>
+      </div>
+      <div id="rtParse" class="sk-legend"></div>
+      <div class="mm-res" id="rtRes" aria-live="polite"></div>
+      <div class="sk-stats" id="rtStats"></div>
+      <div class="sk-formula" id="rtFormula"></div>
+      <canvas class="mm-cv" id="rtStrip" aria-label="갤러리 전체 유사도 순위 막대"></canvas>
+      <div class="sk-legend"><span><i style="background:var(--role-img)"></i>정답 영상</span><span><i style="background:var(--role-gt)"></i>정답 아님</span><span><i style="background:var(--role-fuse)"></i>top_k 경계</span></div>
+      <div class="mm-code"><pre class="sk-formula" id="rtCode"></pre><button class="sk-btn sk-btn--sm" type="button" data-copy="rtCode">복사</button></div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>CLIP 유사도 행렬 확인 (영상 3장 × 문장 3개)</h2><span class="mm-mock">모의 임베딩 · softmax·손실은 실제 계산</span></div>
+      <p class="sk-lead">실습 노트북처럼 세 검색 문장 각각의 1순위 영상 3장을 모아 <code class="mm-code-inline">logits_per_image.softmax(dim=-1)</code>를 계산합니다. 대각선(짝이 맞는 쌍)이 높게 나오는 것이 CLIP이 사전 학습에서 만들려던 결과입니다.</p>
+      <div class="sk-controls"><div class="sk-slider"><div class="sk-sl-head"><span>logit scale</span><b id="mxScaleV">100</b></div><input type="range" id="mxScale" min="1" max="100" step="1" value="100" aria-label="유사도 행렬 logit scale"></div></div>
+      <div class="sk-grid2">
+        <div class="sk-scroll"><div class="sk-mat-label">코사인 유사도 cos(영상 i, 문장 j)</div><table class="mm-mt" id="mxCos"></table></div>
+        <div class="sk-scroll"><div class="sk-mat-label">softmax(scale × cos) — 행(영상)마다 합 1</div><table class="mm-mt" id="mxProb"></table></div>
+      </div>
+      <div class="sk-formula" id="mxLoss"></div>
+    </div>
+  </section>
+
+  <!-- ================= 6. 캡셔닝·VQA ================= -->
+  <section id="pane-f" role="tabpanel" aria-labelledby="tab-f" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>이미지 캡셔닝 (blip-image-captioning-base)</h2><span class="mm-nb">문장은 실습 노트북 출력 · 영상은 모의</span></div>
+      <p class="sk-lead">생성은 GPT와 같은 자기회귀 방식입니다. Unconditional은 영상만, Conditional은 문장 앞부분을 함께 넣어 이어 쓰게 합니다. 반복 지표(3-gram 반복, distinct-2)는 출력 문장에서 직접 계산합니다(공백 기준 토큰).</p>
+      <div class="sk-controls"><div class="sk-seg" id="capMode" role="group" aria-label="캡셔닝 방식"><button type="button" data-v="unc" aria-pressed="true">Unconditional</button><button type="button" data-v="cond" aria-pressed="false">Conditional</button><button type="button" data-v="beam" aria-pressed="false">Beam + Repetition Penalty</button></div></div>
+      <div class="sk-grid3" id="capGrid"></div>
+      <p class="sk-note" id="capNote"></p>
+      <div class="mm-code"><pre class="sk-formula" id="capCode"></pre><button class="sk-btn sk-btn--sm" type="button" data-copy="capCode">복사</button></div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>반복을 막는 생성 하이퍼파라미터</h2><span class="mm-mock">로짓은 모의 · 벌점·차단·softmax는 실제 계산</span></div>
+      <p class="sk-lead">Unconditional 세 번째 문장처럼 "x - ray"가 끝없이 반복될 때, 다음 단어 후보에 <code class="mm-code-inline">repetition_penalty</code>(이미 나온 토큰의 로짓을 나눔)와 <code class="mm-code-inline">no_repeat_ngram_size</code>(이미 나온 n-gram을 다시 만들 토큰 차단)를 적용해 봅니다.</p>
+      <div class="sk-controls">
+        <div class="sk-slider"><div class="sk-sl-head"><span>repetition_penalty θ</span><b id="ntPenV">1.0</b></div><input type="range" id="ntPen" min="1" max="2" step="0.1" value="1" aria-label="repetition penalty"></div>
+        <div class="sk-group"><span class="sk-label">no_repeat_ngram_size</span><div class="sk-seg" id="ntNg" role="group" aria-label="no repeat ngram size"><button type="button" data-v="0" aria-pressed="true">끔</button><button type="button" data-v="2" aria-pressed="false">2</button><button type="button" data-v="3" aria-pressed="false">3</button></div></div>
+      </div>
+      <div id="ntPrefix"></div>
+      <div class="sk-scroll"><table class="sk-table" id="ntTable"></table></div>
+      <p class="sk-note" id="ntOut"></p>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>시각 질의응답 (VQA): 실습 노트북 출력</h2><span class="mm-nb">실습 노트북 출력 · 정답 판정은 실제 계산</span></div>
+      <p class="sk-lead">판정은 노트북과 같은 정확 일치(<code class="mm-code-inline">pred.strip().lower() == answer.lower()</code>)입니다.</p>
+      <h3>Test 앞 5개 (일반 BLIP VQA, Open·Closed 섞임)</h3>
+      <div class="sk-scroll"><table class="sk-table" id="vqA"></table></div>
+      <h3>Closed 앞 5개: 일반 vs Fine-Tuning</h3>
+      <div class="sk-scroll"><table class="sk-table" id="vqB"></table></div>
+      <div class="sk-scroll"><table class="sk-table">
+        <thead><tr><th>test[0] 영상에 직접 질문</th><th>일반 BLIP VQA 답</th></tr></thead>
+        <tbody><tr><td class="mm-code-inline">Is this a chest x-ray?</td><td class="mm-code-inline">yes</td></tr><tr><td class="mm-code-inline">What organ is shown?</td><td class="mm-code-inline">stomach</td></tr></tbody>
+      </table></div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>Closed 질문 정확도</h2><span class="mm-nb">실습 노트북 출력</span></div>
+      <p class="sk-lead">Test 451개 중 답이 yes / no인 Closed 질문 251개를 골라, 앞 50개(n = 50)로 정확도를 계산했습니다.</p>
+      <div class="mm-acc" id="accBox"></div>
+      <div class="sk-formula" id="accFormula"></div>
+      <p class="sk-note sk-note--warn"><b>Fine-Tuning 0.0을 그대로 믿으면 안 됩니다.</b> 노트북에서 <code class="mm-code-inline">ayyuce/blip-vqa-rad</code>는 모든 질문에 빈 문자열(<span class="mm-empty">''</span>)을 냈고, 로드 보고서에 text_encoder 층의 가중치 다수가 MISSING으로 나왔습니다(원본 788개 텐서 vs 472개). 빈 답은 어떤 정답과도 일치하지 않으므로 0.0이 됩니다. 개인이 공개한 모형이라 모델 카드에 학습·평가 정보가 부족하고, Test 데이터가 학습에 포함되었을 가능성도 배제할 수 없어 정확도는 참고용으로만 해석합니다.</p>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>VQA 탐색기: 영상 + 질문 → 답</h2><span class="mm-mock">모의 출력</span></div>
+      <p class="sk-lead">모의 영상과 질문을 고르면 일반 BLIP VQA의 모의 답과, 노트북에서 관찰된 Fine-Tuning 모형의 출력(빈 문자열)을 나란히 보여 줍니다. 정답은 모의 영상의 생성 라벨입니다.</p>
+      <div class="sk-controls">
+        <label class="sk-group"><span class="sk-label">영상</span><select class="sk-select" id="vqImg"></select></label>
+        <label class="sk-group"><span class="sk-label">질문</span><select class="sk-select" id="vqQ"></select></label>
+      </div>
+      <div class="mm-side mm-side--vq">
+        <canvas class="mm-big" id="vqCv" width="160" height="160" aria-label="질문할 모의 영상"></canvas>
+        <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+          <div class="sk-scroll"><table class="sk-table" id="vqOut"></table></div>
+          <p class="sk-note" id="vqNote"></p>
+        </div>
+      </div>
+      <div class="mm-code"><pre class="sk-formula" id="vqCode"></pre><button class="sk-btn sk-btn--sm" type="button" data-copy="vqCode">복사</button></div>
+    </div>
+  </section>
+
+  <!-- ================= 7. 한계와 안전장치 ================= -->
+  <section id="pane-g" role="tabpanel" aria-labelledby="tab-g" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>한계</h2><span class="sk-hint">실습 노트북의 정리</span></div>
+      <div class="mm-warns">
+        <p class="sk-note sk-note--warn"><b>소견 수준 제로샷의 한계.</b> 영상 종류 구분은 쉽지만, 정상 / 폐렴 / 흉수 / 심비대처럼 미세한 차이는 사전 학습 데이터에 소견 설명이 충분하지 않으면 제로샷으로 맞히기 어렵습니다 → Fine-Tuning 필요.</p>
+        <p class="sk-note sk-note--warn"><b>일반 모형은 의료 소견을 모릅니다.</b> 일반 캡셔닝 모형은 "흑백 사진", "사람의 가슴" 수준의 묘사는 하지만 의학적 소견은 만들지 못합니다(인터넷 이미지 위주 사전 학습). 일반 VQA는 test[0] 영상의 장기를 <code class="mm-code-inline">stomach</code>라고 답했습니다 → 도메인 사전 학습 / Fine-Tuning 필요.</p>
+        <p class="sk-note sk-note--warn"><b>환각 (Hallucination).</b> 생성 모형은 영상에 없는 병변을 그럴듯한 문장으로 만들어 낼 수 있습니다. 임상에서는 반드시 판독의(전문의)가 검토합니다.</p>
+        <p class="sk-note sk-note--warn"><b>대부분 영어로 학습.</b> 한국어 질문·판독문에는 추가 학습이 필요합니다. 검색 탭에서 한국어로 검색하면 모의 인코더도 개념을 약하게만 반영합니다.</p>
+        <p class="sk-note sk-note--warn"><b>커뮤니티 공개 모형 주의.</b> 모델 카드에 학습 데이터·평가 정보가 충분하지 않을 수 있고, Test 데이터가 학습에 포함되었을 가능성도 있습니다. 로드 보고서(MISSING / UNEXPECTED)와 출력이 비어 있지 않은지 먼저 확인합니다(노트북: Fine-Tuning 모형 빈 출력 → 정확도 0.0).</p>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>의료 특화 사전 학습 모형</h2></div>
+      <div class="sk-scroll"><table class="sk-table">
+        <thead><tr><th>모형</th><th>구조</th><th>학습 데이터 · 특징</th><th>용도</th></tr></thead>
+        <tbody>
+          <tr><td><b>PubMedCLIP</b></td><td>Dual Encoder</td><td class="wrap">ROCO 데이터(방사선 영상 + 논문 캡션, 약 8만 쌍)로 CLIP을 추가 학습. 실습 노트북의 검색 임베딩 모형</td><td class="wrap">제로샷 분류, 텍스트 ↔ 영상 검색</td></tr>
+          <tr><td><b>BiomedCLIP</b></td><td>Dual Encoder</td><td class="wrap">PubMed Central 논문 그림-캡션 1,500만 쌍(PMC-15M)으로 학습</td><td class="wrap">제로샷 분류, 텍스트 ↔ 영상 검색</td></tr>
+          <tr><td><b>blip-vqa-rad</b></td><td>Encoder-Decoder</td><td class="wrap"><code class="mm-code-inline">Salesforce/blip-vqa-base</code>를 VQA-RAD로 Fine-Tuning한 커뮤니티 공개 모형(정보 부족 주의)</td><td class="wrap">의료 VQA</td></tr>
+          <tr><td><b>LLaVA-Med, CheXagent</b></td><td>Vision Encoder + LLM</td><td class="wrap">대형 언어 모델에 이미지 인코더 연결</td><td class="wrap">대화형 판독 보조, 리포트 초안 생성</td></tr>
+          <tr><td><b>MedGemma</b></td><td>Vision Encoder + LLM</td><td class="wrap">Google의 의료 특화 VLM (4B), <code class="mm-code-inline">google/medgemma-1.5-4b-it</code> · 사용 동의 필요 / GPU 권장</td><td class="wrap">대화형 판독 보조, 리포트 초안 생성</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>안전장치: 결과를 쓰기 전에 사람이 확인할 것</h2><span class="sk-hint" id="ckCount"></span></div>
+      <p class="sk-lead">검색·캡셔닝·VQA 결과는 판독을 대신하지 않고 <b>보조</b>합니다. 아래 항목을 확인했는지 표시해 보세요.</p>
+      <div class="mm-checks" id="ckList">
+        <label class="sk-check"><input type="checkbox">검색 결과(유사 증례)와 생성 문장은 판독의가 최종 확인한다</label>
+        <label class="sk-check"><input type="checkbox">생성 문장에 영상에 없는 병변(환각)이 들어 있지 않은지 대조한다</label>
+        <label class="sk-check"><input type="checkbox">소견 수준 판단에는 제로샷 결과를 쓰지 않고, 의료 데이터로 Fine-Tuning·검증한 모형을 쓴다</label>
+        <label class="sk-check"><input type="checkbox">모형 출처·모델 카드·로드 보고서(MISSING 가중치)·빈 출력 여부를 확인한다</label>
+        <label class="sk-check"><input type="checkbox">평가 데이터가 학습에 섞이지 않았는지(누수) 확인하고 정확도는 참고용으로 해석한다</label>
+        <label class="sk-check"><input type="checkbox">한국어 질문·판독문에 쓰기 전에 추가 학습과 검증을 거친다</label>
+      </div>
+      <p class="sk-note sk-note--warn">이 시뮬레이터의 영상·임베딩·답변은 모두 교육용 모의 데이터입니다. 실제 진단이나 임상 판단에 쓰지 않습니다.</p>
+    </div>
+  </section>
+
+  <!-- ================= 8. 알고리즘 구성도 ================= -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">강의 슬라이드 3장 · 데이터와 검색 흐름 · CLIP 계산 · BLIP VQA 구조</span></div><div data-ds-diagrams="medical-image-retrieval"></div></section>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/medical-image-retrieval.js?v=20261002c"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const f3 = x => x.toFixed(3), f2 = x => x.toFixed(2), f4 = x => x.toFixed(4);
+  const pct = x => (x * 100).toFixed(1) + "%";
+  function fmtP(p) { return p >= 0.001 ? p.toFixed(4) : p.toExponential(2); }
+
+  /* ---------------- 결정적 난수 · 해시 ---------------- */
+  function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function fnv(s) { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); } return h >>> 0; }
+  function randn(r) { let u = 0; while (u === 0) u = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * r()); }
+
+  /* ---------------- 클래스 · 소견 ---------------- */
+  const CLS = {
+    cxr: { o: "chest", m: "xray", ko: "흉부 X선", mod: "X선 (PA)", part: "흉부", label: "a chest x-ray", organ: "chest", modal: "x-ray" },
+    bct: { o: "head", m: "ct", ko: "뇌 CT", mod: "CT (축상면)", part: "뇌", label: "a brain CT scan", organ: "brain", modal: "ct" },
+    bmr: { o: "head", m: "mri", ko: "뇌 MRI", mod: "MRI (T2 축상면)", part: "뇌", label: "a brain MRI", organ: "brain", modal: "mri" },
+    act: { o: "abdomen", m: "ct", ko: "복부 CT", mod: "CT (축상면)", part: "복부", label: "an abdominal CT scan", organ: "abdomen", modal: "ct" }
+  };
+  const FKO = { normal: "정상", pneumonia: "폐렴(경화)", effusion: "흉수", cardiomegaly: "심비대", hemorrhage: "출혈", mass: "종괴", liverlesion: "간 병변" };
+  const OKO = { chest: "흉부", head: "뇌", abdomen: "복부" }, MKO = { xray: "X선", ct: "CT", mri: "MRI" };
+
+  /* ---------------- 모의 영상 생성 ---------------- */
+  const S_IMG = 160;
+  function valueNoise(r, g) {
+    const a = []; for (let i = 0; i < (g + 1) * (g + 1); i++) a.push(r());
+    return (u, v) => {
+      const x = clamp(u, 0, 0.9999) * g, y = clamp(v, 0, 0.9999) * g, i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j;
+      const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+      const A = a[j * (g + 1) + i], B = a[j * (g + 1) + i + 1], C = a[(j + 1) * (g + 1) + i], D = a[(j + 1) * (g + 1) + i + 1];
+      return A + (B - A) * sx + (C - A) * sy + (A - B - C + D) * sx * sy;
+    };
+  }
+  const ell = (u, v, cx, cy, rx, ry) => { const dx = (u - cx) / rx, dy = (v - cy) / ry; return dx * dx + dy * dy; };
+  const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  const inside = (d, w) => 1 - sstep(1 - w, 1 + w, d);
+  const mix = (a, b, t) => a + (b - a) * t;
+  function rotE(u, v, cx, cy, rx, ry, th) { const x = u - cx, y = v - cy, c = Math.cos(th), s = Math.sin(th); return ell(x * c + y * s, -x * s + y * c, 0, 0, rx, ry); }
+
+  function pixChest(u, v, P) {
+    const body = inside(ell(u, v, 0, 0.1, 0.97, 1.12), 0.06);
+    let I = 0.04 + 0.52 * body;
+    const lung = Math.max(inside(ell(u, v, -0.4, -0.1, 0.3, 0.6), 0.3), inside(ell(u, v, 0.4, -0.1, 0.3, 0.6), 0.3));
+    I -= 0.38 * lung;
+    const fr = (((v + 0.38 * u * u) * 7 + 20) % 1 + 1) % 1;
+    if (Math.abs(u) > 0.1) I += 0.11 * Math.exp(-((fr - 0.5) ** 2) / 0.01) * lung;
+    I += 0.2 * (1 - sstep(0.06, 0.14, Math.abs(u))) * body;
+    const hs = P.hs, hc = inside(ell(u, v, 0.08 + 0.1 * (hs - 1), 0.32, 0.25 * hs, 0.24 * (0.6 + 0.4 * hs)), 0.25);
+    I = mix(I, 0.56, hc);
+    const cy = v + 0.68 - 0.14 * Math.abs(u);
+    if (Math.abs(u) > 0.08 && Math.abs(u) < 0.62) I += 0.2 * Math.exp(-cy * cy / 0.0016);
+    if (P.f === "pneumonia") { const b = inside(ell(u, v, P.px, P.py, 0.18, 0.22), 0.7) * (0.5 + 0.8 * P.n2((u + 1) / 2, (v + 1) / 2)); I += 0.34 * b * lung; }
+    if (P.f === "effusion") { const lx = P.side * 0.4, inL = inside(ell(u, v, lx, -0.1, 0.31, 0.62), 0.15), lvl = 0.25 - 0.4 * P.side * (u - lx); I += 0.36 * clamp((v - lvl) / 0.07, 0, 1) * inL; }
+    return I;
+  }
+  function ventricles(u, v) {
+    return Math.max(inside(rotE(u, v, -0.11, -0.02, 0.06, 0.22, -0.35), 0.3), inside(rotE(u, v, 0.11, -0.02, 0.06, 0.22, 0.35), 0.3), inside(ell(u, v, 0, 0.14, 0.022, 0.06), 0.3));
+  }
+  function pixHeadCT(u, v, P) {
+    const e = ell(u, v, 0, 0, 0.72, 0.88);
+    let I = 0.02 + 0.28 * (1 - sstep(1.12, 1.2, e));
+    I = mix(I, 0.95, sstep(0.8, 0.84, e) * (1 - sstep(0.98, 1.02, e)));
+    const br = 1 - sstep(0.8, 0.84, e);
+    const brain = 0.4 + 0.06 * (P.n1((u + 1) / 2, (v + 1) / 2) - 0.5) + 0.03 * sstep(0.4, 0.7, e);
+    I = mix(I, brain, br);
+    I = mix(I, 0.12, ventricles(u, v) * br);
+    if (v < -0.25) I += 0.12 * Math.exp(-u * u / 0.0004) * br;
+    if (P.f === "hemorrhage") I = mix(I, 0.8, inside(ell(u, v, P.hx, P.hy, 0.13, 0.1), 0.25) * br);
+    return I;
+  }
+  function pixMRI(u, v, P) {
+    const e = ell(u, v, 0, 0, 0.72, 0.88);
+    let I = 0.02 + 0.6 * (1 - sstep(1.14, 1.2, e));
+    I = mix(I, 0.08, sstep(0.88, 0.9, e) * (1 - sstep(0.99, 1.01, e)));
+    I = mix(I, 0.82, sstep(0.85, 0.86, e) * (1 - sstep(0.88, 0.9, e)));
+    const br = 1 - sstep(0.85, 0.86, e);
+    let b = mix(0.34, 0.52, sstep(0.45, 0.62, e)) + 0.05 * (P.n1((u + 1) / 2, (v + 1) / 2) - 0.5);
+    const s = P.n3((u + 1) / 2, (v + 1) / 2);
+    if (e > 0.52 && Math.abs(s - 0.5) < 0.035) b = 0.8;
+    I = mix(I, b, br);
+    I = mix(I, 0.9, ventricles(u, v) * br);
+    if (P.f === "mass") {
+      const d = ell(u, v, P.hx, P.hy, 0.12, 0.12);
+      I = mix(I, Math.min(1, I + 0.15), (1 - sstep(1.4, 2.4, d)) * br);
+      I = mix(I, 0.22, sstep(0.75, 0.85, d) * (1 - sstep(1.05, 1.2, d)) * br);
+      I = mix(I, 0.9, inside(d, 0.15) * br);
+    }
+    return I;
+  }
+  function pixAbd(u, v, P) {
+    const e = ell(u, v, 0, 0.06, 0.94, 0.66);
+    let I = 0.02;
+    const body = inside(e, 0.03);
+    I = mix(I, 0.2, body);
+    I = mix(I, 0.5, inside(e / 0.86, 0.02));
+    const inner = inside(e / 0.8, 0.02);
+    I = mix(I, 0.43 + 0.06 * (P.n1((u + 1) / 2, (v + 1) / 2) - 0.5), inner);
+    const liver = inside(ell(u, v, -0.36, -0.08, 0.44, 0.36), 0.08) * inner;
+    I = mix(I, 0.6, liver);
+    I = mix(I, 0.56, inside(ell(u, v, 0.6, 0.0, 0.15, 0.2), 0.1) * inner);
+    for (const sx of [-1, 1]) { I = mix(I, 0.64, inside(ell(u, v, sx * 0.34, 0.3, 0.1, 0.15), 0.1)); I = mix(I, 0.36, inside(ell(u, v, sx * 0.3, 0.3, 0.03, 0.05), 0.2)); }
+    I = mix(I, 0.93, inside(ell(u, v, 0, 0.42, 0.13, 0.11), 0.08));
+    I = mix(I, 0.3, inside(ell(u, v, 0, 0.56, 0.05, 0.04), 0.2));
+    I = mix(I, 0.9, inside(ell(u, v, 0, 0.64, 0.03, 0.05), 0.2));
+    I = mix(I, 0.66, inside(ell(u, v, 0.06, 0.24, 0.055, 0.055), 0.1));
+    I = mix(I, 0.6, inside(ell(u, v, -0.1, 0.22, 0.06, 0.045), 0.1));
+    for (const g of P.gas) I = mix(I, 0.03, inside(ell(u, v, g.x, g.y, g.r, g.r * 0.85), 0.15) * inner);
+    if (P.f === "liverlesion") I = mix(I, 0.32, inside(ell(u, v, P.lx, P.ly, 0.09, 0.08), 0.2) * liver);
+    return I;
+  }
+  const PIX = { cxr: pixChest, bct: pixHeadCT, bmr: pixMRI, act: pixAbd };
+
+  function renderImg(it) {
+    const cv = document.createElement("canvas"); cv.width = cv.height = S_IMG;
+    const ctx = cv.getContext("2d"), im = ctx.createImageData(S_IMG, S_IMG), r = mulberry32(fnv("px" + it.id)), fn = PIX[it.cls];
+    for (let y = 0; y < S_IMG; y++) for (let x = 0; x < S_IMG; x++) {
+      const u = (x + 0.5) / S_IMG * 2 - 1, v = (y + 0.5) / S_IMG * 2 - 1;
+      let I = fn(u, v, it.P) + (it.P.n4((u + 1) / 2, (v + 1) / 2) - 0.5) * 0.05 + (r() + r() + r() - 1.5) * 0.035;
+      const g = Math.round(clamp(I, 0, 1) * 255), k = (y * S_IMG + x) * 4;
+      im.data[k] = im.data[k + 1] = im.data[k + 2] = g; im.data[k + 3] = 255;
+    }
+    ctx.putImageData(im, 0, 0);
+    let h = 0x811c9dc5; for (let k = 0; k < im.data.length; k += 4) { h ^= im.data[k]; h = Math.imul(h, 0x01000193); }
+    it.hash = (h >>> 0).toString(16).padStart(8, "0");
+    it.cv = cv;
+  }
+
+  /* ---------------- 갤러리 데이터 (24장) ---------------- */
+  const SPEC = [["cxr", "normal", 3], ["cxr", "pneumonia", 2], ["cxr", "effusion", 2], ["cxr", "cardiomegaly", 1], ["bct", "normal", 2], ["bct", "hemorrhage", 2], ["bmr", "normal", 2], ["bmr", "mass", 2], ["act", "normal", 5], ["act", "liverlesion", 3]];
+  const GAL = [];
+  (function buildGallery() {
+    const raw = []; SPEC.forEach(([c, f, k]) => { for (let i = 0; i < k; i++) raw.push({ cls: c, f }); });
+    const r = mulberry32(20240); for (let i = raw.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [raw[i], raw[j]] = [raw[j], raw[i]]; }
+    // 첫 영상은 흉부 X선 (실습 노트북의 img_list[0]도 흉부 X선)
+    const c0 = raw.findIndex(x => x.cls === "cxr" && x.f === "normal"); [raw[0], raw[c0]] = [raw[c0], raw[0]];
+    raw.forEach((x, i) => {
+      const id = "R" + String(i + 1).padStart(2, "0"), q = mulberry32(fnv("p" + id));
+      const P = { f: x.f, hs: x.f === "cardiomegaly" ? 1.42 : 0.95 + 0.1 * q(), px: (q() < 0.5 ? -1 : 1) * (0.32 + 0.1 * q()), py: 0.1 + 0.2 * q(), side: q() < 0.5 ? -1 : 1,
+        hx: (q() < 0.5 ? -1 : 1) * (0.22 + 0.2 * q()), hy: -0.35 + 0.6 * q(), lx: -0.42 + 0.14 * q(), ly: -0.14 + 0.14 * q(), gas: [] };
+      const ng = 4 + Math.floor(q() * 4); for (let g = 0; g < ng; g++) P.gas.push({ x: -0.15 + 0.6 * q(), y: -0.3 + 0.45 * q(), r: 0.03 + 0.04 * q() });
+      P.n1 = valueNoise(q, 6); P.n2 = valueNoise(q, 5); P.n3 = valueNoise(q, 16); P.n4 = valueNoise(q, 10);
+      GAL.push({ id, i, cls: x.cls, f: x.f, P, vis: 0.35 + 0.9 * q() });
+    });
+    GAL.forEach(renderImg);
+  })();
+
+  function qaFor(it) {
+    const c = CLS[it.cls], f = it.f, list = [];
+    list.push({ q: { cxr: "is this a chest x-ray?", bct: "is this a ct scan?", bmr: "is this an mri?", act: "is this a ct scan?" }[it.cls], a: "yes", t: "Closed" });
+    if (it.cls === "cxr") {
+      const pick = ["is there a pleural effusion?", "is there airspace consolidation?", "is the heart enlarged?"][fnv(it.id) % 3];
+      const tr = { "is there a pleural effusion?": "effusion", "is there airspace consolidation?": "pneumonia", "is the heart enlarged?": "cardiomegaly" }[pick];
+      list.push({ q: pick, a: f === tr ? "yes" : "no", t: "Closed" });
+    } else if (it.cls === "bct") list.push({ q: "is there evidence of hemorrhage?", a: f === "hemorrhage" ? "yes" : "no", t: "Closed" });
+    else if (it.cls === "bmr") list.push({ q: "is there a mass?", a: f === "mass" ? "yes" : "no", t: "Closed" });
+    else list.push({ q: "is there a lesion in the liver?", a: f === "liverlesion" ? "yes" : "no", t: "Closed" });
+    list.push({ q: "what organ is shown?", a: c.organ, t: "Open" });
+    const n = 1 + fnv("n" + it.id) % 3;
+    return list.slice(0, n);
+  }
+  GAL.forEach(it => it.qa = qaFor(it));
+  const nm = it => `${it.id} ${CLS[it.cls].ko}`;
+
+  function thumbCanvas(it, cls) { const c = document.createElement("canvas"); c.width = c.height = S_IMG; c.getContext("2d").drawImage(it.cv, 0, 0); c.setAttribute("aria-hidden", "true"); if (cls) c.className = cls; return c; }
+  function paintTo(cv, it) { cv.getContext("2d").drawImage(it.cv, 0, 0, cv.width, cv.height); }
+
+  /* ---------------- 모의 임베딩 (512차원) ---------------- */
+  const D = 512, vcache = new Map();
+  function normalize(v) { let s = 0; for (let i = 0; i < v.length; i++) s += v[i] * v[i]; s = Math.sqrt(s) || 1; for (let i = 0; i < v.length; i++) v[i] /= s; return v; }
+  function unitVec(name) { if (vcache.has(name)) return vcache.get(name); const r = mulberry32(fnv(name)), v = new Float64Array(D); for (let i = 0; i < D; i++) v[i] = randn(r); normalize(v); vcache.set(name, v); return v; }
+  const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
+  const nrm = a => Math.sqrt(dot(a, a));
+  const cosSim = (a, b) => dot(a, b) / (nrm(a) * nrm(b));
+  function axpy(o, a, x) { for (let i = 0; i < D; i++) o[i] += a * x[i]; }
+  const MODELS = { pub: { wM: .30, wF: .085, wFt: .10, s: .50, nI: .30, nT: .16, name: "flaviagiammarino/pubmed-clip-vit-base-patch32", ko: "PubMedCLIP" },
+                   gen: { wM: .27, wF: .04, wFt: .08, s: .45, nI: .34, nT: .20, name: "openai/clip-vit-base-patch32", ko: "일반 CLIP" } };
+  function conceptVec(o, m) { const v = new Float64Array(D); if (o) axpy(v, 1, unitVec("organ:" + o)); if (m) axpy(v, 1, unitVec("mod:" + m)); return normalize(v); }
+  const ecache = new Map();
+  function imgEmb(model, it, gap) {
+    const key = "i|" + model + "|" + gap + "|" + it.id; if (ecache.has(key)) return ecache.get(key);
+    const P = MODELS[model], c = CLS[it.cls], v = new Float64Array(D);
+    axpy(v, P.wM, conceptVec(c.o, c.m)); if (it.f) axpy(v, P.wF * it.vis, unitVec("find:" + it.f));
+    axpy(v, P.s, unitVec("shared")); axpy(v, gap, unitVec("gap:img")); axpy(v, P.nI, unitVec("noise:" + model + ":" + it.id));
+    normalize(v); ecache.set(key, v); return v;
+  }
+  const RX = {
+    chest: /chest|lung|thora|흉부|폐|가슴/, head: /brain|head|skull|cranial|뇌|두부|머리/, abdomen: /abdom|liver|kidney|spleen|bowel|복부|신장|(^|\s)간(\s|$|에|의|을|이|은)/,
+    xray: /x-?\s?ray|xray|radiograph|엑스레이|x선|엑스선/, ct: /\bct\b|computed tomography|씨티/, mri: /\bmri\b|magnetic resonance|자기공명/,
+    pneumonia: /pneumonia|consolidation|폐렴|경화/, effusion: /effusion|흉수|흉막/, cardiomegaly: /cardiomegaly|enlarged heart|heart is enlarged|심비대|심장비대/,
+    hemorrhage: /hemorrhage|haemorrhage|bleed|출혈/, mass: /mass|tumou?r|lesion|종괴|종양|병변/, normal: /\bnormal\b|정상|no finding/
+  };
+  function parseQuery(text) {
+    const t = text.toLowerCase();
+    let o = null, m = null, F = null;
+    for (const k of ["chest", "head", "abdomen"]) if (RX[k].test(t)) { o = k; break; }
+    for (const k of ["xray", "ct", "mri"]) if (RX[k].test(t)) { m = k; break; }
+    for (const k of ["pneumonia", "effusion", "cardiomegaly", "hemorrhage", "mass", "normal"]) if (RX[k].test(t)) { F = k; break; }
+    if (F === "mass" && o === "abdomen") F = "liverlesion";
+    if (!o && F) o = { pneumonia: "chest", effusion: "chest", cardiomegaly: "chest", hemorrhage: "head" }[F] || null;
+    if (F === "mass" && o && o !== "head") F = o === "abdomen" ? "liverlesion" : F;
+    const ko = /[가-힣]/.test(t);
+    return { o, m, F, ko, M: (o || m) ? conceptVec(o, m) : null };
+  }
+  const TQ = { photo: { gen: 1.0, pub: 1.0 }, radio: { gen: 1.12, pub: 1.04 }, plain: { gen: 0.95, pub: 1.0 } };
+  function txtEmb(model, text, gap, q = 1) {
+    const key = "t|" + model + "|" + gap + "|" + q + "|" + text; if (ecache.has(key)) return ecache.get(key);
+    const P = MODELS[model], p = parseQuery(text), v = new Float64Array(D), w = q * (p.ko ? 0.35 : 1);
+    if (p.M) axpy(v, P.wM * w, p.M); if (p.F) axpy(v, P.wFt * w, unitVec("find:" + p.F));
+    axpy(v, P.s, unitVec("shared")); axpy(v, gap, unitVec("gap:txt")); axpy(v, P.nT, unitVec("tnoise:" + model + ":" + text.trim().toLowerCase()));
+    normalize(v); ecache.set(key, v); return v;
+  }
+  function softmax(arr) { const m = Math.max(...arr), e = arr.map(x => Math.exp(x - m)), s = e.reduce((a, b) => a + b, 0); return e.map(x => x / s); }
+  function isRel(it, p) { const c = CLS[it.cls]; if (!p.o && !p.m && !p.F) return false; return (!p.o || c.o === p.o) && (!p.m || c.m === p.m) && (!p.F || it.f === p.F); }
+
+  /* ---------------- 공통: 캔버스 · 테마 ---------------- */
+  function fit(cv, h) { const w = cv.clientWidth; if (!w) return null; const dpr = window.devicePixelRatio || 1; cv.style.height = h + "px"; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return { ctx, w, h }; }
+  function segBind(id, fn) { const g = $(id); g.addEventListener("click", e => { const b = e.target.closest("button[data-v]"); if (!b) return; $$("button", g).forEach(x => x.setAttribute("aria-pressed", x === b)); fn(b.dataset.v); }); }
+  function makePlayer(p, getN, render, scope) {
+    const st = { i: 0, timer: null }, bPl = $(p + "Play"), sp = $(p + "Speed");
+    function go(i) { st.i = clamp(i, 0, getN() - 1); render(st.i); }
+    function stop() { if (st.timer) { clearInterval(st.timer); st.timer = null; } bPl.textContent = "▶ 재생"; bPl.setAttribute("aria-pressed", "false"); }
+    function play() { if (st.timer) { stop(); return; } if (st.i >= getN() - 1) go(0); bPl.textContent = "❚❚ 멈춤"; bPl.setAttribute("aria-pressed", "true"); st.timer = setInterval(() => { if (st.i >= getN() - 1) { stop(); return; } go(st.i + 1); }, +sp.value); }
+    $(p + "First").onclick = () => { stop(); go(0); }; $(p + "Prev").onclick = () => { stop(); go(st.i - 1); }; $(p + "Next").onclick = () => { stop(); go(st.i + 1); };
+    bPl.onclick = play; sp.onchange = () => { if (st.timer) { stop(); play(); } };
+    scope.addEventListener("keydown", e => { if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return; if (e.key === "ArrowRight") { stop(); go(st.i + 1); e.preventDefault(); } else if (e.key === "ArrowLeft") { stop(); go(st.i - 1); e.preventDefault(); } });
+    return { go, stop, get i() { return st.i; } };
+  }
+  function codeBlock(id, s) { $(id).textContent = s; }
+
+  /* =============================================================
+     1. 문제·데이터
+     ============================================================= */
+  const statItems = [["315", "영상"], ["2,244", "질의응답 (1,793 + 451)"], ["1,793", "Train"], ["451", "Test"], ["203", "Test 고유 영상"], ["251", "Closed (yes/no)"]];
+  $("dsStats").innerHTML = statItems.map(([b, s]) => `<div class="sk-stat"><b>${b}</b><span>${s}</span></div>`).join("");
+  $("dsSumNote").innerHTML = `노트북 설명은 "질의응답 약 2,248개", 실제로 내려받은 분할은 Train <b>1,793</b> + Test <b>451</b> = <b>${(1793 + 451).toLocaleString()}</b>행입니다. Test 451행의 영상을 해시로 중복 제거하면 <b>203</b>장, 영상 1장에 평균 <b>${(451 / 203).toFixed(2)}</b>개의 질문이 달려 있는 셈입니다. Open 질문은 451 − 251 = <b>${451 - 251}</b>개입니다.`;
+  $("ddRatioNb").textContent = (451 / 203).toFixed(2);
+
+  let galSel = GAL[0], galFilter = "all";
+  function buildGal() {
+    const g = $("gal"); g.innerHTML = "";
+    GAL.filter(it => galFilter === "all" || it.cls === galFilter).forEach(it => {
+      const b = document.createElement("button"); b.type = "button"; b.className = "mm-thumb"; b.setAttribute("aria-pressed", it === galSel);
+      b.setAttribute("aria-label", `${it.id} ${CLS[it.cls].ko} ${FKO[it.f]}`);
+      b.appendChild(thumbCanvas(it)); const s = document.createElement("span"); s.textContent = `${it.id} · ${CLS[it.cls].ko}`; b.appendChild(s);
+      b.onclick = () => { galSel = it; $$(".mm-thumb", g).forEach(x => x.setAttribute("aria-pressed", x === b)); showGal(); };
+      g.appendChild(b);
+    });
+  }
+  function showGal() {
+    const it = galSel, c = CLS[it.cls];
+    $("galTitle").textContent = `${it.id} · ${c.ko}`;
+    paintTo($("galBig"), it);
+    $("galKv").innerHTML = [["영상 종류", c.mod], ["부위", c.part], ["소견 (모의 라벨)", FKO[it.f]], ["크기", `${S_IMG}×${S_IMG} 흑백 → 3채널`], ["해시 키", it.hash], ["질의응답 행", it.qa.length + "개"]].map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
+    $("galQa").innerHTML = it.qa.map(x => `<li><span class="sk-pill" style="color:${x.t === "Closed" ? "var(--role-txt)" : "var(--role-fuse)"}">${x.t}</span> <code>${esc(x.q)}</code> → <b>${esc(x.a)}</b></li>`).join("");
+  }
+  segBind("galFilter", v => { galFilter = v; buildGal(); });
+  buildGal(); showGal();
+
+  /* 중복 제거 */
+  const DD = []; GAL.forEach(it => it.qa.forEach(x => DD.push({ it, q: x.q, a: x.a })));
+  (function () { const r = mulberry32(777); for (let i = DD.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [DD[i], DD[j]] = [DD[j], DD[i]]; } })();
+  $("ddBody").innerHTML = DD.map((d, i) => `<tr id="dd${i}"><td class="n">${i}</td><td>${d.it.id}</td><td class="sk-mono">${d.it.hash}</td><td class="mm-code-inline">${esc(d.q)}</td><td>${esc(d.a)}</td><td class="st"></td></tr>`).join("");
+  function ddRender(k) {
+    const seen = new Set(); let added = 0;
+    DD.forEach((d, i) => {
+      const tr = $("dd" + i), st = tr.querySelector(".st");
+      tr.classList.toggle("mm-cur", i === k);
+      if (i > k) { st.textContent = ""; return; }
+      if (!seen.has(d.it.hash)) { seen.add(d.it.hash); added++; st.innerHTML = `<span class="mm-ok">새 영상 → 추가</span>`; }
+      else st.innerHTML = `<span class="mm-c-gt">이미 본 키 → 건너뜀</span>`;
+    });
+    const sc = $("ddScroll"), tr = $("dd" + k);
+    if (tr) { const top = tr.offsetTop - sc.clientHeight / 2; sc.scrollTop = Math.max(0, top); }
+    $("ddStats").innerHTML = [[`${k + 1} / ${DD.length}`, "처리한 행"], [String(added), "img_list 영상 수"], [String(k + 1 - added), "건너뛴 행"], [k === DD.length - 1 ? (DD.length / added).toFixed(2) : "…", "질문/영상"]].map(([b, s]) => `<div class="sk-stat"><b>${b}</b><span>${s}</span></div>`).join("");
+  }
+  const ddP = makePlayer("dd", () => DD.length, ddRender, $("ddCard"));
+  ddP.go(DD.length - 1);
+
+  /* =============================================================
+     2. 모형 구조
+     ============================================================= */
+  const RC = { img: "var(--role-img)", txt: "var(--role-txt)", fuse: "var(--role-fuse)", gt: "var(--role-gt)" };
+  const RK = { img: "영상 경로", txt: "문장 경로", fuse: "결합·공동 임베딩", gt: "저장·결과" };
+  const W = 136, H = 76;
+  const col = c => 14 + c * 152;
+  const DIAG = {
+    clip: {
+      vb: [1260, 350], labels: [[14, 30, "이미지 인코더 (ViT-B/32)", "img"], [14, 232, "텍스트 인코더 (Transformer)", "txt"], [962, 132, "공동 임베딩 공간", "fuse"]],
+      blocks: [
+        { id: "i0", x: col(0), y: 40, r: "img", t: ["입력 영상"], sh: "3×224×224", in: "흑백 영상 (H×W)", out: "3×224×224", desc: "CLIPProcessor가 짧은 변을 224로 맞추고 가운데 224×224를 자른 뒤 채널별로 정규화합니다. 흑백 방사선 영상은 img.convert('RGB')로 3채널로 복제합니다.", fm: "x' = (x − μ_c) / σ_c   (c = R, G, B)" },
+        { id: "i1", x: col(1), y: 40, r: "img", t: ["패치 분할", "32×32"], sh: "49×3072", in: "3×224×224", out: "49×3072", desc: "ViT-B/32는 영상을 32×32 조각으로 자릅니다. 224 / 32 = 7이므로 7×7 = 49개 패치, 각 패치는 3·32·32 = 3,072개 값입니다. 패치가 단어 토큰 역할을 합니다.", fm: "N = (224 / 32)² = 7 × 7 = 49,  패치 차원 = 3 × 32 × 32 = 3072" },
+        { id: "i2", x: col(2), y: 40, r: "img", t: ["패치 임베딩", "+[CLS]+위치"], sh: "50×768", in: "49×3072", out: "50×768", desc: "각 패치를 선형 투영(3072→768)하고, 맨 앞에 [CLS] 토큰 1개를 붙인 뒤 위치 임베딩을 더합니다. 49 + 1 = 50개 토큰.", fm: "z₀ = [x_cls ; x₁E ; … ; x₄₉E] + E_pos,   E ∈ ℝ^(3072×768),  E_pos ∈ ℝ^(50×768)" },
+        { id: "i3", x: col(3), y: 40, r: "img", t: ["ViT 인코더", "× 12층"], sh: "50×768", in: "50×768", out: "50×768", desc: "Transformer Encoder 12층(헤드 12개, 은닉 768, MLP 3072). 모든 패치가 Self-Attention으로 서로를 참조합니다. 모양은 그대로 유지됩니다.", fm: "z' = z + MSA(LN(z)),   z = z' + MLP(LN(z'))" },
+        { id: "i4", x: col(4), y: 40, r: "img", t: ["[CLS] 출력", "→ 투영 W_i"], sh: "768 → 512", in: "50×768 중 [CLS] 768", out: "512", desc: "[CLS] 위치의 출력만 꺼내 LayerNorm 후 이미지 투영 행렬 W_i로 공동 공간 512차원에 보냅니다.", fm: "v = LN(z_L[CLS]) · W_i,   W_i ∈ ℝ^(768×512)" },
+        { id: "i5", x: col(5), y: 40, r: "img", t: ["L2 정규화"], sh: "512, ‖v‖=1", in: "512", out: "512", desc: "길이를 1로 맞춥니다. 실습 노트북: image_embedding(img_list[0]).shape = (512,).", fm: "v̂ = v / ‖v‖₂" },
+        { id: "t0", x: col(0), y: 242, r: "txt", t: ["입력 문장"], sh: "'a chest x-ray'", in: "문자열", out: "문자열", desc: "후보 문장(문장 틀 + 클래스)이나 검색 문장. 예: 'This is a photo of a chest x-ray.'", fm: "text = template.format(label)" },
+        { id: "t1", x: col(1), y: 242, r: "txt", t: ["BPE 토큰화"], sh: "L ≤ 77 토큰", in: "문자열", out: "L개 토큰 id", desc: "바이트 수준 BPE(어휘 49,408개)로 자르고 [SOS] … [EOS]를 붙입니다. 최대 77토큰, padding=True로 배치 길이를 맞춥니다.", fm: "[SOS] a chest x - ray [EOS]   (토큰 분할은 예시)" },
+        { id: "t2", x: col(2), y: 242, r: "txt", t: ["토큰 + 위치", "임베딩"], sh: "L×512", in: "L개 id", out: "L×512", desc: "토큰 임베딩(49,408×512)과 위치 임베딩(77×512)을 더합니다.", fm: "h₀ = E_tok[ids] + E_pos[0:L]" },
+        { id: "t3", x: col(3), y: 242, r: "txt", t: ["텍스트 인코더", "× 12층"], sh: "L×512", in: "L×512", out: "L×512", desc: "폭 512, 헤드 8개, 12층. 앞 토큰만 보는 마스크(causal mask)를 씁니다.", fm: "h = h + MSA_mask(LN(h)),   h = h + MLP(LN(h))" },
+        { id: "t4", x: col(4), y: 242, r: "txt", t: ["[EOS] 출력", "→ 투영 W_t"], sh: "512 → 512", in: "L×512 중 [EOS] 512", out: "512", desc: "문장 끝 [EOS] 위치의 출력을 LayerNorm 후 텍스트 투영 W_t로 공동 공간에 보냅니다.", fm: "t = LN(h_L[EOS]) · W_t,   W_t ∈ ℝ^(512×512)" },
+        { id: "t5", x: col(5), y: 242, r: "txt", t: ["L2 정규화"], sh: "512, ‖t‖=1", in: "512", out: "512", desc: "실습 노트북: text_embedding('a chest x-ray').shape = (512,). 영상 벡터와 같은 512차원이라 서로 다른 모달리티를 직접 비교할 수 있습니다.", fm: "t̂ = t / ‖t‖₂" },
+        { id: "f0", x: 962, y: 142, r: "fuse", t: ["공동 임베딩", "공간"], sh: "N×512, M×512", in: "영상 512 · 문장 512", out: "같은 공간의 두 벡터", desc: "이미지와 텍스트가 같은 512차원 공간에 놓입니다. 약 4억 쌍의 대조학습으로 짝이 맞는 쌍이 가까워지도록 학습되었습니다.", fm: "cos(v̂, t̂) = v̂ · t̂   (정규화 후 내적 = 코사인)" },
+        { id: "f1", x: 1110, y: 142, r: "fuse", t: ["유사도 × 100", "→ softmax"], sh: "N×M", in: "N×512, M×512", out: "N×M 확률", desc: "logits_per_image = 100 · V̂ T̂ᵀ. 제로샷 분류는 후보 문장 방향으로 softmax, 사전 학습은 N×N 행렬의 대각선이 정답인 대칭 교차엔트로피입니다.", fm: "p_ij = exp(100·cos_ij) / Σ_k exp(100·cos_ik)\nL = ½ (CE_행 + CE_열),  정답 = 대각선" }
+      ],
+      arrows: [["i0", "i1"], ["i1", "i2"], ["i2", "i3"], ["i3", "i4"], ["i4", "i5"], ["t0", "t1"], ["t1", "t2"], ["t2", "t3"], ["t3", "t4"], ["t4", "t5"], ["i5", "f0", { mx: 936 }], ["t5", "f0", { mx: 936 }], ["f0", "f1"]],
+      steps: ["i0", "i1", "i2", "i3", "i4", "i5", "t0", "t1", "t2", "t3", "t4", "t5", "f0", "f1"]
+    },
+    ret: {
+      vb: [1160, 350], labels: [[14, 30, "오프라인: 갤러리 색인 (한 번만)", "img"], [14, 232, "온라인: 검색할 때마다", "txt"], [650, 132, "비교·순위", "fuse"]],
+      blocks: [
+        { id: "r0", x: col(0), y: 40, r: "img", t: ["갤러리 영상"], sh: "203장", in: "Test 451행", out: "img_list 203장", desc: "Test 데이터의 영상을 해시로 중복 제거한 203장이 검색 대상입니다.", fm: "img_list = [img for img in test['image'] if 처음 보는 해시]" },
+        { id: "r1", x: col(1), y: 40, r: "img", t: ["이미지 인코더", "PubMedCLIP"], sh: "3×224×224 → 512", in: "영상 1장", out: "512", desc: "image_embedding(img): clip_proc로 전처리 후 clip_model.get_image_features로 512차원 벡터를 얻습니다(transformers 5.x는 pooler_output).", fm: "vec = get_image_features(pixel_values)  # (1, 512)" },
+        { id: "r2", x: col(2), y: 40, r: "gt", t: ["벡터 저장", "df['embedding']"], sh: "203×512", in: "203 × 512", out: "DataFrame (203, 2)", desc: "모든 영상을 미리 벡터로 바꿔 저장합니다. 실습 노트북: df.shape = (203, 2) — image, embedding 두 열.", fm: "df['embedding'] = [image_embedding(x) for x in df['image']]" },
+        { id: "r3", x: col(3), y: 40, r: "img", t: ["L2 정규화"], sh: "203×512", in: "203×512", out: "203×512", desc: "노트북의 cos_sim은 계산할 때마다 노름으로 나누지만, 미리 정규화해 두면 코사인 = 내적이라 행렬 곱 한 번으로 끝납니다.", fm: "Ê = E / ‖E‖ (행마다)" },
+        { id: "q0", x: col(0), y: 242, r: "txt", t: ["검색 문장 Q"], sh: "'a chest x-ray'", in: "문자열", out: "문자열", desc: "실습 노트북의 검색 문장: 'a chest x-ray', 'an axial CT scan of the brain', 'an MRI of the brain'.", fm: "Q = 'an axial CT scan of the brain'" },
+        { id: "q1", x: col(1), y: 242, r: "txt", t: ["텍스트 인코더", "PubMedCLIP"], sh: "→ 512", in: "문자열", out: "512", desc: "text_embedding(Q): 같은 CLIP 모형의 텍스트 쪽으로 512차원 벡터를 만듭니다.", fm: "embedd = get_text_features(input_ids)  # (1, 512)" },
+        { id: "q2", x: col(2), y: 242, r: "txt", t: ["L2 정규화"], sh: "512", in: "512", out: "512", desc: "질의 벡터도 길이 1로 맞춥니다.", fm: "q̂ = q / ‖q‖" },
+        { id: "s0", x: 650, y: 142, r: "fuse", t: ["코사인 유사도"], sh: "(203,)", in: "203×512, 512", out: "203개 점수", desc: "df['Score'] = df['embedding'].apply(lambda x: cos_sim(x, embedd)). 영상 203장 각각의 점수입니다.", fm: "score_i = (e_i · q) / (‖e_i‖ ‖q‖) = ê_i · q̂" },
+        { id: "s1", x: 818, y: 142, r: "fuse", t: ["상위 k개", "nlargest"], sh: "top_k = 3", in: "(203,)", out: "(3,)", desc: "점수가 가장 높은 top_k장(노트북 기본값 3)을 고릅니다.", fm: "top = df.nlargest(top_k, 'Score')" },
+        { id: "s2", x: 986, y: 142, r: "gt", t: ["결과 영상", "+ score"], sh: "3장", in: "(3,)", out: "영상 3장 + 점수", desc: "show_images로 영상과 'score : 0.xxx'를 출력합니다. 활용: 판독문으로 유사 증례 영상 검색, 영상으로 유사 판독문 검색(검색 기반 리포트 생성).", fm: "show_images(list(top['image']), [f'{Q}\\nscore : {s:.3f}' ...])" }
+      ],
+      arrows: [["r0", "r1"], ["r1", "r2"], ["r2", "r3"], ["q0", "q1"], ["q1", "q2"], ["r3", "s0", { mx: 628 }], ["q2", "s0", { mx: 628 }], ["s0", "s1"], ["s1", "s2"]],
+      steps: ["r0", "r1", "r2", "r3", "q0", "q1", "q2", "s0", "s1", "s2"]
+    },
+    vqa: {
+      vb: [1080, 470], labels: [[14, 30, "이미지 인코더 (ViT-B/16)", "img"], [14, 182, "질문 인코더 (BERT + Cross-Attention)", "txt"], [14, 340, "답변 디코더 (GPT 방식)", "fuse"]],
+      blocks: [
+        { id: "b0", x: col(0), y: 40, r: "img", t: ["입력 영상"], sh: "3×384×384", in: "영상", out: "3×384×384", desc: "blip-vqa-base 전처리기는 영상을 384×384로 맞춥니다. vqa_answer는 img.convert('RGB')로 3채널을 만듭니다.", fm: "inputs = processor(images=img, text=question)" },
+        { id: "b1", x: col(1), y: 40, r: "img", t: ["패치 분할", "16×16"], sh: "577×768", in: "3×384×384", out: "577×768", desc: "384 / 16 = 24 → 24×24 = 576개 패치 + [CLS] 1개 = 577개 토큰, 각 768차원.", fm: "N = (384 / 16)² = 576,  576 + 1 = 577" },
+        { id: "b2", x: col(2), y: 40, r: "img", t: ["ViT 인코더", "× 12층"], sh: "577×768", in: "577×768", out: "577×768", desc: "영상 특징 577×768. 질문 인코더의 Cross-Attention에서 Key·Value로 쓰입니다.", fm: "F_img = ViT(x) ∈ ℝ^(577×768)" },
+        { id: "b3", x: col(0), y: 192, r: "txt", t: ["질문 문장"], sh: "'is there a fracture?'", in: "문자열", out: "문자열", desc: "예: 'is there evidence of an aortic aneurysm?' (test[0]).", fm: "question = row['question']" },
+        { id: "b4", x: col(1), y: 192, r: "txt", t: ["토큰화"], sh: "L 토큰", in: "문자열", out: "L개 id", desc: "BERT 방식 WordPiece(소문자)로 자르고 특수 토큰을 붙입니다.", fm: "[CLS] is there a fracture ? [SEP]" },
+        { id: "b5", x: 470, y: 192, w: 176, r: "txt", t: ["질문 인코더 × 12", "Self → Cross → FFN"], sh: "L×768", in: "L×768 + 영상 577×768", out: "L×768", desc: "질문 문장을 인코딩하면서 층마다 Cross-Attention으로 영상 정보를 함께 반영합니다(Q = 질문, K·V = 영상).", fm: "CrossAttn = softmax(Q Kᵀ / √d) V\nQ ∈ ℝ^(L×768),  K, V ∈ ℝ^(577×768)" },
+        { id: "b6", x: col(1), y: 350, r: "txt", t: ["[BOS] 시작"], sh: "1 토큰", in: "—", out: "1개 id", desc: "답변 디코더는 시작 토큰에서 출발해 한 단어씩 생성합니다.", fm: "y₀ = [BOS]" },
+        { id: "b7", x: 470, y: 350, w: 176, r: "fuse", t: ["답변 디코더 × 12", "Causal → Cross → FFN"], sh: "t×768", in: "t×768 + 질문 L×768", out: "t×768", desc: "앞 단어만 보는 Self-Attention 뒤에 질문 인코딩(영상이 섞인)을 Cross-Attention으로 참조합니다. GPT 방식.", fm: "h_t = Dec(y_<t , Enc(질문, 영상))" },
+        { id: "b8", x: 700, y: 350, r: "fuse", t: ["다음 토큰 확률"], sh: "30,524", in: "768", out: "어휘 30,524개 확률", desc: "어휘 전체에 대한 softmax에서 다음 토큰을 고릅니다. 노트북: max_new_tokens=20. 고른 토큰은 다시 디코더 입력이 됩니다(자기회귀).", fm: "P(y_t | y_<t, 질문, 영상) = softmax(h_t W_vocab)" },
+        { id: "b9", x: 870, y: 350, w: 190, r: "gt", t: ["답변"], sh: "'yes'", in: "토큰 id 열", out: "문자열", desc: "processor.decode(outputs[0], skip_special_tokens=True). 실습 노트북에서 Fine-Tuning 모형(blip-vqa-rad)은 모든 질문에 빈 문자열('')을 냈습니다.", fm: "answer = decode(ids, skip_special_tokens=True)" }
+      ],
+      arrows: [["b0", "b1"], ["b1", "b2"], ["b3", "b4"], ["b4", "b5"], ["b2", "b5", { kind: "hv", lab: "Cross-Attention (K, V = 영상)" }], ["b6", "b7"], ["b5", "b7", { kind: "v", lab: "Cross-Attention (질문 인코딩)" }], ["b7", "b8"], ["b8", "b9"], ["b8", "b7", { kind: "loop", lab: "생성한 토큰을 다시 입력 (자기회귀)", dash: 1 }]],
+      steps: ["b0", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9"]
+    }
+  };
+  let dgKey = "clip";
+  function arrowPath(A, B, o) {
+    const aw = A.w || W, bw = B.w || W;
+    if (o.kind === "hv") { const ax = A.x + aw, ay = A.y + H / 2, bx = B.x + bw / 2; return `M${ax} ${ay} H${bx} V${B.y}`; }
+    if (o.kind === "v") { const x = A.x + aw / 2; return `M${x} ${A.y + H} V${B.y}`; }
+    if (o.kind === "loop") { const ax = A.x + aw / 2, bx = B.x + bw / 2, yb = A.y + H + 26; return `M${ax} ${A.y + H} V${yb} H${bx} V${B.y + H}`; }
+    const ax = A.x + aw, ay = A.y + H / 2, bx = B.x, by = B.y + H / 2;
+    if (Math.abs(ay - by) < 1) return `M${ax} ${ay} H${bx}`;
+    const mx = o.mx || (ax + bx) / 2; return `M${ax} ${ay} H${mx} V${by} H${bx}`;
+  }
+  function renderDiag() {
+    const d = DIAG[dgKey], svg = $("dgSvg"), B = {}; d.blocks.forEach(b => B[b.id] = b);
+    svg.setAttribute("viewBox", `0 0 ${d.vb[0]} ${d.vb[1]}`);
+    let s = "<defs>" + Object.keys(RC).map(k => `<marker id="ah-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" style="fill:${RC[k]}"/></marker>`).join("") + "</defs>";
+    d.labels.forEach(([x, y, t, r]) => { s += `<text class="mm-row-lab" x="${x}" y="${y}" style="fill:${RC[r]}">${esc(t)}</text>`; });
+    d.arrows.forEach(([a, b, o = {}], k) => {
+      const A = B[a], Bb = B[b], r = o.kind === "hv" || o.kind === "v" || o.kind === "loop" ? "fuse" : A.r === "gt" ? Bb.r : A.r;
+      s += `<path id="dga${k}" class="mm-arr${o.dash ? " dash" : ""}" d="${arrowPath(A, Bb, o)}" style="--c:${RC[r]}" marker-end="url(#ah-${r})"/>`;
+      if (o.lab) {
+        let lx, ly;
+        if (o.kind === "hv") { lx = A.x + (A.w || W) + 12; ly = A.y + H / 2 - 7; }
+        else if (o.kind === "v") { lx = A.x + (A.w || W) / 2 + 8; ly = A.y + H + 42; }
+        else { lx = Bb.x + 8; ly = A.y + H + 42; }
+        s += `<text class="mm-arr-lab" x="${lx}" y="${ly}">${esc(o.lab)}</text>`;
+      }
+    });
+    d.blocks.forEach(b => {
+      const w = b.w || W, lines = b.t, cy = b.y + (lines.length === 1 ? 30 : 23);
+      s += `<g class="mm-blk" id="dgb-${b.id}" data-id="${b.id}" tabindex="0" role="button" aria-label="${esc(lines.join(" "))}, ${esc(b.sh)}" style="--c:${RC[b.r]}"><rect x="${b.x}" y="${b.y}" width="${w}" height="${H}" rx="9"/>`;
+      lines.forEach((ln, i) => { s += `<text x="${b.x + w / 2}" y="${cy + i * 16}" text-anchor="middle">${esc(ln)}</text>`; });
+      s += `<text class="sh" x="${b.x + w / 2}" y="${b.y + H - 10}" text-anchor="middle">${esc(b.sh)}</text></g>`;
+    });
+    svg.innerHTML = s;
+  }
+  function dgShow(k) {
+    const d = DIAG[dgKey], id = d.steps[k], b = d.blocks.find(x => x.id === id), done = new Set(d.steps.slice(0, k));
+    $$(".mm-blk", $("dgSvg")).forEach(g => { g.classList.toggle("cur", g.dataset.id === id); g.classList.toggle("done", done.has(g.dataset.id)); });
+    d.arrows.forEach(([a, bb], i) => { const p = $("dga" + i); if (p) p.classList.toggle("on", (bb === id && done.has(a)) || (done.has(a) && done.has(bb))); });
+    $("dgTitle").innerHTML = `${k + 1}/${d.steps.length} · ${esc(b.t.join(" "))} <span class="sk-pill" style="color:${RC[b.r]}">${RK[b.r]}</span>`;
+    $("dgDesc").textContent = b.desc;
+    $("dgFormula").innerHTML = esc(b.fm).replace(/\n/g, "<br>");
+    $("dgKv").innerHTML = `<dt>입력</dt><dd class="wrap">${esc(b.in)}</dd><dt>출력</dt><dd class="wrap">${esc(b.out)}</dd><dt>텐서 모양</dt><dd class="wrap">${esc(b.sh)}</dd>`;
+    const g = $("dgb-" + id), wrap = $("dgWrap");
+    if (g && wrap.scrollWidth > wrap.clientWidth) { const r = g.getBoundingClientRect(), wr = wrap.getBoundingClientRect(); if (r.left < wr.left || r.right > wr.right) wrap.scrollLeft += (r.left + r.right) / 2 - (wr.left + wr.right) / 2; }
+  }
+  const dgP = makePlayer("dg", () => DIAG[dgKey].steps.length, dgShow, $("dgCard"));
+  function dgPick(e) { const g = e.target.closest(".mm-blk"); if (!g) return; dgP.stop(); dgP.go(DIAG[dgKey].steps.indexOf(g.dataset.id)); }
+  $("dgSvg").addEventListener("click", dgPick);
+  $("dgSvg").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); dgPick(e); } });
+  segBind("dgSel", v => { dgP.stop(); dgKey = v; renderDiag(); dgP.go(0); });
+  renderDiag(); dgP.go(0);
+
+  /* =============================================================
+     3. 제로샷 분류
+     ============================================================= */
+  const NB_LABELS = ["a chest x-ray", "an abdominal CT scan", "a brain CT scan", "a brain MRI"];
+  const NB_GEN = [0.985355794429779, 0.014634773135185242, 8.023328518902417e-06, 1.4247766557673458e-06];
+  const NB_PUB = [0.9998931884765625, 9.356094960821792e-05, 7.810718670953065e-06, 5.412019618233899e-06];
+  const dlog = arr => arr.map(p => Math.log(p / arr[0]));
+  function zsNbRender() {
+    const s = +$("zsScale").value; $("zsScaleV").textContent = s;
+    const dg = dlog(NB_GEN), dp = dlog(NB_PUB), pg = softmax(dg.map(x => x * s / 100)), pp = softmax(dp.map(x => x * s / 100));
+    const sumG = NB_GEN.reduce((a, b) => a + b, 0), sumP = NB_PUB.reduce((a, b) => a + b, 0);
+    $("zsNb").innerHTML = `<thead><tr><th>후보 문장</th><th class="n">일반 CLIP p (노트북)</th><th class="n">PubMedCLIP p (노트북)</th><th class="n">Δcos 일반</th><th class="n">Δcos PubMed</th><th class="n">p (s=${s}) 일반</th><th class="n">p (s=${s}) PubMed</th></tr></thead><tbody>` +
+      NB_LABELS.map((l, i) => `<tr><td class="mm-code-inline">${l}</td><td class="n" title="${NB_GEN[i]}">${fmtP(NB_GEN[i])}</td><td class="n" title="${NB_PUB[i]}">${fmtP(NB_PUB[i])}</td><td class="n">${i ? (dg[i] / 100).toFixed(4) : "0 (기준)"}</td><td class="n">${i ? (dp[i] / 100).toFixed(4) : "0 (기준)"}</td><td class="n">${fmtP(pg[i])}</td><td class="n">${fmtP(pp[i])}</td></tr>`).join("") +
+      `<tr><td>합계</td><td class="n">${sumG.toFixed(6)}</td><td class="n">${sumP.toFixed(6)}</td><td></td><td></td><td class="n">${pg.reduce((a, b) => a + b, 0).toFixed(6)}</td><td class="n">${pp.reduce((a, b) => a + b, 0).toFixed(6)}</td></tr></tbody>`;
+    $("zsNbFormula").innerHTML = `로짓 차이 = ln(p₂ / p₁) = ln(${NB_GEN[1].toFixed(6)} / ${NB_GEN[0].toFixed(6)}) = ${dg[1].toFixed(4)}  →  Δcos = ${dg[1].toFixed(4)} / 100 = ${(dg[1] / 100).toFixed(4)} (일반 CLIP, 2위 후보)<br>` +
+      `p_k(s) = exp(s·Δcos_k) / Σ_j exp(s·Δcos_j)  →  s = 100이면 노트북 확률이 그대로 재현됩니다 (1위: 일반 ${fmtP(pg[0])}, PubMed ${fmtP(pp[0])}).<br>` +
+      `코사인 차이 ${(-(dg[1] / 100)).toFixed(3)}만으로 확률 ${pct(NB_GEN[0])}가 나오는 이유 = 큰 logit scale(100). s를 낮추면 같은 코사인 차이에서도 확률이 고르게 퍼집니다.`;
+  }
+  $("zsScale").addEventListener("input", zsNbRender);
+  zsNbRender();
+
+  const MOD_LABELS = ["a chest x-ray", "a brain MRI", "a brain CT scan", "an abdominal CT scan"], MOD_CLS = ["cxr", "bmr", "bct", "act"];
+  const FIND_LABELS = ["a normal chest x-ray", "a chest x-ray with pneumonia", "a chest x-ray with pleural effusion", "a chest x-ray with cardiomegaly"], FIND_F = ["normal", "pneumonia", "effusion", "cardiomegaly"];
+  const TPL = { photo: "This is a photo of {}.", radio: "a radiology image showing {}.", plain: "{}" };
+  const ZS_GAP = 0.85;
+  const zs = { set: "mod", tpl: "photo", it: GAL[0] };
+  function zeroShot(model, it, set, tpl) {
+    const labels = set === "mod" ? MOD_LABELS : FIND_LABELS, v = imgEmb(model, it, ZS_GAP);
+    const cs = labels.map(l => cosSim(v, txtEmb(model, TPL[tpl].replace("{}", l), ZS_GAP, TQ[tpl][model])));
+    const p = softmax(cs.map(c => 100 * c)); const order = p.map((x, i) => i).sort((a, b) => p[b] - p[a]);
+    return { labels, cs, p, order, top: order[0] };
+  }
+  function zsPickBuild() {
+    const g = $("zsPick"); g.innerHTML = "";
+    GAL.forEach(it => { const b = document.createElement("button"); b.type = "button"; b.className = "mm-thumb"; b.setAttribute("aria-pressed", it === zs.it); b.setAttribute("aria-label", nm(it)); b.title = nm(it); b.appendChild(thumbCanvas(it)); const s = document.createElement("span"); s.textContent = it.id; b.appendChild(s); b.onclick = () => { zs.it = it; $$(".mm-thumb", g).forEach(x => x.setAttribute("aria-pressed", x === b)); zsRender(); }; g.appendChild(b); });
+  }
+  function barsHtml(r, color) {
+    return r.order.map(i => `<div class="mm-barrow${i === r.top ? " top" : ""}" style="--c:${color}"><span class="lab mm-code-inline">${r.labels[i]}</span><span class="val">${f3(r.p[i])}</span><div class="bar"><i style="width:${(r.p[i] * 100).toFixed(1)}%"></i></div></div>`).join("") +
+      `<div class="sk-hint">cos: ${r.labels.map((l, i) => f3(r.cs[i])).join(" · ")}</div>`;
+  }
+  function zsRender() {
+    const it = zs.it, g = zeroShot("gen", it, zs.set, zs.tpl), p = zeroShot("pub", it, zs.set, zs.tpl);
+    paintTo($("zsBig"), it);
+    $("zsGen").innerHTML = barsHtml(g, "var(--role-txt)"); $("zsPub").innerHTML = barsHtml(p, "var(--role-fuse)");
+    $("zsTitleLine").textContent = `${nm(it)} (정답: ${zs.set === "mod" ? CLS[it.cls].label : (it.cls === "cxr" ? FIND_LABELS[FIND_F.indexOf(it.f)] : "해당 없음")})\nCLIP : ${g.labels[g.top]} (${f2(g.p[g.top])})\nPubMed : ${p.labels[p.top]} (${f2(p.p[p.top])})`;
+    const i2 = p.order[1];
+    $("zsCalc").innerHTML = `PubMedCLIP 계산: 후보 문장 = "${esc(TPL[zs.tpl].replace("{}", p.labels[p.top]))}"<br>logit = 100 × cos → ${p.cs.map(c => (100 * c).toFixed(2)).join(", ")}<br>p(1위) = 1 / (1 + Σ exp(logit_j − logit_1위)) = ${f4(p.p[p.top])},  1·2위 코사인 차이 = ${f4(p.cs[p.top] - p.cs[i2])}`;
+    const warn = $("zsWarn");
+    if (zs.set === "find" && it.cls !== "cxr") { warn.className = "sk-note sk-note--warn"; warn.textContent = "흉부 소견 후보는 흉부 X선 영상용입니다. 다른 영상에도 확률은 나오지만(softmax는 항상 합이 1) 의미가 없습니다 — 제로샷은 '해당 없음'을 말하지 못합니다."; }
+    else if (zs.set === "find") { warn.className = "sk-note sk-note--warn"; warn.textContent = `소견 수준: 1위 확률이 영상 종류 분류보다 훨씬 낮고(PubMed ${f2(p.p[p.top])}) 틀리기도 합니다. 후보 문장끼리 '흉부 X선' 성분을 공유해 코사인 차이가 작기 때문입니다.`; }
+    else { warn.className = "sk-note"; warn.textContent = "문장 틀을 바꾸면 후보 문장 벡터가 달라져 확률이 바뀝니다. CLIP은 GPT의 Beam·Temperature처럼 Prompt(후보 문장 설계)가 성능을 좌우합니다. 의료 영상에 맞는 표현(a radiology image showing {}.)이 도움이 될 수 있습니다."; }
+    codeBlock("zsCode", `from transformers import pipeline
+
+general = pipeline('zero-shot-image-classification', model='openai/clip-vit-base-patch32')
+medical = pipeline('zero-shot-image-classification', model='flaviagiammarino/pubmed-clip-vit-base-patch32')
+
+labels = ${JSON.stringify(zs.set === "mod" ? MOD_LABELS : FIND_LABELS).replace(/"/g, "'").replace(/','/g, "', '")}
+template = '${TPL[zs.tpl]}'
+
+g = general(img, candidate_labels=labels, hypothesis_template=template)[0]
+m = medical(img, candidate_labels=labels, hypothesis_template=template)[0]
+print(f"CLIP : {g['label']} ({g['score']:.2f})")
+print(f"PubMed : {m['label']} ({m['score']:.2f})")`);
+    zsAllRender();
+  }
+  function zsAllRender() {
+    const rows = [];
+    for (const set of ["mod", "find"]) {
+      const imgs = set === "mod" ? GAL : GAL.filter(it => it.cls === "cxr"), res = {};
+      for (const m of ["gen", "pub"]) { let ok = 0, conf = 0; imgs.forEach(it => { const r = zeroShot(m, it, set, zs.tpl); const truth = set === "mod" ? MOD_CLS.indexOf(it.cls) : FIND_F.indexOf(it.f); if (r.top === truth) ok++; conf += r.p[r.top]; }); res[m] = { ok, n: imgs.length, conf: conf / imgs.length }; }
+      rows.push([set === "mod" ? "영상 종류 4개 (갤러리 24장)" : "흉부 소견 4개 (흉부 X선 8장)", res]);
+    }
+    $("zsAll").innerHTML = `<thead><tr><th>과제 (문장 틀: ${esc(TPL[zs.tpl])})</th><th class="n">일반 CLIP 정확도</th><th class="n">평균 1위 확률</th><th class="n">PubMedCLIP 정확도</th><th class="n">평균 1위 확률</th></tr></thead><tbody>` +
+      rows.map(([t, r]) => `<tr><td>${t}</td><td class="n">${r.gen.ok}/${r.gen.n} = ${f2(r.gen.ok / r.gen.n)}</td><td class="n">${f2(r.gen.conf)}</td><td class="n">${r.pub.ok}/${r.pub.n} = ${f2(r.pub.ok / r.pub.n)}</td><td class="n">${f2(r.pub.conf)}</td></tr>`).join("") + "</tbody>";
+    const chest = []; for (const it of GAL) { if (zeroShot("pub", it, "mod", "photo").labels[zeroShot("pub", it, "mod", "photo").top] === "a chest x-ray") chest.push(it); if (chest.length === 4) break; }
+    $("zsChest").innerHTML = `노트북 흐름 재현: PubMedCLIP이 'a chest x-ray'로 분류한 영상을 앞에서부터 4장 → <b>${chest.map(x => x.id).join(", ")}</b>. 이 4장을 소견 후보(문장 틀 '{}')로 분류하면: ` +
+      chest.map(it => { const r = zeroShot("pub", it, "find", "plain"); return `${it.id} 정답 ${FKO[it.f]} → ${FKO[FIND_F[r.top]]} (${f2(r.p[r.top])}) ${r.top === FIND_F.indexOf(it.f) ? '<span class="mm-ok">맞음</span>' : '<span class="mm-no">틀림</span>'}`; }).join(" · ") + ` <span class="mm-mock">모의 출력</span>`;
+  }
+  segBind("zsSet", v => { zs.set = v; zsRender(); });
+  segBind("zsTpl", v => { zs.tpl = v; zsRender(); });
+  zsPickBuild(); zsRender();
+
+  /* =============================================================
+     4. 임베딩 공간
+     ============================================================= */
+  const EM_TEXTS = ["a chest x-ray", "a brain MRI", "a brain CT scan", "an abdominal CT scan", "an axial CT scan of the brain", "an MRI of the brain", "a chest x-ray with pleural effusion"];
+  const em = { model: "pub", gap: 0.85, sel: null, pts: [], proj: null };
+  function pca2(X) {
+    const n = X.length, mu = new Float64Array(D); X.forEach(x => axpy(mu, 1 / n, x));
+    const C = X.map(x => { const c = new Float64Array(D); for (let i = 0; i < D; i++) c[i] = x[i] - mu[i]; return c; });
+    let tot = 0; C.forEach(c => tot += dot(c, c));
+    const comps = [], lams = [];
+    for (let k = 0; k < 2; k++) {
+      let v = new Float64Array(D); const r = mulberry32(99 + k); for (let i = 0; i < D; i++) v[i] = r() - 0.5; normalize(v);
+      for (let it = 0; it < 80; it++) {
+        const s = C.map(c => dot(c, v)), w = new Float64Array(D); C.forEach((c, j) => axpy(w, s[j], c));
+        comps.forEach(p => { const a = dot(w, p); axpy(w, -a, p); });
+        normalize(w); v = w;
+      }
+      const s = C.map(c => dot(c, v)); lams.push(s.reduce((a, b) => a + b * b, 0)); comps.push(v);
+    }
+    return { coords: C.map(c => [dot(c, comps[0]), dot(c, comps[1])]), evr: lams.map(l => l / tot) };
+  }
+  function emCompute() {
+    const pts = [];
+    GAL.forEach(it => pts.push({ kind: "img", it, name: nm(it), v: imgEmb(em.model, it, em.gap) }));
+    EM_TEXTS.forEach(t => pts.push({ kind: "txt", name: t, v: txtEmb(em.model, t, em.gap) }));
+    const P = pca2(pts.map(p => p.v));
+    const meanImgX = pts.reduce((a, p, i) => a + (p.kind === "img" ? P.coords[i][0] : 0), 0);
+    pts.forEach((p, i) => { p.x = P.coords[i][0] * (meanImgX > 0 ? -1 : 1); p.y = P.coords[i][1]; });
+    em.pts = pts; em.evr = P.evr;
+    const imgs = pts.filter(p => p.kind === "img"), txts = pts.filter(p => p.kind === "txt").slice(0, 4);
+    let mt = 0, mo = 0, nmo = 0, ii = 0, nii = 0, iiD = 0, niiD = 0;
+    imgs.forEach(p => txts.forEach((t, j) => { const c = cosSim(p.v, t.v); if (MOD_CLS[j] === p.it.cls) mt += c; else { mo += c; nmo++; } }));
+    for (let a = 0; a < imgs.length; a++) for (let b = a + 1; b < imgs.length; b++) { const c = cosSim(imgs[a].v, imgs[b].v); if (imgs[a].it.cls === imgs[b].it.cls) { ii += c; nii++; } else { iiD += c; niiD++; } }
+    const mi = new Float64Array(D), mtv = new Float64Array(D); imgs.forEach(p => axpy(mi, 1 / imgs.length, p.v)); const allT = pts.filter(p => p.kind === "txt"); allT.forEach(p => axpy(mtv, 1 / allT.length, p.v));
+    const gapD = Math.sqrt(mi.reduce((a, x, i) => a + (x - mtv[i]) ** 2, 0));
+    $("emStats").innerHTML = [["cos(영상, 짝 문장) 평균", f3(mt / imgs.length)], ["cos(영상, 다른 종류 문장) 평균", f3(mo / nmo)], ["cos(같은 종류 영상끼리) 평균", f3(ii / nii)], ["cos(다른 종류 영상끼리) 평균", f3(iiD / niiD)], ["‖μ_영상 − μ_문장‖ (중심 간격)", f3(gapD)], ["PCA 설명 분산 PC1 / PC2", `${pct(em.evr[0])} / ${pct(em.evr[1])}`]].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+    if (em.sel != null && em.sel >= pts.length) em.sel = null;
+    emSelRender();
+  }
+  function emDraw() {
+    const cv = $("emCv"), h = window.innerWidth < 600 ? 330 : 430, F = fit(cv, h); if (!F || !em.pts.length) return;
+    const { ctx, w } = F, pts = em.pts, pad = 36;
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const sx = x => pad + (x - x0) / ((x1 - x0) || 1) * (w - 2 * pad), sy = y => pad + (y - y0) / ((y1 - y0) || 1) * (h - 2 * pad);
+    const cImg = cssv("--role-img"), cTxt = cssv("--role-txt"), cFuse = cssv("--role-fuse"), cLine = cssv("--line"), cMuted = cssv("--muted"), cInk = cssv("--ink"), cSurf = cssv("--surface");
+    ctx.clearRect(0, 0, w, h);
+    ctx.strokeStyle = cLine; ctx.lineWidth = 1; ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
+    ctx.fillStyle = cMuted; ctx.font = `12px ${cssv("--sans")}`; ctx.textAlign = "center"; ctx.fillText(`PC1 (${pct(em.evr[0])}) →`, w / 2, h - 8); ctx.textAlign = "left"; ctx.save(); ctx.translate(14, h / 2 + 30); ctx.rotate(-Math.PI / 2); ctx.fillText(`PC2 (${pct(em.evr[1])}) →`, 0, 0); ctx.restore();
+    pts.forEach((p, i) => { p.px = sx(p.x); p.py = sy(p.y); });
+    const imgs = pts.filter(p => p.kind === "img"), txts = pts.filter(p => p.kind === "txt");
+    if ($("emLinks").checked) {
+      ctx.strokeStyle = cFuse; ctx.globalAlpha = 0.55; ctx.setLineDash([3, 3]);
+      txts.forEach(t => { let best = null, bc = -2; imgs.forEach(p => { const c = cosSim(t.v, p.v); if (c > bc) { bc = c; best = p; } }); ctx.beginPath(); ctx.moveTo(t.px, t.py); ctx.lineTo(best.px, best.py); ctx.stroke(); });
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
+    }
+    if ($("emCent").checked) {
+      const ci = [imgs.reduce((a, p) => a + p.px, 0) / imgs.length, imgs.reduce((a, p) => a + p.py, 0) / imgs.length], ct = [txts.reduce((a, p) => a + p.px, 0) / txts.length, txts.reduce((a, p) => a + p.py, 0) / txts.length];
+      ctx.strokeStyle = cFuse; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ci[0], ci[1]); ctx.lineTo(ct[0], ct[1]); ctx.stroke();
+      [ci, ct].forEach(c => { ctx.beginPath(); ctx.arc(c[0], c[1], 6, 0, 7); ctx.fillStyle = cSurf; ctx.fill(); ctx.stroke(); });
+      ctx.fillStyle = cFuse; ctx.font = `600 12px ${cssv("--sans")}`; ctx.fillText("모달리티 간격", (ci[0] + ct[0]) / 2 - 36, (ci[1] + ct[1]) / 2 - 8); ctx.lineWidth = 1;
+    }
+    imgs.forEach(p => { ctx.beginPath(); ctx.arc(p.px, p.py, 6, 0, 7); ctx.fillStyle = cImg; ctx.globalAlpha = 0.8; ctx.fill(); ctx.globalAlpha = 1; });
+    txts.forEach(p => { ctx.beginPath(); ctx.moveTo(p.px, p.py - 8); ctx.lineTo(p.px + 8, p.py); ctx.lineTo(p.px, p.py + 8); ctx.lineTo(p.px - 8, p.py); ctx.closePath(); ctx.fillStyle = cTxt; ctx.fill(); });
+    const boxes = []; ctx.font = `600 11.5px ${cssv("--sans")}`;
+    const hit = (lx, ly, tw) => boxes.some(b => lx - 2 < b[2] && lx + tw + 2 > b[0] && ly - 12 < b[3] && ly + 3 > b[1]);
+    function label(text, x, y, color, left) {
+      const tw = ctx.measureText(text).width, lx = clamp(left ? x - 14 - tw : x + 12, 2, w - tw - 4); let ly = clamp(y + 4, 14, h - 6);
+      for (let k = 1; k < 14 && hit(lx, ly, tw); k++) ly = clamp(y + 4 + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 14, 14, h - 6);
+      boxes.push([lx, ly - 12, lx + tw, ly + 3]);
+      ctx.globalAlpha = 0.82; ctx.fillStyle = cSurf; ctx.fillRect(lx - 2, ly - 12, tw + 4, 15); ctx.globalAlpha = 1; ctx.fillStyle = color; ctx.fillText(text, lx, ly);
+    }
+    Object.keys(CLS).forEach(k => { const ps = imgs.filter(p => p.it.cls === k); label(CLS[k].ko + " 영상", Math.max(...ps.map(p => p.px)), ps.reduce((a, p) => a + p.py, 0) / ps.length, cImg, false); });
+    txts.forEach(p => label("'" + p.name + "'", p.px, p.py, cTxt, p.px > w / 2));
+    if (em.sel != null) { const p = pts[em.sel]; ctx.strokeStyle = cInk; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(p.px, p.py, 11, 0, 7); ctx.stroke(); ctx.lineWidth = 1; }
+  }
+  function emSelRender() {
+    if (em.sel == null) { $("emSelT").textContent = "점을 눌러 보세요"; $("emSel").textContent = "영상이나 문장 점을 누르면 512차원에서 계산한 코사인 유사도 상위 5개 이웃이 나옵니다."; $("emCos").textContent = "cos(A, B) = A·B / (‖A‖‖B‖) = Σᵢ AᵢBᵢ  (‖A‖ = ‖B‖ = 1)"; return; }
+    const p = em.pts[em.sel], nb = em.pts.map((q, i) => ({ q, i, c: i === em.sel ? -9 : cosSim(p.v, q.v) })).sort((a, b) => b.c - a.c).slice(0, 5);
+    $("emSelT").innerHTML = `<span class="${p.kind === "img" ? "mm-c-img" : "mm-c-txt"}">${p.kind === "img" ? "영상" : "문장"}</span> ${esc(p.kind === "img" ? p.name + " · " + FKO[p.it.f] : "'" + p.name + "'")}`;
+    $("emSel").innerHTML = `<ol style="margin:0;padding-left:20px">` + nb.map(n => `<li><span class="${n.q.kind === "img" ? "mm-c-img" : "mm-c-txt"}">${n.q.kind === "img" ? "영상" : "문장"}</span> ${esc(n.q.kind === "img" ? n.q.name : "'" + n.q.name + "'")} <b class="sk-mono">${f3(n.c)}</b></li>`).join("") + "</ol>";
+    const q = nb[0].q, A = p.v, B = q.v;
+    $("emCos").innerHTML = `cos(선택, 1위 이웃) = Σᵢ AᵢBᵢ = ${[0, 1, 2, 3, 4].map(i => `(${A[i].toFixed(3)})(${B[i].toFixed(3)})`).join(" + ")} + … (512개 항)<br>= ${f4(dot(A, B))},   ‖A‖ = ${nrm(A).toFixed(3)},  ‖B‖ = ${nrm(B).toFixed(3)}  →  cos = ${f4(cosSim(A, B))}`;
+  }
+  function emHit(e) {
+    const r = $("emCv").getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; let best = null, bd = 16;
+    em.pts.forEach((p, i) => { const d = Math.hypot(p.px - x, p.py - y); if (d < bd) { bd = d; best = i; } }); return best;
+  }
+  $("emCv").addEventListener("click", e => { const i = emHit(e); em.sel = i; emSelRender(); emDraw(); });
+  $("emCv").addEventListener("mousemove", e => { $("emCv").style.cursor = emHit(e) != null ? "pointer" : "default"; });
+  $("emCv").addEventListener("keydown", e => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); e.stopPropagation(); const n = em.pts.length; em.sel = em.sel == null ? 0 : (em.sel + (e.key === "ArrowRight" ? 1 : -1) + n) % n; emSelRender(); emDraw(); } });
+  segBind("emModel", v => { em.model = v; emCompute(); emDraw(); });
+  $("emGap").addEventListener("input", () => { em.gap = +$("emGap").value; $("emGapV").textContent = em.gap.toFixed(2); emCompute(); emDraw(); });
+  $("emLinks").addEventListener("change", emDraw); $("emCent").addEventListener("change", emDraw);
+  emCompute();
+
+  /* =============================================================
+     5. 검색
+     ============================================================= */
+  const PRESETS = ["a chest x-ray", "an axial CT scan of the brain", "an MRI of the brain", "an abdominal CT scan", "a chest x-ray with pleural effusion", "a brain CT scan with hemorrhage", "흉부 엑스레이"];
+  const NB_Q = ["a chest x-ray", "an axial CT scan of the brain", "an MRI of the brain"];
+  const rt = { mode: "txt", model: "pub", k: 3, q: "a chest x-ray", qi: GAL[0] };
+  $("rtPresets").innerHTML = PRESETS.map((p, i) => `<button class="sk-btn sk-btn--sm" type="button" data-p="${i}">${esc(p)}${i < 3 ? ' <span class="sk-hint">노트북</span>' : ""}</button>`).join("");
+  $("rtPresets").addEventListener("click", e => { const b = e.target.closest("button[data-p]"); if (!b) return; rt.q = PRESETS[+b.dataset.p]; $("rtQ").value = rt.q; rtRender(); });
+  $("rtForm").addEventListener("submit", e => { e.preventDefault(); rt.q = $("rtQ").value.trim() || "a chest x-ray"; rtRender(); });
+  function rtPickBuild() {
+    const g = $("rtPick"); g.innerHTML = "";
+    GAL.forEach(it => { const b = document.createElement("button"); b.type = "button"; b.className = "mm-thumb"; b.setAttribute("aria-pressed", it === rt.qi); b.setAttribute("aria-label", nm(it)); b.title = `${nm(it)} · ${FKO[it.f]}`; b.appendChild(thumbCanvas(it)); const s = document.createElement("span"); s.textContent = it.id; b.appendChild(s); b.onclick = () => { rt.qi = it; $$(".mm-thumb", g).forEach(x => x.setAttribute("aria-pressed", x === b)); rtRender(); }; g.appendChild(b); });
+  }
+  function rankText(model, q, gap) { const t = txtEmb(model, q, gap); return GAL.map(it => ({ it, s: cosSim(imgEmb(model, it, gap), t) })).sort((a, b) => b.s - a.s); }
+  function rtRender() {
+    const gap = em.gap; let ranked, relFn, desc;
+    $("rtTxtBox").hidden = rt.mode !== "txt"; $("rtImgBox").hidden = rt.mode !== "img";
+    if (rt.mode === "txt") {
+      const p = parseQuery(rt.q); ranked = rankText(rt.model, rt.q, gap); relFn = it => isRel(it, p);
+      const chips = []; if (p.o) chips.push(`부위: ${OKO[p.o]}`); if (p.m) chips.push(`영상 종류: ${MKO[p.m]}`); if (p.F) chips.push(`소견: ${FKO[p.F]}`);
+      desc = `<span class="sk-label">모의 텍스트 인코더가 읽은 개념</span> ` + (chips.length ? chips.map(c => `<span class="mm-chip">${c}</span>`).join(" ") : `<span class="mm-chip mm-c-warn">아는 개념 없음 → 점수가 거의 비슷해짐</span>`) + (p.ko ? ` <span class="mm-chip mm-c-warn">한국어 → 영어 위주 학습 한계로 약하게 반영</span>` : "") + ` <span class="sk-hint">정답 기준 = 읽은 개념과 일치하는 영상</span>`;
+    } else {
+      const qv = imgEmb(rt.model, rt.qi, gap), withF = $("rtFind").checked;
+      ranked = GAL.filter(it => it !== rt.qi).map(it => ({ it, s: cosSim(imgEmb(rt.model, it, gap), qv) })).sort((a, b) => b.s - a.s);
+      relFn = it => it.cls === rt.qi.cls && (!withF || it.f === rt.qi.f);
+      desc = `<span class="sk-label">질의 영상</span> <span class="mm-chip">${nm(rt.qi)} · ${FKO[rt.qi.f]}</span> <span class="sk-hint">자기 자신은 제외 · 정답 = 같은 영상 종류${withF ? " + 같은 소견" : ""}</span>`;
+    }
+    $("rtParse").innerHTML = desc;
+    const k = rt.k, top = ranked.slice(0, k), R = ranked.filter(r => relFn(r.it)).length, a = top.filter(r => relFn(r.it)).length;
+    let ap = 0, hit = 0; ranked.forEach((r, i) => { if (relFn(r.it)) { hit++; ap += hit / (i + 1); } }); ap = R ? ap / R : 0;
+    const res = $("rtRes"); res.innerHTML = "";
+    top.forEach((r, i) => {
+      const d = document.createElement("div"), rel = relFn(r.it); d.className = "it" + (rel ? " rel" : "");
+      d.appendChild(thumbCanvas(r.it));
+      d.insertAdjacentHTML("beforeend", `<span>${i + 1}위 · ${r.it.id}</span><span class="sk-hint">${CLS[r.it.cls].ko} · ${FKO[r.it.f]}</span><b>score : ${f3(r.s)}</b><span class="${rel ? "mm-ok" : "mm-no"}">${rel ? "정답" : "정답 아님"}</span>`);
+      res.appendChild(d);
+    });
+    $("rtStats").innerHTML = [[`${a}/${k}`, `Precision@${k}`], [R ? `${a}/${R}` : "—", `Recall@${k}`], [R ? f3(ap) : "—", "AP (전체 순위)"], [String(R), "정답 영상 수"], [f3(ranked[0].s), "1위 score"]].map(([b, s]) => `<div class="sk-stat"><b>${b}</b><span>${s}</span></div>`).join("");
+    $("rtFormula").innerHTML = `Precision@${k} = |정답 ∩ 상위 ${k}| / ${k} = ${a} / ${k} = ${f3(a / k)}<br>Recall@${k} = |정답 ∩ 상위 ${k}| / |정답| = ${R ? `${a} / ${R} = ${f3(a / R)}` : "정답 없음"}<br>score_i = cos(e_i, q) = (e_i·q) / (‖e_i‖‖q‖),  1위 ${ranked[0].it.id}: ${f4(ranked[0].s)}`;
+    rt.ranked = ranked; rt.relFn = relFn; rtStrip();
+    const mn = MODELS[rt.model].name;
+    codeBlock("rtCode", rt.mode === "txt" ? `model_name = '${mn}'
+clip_model = CLIPModel.from_pretrained(model_name)
+clip_proc = CLIPProcessor.from_pretrained(model_name)
+
+df = pd.DataFrame({'image': img_list})
+df['embedding'] = [image_embedding(x) for x in df['image']]   # (203, 512)
+
+def cos_sim(A, B):
+    return np.dot(A, B) / (np.linalg.norm(A) * np.linalg.norm(B))
+
+def return_image(Q, top_k=3):
+    embedd = text_embedding(Q)
+    df['Score'] = df['embedding'].apply(lambda x: cos_sim(x, embedd))
+    top = df.nlargest(top_k, 'Score')
+    show_images(list(top['image']), [f'{Q}\\nscore : {s:.3f}' for s in top['Score']])
+    return top
+
+result = return_image('${rt.q.replace(/'/g, "\\'")}', top_k=${k})` : `# 영상 → 영상 검색: 질의 영상도 같은 이미지 인코더로 벡터화
+q_idx = ${rt.qi.i}                                   # 질의 영상 번호
+q_vec = df['embedding'].iloc[q_idx]
+df['Score'] = df['embedding'].apply(lambda x: cos_sim(x, q_vec))
+top = df.drop(index=q_idx).nlargest(${k}, 'Score')  # 자기 자신 제외
+show_images(list(top['image']), [f'score : {s:.3f}' for s in top['Score']])`);
+    mxRender();
+  }
+  function rtStrip() {
+    const cv = $("rtStrip"), F = fit(cv, 150); if (!F || !rt.ranked) return;
+    const { ctx, w, h } = F, rk = rt.ranked, n = rk.length, padL = 40, padB = 22, padT = 10, bw = (w - padL - 8) / n;
+    const smin = Math.min(...rk.map(r => r.s)), smax = Math.max(...rk.map(r => r.s)), lo = smin - (smax - smin) * 0.15 - 0.005, hi = smax + 0.002;
+    const yy = s => padT + (1 - (s - lo) / (hi - lo)) * (h - padT - padB);
+    ctx.clearRect(0, 0, w, h);
+    const cImg = cssv("--role-img"), cGt = cssv("--role-gt"), cFuse = cssv("--role-fuse"), cMuted = cssv("--muted"), cLine = cssv("--line");
+    ctx.strokeStyle = cLine; ctx.beginPath(); ctx.moveTo(padL, h - padB + 0.5); ctx.lineTo(w - 4, h - padB + 0.5); ctx.stroke();
+    ctx.fillStyle = cMuted; ctx.font = `11px ${cssv("--mono")}`; ctx.textAlign = "right"; ctx.fillText(f3(hi), padL - 4, padT + 8); ctx.fillText(f3(lo), padL - 4, h - padB); ctx.textAlign = "left";
+    rk.forEach((r, i) => { const x = padL + i * bw + 1, y = yy(r.s); ctx.fillStyle = rt.relFn(r.it) ? cImg : cGt; ctx.globalAlpha = i < rt.k ? 1 : 0.55; ctx.fillRect(x, y, Math.max(1, bw - 2), h - padB - y); });
+    ctx.globalAlpha = 1;
+    const xk = padL + rt.k * bw; ctx.strokeStyle = cFuse; ctx.lineWidth = 2; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(xk, padT - 4); ctx.lineTo(xk, h - padB); ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
+    ctx.fillStyle = cFuse; ctx.font = `600 11.5px ${cssv("--sans")}`; ctx.fillText(`top_k = ${rt.k}`, Math.min(xk + 4, w - 70), padT + 10);
+    ctx.fillStyle = cMuted; ctx.font = `11px ${cssv("--sans")}`; ctx.fillText(`순위 1 → ${n} (score 내림차순)`, padL, h - 6);
+  }
+  segBind("rtMode", v => { rt.mode = v; rtRender(); });
+  segBind("rtModel", v => { rt.model = v; rtRender(); });
+  $("rtK").addEventListener("input", () => { rt.k = +$("rtK").value; $("rtKV").textContent = rt.k; rtRender(); });
+  $("rtFind").addEventListener("change", rtRender);
+  rtPickBuild();
+
+  function mxRender() {
+    const s = +$("mxScale").value; $("mxScaleV").textContent = s;
+    const gap = em.gap, model = rt.model, imgs = NB_Q.map(q => rankText(model, q, gap)[0].it);
+    const C = imgs.map(it => NB_Q.map(q => cosSim(imgEmb(model, it, gap), txtEmb(model, q, gap))));
+    const Lg = C.map(r => r.map(c => s * c)), Prow = Lg.map(softmax);
+    const Pcol = [0, 1, 2].map(j => softmax(Lg.map(r => r[j])));
+    const Li2t = -[0, 1, 2].reduce((a, i) => a + Math.log(Prow[i][i]), 0) / 3, Lt2i = -[0, 1, 2].reduce((a, j) => a + Math.log(Pcol[j][j]), 0) / 3;
+    const head = `<tr><th></th>${NB_Q.map(q => `<th>'${esc(q)}'</th>`).join("")}</tr>`;
+    const cmin = Math.min(...C.flat()), cmax = Math.max(...C.flat());
+    $("mxCos").innerHTML = head + C.map((r, i) => `<tr><th class="r">image ${i + 1} (${imgs[i].id})</th>${r.map((c, j) => `<td class="${i === j ? "diag" : ""}" style="--a:${(10 + 50 * (c - cmin) / ((cmax - cmin) || 1)).toFixed(0)}%">${f3(c)}</td>`).join("")}</tr>`).join("");
+    $("mxProb").innerHTML = head + Prow.map((r, i) => `<tr><th class="r">image ${i + 1}</th>${r.map((p, j) => `<td class="${i === j ? "diag" : ""}" style="--a:${(8 + 60 * p).toFixed(0)}%">${f2(p)}</td>`).join("")}</tr>`).join("");
+    $("mxLoss").innerHTML = `logits_per_image = ${s} × cos,  softmax(dim=-1) → 행 합 = ${Prow.map(r => r.reduce((a, b) => a + b, 0).toFixed(3)).join(", ")}<br>대각선 확률: ${Prow.map((r, i) => f3(r[i])).join(", ")}  ·  대조 손실 (CLIP 학습 목표): L_영상→문장 = −⅓ Σ log p_ii = ${f4(Li2t)},  L_문장→영상 = ${f4(Lt2i)},  L = ½(합) = ${f4((Li2t + Lt2i) / 2)}`;
+  }
+  $("mxScale").addEventListener("input", mxRender);
+
+  /* =============================================================
+     6. 캡셔닝 · VQA
+     ============================================================= */
+  const CAP = {
+    unc: ["a chest xray with a small, white, chest", "a chest xray with a large, open chest", "chest x - ray - x - ray - x - ray - x - ray x - ray x - ray x - ray x - ray"],
+    cond: ["a radiology image of the chest", "a radiology image of the chest", "a radiology image of the chest and chest"],
+    beam: ["a radiology image of the chest", "a radiology image of the chest", "a radiology image of the chest and chest"]
+  };
+  const CAP_CODE = { unc: "generate_caption(img)", cond: "generate_caption(img, prompt='a radiology image of')", beam: "generate_caption(img, prompt='a radiology image of',\n                      num_beams=3, repetition_penalty=1.5, no_repeat_ngram_size=3)" };
+  const capImgs = GAL.filter(it => it.cls === "cxr").slice(0, 3);
+  function repStats(s) {
+    const t = s.split(/\s+/).filter(Boolean), tri = new Map(), bi = new Set(); let rep = 0;
+    for (let i = 0; i + 2 < t.length; i++) { const k = t.slice(i, i + 3).join(" "); tri.set(k, (tri.get(k) || 0) + 1); }
+    tri.forEach(c => { if (c > 1) rep += c - 1; });
+    for (let i = 0; i + 1 < t.length; i++) bi.add(t[i] + " " + t[i + 1]);
+    return { n: t.length, rep, d2: t.length > 1 ? bi.size / (t.length - 1) : 1 };
+  }
+  let capMode = "unc";
+  function capRender() {
+    const g = $("capGrid"); g.innerHTML = "";
+    CAP[capMode].forEach((c, i) => {
+      const st = repStats(c), d = document.createElement("div"); d.className = "sk-card sk-card--sunk";
+      d.appendChild(thumbCanvas(capImgs[i], "mm-big"));
+      d.insertAdjacentHTML("beforeend", `<span class="sk-hint">img_list[${i}] 자리 · 모의 흉부 X선</span><p class="mm-title">${esc(c)}</p><dl class="sk-kv"><dt>토큰 수</dt><dd>${st.n}</dd><dt>반복 3-gram</dt><dd class="${st.rep ? "mm-no" : ""}">${st.rep}</dd><dt>distinct-2</dt><dd>${f2(st.d2)}</dd></dl>`);
+      g.appendChild(d);
+    });
+    $("capNote").innerHTML = capMode === "unc" ? `영상만 넣으면 "chest xray" 수준의 묘사에 그치고, 세 번째 문장은 "x - ray"가 끝없이 반복됩니다(반복 3-gram ${repStats(CAP.unc[2]).rep}개). 의학적 소견은 나오지 않습니다.`
+      : capMode === "cond" ? `'a radiology image of'를 앞부분으로 주면 반복은 사라지지만 내용은 "the chest"뿐입니다. 세 번째 문장은 "chest and chest"로 같은 단어를 되풀이합니다.`
+      : `Beam Search(num_beams=3) + repetition_penalty=1.5 + no_repeat_ngram_size=3을 적용해도 노트북 출력은 Conditional과 <b>똑같았습니다</b>. 생성 하이퍼파라미터는 문장 모양을 다듬을 뿐, 모형이 모르는 의료 지식을 만들어 주지 않습니다 → 의료 데이터 Fine-Tuning 필요, 환각 주의.`;
+    codeBlock("capCode", `from transformers import BlipProcessor, BlipForConditionalGeneration
+
+cap_name = 'Salesforce/blip-image-captioning-base'
+cap_proc = BlipProcessor.from_pretrained(cap_name)
+cap_model = BlipForConditionalGeneration.from_pretrained(cap_name)
+
+def generate_caption(img, prompt=None, **kwargs):
+    if prompt is None:
+        inputs = cap_proc(images=img, return_tensors='pt')
+    else:
+        inputs = cap_proc(images=img, text=prompt, return_tensors='pt')
+    with torch.no_grad():
+        outputs = cap_model.generate(**inputs, max_new_tokens=30, **kwargs)
+    return cap_proc.decode(outputs[0], skip_special_tokens=True)
+
+for img in img_list[:3]:
+    print(${CAP_CODE[capMode]})`);
+  }
+  segBind("capMode", v => { capMode = v; capRender(); });
+
+  /* 다음 단어 선택 */
+  const NT_PREFIX = ["chest", "x", "-", "ray", "-", "x", "-", "ray", "-"];
+  const NT_CAND = [["x", 3.2], ["ray", 2.1], ["chest", 1.9], ["[SEP]", 1.6], ["with", 1.2], ["of", 0.8]];
+  let ntNg = 0;
+  function ntRender() {
+    const th = +$("ntPen").value; $("ntPenV").textContent = th.toFixed(1);
+    const seen = new Set(NT_PREFIX), banned = new Set();
+    if (ntNg > 0) { const n = ntNg, ctxT = NT_PREFIX.slice(NT_PREFIX.length - (n - 1)).join(" "); for (let i = 0; i + n <= NT_PREFIX.length; i++) { if (NT_PREFIX.slice(i, i + n - 1).join(" ") === ctxT) banned.add(NT_PREFIX[i + n - 1]); } }
+    const rows = NT_CAND.map(([t, l]) => { let a = l; if (seen.has(t)) a = l > 0 ? l / th : l * th; const b = banned.has(t); return { t, l, a, b, fin: b ? -Infinity : a }; });
+    const p = softmax(rows.map(r => r.fin === -Infinity ? -1e9 : r.fin)); const best = rows.reduce((bi, r, i) => r.fin > rows[bi].fin ? i : bi, 0);
+    $("ntPrefix").innerHTML = `<span class="sk-label">지금까지 생성</span> ` + NT_PREFIX.map(t => `<span class="mm-tok">${esc(t)}</span>`).join("") + ` <span class="mm-tok new">${esc(rows[best].t)}</span>`;
+    $("ntTable").innerHTML = `<thead><tr><th>후보 토큰</th><th class="n">원래 로짓 (모의)</th><th>이미 나옴?</th><th class="n">벌점 후 로짓</th><th>n-gram 차단</th><th class="n">확률</th></tr></thead><tbody>` +
+      rows.map((r, i) => `<tr class="${i === best ? "mm-cur" : ""}"><td class="mm-code-inline">${esc(r.t)}</td><td class="n">${r.l.toFixed(2)}</td><td>${seen.has(r.t) ? "예 → ÷θ" : "아니오"}</td><td class="n">${r.a.toFixed(2)}</td><td>${r.b ? '<span class="mm-no">차단</span>' : "—"}</td><td class="n">${f3(p[i])}</td></tr>`).join("") + "</tbody>";
+    $("ntOut").innerHTML = `선택(greedy) = <b class="mm-code-inline">${esc(rows[best].t)}</b>. ` + (rows[best].t === "x" ? "또 'x'를 골라 반복이 이어집니다(노트북 세 번째 캡션과 같은 현상)." : rows[best].t === "[SEP]" ? "문장이 끝나 반복이 멈춥니다." : "반복 대신 다른 단어가 이어집니다.") +
+      (ntNg ? ` 마지막 ${ntNg - 1}개 토큰 '${NT_PREFIX.slice(NT_PREFIX.length - (ntNg - 1)).join(" ")}' 다음에 이미 나왔던 토큰(${[...banned].join(", ") || "없음"})은 차단됩니다.` : "") + ` repetition_penalty: 이미 나온 토큰의 양수 로짓 ÷ θ (θ = ${th.toFixed(1)}).`;
+  }
+  $("ntPen").addEventListener("input", ntRender);
+  segBind("ntNg", v => { ntNg = +v; ntRender(); });
+
+  /* VQA 노트북 출력 */
+  const VQA_A = [["is there evidence of an aortic aneurysm?", "yes", "yes"], ["is there airspace consolidation on the left side?", "yes", "no"], ["is there any intraparenchymal abnormalities in the lung fields?", "no", "yes"], ["which side of the heart border is obscured?", "right", "right"], ["where are the kidney?", "not seen here", "in lower right"]];
+  const VQA_B = [["is there evidence of an aortic aneurysm?", "yes", "yes", ""], ["is there airspace consolidation on the left side?", "yes", "no", ""], ["is there any intraparenchymal abnormalities in the lung fields?", "no", "yes", ""], ["are the kidneys present in this image?", "no", "no", ""], ["is the liver visible in the image?", "no", "no", ""]];
+  const em_ = (p, a) => p.trim().toLowerCase() === a.toLowerCase();
+  const mark = ok => ok ? '<span class="mm-ok">일치</span>' : '<span class="mm-no">불일치</span>';
+  const shw = s => s === "" ? '<span class="mm-empty">\'\' (빈 문자열)</span>' : `<span class="mm-code-inline">${esc(s)}</span>`;
+  (function () {
+    const okA = VQA_A.filter(r => em_(r[2], r[1])).length;
+    $("vqA").innerHTML = `<thead><tr><th>질문</th><th>유형</th><th>정답</th><th>예측 (일반)</th><th>판정</th></tr></thead><tbody>` + VQA_A.map(r => `<tr><td class="mm-code-inline">${esc(r[0])}</td><td>${/^(yes|no)$/.test(r[1]) ? "Closed" : "Open"}</td><td>${shw(r[1])}</td><td>${shw(r[2])}</td><td>${mark(em_(r[2], r[1]))}</td></tr>`).join("") + `<tr><td colspan="4">일치 개수</td><td class="n">${okA}/5 = ${f2(okA / 5)}</td></tr></tbody>`;
+    const okB = VQA_B.filter(r => em_(r[2], r[1])).length, okF = VQA_B.filter(r => em_(r[3], r[1])).length;
+    $("vqB").innerHTML = `<thead><tr><th>질문</th><th>정답</th><th>일반</th><th>판정</th><th>Fine-Tuning</th><th>판정</th></tr></thead><tbody>` + VQA_B.map(r => `<tr><td class="mm-code-inline">${esc(r[0])}</td><td>${shw(r[1])}</td><td>${shw(r[2])}</td><td>${mark(em_(r[2], r[1]))}</td><td>${shw(r[3])}</td><td>${mark(em_(r[3], r[1]))}</td></tr>`).join("") + `<tr><td colspan="3">일치 개수</td><td class="n">${okB}/5</td><td></td><td class="n">${okF}/5</td></tr></tbody>`;
+    const n = 50, base = 0.6, ft = 0.0;
+    $("accBox").innerHTML = [["일반 BLIP VQA", base, "var(--role-txt)"], ["Fine-Tuning (blip-vqa-rad)", ft, "var(--role-warn)"]].map(([l, v, c]) => `<span>${l}</span><div class="bar" style="--c:${c}"><i style="width:${v * 100}%"></i></div><span class="v">${v.toFixed(1)} (${Math.round(v * n)}/${n})</span>`).join("");
+    $("accFormula").innerHTML = `closed = test.filter(answer ∈ {yes, no}) → 251개,  closed_accuracy(n=50)<br>정확도 = Σ [pred.strip().lower() == answer.lower()] / 50 :  일반 0.6 → ${Math.round(0.6 * n)}개 정답,  Fine-Tuning 0.0 → 0개 (빈 문자열은 yes·no 어느 것과도 불일치)`;
+  })();
+
+  /* 모의 VQA 탐색기 */
+  const VQ = [
+    { id: "c1", q: "is this a chest x-ray?", t: "Closed", truth: it => it.cls === "cxr" ? "yes" : "no", kind: "mod" },
+    { id: "c2", q: "is this an mri?", t: "Closed", truth: it => it.cls === "bmr" ? "yes" : "no", kind: "mod" },
+    { id: "c3", q: "is there a pleural effusion?", t: "Closed", truth: it => it.f === "effusion" ? "yes" : "no", kind: "find" },
+    { id: "c4", q: "is the heart enlarged?", t: "Closed", truth: it => it.f === "cardiomegaly" ? "yes" : "no", kind: "find" },
+    { id: "c5", q: "is there evidence of hemorrhage?", t: "Closed", truth: it => it.f === "hemorrhage" ? "yes" : "no", kind: "find" },
+    { id: "c6", q: "is the liver visible in the image?", t: "Closed", truth: it => it.cls === "act" ? "yes" : "no", kind: "anat" },
+    { id: "c7", q: "are the kidneys present in this image?", t: "Closed", truth: it => it.cls === "act" ? "yes" : "no", kind: "anat" },
+    { id: "o1", q: "what organ is shown?", t: "Open", truth: it => CLS[it.cls].organ, kind: "organ" },
+    { id: "o2", q: "what imaging modality is this?", t: "Open", truth: it => CLS[it.cls].modal, kind: "modal" }
+  ];
+  function mockBase(it, Q) {
+    const r = mulberry32(fnv("vqa" + it.id + Q.id))(), tr = Q.truth(it), flip = a => a === "yes" ? "no" : "yes";
+    if (Q.kind === "mod") return tr;
+    if (Q.kind === "anat") return r < 0.7 ? tr : flip(tr);
+    if (Q.kind === "find") return r < 0.55 ? "yes" : "no";
+    if (Q.kind === "organ") return it.cls === "cxr" ? (r < 0.5 ? "chest" : r < 0.8 ? "lungs" : "stomach") : CLS[it.cls].o === "head" ? (r < 0.7 ? "brain" : "head") : (r < 0.4 ? "stomach" : r < 0.7 ? "liver" : "abdomen");
+    return { cxr: r < 0.8 ? "x-ray" : "ct", bct: r < 0.6 ? "ct" : "mri", bmr: r < 0.6 ? "mri" : "ct", act: r < 0.8 ? "ct" : "x-ray" }[it.cls];
+  }
+  $("vqImg").innerHTML = GAL.map((it, i) => `<option value="${i}">${it.id} · ${CLS[it.cls].ko} · ${FKO[it.f]}</option>`).join("");
+  $("vqQ").innerHTML = `<optgroup label="Closed (yes / no)">${VQ.filter(q => q.t === "Closed").map(q => `<option value="${q.id}">${q.q}</option>`).join("")}</optgroup><optgroup label="Open">${VQ.filter(q => q.t === "Open").map(q => `<option value="${q.id}">${q.q}</option>`).join("")}</optgroup>`;
+  function vqRender() {
+    const it = GAL[+$("vqImg").value], Q = VQ.find(q => q.id === $("vqQ").value), tr = Q.truth(it), b = mockBase(it, Q);
+    paintTo($("vqCv"), it);
+    $("vqOut").innerHTML = `<thead><tr><th>항목</th><th>값</th><th>판정</th></tr></thead><tbody><tr><td>질문 (${Q.t})</td><td class="mm-code-inline">${esc(Q.q)}</td><td></td></tr><tr><td>정답 (모의 라벨)</td><td>${shw(tr)}</td><td></td></tr><tr><td>일반 BLIP VQA <span class="mm-mock">모의 출력</span></td><td>${shw(b)}</td><td>${mark(em_(b, tr))}</td></tr><tr><td>Fine-Tuning <span class="mm-nb">노트북 관찰 재현</span></td><td>${shw("")}</td><td>${mark(false)}</td></tr></tbody>`;
+    $("vqNote").innerHTML = Q.kind === "find" ? "소견 질문은 영상의 미세한 차이를 봐야 해서, 일반 VQA 모형은 사실상 찍기에 가까운 답을 냅니다(모의 출력은 이 경향을 재현)." :
+      Q.kind === "organ" ? "Open 질문은 표현이 조금만 달라도(lungs vs chest) 정확 일치 판정에서 틀린 것으로 셉니다. 노트북에서도 test[0] 영상의 장기를 'stomach'라고 답했습니다." :
+      Q.kind === "modal" ? "영상 종류는 전체 모양이 확연히 달라 비교적 잘 맞힙니다. 그래도 정확 일치는 'x-ray'와 'xray'를 다르게 셉니다." : "영상 종류·해부 구조처럼 전체 모양으로 판단할 수 있는 질문은 상대적으로 잘 맞힙니다.";
+    codeBlock("vqCode", `from transformers import BlipProcessor, BlipForQuestionAnswering
+
+vqa_name = 'Salesforce/blip-vqa-base'
+vqa_proc = BlipProcessor.from_pretrained(vqa_name)
+vqa_model = BlipForQuestionAnswering.from_pretrained(vqa_name)
+ft_model = BlipForQuestionAnswering.from_pretrained('ayyuce/blip-vqa-rad')  # 전처리기는 원본 재사용
+
+def vqa_answer(img, question, model, processor):
+    inputs = processor(images=img.convert('RGB'), text=question, return_tensors='pt')
+    with torch.no_grad():
+        outputs = model.generate(**inputs, max_new_tokens=20)
+    return processor.decode(outputs[0], skip_special_tokens=True)
+
+print(vqa_answer(img, '${Q.q}', vqa_model, vqa_proc))
+print(repr(vqa_answer(img, '${Q.q}', ft_model, vqa_proc)))   # 빈 문자열인지 repr로 확인`);
+  }
+  $("vqImg").addEventListener("change", vqRender); $("vqQ").addEventListener("change", vqRender);
+
+  /* =============================================================
+     7. 체크리스트 · 복사
+     ============================================================= */
+  function ckCount() { const c = $$("#ckList input"), n = c.filter(x => x.checked).length; $("ckCount").textContent = `${n} / ${c.length} 확인`; }
+  $("ckList").addEventListener("change", ckCount); ckCount();
+  $$("[data-copy]").forEach(b => b.addEventListener("click", () => {
+    const t = $(b.dataset.copy).textContent, done = () => { b.textContent = "복사됨"; setTimeout(() => { b.textContent = "복사"; }, 1200); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, () => {}); else done();
+  }));
+
+  /* =============================================================
+     탭 · 다시 그리기
+     ============================================================= */
+  const onShow = { d: emDraw, e: () => { rtRender(); }, f: () => { capRender(); ntRender(); vqRender(); } };
+  const tabs = [...document.querySelectorAll(".sk-tab")];
+  let curTab = "a";
+  function show(t) {
+    tabs.forEach(b => { const on = b === t; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1; document.getElementById(b.getAttribute("aria-controls")).hidden = !on; });
+    history.replaceState(null, "", "#" + t.id.replace("tab-", ""));
+    curTab = t.id.slice(4); if (onShow[curTab]) onShow[curTab]();
+  }
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => show(b));
+    b.addEventListener("keydown", e => { const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return; const n = tabs[(i + d + tabs.length) % tabs.length]; show(n); n.focus(); e.preventDefault(); });
+  });
+  capRender(); ntRender(); vqRender(); rtRender();
+  const start = document.getElementById("tab-" + location.hash.slice(1)); if (start) show(start);
+  function redraw() { if (curTab === "d") emDraw(); if (curTab === "e") rtStrip(); }
+  new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", redraw);
+  let rz = 0; window.addEventListener("resize", () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(redraw); });
+})();
+</script>
+</body>
+</html>

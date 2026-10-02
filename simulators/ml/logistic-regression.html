@@ -8,8 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
-<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 /* 역할 색: 클래스 0 파랑 · 클래스 1 주황 · 모델(시그모이드·경계·경로) 보라 · 한계(선형회귀·오분류) 빨강 · 최적점 초록 · 검증 청록 */
@@ -113,6 +114,8 @@
       <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -140,6 +143,7 @@
     <button type="button" class="sk-tab" role="tab" id="tab-2d" aria-controls="pane-2d" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>2차원 결정 경계</button>
     <button type="button" class="sk-tab" role="tab" id="tab-roc" aria-controls="pane-roc" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>임계값과 ROC</button>
     <button type="button" class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>코드</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>알고리즘 구성도</button>
   </nav>
 
   <!-- ================= 1. 왜 S자인가 ================= -->
@@ -362,6 +366,11 @@ x가 1 늘면  z는 b₁ 늘고  오즈는 e<sup>b₁</sup>배</div>
       <p class="sk-note">맨 아래 주석은 이 페이지가 같은 데이터로 계산한 값입니다. scikit-learn의 기본 최적화(lbfgs)는 허용오차가 있어 소수 셋째~넷째 자리에서 조금 다를 수 있습니다.</p>
     </div>
   </section>
+
+  <!-- ================= 알고리즘 구성도 ================= -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">시그모이드 · 로그손실 · 결정 경계와 ROC 3장 · 강의용 도식</span></div><div data-ds-diagrams="logistic-regression"></div></section>
+  </section>
 </main>
 
 <!-- ===== 공통 푸터 ===== -->
@@ -378,7 +387,9 @@ x가 1 늘면  z는 b₁ 늘고  오즈는 e<sup>b₁</sup>배</div>
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/logistic-regression.js?v=20261002c"></script>
 <!-- TensorFlow.js가 필요하면 아래 줄의 주석을 풉니다 (공용 파일, 약 1.4MB) -->
 <!-- <script src="../../assets/vendor/tf.min.js"></script> -->
 <script>
@@ -469,7 +480,7 @@ function svgPut(host,F,body,extraCls){host.innerHTML=`<svg viewBox="0 0 ${F.W} $
 function svgPoint(svg,F,e){const r=svg.getBoundingClientRect();return[(e.clientX-r.left)*F.W/r.width,(e.clientY-r.top)*F.H/r.height];}
 
 /* ================= 탭 ================= */
-const TABS=["sig","loss","2d","roc","code"];let curTab="sig";
+const TABS=["sig","loss","2d","roc","code","diagram"];let curTab="sig";
 const onShow={};
 function showTab(k,focus){
   if(!TABS.includes(k))k="sig";

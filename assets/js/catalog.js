@@ -5,7 +5,7 @@
      1) templates/simulator-template.html 을 복사해
         simulators/<분류 폴더>/<파일명>.html 로 저장하고 내용을 채웁니다.
      2) 아래 SIMULATORS 배열에 항목 하나를 추가합니다.
-        - category : "ml" | "nn" | "cv" | "nlp" | "ts"  (CATEGORIES의 id)
+        - category : "ml" | "nn" | "cv" | "nlp" | "ts" | "mm"  (CATEGORIES의 id)
         - href     : index.html 기준 상대 경로
         - title / summary / tags : 카드에 보이는 글
         - requires : (선택) TensorFlow.js를 쓰면 "tfjs"
@@ -22,7 +22,9 @@ window.DS_CATEGORIES = [
   { id: "nlp", label: "자연어처리",  en: "NLP", folder: "simulators/nlp/",
     blurb: "토픽 모델링, Seq2Seq, Attention, 트랜스포머까지 문장을 다루는 모델을 한 단계씩 풀어 봅니다." },
   { id: "ts",  label: "시계열 분석", en: "Time Series", folder: "simulators/ts/",
-    blurb: "추세·계절성 분해부터 ETS·ARIMA·Prophet, 롤링 예측까지 시간 순서가 있는 데이터를 예측하는 과정을 따라갑니다." }
+    blurb: "추세·계절성 분해부터 ETS·ARIMA·Prophet, 롤링 예측까지 시간 순서가 있는 데이터를 예측하는 과정을 따라갑니다." },
+  { id: "mm",  label: "멀티모달", en: "Multi-Modal", folder: "simulators/mm/",
+    blurb: "영상과 문장, 영상과 시간축을 함께 다루는 실제 사례(Case Study)를 모형 구조도와 함께 단계별로 따라갑니다." }
 ];
 
 window.DS_SIMULATORS = [
@@ -315,5 +317,43 @@ window.DS_SIMULATORS = [
     summary: "응급실 일별 내원 수를 추세·변화점, 푸리에 계절성, 명절 효과로 나눠 하나씩 쌓아 보고, 예측 구간과 교차검증·하이퍼파라미터 튜닝까지 확인합니다.",
     tags: ["Prophet", "변화점", "푸리에 계절성", "교차검증"],
     glyph: "prophet"
+  },
+
+  /* ---------- 멀티모달 (Case Study) ---------- */
+  {
+    id: "thermal-detection-tracking",
+    category: "mm",
+    href: "simulators/mm/thermal-detection-tracking.html",
+    title: "[Case Study] 열화상 영상 객체 탐지 멀티 모달 시뮬레이터",
+    summary: "드론 열화상에서 방사율·AGC로 영상이 만들어지는 과정을 보고, 열점 후보·IoU·NMS·AP로 사람을 찾은 뒤 칼만+헝가리안 SORT로 추적해 MOTA·IDF1을 계산하고, GSD로 속도를 구해 상황 보고서까지 작성합니다.",
+    tags: ["열화상", "YOLOv8n · 2단계 검출기", "SORT 추적", "GSD · 상황 보고"],
+    glyph: "thermal"
+  },
+  {
+    id: "mri-detection-report",
+    category: "mm",
+    href: "simulators/mm/mri-detection-report.html",
+    title: "[Case Study] MRI 데이터 객체 탐지 및 문장 생성 시뮬레이터",
+    summary: "요추 MRI 추간공 협착 사례로 탐지 박스 → 구조화 소견 → 판독 리포트 흐름을 따라가며, CLIP 대조학습·제로샷·선형 프로빙·검색을 직접 계산하고 템플릿·검색·BLIP 리포트를 같은 지표로 채점합니다.",
+    tags: ["CLIP", "BLIP", "리포트 생성", "요추 MRI"],
+    glyph: "mri"
+  },
+  {
+    id: "tccc-tool-detection",
+    category: "mm",
+    href: "simulators/mm/tccc-tool-detection.html",
+    title: "[Case Study] TCCC 술기 도구 객체 탐지 및 판별 모형 시뮬레이터",
+    summary: "박스 라벨만 있는 응급처치 도구 영상에서 SAM 점·박스 프롬프트로 박스를 마스크로 승격하고, 닫힌/개방형 어휘 VLM으로 이름 없는 클래스를 판별합니다. 자동 라벨링, VQA 환각, 지우기·붙여 넣기 생성과 검증까지 다룹니다.",
+    tags: ["SAM", "개방형 어휘 VLM", "자동 라벨링", "VQA"],
+    glyph: "sam"
+  },
+  {
+    id: "medical-image-retrieval",
+    category: "mm",
+    href: "simulators/mm/medical-image-retrieval.html",
+    title: "[Case Study] 의료 영상 자료 검색 모형 시뮬레이터",
+    summary: "VQA-RAD 방사선 영상으로 CLIP 제로샷 분류, 임베딩 코사인 유사도 기반 텍스트→영상·영상→영상 검색, BLIP 캡셔닝·VQA의 원리와 한계를 직접 조작해 봅니다.",
+    tags: ["CLIP", "이미지 검색", "BLIP VQA", "VQA-RAD"],
+    glyph: "retrieval"
   }
 ];

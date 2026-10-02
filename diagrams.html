@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>알고리즘 구성도 | Machine Learning & AI 모형 시뮬레이터</title>
+<meta name="description" content="시뮬레이터마다 쓰이는 알고리즘의 구성도를 한곳에 모았습니다.">
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="assets/css/diagram.css?v=20261002c">
+<style>
+.dgall { max-width: var(--max); width: 100%; margin: 0 auto; padding: 8px var(--gutter) 56px; }
+.dg-tools { position: sticky; top: 64px; z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 0; margin-bottom: 6px;
+  background: color-mix(in srgb, var(--bg) 92%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+.dg-chipf { appearance: none; font: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 13px; font-weight: 700; }
+.dg-chipf::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--ink)); }
+.dg-chipf[data-f="all"]::before { display: none; }
+.dg-chipf:hover { color: var(--ink); }
+.dg-chipf[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
+.dg-search { margin-left: auto; width: 250px; min-width: 0; font: inherit; font-size: 14px; padding: 7px 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.dg-search::placeholder { color: var(--faint); }
+.dg-chipf:focus-visible, .dg-search:focus-visible, .dg-thumb:focus-visible, .dg-simhead a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.dg-count { font-size: 13px; color: var(--faint); font-weight: 600; }
+
+.dg-cat { padding-top: 28px; }
+.dg-cat > h2 { margin: 0 0 4px; font-size: 22px; display: flex; align-items: center; gap: 10px; }
+.dg-cat > h2::before { content: ""; width: 4px; height: 20px; border-radius: 2px; background: var(--c); }
+.dg-cat > p { margin: 0 0 8px; color: var(--muted); font-size: 14px; }
+.dg-sim { padding: 16px 0 6px; border-top: 1px dashed var(--line); margin-top: 12px; scroll-margin-top: 130px; }
+.dg-sim.is-target { animation: dgflash 1.6s ease-out; border-radius: 10px; }
+@keyframes dgflash { 0% { background: color-mix(in srgb, var(--c) 18%, transparent); } 100% { background: transparent; } }
+.dg-simhead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; margin-bottom: 10px; }
+.dg-simhead h3 { margin: 0; font-size: 17px; }
+.dg-simhead a { font-size: 13px; font-weight: 700; color: var(--c); text-decoration: none; white-space: nowrap; }
+.dg-simhead a:hover { text-decoration: underline; }
+.dg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; list-style: none; margin: 0; padding: 0; }
+.dg-thumb { appearance: none; font: inherit; text-align: left; cursor: zoom-in; width: 100%; padding: 0; display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; color: var(--ink); transition: box-shadow .15s, transform .15s, border-color .15s; }
+.dg-thumb:hover { box-shadow: var(--shadow-lift); transform: translateY(-2px); border-color: color-mix(in srgb, var(--c) 45%, var(--line)); }
+.dg-thumb__art { border-bottom: 1px solid var(--line); background: var(--dg-bg); pointer-events: none; }
+.dg-thumb__cap { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 3px; }
+.dg-thumb__cap b { font-size: 14px; line-height: 1.4; }
+.dg-thumb__cap span { font-size: 12px; color: var(--muted); }
+.dg-missing { padding: 18px; border: 1.5px dashed var(--line-strong); border-radius: 12px; color: var(--muted); font-size: 14px; }
+.dg-none { padding: 40px; text-align: center; color: var(--muted); }
+
+/* 크게 보기 */
+.dg-lb { position: fixed; inset: 0; z-index: 100; background: color-mix(in srgb, #000 72%, transparent); display: flex; flex-direction: column; }
+.dg-lb[hidden] { display: none; }
+.dg-lb__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.dg-lb__t { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.dg-lb__t b { font-size: 15px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dg-lb__t span { font-size: 12px; color: var(--muted); }
+.dg-lb__tools { display: flex; flex-wrap: wrap; gap: 6px; }
+.dg-lb__stage { flex: 1; min-height: 0; display: grid; place-items: center; padding: 16px; overflow: auto; }
+.dg-lb__stage svg.dg-svg { width: min(100%, calc((100vh - 120px) * 16 / 9)); border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,.35); }
+@media (max-width: 760px) {
+  .dg-tools { top: 0; position: static; }
+  .dg-search { width: 100%; margin-left: 0; }
+  .dg-grid { grid-template-columns: minmax(0, 1fr); }
+  .dg-lb__stage { place-items: start; }
+  .dg-lb__stage svg.dg-svg { width: 900px; max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) { .dg-thumb { transition: none; } .dg-thumb:hover { transform: none; } .dg-sim.is-target { animation: none; } }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="index.html" aria-label="메인으로">
+      <img class="ds-brand__logo ds-brand__logo--light" src="image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+      <a href="index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="diagrams.html" aria-current="page">알고리즘 구성도</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치"><a href="index.html">홈</a><span aria-hidden="true">›</span><span>알고리즘 구성도</span></nav>
+  <h1 class="ds-hero__title">알고리즘 구성도</h1>
+  <p class="ds-hero__lede">시뮬레이터마다 쓰이는 알고리즘의 구조와 계산 흐름을 강의 도식 양식으로 정리했습니다. 도식을 누르면 크게 볼 수 있고, PNG로 저장해 수업 자료에 바로 쓸 수 있습니다.</p>
+</section>
+
+<main class="dgall" id="main">
+  <div class="dg-tools">
+    <div id="dgChips" style="display:contents"></div>
+    <span class="dg-count" id="dgCount" aria-live="polite"></span>
+    <input class="dg-search" id="dgSearch" type="search" placeholder="알고리즘·키워드 검색" aria-label="구성도 검색">
+  </div>
+  <div id="dgBody"><p class="dg-none">구성도를 불러오는 중입니다…</p></div>
+</main>
+
+<div class="dg-lb" id="dgLb" hidden role="dialog" aria-modal="true" aria-labelledby="dgLbTitle">
+  <div class="dg-lb__bar">
+    <div class="dg-lb__t"><b id="dgLbTitle"></b><span id="dgLbSub"></span></div>
+    <div class="dg-lb__tools">
+      <button type="button" class="dgv__btn" data-lb="prev" aria-label="이전 구성도"></button>
+      <button type="button" class="dgv__btn" data-lb="next" aria-label="다음 구성도"></button>
+      <a class="dgv__btn" id="dgLbSim" href="#">시뮬레이터 열기</a>
+      <button type="button" class="dgv__btn" data-lb="png"></button>
+      <button type="button" class="dgv__btn" data-lb="close" aria-label="닫기">닫기 (Esc)</button>
+    </div>
+  </div>
+  <div class="dg-lb__stage" id="dgLbStage"></div>
+</div>
+
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="assets/js/catalog.js?v=20261002c"></script>
+<script src="assets/js/site.js?v=20261002c"></script>
+<script src="assets/js/diagram-kit.js?v=20261002c"></script>
+<script>
+(function () {
+  var V = "20261002c";
+  var CATS = window.DS_CATEGORIES, SIMS = window.DS_SIMULATORS, D = window.DSDiagram;
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  var body = document.getElementById("dgBody"), chips = document.getElementById("dgChips"), search = document.getElementById("dgSearch"), count = document.getElementById("dgCount");
+  var lb = document.getElementById("dgLb"), lbStage = document.getElementById("dgLbStage");
+  lb.querySelector('[data-lb="prev"]').innerHTML = D.ICON.prev;
+  lb.querySelector('[data-lb="next"]').innerHTML = D.ICON.next;
+  lb.querySelector('[data-lb="png"]').innerHTML = D.ICON.png + "PNG 저장";
+
+  /* 도식 파일 불러오기 (file:// 에서도 되도록 script 태그) */
+  function load(src) {
+    return new Promise(function (res) { var s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = res; document.head.appendChild(s); });
+  }
+  Promise.all(SIMS.map(function (s) { return load("assets/diagrams/" + s.id + ".js?v=" + V); })).then(build);
+
+  var curCat = "all", flat = [], lbIndex = 0;
+  function build() {
+    var catOf = {}; CATS.forEach(function (c) { catOf[c.id] = c; });
+    chips.innerHTML = '<button type="button" class="dg-chipf" data-f="all" aria-pressed="true">전체</button>' +
+      CATS.map(function (c) { return '<button type="button" class="dg-chipf" data-f="' + c.id + '" aria-pressed="false" style="--c:var(--cat-' + c.id + ')">' + esc(c.label) + "</button>"; }).join("");
+    draw();
+    var h = decodeURIComponent((location.hash || "").slice(1));
+    if (h) {
+      var el = document.getElementById("sim-" + h);
+      if (el) { el.scrollIntoView({ block: "start" }); el.classList.add("is-target"); }
+    }
+  }
+  function norm(t) { return String(t || "").toLowerCase().replace(/\s+/g, ""); }
+  function draw() {
+    var q = norm(search.value), html = "", total = 0;
+    flat = [];
+    CATS.forEach(function (c) {
+      if (curCat !== "all" && curCat !== c.id) return;
+      var sec = "";
+      SIMS.filter(function (s) { return s.category === c.id; }).forEach(function (s) {
+        var defs = D.forSim(s.id);
+        var hay = norm([s.title, (s.tags || []).join(" "), c.label].concat(defs.map(function (d) { return d.title + " " + (d.sub || ""); })).join(" "));
+        if (q && hay.indexOf(q) < 0) return;
+        sec += '<div class="dg-sim" id="sim-' + esc(s.id) + '" style="--c:var(--cat-' + c.id + ')">' +
+          '<div class="dg-simhead"><h3>' + esc(s.title) + '</h3><a href="' + esc(s.href) + '">시뮬레이터 열기 →</a></div>';
+        if (!defs.length) sec += '<div class="dg-missing">구성도 준비 중입니다.</div>';
+        else {
+          sec += '<ul class="dg-grid">';
+          defs.forEach(function (d) {
+            var i = flat.length; flat.push({ def: d, sim: s }); total++;
+            sec += '<li><button type="button" class="dg-thumb" data-i="' + i + '" style="--c:var(--cat-' + c.id + ')" aria-label="' + esc(d.title) + ' 크게 보기">' +
+              '<div class="dg-thumb__art">' + D.render(d) + '</div>' +
+              '<div class="dg-thumb__cap"><b>' + esc(d.title) + '</b><span>' + esc(d.label || "") + '</span></div></button></li>';
+          });
+          sec += "</ul>";
+        }
+        sec += "</div>";
+      });
+      if (sec) html += '<section class="dg-cat" style="--c:var(--cat-' + c.id + ')"><h2>' + esc(c.label) + '</h2><p>' + esc(c.blurb) + "</p>" + sec + "</section>";
+    });
+    body.innerHTML = html || '<p class="dg-none">조건에 맞는 구성도가 없습니다.</p>';
+    count.textContent = "구성도 " + total + "장";
+  }
+  chips.addEventListener("click", function (e) {
+    var b = e.target.closest(".dg-chipf"); if (!b) return;
+    curCat = b.getAttribute("data-f");
+    chips.querySelectorAll(".dg-chipf").forEach(function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+    draw();
+  });
+  search.addEventListener("input", draw);
+
+  /* 크게 보기 */
+  var lastFocus = null;
+  function openLb(i) {
+    if (!flat.length) return;
+    lbIndex = (i + flat.length) % flat.length;
+    var it = flat[lbIndex];
+    lbStage.innerHTML = D.render(it.def);
+    document.getElementById("dgLbTitle").textContent = it.def.title;
+    document.getElementById("dgLbSub").textContent = it.sim.title + " · " + (lbIndex + 1) + " / " + flat.length;
+    document.getElementById("dgLbSim").setAttribute("href", it.sim.href);
+    if (lb.hidden) { lastFocus = document.activeElement; lb.hidden = false; document.body.style.overflow = "hidden"; lb.querySelector('[data-lb="close"]').focus(); }
+  }
+  function closeLb() { lb.hidden = true; document.body.style.overflow = ""; if (lastFocus) lastFocus.focus(); }
+  body.addEventListener("click", function (e) { var t = e.target.closest(".dg-thumb"); if (t) openLb(+t.getAttribute("data-i")); });
+  lb.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-lb]");
+    if (!b) { if (e.target === lb || e.target === lbStage) closeLb(); return; }
+    var a = b.getAttribute("data-lb");
+    if (a === "prev") openLb(lbIndex - 1); else if (a === "next") openLb(lbIndex + 1);
+    else if (a === "close") closeLb(); else if (a === "png") D.savePng(lbStage.querySelector("svg"), flat[lbIndex].def.id);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (lb.hidden) return;
+    if (e.key === "Escape") closeLb();
+    else if (e.key === "ArrowRight") openLb(lbIndex + 1);
+    else if (e.key === "ArrowLeft") openLb(lbIndex - 1);
+  });
+})();
+</script>
+</body>
+</html>

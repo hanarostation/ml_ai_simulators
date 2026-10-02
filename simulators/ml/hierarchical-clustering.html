@@ -8,8 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
-<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
 <style>
 /* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
 /* 역할 색: 군집 색 10가지(--k1~--k10) · 갱신된 행 청록 · 역전·이상 빨강 · 최적 초록 */
@@ -168,6 +169,8 @@
       <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
       <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
       <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -206,6 +209,7 @@
     <button type="button" class="sk-tab" role="tab" id="tab-diana" aria-controls="pane-diana" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>DIANA 분할</button>
     <button type="button" class="sk-tab" role="tab" id="tab-scale" aria-controls="pane-scale" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>거리와 스케일</button>
     <button type="button" class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>코드</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>알고리즘 구성도</button>
   </nav>
 
   <!-- ================= 1. 병합 과정 ================= -->
@@ -398,6 +402,10 @@
       <pre class="sk-formula hc-code" id="codePre"></pre>
     </div>
   </section>
+  <!-- ================= 7. 알고리즘 구성도 ================= -->
+  <section class="hc-pane" id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">강의용 도식 · 병합 과정 · 연결법 5가지 · DIANA</span></div><div data-ds-diagrams="hierarchical-clustering"></div></section>
+  </section>
 </main>
 
 <!-- ===== 공통 푸터 ===== -->
@@ -414,7 +422,9 @@
   </div>
 </footer>
 
-<script src="../../assets/js/site.js?v=20261002a"></script>
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/hierarchical-clustering.js?v=20261002c"></script>
 <script>
 (function () {
 "use strict";
@@ -513,7 +523,7 @@ const AL={
 };
 const MET={euclid:{name:"유클리드",sp:"euclidean",sk:"euclidean"},manhattan:{name:"맨해튼",sp:"cityblock",sk:"manhattan"},cosine:{name:"코사인",sp:"cosine",sk:"cosine"}};
 const SCL={none:{name:"스케일링 없음",short:"없음"},std:{name:"표준화",short:"표준화"},minmax:{name:"Min-Max",short:"Min-Max"}};
-const TABS=["merge","cut","compare","diana","scale","code"];
+const TABS=["merge","cut","compare","diana","scale","code","diagram"];
 const DEF={main:{preset:"blobs3",n:10,seed:1},cmp:{preset:"bands",n:36,seed:1},scl:{preset:"strata",n:30,seed:3}};
 const S={algo:"single",tab:"merge",metric:"euclid",scale:"std",data:{},
   m:{step:3}, cut:{mode:"k",k:3,t:0,sel:null}, cmpK:2, sclK:2, dv:{pos:0}, xN:2, codeData:true};
@@ -1362,9 +1372,9 @@ function renderCode(){
 }
 
 /* ================================================================== 탭 · 알고리즘 · 해시 */
-const RENDER={merge:renderMerge,cut:renderCut,compare:renderCompare,diana:renderDiana,scale:renderScale,code:renderCode};
-function render(){ setChip(); renderAlgoNote(); RENDER[S.tab](); if(S.tab!=="code") renderCode(); }
-function writeHash(){ history.replaceState(null,"","#"+S.algo+(S.tab==="merge"?"":"-"+S.tab)); }
+const RENDER={merge:renderMerge,cut:renderCut,compare:renderCompare,diana:renderDiana,scale:renderScale,code:renderCode,diagram:()=>{}};
+function render(){ setChip(); renderAlgoNote(); RENDER[S.tab](); if(S.tab!=="code"&&S.tab!=="diagram") renderCode(); }
+function writeHash(){ history.replaceState(null,"","#"+(S.tab==="diagram"?"diagram":S.algo+(S.tab==="merge"?"":"-"+S.tab))); }
 function syncAlgo(){ document.querySelectorAll("#algoSeg button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.a===S.algo)); }
 function setAlgo(a,write){ stopPlay(); S.algo=a; syncAlgo(); if(write!==false) writeHash(); render(); }
 function showTab(t,write){
@@ -1379,7 +1389,9 @@ const algoBtns=[...document.querySelectorAll("#algoSeg button")];
 algoBtns.forEach((b,i)=>{ b.addEventListener("click",()=>setAlgo(b.dataset.a));
   b.addEventListener("keydown",e=>{ const d=e.key==="ArrowRight"?1:e.key==="ArrowLeft"?-1:0; if(!d) return; const n=algoBtns[(i+d+algoBtns.length)%algoBtns.length]; setAlgo(n.dataset.a); n.focus(); e.preventDefault(); }); });
 function readHash(){
-  const [a,t]=location.hash.slice(1).split("-");
+  const h=location.hash.slice(1);
+  if(h==="diagram"){ syncAlgo(); showTab("diagram",false); return; }
+  const [a,t]=h.split("-");
   S.algo=ALGOS.includes(a)?a:"single"; S.tab=TABS.includes(t)?t:"merge"; syncAlgo(); showTab(S.tab,false);
 }
 window.addEventListener("hashchange",readHash);

@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="assets/css/site.css?v=20261002a">
+<link rel="stylesheet" href="assets/css/site.css?v=20261002c">
 <style>
 /* ---------- 메인 페이지 전용 ---------- */
 .home { max-width: var(--max); width: 100%; margin: 0 auto; padding: 0 var(--gutter) 56px; }
@@ -25,7 +25,7 @@
 .stat span { font-size: 13px; color: var(--muted); font-weight: 600; }
 
 /* 탭 */
-.tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; padding: 6px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; }
+.tabs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; padding: 6px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; }
 .tab {
   appearance: none; font: inherit; cursor: pointer; border: 1px solid transparent; background: transparent; color: var(--muted);
   border-radius: 10px; padding: 11px 14px; display: flex; align-items: center; justify-content: center; gap: 9px;
@@ -81,7 +81,62 @@
 .empty b { color: var(--ink); font-size: 17px; }
 .empty p { margin: 0; font-size: 14px; max-width: 52ch; }
 
-@media (max-width: 1180px) { .tab .en { display: none; } }
+/* 전체 시뮬레이터 표 */
+.overview { margin-top: 56px; padding-top: 32px; border-top: 1px solid var(--line); }
+.overview__head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; margin-bottom: 14px; }
+.overview__head h2 { margin: 0; font-size: 22px; display: flex; align-items: center; gap: 10px; }
+.overview__head h2::before { content: ""; width: 4px; height: 20px; border-radius: 2px; background: var(--ink); }
+.overview__head p { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+.ov-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.ov-chip { appearance: none; font: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 13px; font-weight: 700; }
+.ov-chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--ink)); }
+.ov-chip:hover { color: var(--ink); }
+.ov-chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
+.ov-chip[data-ov="all"]::before { display: none; }
+.ov-chip:focus-visible, .ov-search:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.ov-search { margin-left: auto; min-width: 0; width: 240px; font: inherit; font-size: 14px; padding: 7px 12px; border-radius: 9px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.ov-search::placeholder { color: var(--faint); }
+.ov-wrap { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.ov-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.ov-table th { text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .02em; background: var(--surface-2);
+  padding: 10px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.ov-table td { padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--text); }
+.ov-table tbody tr:last-child td { border-bottom: 0; }
+.ov-table tbody tr:hover td { background: color-mix(in srgb, var(--c) 5%, var(--surface)); }
+.ov-no { font-family: var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; width: 48px; }
+.ov-cat { white-space: nowrap; font-weight: 700; color: var(--c); }
+.ov-cat::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin-right: 7px; vertical-align: 1px; }
+.ov-name a { color: var(--ink); font-weight: 700; text-decoration: none; }
+.ov-name a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.ov-name a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
+.ov-sum { color: var(--muted); font-size: 13px; line-height: 1.55; margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.ov-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.ov-tags span { font-size: 12px; font-weight: 600; color: var(--muted); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+.ov-run { white-space: nowrap; font-size: 12px; font-weight: 700; color: var(--faint); }
+.ov-empty { padding: 28px; text-align: center; color: var(--muted); }
+.ov-dg { white-space: nowrap; }
+.ov-dg a { font-size: 13px; font-weight: 700; color: var(--c); text-decoration: none; }
+.ov-dg a:hover { text-decoration: underline; }
+.ov-dg a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
+.ov-count { font-size: 13px; color: var(--faint); font-weight: 600; }
+@media (max-width: 1000px) { .ov-col-sum { display: none; } }
+@media (max-width: 760px) {
+  .ov-search { width: 100%; margin-left: 0; }
+  .ov-table thead { display: none; }
+  .ov-table, .ov-table tbody, .ov-table tr, .ov-table td { display: block; width: 100%; }
+  .ov-table tr { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .ov-table tbody tr:last-child { border-bottom: 0; }
+  .ov-table td { padding: 0; border: 0; }
+  .ov-table td + td { margin-top: 6px; }
+  .ov-sum { -webkit-line-clamp: 2; }
+  .ov-no { display: none !important; }
+  .ov-run { display: none !important; }
+  .ov-dg { margin-top: 8px !important; }
+}
+
+@media (max-width: 1500px) { .tab .en { display: none; } }
 @media (max-width: 900px) {
   .intro { grid-template-columns: minmax(0, 1fr); padding-top: 32px; }
   .intro__title { font-size: 32px; }
@@ -90,6 +145,7 @@
 @media (max-width: 520px) {
   .intro__title { font-size: 27px; }
   .intro__stats .stat { flex: 1; min-width: 0; }
+  .tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tab { padding: 10px 8px; font-size: 14px; }
   .tab .en { display: none; }
   .cards { grid-template-columns: minmax(0, 1fr); }
@@ -116,6 +172,8 @@
       <a href="#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
       <a href="#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
       <a href="#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a class="ds-nav__dg" href="diagrams.html">알고리즘 구성도</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -130,12 +188,32 @@
     </div>
     <div class="intro__stats" aria-label="요약">
       <div class="stat"><b id="statSims">0</b><span>시뮬레이터</span></div>
-      <div class="stat"><b id="statCats">5</b><span>분야</span></div>
+      <div class="stat"><b id="statCats">6</b><span>분야</span></div>
     </div>
   </section>
 
   <div class="tabs" role="tablist" aria-label="시뮬레이터 분류" id="tabs"></div>
   <div id="panels"></div>
+
+  <section class="overview" aria-labelledby="ovTitle">
+    <div class="overview__head">
+      <div>
+        <h2 id="ovTitle">전체 시뮬레이터 한눈에 보기</h2>
+        <p>모든 분야의 시뮬레이터를 한 표로 정리했습니다. 분류를 고르거나 검색어를 넣어 좁혀 보세요.</p>
+      </div>
+      <span class="ov-count" id="ovCount" aria-live="polite"></span>
+    </div>
+    <div class="ov-tools">
+      <div id="ovChips" style="display:contents"></div>
+      <input class="ov-search" id="ovSearch" type="search" placeholder="모형·키워드 검색 (예: CLIP, 경사하강법)" aria-label="시뮬레이터 검색">
+    </div>
+    <div class="ov-wrap">
+      <table class="ov-table">
+        <thead><tr><th class="ov-no">번호</th><th>분류</th><th>시뮬레이터</th><th class="ov-col-sum">핵심 키워드</th><th class="ov-run">실행</th><th class="ov-dg">구성도</th></tr></thead>
+        <tbody id="ovBody"></tbody>
+      </table>
+    </div>
+  </section>
 </main>
 
 <footer class="ds-footer">
@@ -151,8 +229,8 @@
   </div>
 </footer>
 
-<script src="assets/js/catalog.js?v=20261002a"></script>
-<script src="assets/js/site.js?v=20261002a"></script>
+<script src="assets/js/catalog.js?v=20261002c"></script>
+<script src="assets/js/site.js?v=20261002c"></script>
 <script>
 (function () {
   var CATS = window.DS_CATEGORIES, SIMS = window.DS_SIMULATORS;
@@ -337,6 +415,39 @@
       '<path d="M16 76 L70 62 L176 30" stroke="currentColor" stroke-width="2.6"/><path d="M70 14V90" stroke="var(--cat-ml)" stroke-width="1.4" stroke-dasharray="3 3"/>' +
       '<path d="M16 46 C 24 34, 32 34, 40 46 S 56 58, 64 46 S 80 34, 88 46 S 104 58, 112 46 S 128 34, 136 46 S 152 58, 160 46 S 172 38, 176 42" stroke="var(--cat-nn)" stroke-width="1.8" opacity=".85"/>' +
       [44, 124].map(function (x) { return '<rect x="' + x + '" y="72" width="8" height="18" rx="2" fill="var(--cat-ml)" opacity=".8"/>'; }).join("") + '</svg>',
+    thermal: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      '<rect x="12" y="14" width="110" height="72" rx="6" fill="currentColor" opacity=".14"/>' +
+      '<circle cx="44" cy="50" r="14" fill="currentColor" opacity=".35"/><circle cx="44" cy="50" r="7" fill="currentColor" opacity=".85"/>' +
+      '<circle cx="90" cy="38" r="10" fill="currentColor" opacity=".3"/><circle cx="90" cy="38" r="5" fill="currentColor" opacity=".8"/>' +
+      '<rect x="28" y="33" width="32" height="34" rx="2" stroke="currentColor" stroke-width="2"/><rect x="78" y="25" width="24" height="26" rx="2" stroke="currentColor" stroke-width="2"/>' +
+      '<path d="M134 74 C146 66 150 50 160 44 S176 30 180 22" stroke="var(--cat-ts)" stroke-width="2.5" stroke-dasharray="4 4"/>' +
+      '<circle cx="134" cy="74" r="3.5" fill="var(--cat-ts)"/><circle cx="180" cy="22" r="4.5" fill="var(--cat-ts)"/></svg>',
+    mri: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      '<rect x="14" y="10" width="64" height="80" rx="6" fill="currentColor" opacity=".12"/>' +
+      '<rect x="34" y="16" width="26" height="11" rx="3" fill="currentColor" opacity=".55"/><rect x="34" y="31" width="26" height="11" rx="3" fill="currentColor" opacity=".55"/>' +
+      '<rect x="34" y="46" width="26" height="11" rx="3" fill="currentColor" opacity=".55"/><rect x="34" y="61" width="26" height="11" rx="3" fill="currentColor" opacity=".55"/>' +
+      '<rect x="30" y="42" width="34" height="20" rx="2" stroke="currentColor" stroke-width="2"/>' +
+      '<path d="M82 52 H100" stroke="var(--faint)" stroke-width="2"/><path d="M96 47 l5 5 -5 5" stroke="var(--faint)" stroke-width="2"/>' +
+      '<rect x="108" y="22" width="68" height="7" rx="3.5" fill="var(--cat-nlp)" opacity=".75"/><rect x="108" y="36" width="56" height="7" rx="3.5" fill="var(--cat-nlp)" opacity=".55"/>' +
+      '<rect x="108" y="50" width="62" height="7" rx="3.5" fill="var(--cat-nlp)" opacity=".65"/><rect x="108" y="64" width="40" height="7" rx="3.5" fill="var(--cat-nlp)" opacity=".45"/></svg>',
+    sam: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      '<rect x="12" y="12" width="166" height="76" rx="6" fill="currentColor" opacity=".08"/>' +
+      '<path d="M40 30 C70 22 96 34 104 52 C110 66 94 78 70 74 C46 70 28 52 40 30Z" fill="currentColor" opacity=".35" stroke="currentColor" stroke-width="2"/>' +
+      '<rect x="30" y="20" width="84" height="62" rx="2" stroke="var(--faint)" stroke-width="1.6" stroke-dasharray="4 3"/>' +
+      '<circle cx="70" cy="50" r="4.5" fill="var(--cat-ts)"/><circle cx="148" cy="34" r="4.5" fill="var(--cat-ml)"/>' +
+      '<rect x="128" y="54" width="44" height="10" rx="5" fill="var(--cat-nlp)" opacity=".7"/><rect x="128" y="70" width="32" height="8" rx="4" fill="var(--cat-nlp)" opacity=".45"/></svg>',
+    retrieval: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      '<rect x="12" y="38" width="54" height="22" rx="11" fill="var(--cat-nlp)" opacity=".25" stroke="var(--cat-nlp)" stroke-width="1.6"/>' +
+      '<circle cx="28" cy="49" r="5" stroke="var(--cat-nlp)" stroke-width="2"/><path d="M32 53 l4 4" stroke="var(--cat-nlp)" stroke-width="2"/>' +
+      '<path d="M70 49 H88" stroke="var(--faint)" stroke-width="2"/><path d="M84 44 l5 5 -5 5" stroke="var(--faint)" stroke-width="2"/>' +
+      '<rect x="96" y="12" width="24" height="24" rx="4" fill="currentColor" opacity=".8"/><rect x="126" y="12" width="24" height="24" rx="4" fill="currentColor" opacity=".55"/><rect x="156" y="12" width="24" height="24" rx="4" fill="currentColor" opacity=".35"/>' +
+      '<rect x="96" y="44" width="24" height="24" rx="4" fill="currentColor" opacity=".25"/><rect x="126" y="44" width="24" height="24" rx="4" fill="currentColor" opacity=".18"/><rect x="156" y="44" width="24" height="24" rx="4" fill="currentColor" opacity=".12"/>' +
+      '<rect x="96" y="76" width="84" height="6" rx="3" fill="currentColor" opacity=".15"/><rect x="96" y="76" width="58" height="6" rx="3" fill="currentColor" opacity=".6"/></svg>',
+    mm: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      '<rect x="14" y="20" width="56" height="60" rx="6" fill="currentColor" opacity=".18"/><circle cx="42" cy="46" r="12" fill="currentColor" opacity=".55"/><rect x="28" y="64" width="28" height="6" rx="3" fill="currentColor" opacity=".4"/>' +
+      '<rect x="120" y="24" width="56" height="8" rx="4" fill="var(--cat-nlp)" opacity=".7"/><rect x="120" y="40" width="44" height="8" rx="4" fill="var(--cat-nlp)" opacity=".5"/><rect x="120" y="56" width="50" height="8" rx="4" fill="var(--cat-nlp)" opacity=".6"/>' +
+      '<path d="M72 50 H86" stroke="var(--faint)" stroke-width="2"/><path d="M104 50 H118" stroke="var(--faint)" stroke-width="2"/>' +
+      '<circle cx="95" cy="50" r="10" fill="currentColor"/><path d="M90 50h10M95 45v10" stroke="var(--surface)" stroke-width="2"/></svg>',
     cv: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
       (function () { var s = ""; for (var r = 0; r < 5; r++) for (var c = 0; c < 5; c++) s += '<rect x="' + (20 + c * 15) + '" y="' + (13 + r * 15) + '" width="14" height="14" fill="currentColor" opacity="' + (0.1 + ((r * 7 + c * 3) % 9) / 12).toFixed(2) + '"/>'; return s; })() +
       '<rect x="34" y="27" width="44" height="44" stroke="var(--ink)" stroke-width="2"/><path d="M100 50h14" stroke="var(--faint)" stroke-width="2"/>' +
@@ -418,6 +529,48 @@
     document.getElementById("tabs").scrollIntoView({ block: "nearest" });
   });
   select(fromHash());
+
+  /* 전체 시뮬레이터 표 */
+  (function () {
+    var body = document.getElementById("ovBody"), chips = document.getElementById("ovChips"),
+        search = document.getElementById("ovSearch"), count = document.getElementById("ovCount");
+    var catOf = {}; CATS.forEach(function (c) { catOf[c.id] = c; });
+    var ordered = [];
+    CATS.forEach(function (c) { SIMS.forEach(function (s) { if (s.category === c.id) ordered.push(s); }); });
+    var cur = "all";
+    chips.innerHTML = '<button type="button" class="ov-chip" data-ov="all" aria-pressed="true">전체 ' + ordered.length + '</button>' +
+      CATS.map(function (c) {
+        var n = SIMS.filter(function (s) { return s.category === c.id; }).length;
+        return '<button type="button" class="ov-chip" data-ov="' + c.id + '" aria-pressed="false" style="--c:var(--cat-' + c.id + ')">' + esc(c.label) + ' ' + n + '</button>';
+      }).join("");
+    function norm(t) { return String(t || "").toLowerCase().replace(/\s+/g, ""); }
+    function draw() {
+      var q = norm(search.value), n = 0, rows = "";
+      ordered.forEach(function (s, i) {
+        var c = catOf[s.category];
+        if (cur !== "all" && s.category !== cur) return;
+        if (q && norm([s.title, s.summary, (s.tags || []).join(" "), c.label, c.en].join(" ")).indexOf(q) < 0) return;
+        n++;
+        rows += '<tr style="--c:var(--cat-' + c.id + ')">' +
+          '<td class="ov-no">' + String(i + 1).padStart(2, "0") + '</td>' +
+          '<td class="ov-cat">' + esc(c.label) + '</td>' +
+          '<td class="ov-name"><a href="' + esc(s.href) + '" title="' + esc(s.summary) + '">' + esc(s.title) + '</a><div class="ov-sum">' + esc(s.summary) + '</div></td>' +
+          '<td class="ov-col-sum"><div class="ov-tags">' + (s.tags || []).map(function (t) { return '<span>' + esc(t) + '</span>'; }).join("") + '</div></td>' +
+          '<td class="ov-run">' + (s.requires === "tfjs" ? "TensorFlow.js" : "순수 JS") + '</td>' +
+          '<td class="ov-dg"><a href="diagrams.html#' + esc(s.id) + '">구성도 보기</a></td></tr>';
+      });
+      body.innerHTML = rows || '<tr><td colspan="6" class="ov-empty">조건에 맞는 시뮬레이터가 없습니다.</td></tr>';
+      count.textContent = n + " / " + ordered.length + "개";
+    }
+    chips.addEventListener("click", function (e) {
+      var b = e.target.closest(".ov-chip"); if (!b) return;
+      cur = b.getAttribute("data-ov");
+      chips.querySelectorAll(".ov-chip").forEach(function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+      draw();
+    });
+    search.addEventListener("input", draw);
+    draw();
+  })();
 })();
 </script>
 </body>

@@ -1,0 +1,2054 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>[Case Study] TCCC 술기 도구 객체 탐지 및 판별 모형 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002c">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261002c">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 영상 경로(청록) · 프롬프트/문장 경로(파랑) · 결합(자주) · 정답(회색) · 경고(빨강) + 모의 클래스 7종 */
+:root{
+  --sk-accent: var(--cat-mm);
+  --role-img:#0B8478; --role-txt:#2F6FDB; --role-fuse:#AE3EC9; --role-time:#2B8A3E; --role-gt:#6B7280; --role-warn:#D6336C;
+  --role-pos:#2FB344; --role-neg:#E03131; --role-mask:#F59F00; --role-box:#FFD43B;
+  --k0:#E8590C; --k1:#1C7ED6; --k2:#F2F2F2; --k3:#22B8CF; --k4:#FAB005; --k5:#E64980; --k6:#82C91E; --k7:#BE4BDB;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --role-img:#33D1BD; --role-txt:#6C9BF2; --role-fuse:#DA77F2; --role-time:#51CF66; --role-gt:#A0A8B8; --role-warn:#FF6B8B;
+  --role-pos:#51CF66; --role-neg:#FF6B6B; --role-mask:#FFC078; --role-box:#FFE066;
+  --k0:#FF922B; --k1:#4DABF7; --k2:#FFFFFF; --k3:#66D9E8; --k4:#FFD43B; --k5:#F783AC; --k6:#A9E34B; --k7:#DA77F2;
+} }
+:root[data-theme="dark"]{
+  --role-img:#33D1BD; --role-txt:#6C9BF2; --role-fuse:#DA77F2; --role-time:#51CF66; --role-gt:#A0A8B8; --role-warn:#FF6B8B;
+  --role-pos:#51CF66; --role-neg:#FF6B6B; --role-mask:#FFC078; --role-box:#FFE066;
+  --k0:#FF922B; --k1:#4DABF7; --k2:#FFFFFF; --k3:#66D9E8; --k4:#FFD43B; --k5:#F783AC; --k6:#A9E34B; --k7:#DA77F2;
+}
+
+.mm-split{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start}
+.mm-split--even{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:980px){.mm-split,.mm-split--even{grid-template-columns:minmax(0,1fr)}}
+.mm-cv{display:block;width:100%;height:auto;aspect-ratio:16/9;border-radius:10px;background:var(--surface-2);touch-action:none}
+.mm-cv--sq{aspect-ratio:1/1;max-width:340px}
+.mm-cv.crosshair{cursor:crosshair}
+.mm-cv:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.mm-thumbs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.mm-thumb{appearance:none;font:inherit;text-align:left;border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:6px;cursor:pointer;color:var(--ink);display:flex;flex-direction:column;gap:4px;min-width:0}
+.mm-thumb[aria-pressed="true"]{border-color:var(--sk-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--sk-accent) 30%,transparent)}
+.mm-thumb canvas{width:100%;height:auto;aspect-ratio:16/9;border-radius:6px;display:block}
+.mm-thumb span{font-size:12px;color:var(--muted);line-height:1.35;font-family:var(--mono)}
+.mm-thumb b{font-size:12.5px}
+.mm-thumb:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.sk-controls .sk-group{max-width:100%;min-width:0}
+.sk-controls .sk-select{max-width:100%}
+.mm-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.mm-small{font-size:13px;color:var(--muted)}
+.mm-small b{color:var(--ink)}
+.mm-mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.mm-tag{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 7px;border-radius:999px;border:1px solid currentColor;line-height:1.5;white-space:nowrap}
+.mm-tag--mock{color:var(--role-fuse)}
+.mm-tag--nb{color:var(--role-gt)}
+.mm-tag--warn{color:var(--role-warn)}
+.mm-tag--ok{color:var(--role-time)}
+.mm-ok{color:var(--role-time);font-weight:700}
+.mm-bad{color:var(--role-warn);font-weight:700}
+.mm-code{position:relative}
+.mm-code pre{margin:0;font-family:var(--mono);font-size:12.5px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow:auto;max-height:340px;color:var(--ink);white-space:pre}
+.mm-code .sk-btn{position:absolute;top:6px;right:8px}
+.mm-dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.sk-table tr.mm-sel td{box-shadow:inset 0 0 0 9999px color-mix(in srgb,var(--focus) 15%,transparent)}
+.sk-table tbody tr[data-i]{cursor:pointer}
+.sk-table td.mm-bad,.sk-table td.mm-ok{font-family:var(--mono)}
+.mm-tscroll{max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.mm-tscroll .sk-table th{z-index:1}
+.mm-heat td.h{font-family:var(--mono);text-align:center;font-variant-numeric:tabular-nums;min-width:40px}
+.mm-heat th.c{text-align:center}
+.mm-legend-row{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--muted)}
+.mm-kv2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 18px}
+@media (max-width:560px){.mm-kv2{grid-template-columns:minmax(0,1fr)}}
+.mm-big{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--ink)}
+.mm-imgrow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:760px){.mm-imgrow{grid-template-columns:minmax(0,1fr)}.mm-thumbs{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}}
+.mm-cap{font-size:12.5px;color:var(--muted);margin-top:4px}
+.mm-list{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.mm-warns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:900px){.mm-warns{grid-template-columns:minmax(0,1fr)}}
+.mm-warns .sk-note--warn h3{margin:0 0 4px;font-size:15px}
+.mm-warns .sk-note--warn p{margin:0}
+.mm-objbtns{display:flex;flex-wrap:wrap;gap:6px}
+.mm-objbtns .sk-btn[aria-pressed="true"]{background:var(--ink);color:var(--on-ink);border-color:var(--ink)}
+.mm-bars{display:flex;flex-direction:column;gap:5px;font-size:13px}
+.mm-barrow{display:grid;grid-template-columns:200px minmax(0,1fr) 60px;gap:8px;align-items:center}
+@media (max-width:520px){.mm-barrow{grid-template-columns:104px minmax(0,1fr) 56px}}
+.mm-barrow .lab{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.mm-barrow .trk{position:relative;height:14px;background:var(--surface-2);border-radius:4px;overflow:hidden}
+.mm-barrow .fil{position:absolute;left:0;top:0;bottom:0;border-radius:4px}
+.mm-barrow .thr{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--role-warn)}
+.mm-barrow .val{font-family:var(--mono);font-size:12.5px;text-align:right;color:var(--ink)}
+.mm-stack{display:flex;height:22px;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+.mm-stack span{display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:var(--on-ink);white-space:nowrap;overflow:hidden}
+
+/* 구조도 */
+.mm-archwrap{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
+.mm-arch{display:block;width:100%;min-width:960px;height:auto}
+.mm-arch text{fill:var(--ink);font-family:var(--sans)}
+.mm-arch .mono{font-family:var(--mono);font-size:12.5px;fill:var(--muted)}
+.mm-arch .ttl{font-size:14px;font-weight:700}
+.mm-arch .rowlab{font-size:12.5px;font-weight:700;fill:var(--faint)}
+.mm-arch .note{font-size:12px;fill:var(--muted);font-family:var(--mono)}
+.mm-arch .blk{cursor:pointer}
+.mm-arch .blk rect{stroke-width:1.6;rx:9;transition:stroke-width .2s,fill .2s}
+.mm-arch .blk.img rect{stroke:var(--role-img);fill:color-mix(in srgb,var(--role-img) 9%,var(--surface))}
+.mm-arch .blk.txt rect{stroke:var(--role-txt);fill:color-mix(in srgb,var(--role-txt) 9%,var(--surface))}
+.mm-arch .blk.fuse rect{stroke:var(--role-fuse);fill:color-mix(in srgb,var(--role-fuse) 9%,var(--surface))}
+.mm-arch .blk.warn rect{stroke:var(--role-warn);fill:color-mix(in srgb,var(--role-warn) 9%,var(--surface))}
+.mm-arch .blk.gt rect{stroke:var(--role-gt);fill:color-mix(in srgb,var(--role-gt) 9%,var(--surface))}
+.mm-arch .blk.on rect{stroke-width:3.4}
+.mm-arch .blk.on.img rect{fill:color-mix(in srgb,var(--role-img) 24%,var(--surface))}
+.mm-arch .blk.on.txt rect{fill:color-mix(in srgb,var(--role-txt) 24%,var(--surface))}
+.mm-arch .blk.on.fuse rect{fill:color-mix(in srgb,var(--role-fuse) 24%,var(--surface))}
+.mm-arch .blk.on.warn rect{fill:color-mix(in srgb,var(--role-warn) 24%,var(--surface))}
+.mm-arch .blk.done rect{stroke-dasharray:none}
+.mm-arch .blk:focus-visible{outline:none}
+.mm-arch .blk:focus-visible rect{stroke:var(--focus);stroke-width:3}
+.mm-arch .arr{fill:none;stroke:var(--line-strong);stroke-width:2}
+.mm-arch .arr.img{stroke:color-mix(in srgb,var(--role-img) 55%,var(--line-strong))}
+.mm-arch .arr.txt{stroke:color-mix(in srgb,var(--role-txt) 55%,var(--line-strong))}
+.mm-arch .arr.fuse{stroke:color-mix(in srgb,var(--role-fuse) 55%,var(--line-strong))}
+.mm-arch .arr.warn{stroke:color-mix(in srgb,var(--role-warn) 55%,var(--line-strong))}
+.mm-arch .arr.on{stroke-width:3.4}
+.mm-arch .arr.on.img{stroke:var(--role-img)} .mm-arch .arr.on.txt{stroke:var(--role-txt)} .mm-arch .arr.on.fuse{stroke:var(--role-fuse)} .mm-arch .arr.on.warn{stroke:var(--role-warn)}
+.mm-arch .ah{fill:var(--line-strong)}
+.mm-arch .ah.img{fill:color-mix(in srgb,var(--role-img) 55%,var(--line-strong))} .mm-arch .ah.txt{fill:color-mix(in srgb,var(--role-txt) 55%,var(--line-strong))} .mm-arch .ah.fuse{fill:color-mix(in srgb,var(--role-fuse) 55%,var(--line-strong))} .mm-arch .ah.warn{fill:color-mix(in srgb,var(--role-warn) 55%,var(--line-strong))}
+.mm-arch .ah.on.img{fill:var(--role-img)} .mm-arch .ah.on.txt{fill:var(--role-txt)} .mm-arch .ah.on.fuse{fill:var(--role-fuse)} .mm-arch .ah.on.warn{fill:var(--role-warn)}
+.mm-arch .brk{fill:none;stroke:var(--faint);stroke-width:1.4;stroke-dasharray:4 3}
+.mm-panel{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.mm-panel h3{margin:0;font-size:16px}
+.mm-panel p{margin:0;font-size:14px}
+.mm-panel .io{font-family:var(--mono);font-size:12.5px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:6px 9px;line-height:1.6;overflow-x:auto}
+.mm-sw{display:inline-block;width:14px;height:4px;border-radius:2px;margin-right:6px;vertical-align:3px}
+
+/* 클래스 분포 막대 */
+.mm-dist{display:block;width:100%;height:auto}
+.mm-dist text{fill:var(--ink);font-family:var(--mono);font-size:12px}
+.mm-dist .sub{fill:var(--muted);font-size:11px}
+.mm-dist .bar{fill:color-mix(in srgb,var(--role-gt) 55%,var(--surface))}
+.mm-dist .bar.rare{fill:var(--role-warn)}
+.mm-dist .bar.sel{fill:var(--role-img)}
+.mm-scatter{display:block;width:100%;height:auto;max-width:620px}
+.mm-scatter text{fill:var(--muted);font-family:var(--mono);font-size:11px}
+.mm-scatter .ax{stroke:var(--line-strong);stroke-width:1}
+.mm-scatter .grid{stroke:var(--line);stroke-width:1}
+.mm-scatter .pt{fill:color-mix(in srgb,var(--role-fuse) 45%,transparent);stroke:var(--role-fuse);stroke-width:1.4}
+.mm-scatter .fit{stroke:var(--role-warn);stroke-width:1.6;stroke-dasharray:5 4}
+.mm-scatter .lab{fill:var(--ink);font-size:11px}
+@media (prefers-reduced-motion: reduce){.mm-arch .blk rect{transition:none}}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+      <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)" aria-current="page">멀티모달</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">[Case Study] TCCC 술기 도구 객체 탐지 및 판별 모형 시뮬레이터</h1>
+      <p class="ds-hero__lede">박스 라벨만 있는 전술적 전투 부상자 처치(TCCC) 도구 영상에서, SAM 으로 박스를 윤곽 마스크로 승격하고 VLM 으로 이름 없는 클래스를 판별합니다. 점·박스 프롬프트, 자동 라벨링, 닫힌/개방형 어휘, 시각 질의응답, 지우기·붙여 넣기 생성과 검증까지 직접 조작합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button class="sk-tab" type="button" role="tab" id="tab-a" aria-controls="pane-a" aria-selected="true"><span class="sk-num">1</span>문제·데이터</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-b" aria-controls="pane-b" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>모형 구조</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-c" aria-controls="pane-c" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>SAM 프롬프트</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-d" aria-controls="pane-d" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>자동 라벨링·판별</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-e" aria-controls="pane-e" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>VQA·이미지 생성</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-f" aria-controls="pane-f" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>한계와 안전장치</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>알고리즘 구성도</button>
+  </nav>
+
+  <!-- ================= 1. 문제·데이터 ================= -->
+  <section id="pane-a" role="tabpanel" aria-labelledby="tab-a">
+   <div class="mm-col">
+    <div class="sk-card">
+      <div class="sk-head"><h2>문제: 박스만 있는 도구 영상에서 "어디"와 "무엇"을 얻기</h2><span class="sk-hint">TCCC = 전술적 전투 부상자 처치 (Tactical Combat Casualty Care)</span></div>
+      <p class="sk-lead">TCCC 응급처치 도구 객체 탐지 데이터(TCCC_Object_640)는 박스 라벨만 있고, 클래스 이름 정의 파일이 없어 <b>class_0 ~ class_15</b> 로만 되어 있습니다. 이 사례는 사람이 윤곽선을 한 번도 그리지 않고 <b>마스크 라벨</b>을 얻는 방법(SAM)과, 텍스트로 <b>클래스를 판별</b>하는 방법(VLM)을 다룹니다.</p>
+      <div class="sk-stats">
+        <div class="sk-stat"><b>12,705</b><span>학습 이미지 (images/train)</span></div>
+        <div class="sk-stat"><b>3,176</b><span>검증 이미지 (images/val)</span></div>
+        <div class="sk-stat"><b>640×360</b><span>JPEG 해상도 (축소본, 모두 같은 크기)</span></div>
+        <div class="sk-stat"><b>45,072</b><span>박스</span></div>
+        <div class="sk-stat"><b>16</b><span>클래스 (이름 없음)</span></div>
+        <div class="sk-stat"><b>15,881</b><span>전체 이미지</span></div>
+      </div>
+      <p class="sk-note">출발점: 앞선 실습에서 <b>박스를 채워 만든 의사(pseudo) 마스크</b>로 U-Net 을 학습했고, 클래스 이름은 crop 을 눈으로 보며 <b>일부만 잠정 복원</b>했습니다. 다음 단계는 박스를 SAM 프롬프트로 넣어 <b>의사 마스크를 진짜 윤곽 마스크로 승격</b>하는 것입니다.</p>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>모의 장면과 YOLO 형식 라벨</h2><span class="mm-tag mm-tag--mock">모의 장면 · 코드로 생성</span></div>
+      <p class="sk-lead">실제 영상 대신 코드로 그린 640×360 야전 장면입니다. 단순 도형으로 그린 도구 7종에 <b>id 0~6</b> 만 붙어 있고(실제 데이터처럼 이름 없음), 도구를 쥔 <b>손</b>은 라벨이 없는 물체입니다. 표의 행을 누르면 정규화 중심 좌표가 픽셀 코너 좌표로 바뀌는 계산이 보입니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">장면</span>
+          <button class="sk-btn sk-btn--sm" type="button" id="aPrev">이전</button>
+          <span class="mm-mono" id="aSeed">seed 1</span>
+          <button class="sk-btn sk-btn--sm" type="button" id="aNext">다음</button>
+          <button class="sk-btn sk-btn--sm" type="button" id="aRand">무작위</button>
+        </div>
+        <label class="sk-check"><input type="checkbox" id="aBox" checked>박스 표시</label>
+        <label class="sk-check"><input type="checkbox" id="aMask">정답 마스크 표시 <span class="mm-small">(모의 장면만 알 수 있음)</span></label>
+      </div>
+      <div class="mm-split">
+        <div class="mm-col">
+          <canvas class="mm-cv" id="aCv" width="640" height="360" aria-label="모의 TCCC 도구 장면과 정답 박스"></canvas>
+          <div class="mm-legend-row" id="aLegend"></div>
+        </div>
+        <div class="mm-col">
+          <div class="sk-scroll"><table class="sk-table" id="aTable"></table></div>
+          <div class="sk-formula" id="aFormula"></div>
+          <p class="sk-note" id="aCond"></p>
+        </div>
+      </div>
+      <div class="mm-code"><pre id="aCode"></pre><button class="sk-btn sk-btn--sm" type="button" data-copy="aCode">복사</button></div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>실제 데이터의 클래스별 박스 수와 모양</h2><span class="mm-tag mm-tag--nb">실습 노트북 결과</span></div>
+      <p class="sk-lead">클래스별 박스 수, 가로세로비 중앙값(aspect_med), 이미지 대비 면적 중앙값(%), 길쭉한 정도 = max(aspect, 1/aspect). 길쭉할수록 대각선으로 누웠을 때 박스 안 빈 공간이 커서 "박스 = 마스크" 가정이 나쁠 것으로 예상합니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">정렬</span>
+          <div class="sk-seg" id="distSort"><button type="button" data-v="id" aria-pressed="true">클래스 id</button><button type="button" data-v="n" aria-pressed="false">박스 수</button><button type="button" data-v="el" aria-pressed="false">길쭉한 정도</button></div>
+        </div>
+      </div>
+      <div class="mm-split">
+        <div><svg class="mm-dist" id="distSvg" role="img" aria-label="클래스별 박스 수 막대그래프"></svg></div>
+        <div class="mm-col">
+          <dl class="sk-kv" id="distKv"></dl>
+          <p class="sk-note">합계 <b>45,072</b> 박스 + 박스가 없는 이미지 행(cls = −1) <b>1,588</b> = 데이터프레임 <b>46,660</b> 행. 표본이 적은 <b>class 7 (265)</b> · <b>class 15 (143)</b> 는 붙여 넣기 합성으로 늘릴 후보입니다.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>평가용 서브셋 40장</h2><span class="mm-tag mm-tag--nb">실습 노트북 결과</span></div>
+        <p class="sk-lead">검증 이미지 중 박스가 <b>2 ~ 5개</b>이고 가장 작은 박스도 이미지 면적의 <b>0.3% 이상</b>인 이미지를 클립별로 고르게 뽑습니다.</p>
+        <dl class="sk-kv">
+          <dt>조건을 만족하는 검증 이미지</dt><dd>1,671 / 3,176</dd>
+          <dt>평가용 이미지 / 박스</dt><dd>40 장 / 126 개</dd>
+          <dt>클립 수</dt><dd>14 개</dd>
+          <dt>포함된 클래스</dt><dd>15 개 (7 없음)</dd>
+        </dl>
+        <div class="sk-formula">box_area_ratio = w × h × 100 (%)　·　cond = (2 ≤ n_box ≤ 5) &amp; (min_area ≥ 0.3)</div>
+        <p class="mm-small">포함된 클립: P01_01, P01_02, P02_02, P02_03, P02_05, P02_06, P02_07, P04_01, P04_03, P04_05, P05_01, P05_02, P05_03, P05_05</p>
+        <p class="sk-note">40장은 의도한 크기입니다. SAM 은 CPU 에서 이미지 1장에 3 ~ 5초가 걸려 40장이면 2 ~ 4분. 클립별로 고르게 뽑는 이유는 <b>클립 종속성</b>(한 클립에 몰리면 그 촬영 조건만 평가) 때문입니다.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>출발점의 문제: 박스채움 의사 마스크</h2><span class="mm-tag mm-tag--nb">실습 노트북 결과</span></div>
+        <p class="sk-lead">P05 촬영분만으로 학습한 U-Net(입력 128×128×3 → 출력 128×128×1)을 박스채움 마스크 기준 Dice 로 평가한 결과입니다.</p>
+        <div class="sk-scroll"><table class="sk-table">
+          <thead><tr><th>시나리오</th><th>n</th><th>Dice 평균</th><th>Dice 중앙값</th></tr></thead>
+          <tbody id="unetBody"></tbody>
+        </table></div>
+        <div class="sk-formula" id="unetFormula"></div>
+        <dl class="sk-kv">
+          <dt>박스채움 마스크의 전경 비율 (128×128)</dt><dd>6.73 %</dd>
+          <dt>박스 안 물체 비율 (Otsu 추정) 평균</dt><dd>31.9 %</dd>
+          <dt>박스를 통째로 채우면 전경 과대 추정</dt><dd id="otsuX">—</dd>
+        </dl>
+        <p class="sk-note--warn sk-note">두 문제가 겹쳐 있습니다. ① 학습하지 않은 시나리오(P01·P02·P04)에서 무너짐(클립 종속성) ② <b>정답 자체가 부풀려져 있음</b> — 진짜 윤곽을 잘 그릴수록 이 Dice 는 오히려 낮아집니다. ①은 데이터를 늘리면 해결되지만 ②는 데이터를 늘려도 해결되지 않습니다.</p>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>왜 분할 라벨을 사람이 만들 수 없는가</h2><span class="mm-tag mm-tag--nb">실습 노트북 표</span></div>
+      <div class="sk-scroll"><table class="sk-table">
+        <thead><tr><th>라벨 종류</th><th>1장당 대략적인 주석 시간</th><th>16,000장이면</th></tr></thead>
+        <tbody>
+          <tr><td>이미지 분류 (클래스 1개)</td><td>2 ~ 5초</td><td>약 10 ~ 20시간</td></tr>
+          <tr><td>박스 (물체 5개)</td><td>30초 ~ 1분</td><td>약 130 ~ 260시간</td></tr>
+          <tr><td><b>픽셀 마스크 (물체 5개)</b></td><td><b>5 ~ 15분</b></td><td><b>1,300 ~ 4,000시간</b></td></tr>
+        </tbody>
+      </table></div>
+      <p class="sk-note">SAM(Segment Anything Model)은 1,100만 장 이미지 / <b>11억 개 마스크</b>(SA-1B)로 학습되어, "무엇을 분할할지"가 아니라 <b>"어디를 가리키면 그 덩어리의 경계를 그린다"</b>를 배운 파운데이션 모델입니다. 개별 과제에는 미세조정 없이 프롬프트만 바꿔 씁니다.</p>
+    </div>
+   </div>
+  </section>
+
+  <!-- ================= 2. 모형 구조 ================= -->
+  <section id="pane-b" role="tabpanel" aria-labelledby="tab-b" hidden>
+   <div class="mm-col">
+    <div class="sk-card">
+      <div class="sk-head"><h2>모형 구조도</h2><span class="sk-hint">블록을 누르거나 단계 버튼(→ 키)으로 데이터 흐름을 따라갑니다</span></div>
+      <div class="sk-controls">
+        <div class="sk-seg" id="archSel"><button type="button" data-v="sam" aria-pressed="true">SAM (어디)</button><button type="button" data-v="vlm" aria-pressed="false">VLM 판별 (무엇)</button></div>
+        <div class="sk-seg" id="encSel"><button type="button" data-v="b" aria-pressed="true">ViT-B (실습 노트북)</button><button type="button" data-v="h" aria-pressed="false">ViT-H</button></div>
+        <div class="sk-group">
+          <button class="sk-btn sk-btn--sm" type="button" id="stFirst">처음</button>
+          <button class="sk-btn sk-btn--sm" type="button" id="stPrev">이전</button>
+          <button class="sk-btn sk-btn--sm" type="button" id="stNext">다음</button>
+          <button class="sk-btn sk-btn--sm sk-btn--primary" type="button" id="stPlay">재생</button>
+        </div>
+        <label class="sk-slider" style="min-width:150px"><span class="sk-sl-head">속도 <b id="stSpdV">1.0 초</b></span><input type="range" id="stSpd" min="0.4" max="2.5" step="0.1" value="1.0" aria-label="재생 속도(단계당 초)"></label>
+      </div>
+      <ol class="sk-stepper" id="stSteps"></ol>
+      <div class="mm-archwrap">
+        <div class="sk-scroll" id="archScroll"><svg class="mm-arch" id="archSvg" role="img" aria-label="모형 구조도"></svg></div>
+        <div class="mm-panel" id="archPanel" aria-live="polite"></div>
+      </div>
+      <div class="mm-legend-row">
+        <span><i class="mm-sw" style="background:var(--role-img)"></i>영상(Vision) 경로</span>
+        <span><i class="mm-sw" style="background:var(--role-txt)"></i>프롬프트·문장(Text) 경로</span>
+        <span><i class="mm-sw" style="background:var(--role-fuse)"></i>결합·공동 임베딩</span>
+        <span><i class="mm-sw" style="background:var(--role-warn)"></i>한계</span>
+      </div>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>무거운 인코더는 이미지당 1회</h2><span class="mm-tag mm-tag--nb">실습 노트북 결과 (sam-vit-base)</span></div>
+        <div class="mm-stack" aria-label="파라미터 비율"><span style="width:95.7%;background:var(--role-img)">Image Encoder 89.7M (95.7%)</span><span style="width:4.3%;background:var(--role-fuse)" title="Mask Decoder 4.1M (4.3%)"></span></div>
+        <dl class="sk-kv">
+          <dt>전체 파라미터</dt><dd>93.7M</dd>
+          <dt>Image Encoder</dt><dd>89.7M (95.7%)</dd>
+          <dt>Mask Decoder</dt><dd>4.1M (4.3%)</dd>
+        </dl>
+        <div class="sk-scroll"><table class="sk-table">
+          <thead><tr><th>구성 요소</th><th>하는 일</th><th>크기</th><th>실행 빈도</th></tr></thead>
+          <tbody>
+            <tr><td><b>Image Encoder</b></td><td>이미지 → 특성 맵 (ViT)</td><td>무거움 (90% 이상)</td><td>이미지당 <b>1회</b></td></tr>
+            <tr><td><b>Prompt Encoder</b></td><td>점·박스·대략적 마스크 → 임베딩</td><td>매우 가벼움</td><td>프롬프트마다</td></tr>
+            <tr><td><b>Mask Decoder</b></td><td>특성 맵 + 프롬프트 → 마스크</td><td>매우 가벼움 (~4M)</td><td>프롬프트마다</td></tr>
+          </tbody>
+        </table></div>
+        <p class="sk-note">학습 목표가 "클래스"가 아니라 <b>"덩어리(경계)"</b>입니다. SAM 은 자기가 무엇을 분할했는지 모릅니다 → <b>박스(무엇) + SAM(어디)</b> 의 조합.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>닫힌 어휘 vs 개방형 어휘</h2><span class="mm-tag mm-tag--nb">실습 노트북 표</span></div>
+        <div class="sk-scroll"><table class="sk-table">
+          <thead><tr><th></th><th>닫힌 어휘 (YOLO · RT-DETR)</th><th>개방형 어휘 (OWL-ViT)</th></tr></thead>
+          <tbody>
+            <tr><td>클래스 정의</td><td>학습 전에 <b>고정</b> (nc=16)</td><td>실행 시 <b>텍스트로 지정</b></td></tr>
+            <tr><td>새 클래스 추가</td><td>라벨 수집 + 재학습</td><td>문장 한 줄 추가</td></tr>
+            <tr><td>성능</td><td>해당 클래스에 대해 높음</td><td>낮고 프롬프트에 민감</td></tr>
+            <tr><td>쓸 곳</td><td>배치할 최종 모형</td><td><b>탐색 · 라벨링 보조 · 사전 복원</b></td></tr>
+          </tbody>
+        </table></div>
+        <div class="sk-scroll"><table class="sk-table">
+          <thead><tr><th>모형</th><th>입력 → 출력</th><th>대표 용도</th></tr></thead>
+          <tbody>
+            <tr><td>CLIP (2021)</td><td>이미지, 텍스트 → 유사도</td><td>제로샷 분류 · 검색</td></tr>
+            <tr><td>OWL-ViT (2022)</td><td>이미지 + 텍스트 목록 → 박스</td><td>개방형 어휘 검출</td></tr>
+            <tr><td>BLIP (2022)</td><td>이미지 → 문장</td><td>캡션 생성</td></tr>
+            <tr><td>LLaVA · Qwen-VL · SmolVLM</td><td>이미지 + 질문 → 답변</td><td>시각 질의응답</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+   </div>
+  </section>
+
+  <!-- ================= 3. SAM 프롬프트 ================= -->
+  <section id="pane-c" role="tabpanel" aria-labelledby="tab-c" hidden>
+   <div class="mm-col">
+    <div class="sk-card">
+      <div class="sk-head"><h2>점·박스 프롬프트로 분할하기</h2><span class="mm-tag mm-tag--mock">모의 출력 · 색 유사도 영역 확장</span></div>
+      <p class="sk-lead">장면을 클릭해 <b>점(+)</b>을 찍거나 <b>점(−)</b>으로 빼고, <b>박스</b> 모드에서 끌어 사각형을 그립니다. 점 하나는 모호하므로 후보 마스크 3개와 자체 점수가 나옵니다. 마스크는 실제 SAM 이 아니라 장면 픽셀로 직접 계산한 <b>모의 출력</b>이고, 정답 마스크와의 IoU 는 실제로 계산합니다.</p>
+      <div class="sk-controls">
+        <div class="sk-seg" id="cMode"><button type="button" data-v="pos" aria-pressed="true">점 (+) 포함</button><button type="button" data-v="neg" aria-pressed="false">점 (−) 제외</button><button type="button" data-v="box" aria-pressed="false">박스</button></div>
+        <button class="sk-btn sk-btn--sm" type="button" id="cDemo">첫 박스 중심에 점</button>
+        <button class="sk-btn sk-btn--sm" type="button" id="cGtBox">정답 박스를 프롬프트로</button>
+        <button class="sk-btn sk-btn--sm" type="button" id="cClear">프롬프트 지우기</button>
+        <div class="sk-group"><span class="sk-label">장면</span><button class="sk-btn sk-btn--sm" type="button" id="cPrev">이전</button><span class="mm-mono" id="cSeed">seed 1</span><button class="sk-btn sk-btn--sm" type="button" id="cNext">다음</button></div>
+        <label class="sk-slider"><span class="sk-sl-head">모의 경계 민감도 <b id="cTolV">34</b></span><input type="range" id="cTol" min="14" max="70" step="1" value="34" aria-label="모의 경계 민감도"></label>
+      </div>
+      <div class="mm-split">
+        <div class="mm-col">
+          <canvas class="mm-cv crosshair" id="cCv" width="640" height="360" tabindex="0" aria-label="SAM 프롬프트 입력 캔버스: 클릭해 점을 찍거나 끌어서 박스를 그림"></canvas>
+          <div class="mm-legend-row"><span><i class="mm-dot" style="background:var(--role-pos)"></i>점 (+)</span><span><i class="mm-dot" style="background:var(--role-neg)"></i>점 (−)</span><span><i class="mm-dot" style="background:var(--role-box)"></i>박스 프롬프트</span><span><i class="mm-dot" style="background:var(--role-mask)"></i>선택한 모의 마스크</span></div>
+        </div>
+        <div class="mm-col">
+          <div class="mm-thumbs" id="cThumbs"></div>
+          <dl class="sk-kv" id="cKv"></dl>
+          <p class="sk-note" id="cNote"></p>
+        </div>
+      </div>
+      <div class="mm-code"><pre id="cCode"></pre><button class="sk-btn sk-btn--sm" type="button" data-copy="cCode">복사</button></div>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>실습 노트북의 예시 이미지</h2><span class="mm-tag mm-tag--nb">실습 노트북 결과</span></div>
+        <div class="sk-scroll"><table class="sk-table">
+          <thead><tr><th>프롬프트</th><th>출력 모양</th><th>모형이 예측한 자체 점수 (iou_scores)</th></tr></thead>
+          <tbody>
+            <tr><td>점 1개 (첫 박스 중심), multimask_output=True</td><td class="n">(3, 360, 640)</td><td class="n">[0.566, 0.942, 0.796]</td></tr>
+            <tr><td>박스 4개, multimask_output=False</td><td class="n">(4, 360, 640)</td><td class="n">[0.942, 0.948, 0.879, 0.94]</td></tr>
+          </tbody>
+        </table></div>
+        <p class="mm-small">점 프롬프트 1개 소요 시간 2.89 초 (CPU)</p>
+        <div class="sk-scroll"><table class="sk-table">
+          <thead><tr><th>프롬프트</th><th>인자</th><th>의미</th><th>쓰임</th></tr></thead>
+          <tbody>
+            <tr><td>점 (positive)</td><td class="mm-mono">input_labels=1</td><td>여기 있는 것을 분할</td><td>라벨이 전혀 없을 때</td></tr>
+            <tr><td>점 (negative)</td><td class="mm-mono">input_labels=0</td><td>여기는 빼라</td><td>배경이 딸려 올 때 수정</td></tr>
+            <tr><td>박스</td><td class="mm-mono">input_boxes</td><td>이 사각형 안의 물체</td><td><b>기존 YOLO 라벨을 그대로 사용</b></td></tr>
+            <tr><td>대략적 마스크</td><td class="mm-mono">input_masks</td><td>이전 예측을 다듬음</td><td>반복 정제</td></tr>
+          </tbody>
+        </table></div>
+        <p class="sk-note">점 하나는 본질적으로 모호합니다(손잡이? 도구 전체? 쥔 손까지?). SAM 은 후보 3개를 내고 각각을 <b>스스로 점수화</b>합니다. iou_scores 는 정답과의 IoU 를 모형이 <b>추정</b>한 값이지 정답을 본 것이 아닙니다. 텍스트 프롬프트는 공개 가중치에 없어 VLM 이 그 자리를 대신합니다.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>모의 마스크는 어떻게 계산되나</h2><span class="mm-tag mm-tag--mock">모의 출력의 규칙</span></div>
+        <ul class="mm-list">
+          <li><b>점</b>: 클릭한 곳의 색(5×5 평균)에서 시작해, 색 거리 &lt; 허용치인 이웃 픽셀로 번져 나갑니다. 허용치 ×0.55 / ×1 / ×1.9 로 <b>후보 3개</b>(부분 · 물체 · 넓게)를 만듭니다.</li>
+          <li><b>점(−)</b>: 그 점에서 번진 영역을 빼고, 점(+)과 이어진 덩어리만 남깁니다.</li>
+          <li><b>박스</b>: 박스 바깥 테두리 픽셀을 배경 표본으로 삼아, 표본과 색이 먼 박스 안 픽셀을 물체로 봅니다(작은 조각 제거).</li>
+          <li><b>모의 자체 점수</b>: 허용치를 조금 낮추고 높여도 마스크가 그대로인지(두 마스크의 IoU = 안정도). 실제 SAM 의 iou_scores 처럼 <b>정답을 보지 않은 자기 평가</b>입니다.</li>
+        </ul>
+        <div class="sk-formula">IoU(A, B) = |A ∩ B| / |A ∪ B|　·　Dice(A, B) = 2|A ∩ B| / (|A| + |B|)</div>
+        <p class="sk-note--warn sk-note">자체 점수가 높아도 정답 IoU 는 낮을 수 있습니다. 압박 붕대처럼 배경(국방색 땅)과 색이 비슷한 도구, 쥔 손에 가려진 도구에서 확인해 보세요. <b>모형의 자기 확신은 검증이 아닙니다.</b></p>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>박스 라벨을 마스크 라벨로 승격</h2><span class="mm-tag mm-tag--mock">모의 장면에서 실제 계산</span></div>
+      <p class="sk-lead">현재 장면의 모든 정답 박스를 박스 프롬프트로 넣어 모의 마스크를 만들고, 박스채움 마스크와 비교합니다. 실습 노트북과 같은 지표(fill_ratio, 박스채움과의 Dice, 박스 안 Otsu 어림값)를 계산하고, 모의 장면에서만 알 수 있는 <b>정답 마스크와의 IoU</b>도 함께 봅니다.</p>
+      <div class="sk-controls">
+        <label class="sk-slider"><span class="sk-sl-head">박스 프롬프트 배경 거리 임계값 <b id="pThrV">30</b></span><input type="range" id="pThr" min="12" max="60" step="1" value="30" aria-label="박스 프롬프트 배경 거리 임계값"></label>
+        <label class="sk-check"><input type="checkbox" id="pShowFill">박스채움 마스크와 겹쳐 보기</label>
+      </div>
+      <div class="mm-split">
+        <div class="mm-col">
+          <canvas class="mm-cv" id="pCv" width="640" height="360" aria-label="박스 프롬프트로 승격한 모의 마스크"></canvas>
+          <div class="sk-formula" id="pFormula"></div>
+        </div>
+        <div class="mm-col">
+          <div class="sk-scroll"><table class="sk-table" id="pTable"></table></div>
+          <div class="sk-scroll"><table class="sk-table" id="pCmp"></table></div>
+        </div>
+      </div>
+      <p class="sk-note">실습 노트북: SAM 마스크는 박스 면적의 <b>30% 안팎</b>(29.5%)만 채웁니다 → 박스채움 마스크는 전경을 <b>약 3배 부풀린</b> 라벨이었습니다. 서로 독립적인 Otsu 어림값(31.9%)과 자릿수가 맞습니다. 박스채움과의 Dice 0.42 는 앞선 U-Net 점수가 "부풀린 정답을 얼마나 잘 흉내 냈는가"였다는 뜻입니다.</p>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>길쭉한 클래스일수록 박스채움 오차가 큰가</h2><span class="mm-tag mm-tag--nb">실습 노트북 결과</span></div>
+        <svg class="mm-scatter" id="scatSvg" viewBox="0 0 560 340" role="img" aria-label="클래스별 길쭉한 정도와 SAM 마스크 면적 비율 산점도"></svg>
+        <div class="sk-formula" id="scatFormula"></div>
+        <p class="sk-note">점 크기 = 평가에 쓰인 박스 수. 박스가 1개뿐인 class 14 · 15 는 신뢰하지 마세요. 경향은 예상과 대체로 맞지만 길쭉함만으로 설명되지 않는 클래스(손에 가려진 도구, 배경과 색이 비슷한 도구)는 자동 라벨링 후에도 <b>사람 검수 대상</b>입니다.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>의료 영상에서도 잘 동작하는가</h2><span class="mm-tag mm-tag--mock">모의 흉부 X-ray · 계산</span></div>
+        <p class="sk-lead">자연 영상으로 학습된 분할은 의료 영상에서 경계를 못 찾습니다. 아래 흑백 모의 영상을 클릭(기본은 중앙 점)해 후보 3개의 크기를 보세요.</p>
+        <div class="mm-split--even mm-split">
+          <canvas class="mm-cv mm-cv--sq crosshair" id="medCv" width="320" height="320" tabindex="0" aria-label="모의 흉부 X-ray 영상: 클릭해 점 프롬프트 지정"></canvas>
+          <div class="mm-col"><dl class="sk-kv" id="medKv"></dl></div>
+        </div>
+        <div class="sk-scroll"><table class="sk-table">
+          <thead><tr><th>관찰 (실습 노트북)</th><th>원인</th></tr></thead>
+          <tbody>
+            <tr><td>후보 하나가 화면의 90% 이상</td><td>배경과 인체의 경계만 잡음</td></tr>
+            <tr><td>세 후보의 크기 차이가 극단적</td><td>원하는 구조 수준을 판단할 근거가 없음</td></tr>
+            <tr><td>점수는 높은데 결과는 쓸모없음</td><td>iou_scores 는 자연 영상 기준 자기 평가</td></tr>
+          </tbody>
+        </table></div>
+        <div class="sk-scroll"><table class="sk-table">
+          <thead><tr><th>모형</th><th>무엇을 바꿨나</th></tr></thead>
+          <tbody>
+            <tr><td>MedSAM (2024)</td><td>100만 장 규모 의료 영상 마스크로 미세조정, 박스 프롬프트 중심</td></tr>
+            <tr><td>SAM-Med2D / 3D</td><td>의료 영상 특화 프롬프트 · 3D 볼륨 지원</td></tr>
+            <tr><td>SAM 2 (2024)</td><td>비디오 지원(프레임 간 마스크 전파) → TCCC 같은 연속 프레임에 유리</td></tr>
+            <tr><td>MedSAM2</td><td>위 둘의 결합 (3D 볼륨을 비디오처럼 처리)</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+   </div>
+  </section>
+
+  <!-- ================= 4. 자동 라벨링·판별 ================= -->
+  <section id="pane-d" role="tabpanel" aria-labelledby="tab-d" hidden>
+   <div class="mm-col">
+    <div class="sk-card">
+      <div class="sk-head"><h2>자동 라벨링 파이프라인 (모의 장면 40장)</h2><span class="mm-tag mm-tag--mock">모의 장면에서 실제 계산</span></div>
+      <p class="sk-lead">평가용 서브셋처럼 박스 2~5개짜리 모의 장면 40장에 파이프라인을 돌립니다. 단계 버튼으로 산출물을 따라가고, 규칙 필터의 범위를 바꿔 <b>사람 검수 대상</b>과 <b>필터를 빠져나간 불량 마스크</b>가 어떻게 바뀌는지 보세요.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">박스 출처</span><div class="sk-seg" id="dSrc"><button type="button" data-v="gt" aria-pressed="true">사람 라벨(정답)</button><button type="button" data-v="det" aria-pressed="false">모의 검출기(잡음)</button></div></div>
+        <label class="sk-slider"><span class="sk-sl-head">fill_ratio 하한 <b id="dLoV">0.10</b></span><input type="range" id="dLo" min="0" max="0.4" step="0.01" value="0.10" aria-label="fill_ratio 하한"></label>
+        <label class="sk-slider"><span class="sk-sl-head">fill_ratio 상한 <b id="dHiV">0.75</b></span><input type="range" id="dHi" min="0.4" max="1" step="0.01" value="0.75" aria-label="fill_ratio 상한"></label>
+        <label class="sk-slider"><span class="sk-sl-head">모의 자체 점수 하한 <b id="dScV">0.80</b></span><input type="range" id="dSc" min="0" max="1" step="0.01" value="0.80" aria-label="모의 자체 점수 하한"></label>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button class="sk-btn sk-btn--sm" type="button" id="dFirst">처음</button>
+          <button class="sk-btn sk-btn--sm" type="button" id="dPrevS">이전</button>
+          <button class="sk-btn sk-btn--sm" type="button" id="dNextS">다음</button>
+          <button class="sk-btn sk-btn--sm sk-btn--primary" type="button" id="dPlay">재생</button>
+        </div>
+        <label class="sk-slider" style="min-width:150px"><span class="sk-sl-head">속도 <b id="dSpdV">1.2 초</b></span><input type="range" id="dSpd" min="0.4" max="2.5" step="0.1" value="1.2" aria-label="재생 속도(단계당 초)"></label>
+        <label class="sk-slider"><span class="sk-sl-head">예시 장면 <b id="dIdxV">1 / 40</b></span><input type="range" id="dIdx" min="0" max="39" step="1" value="0" aria-label="예시 장면 번호"></label>
+      </div>
+      <ol class="sk-stepper" id="dSteps"></ol>
+      <div class="mm-split">
+        <div class="mm-col">
+          <canvas class="mm-cv" id="dCv" width="640" height="360" aria-label="자동 라벨링 단계별 예시 장면"></canvas>
+          <p class="mm-small" id="dStatus">계산 준비 중…</p>
+        </div>
+        <div class="mm-col" id="dStage"></div>
+      </div>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>모의 장면의 클래스별 승격 결과</h2><span class="mm-tag mm-tag--mock">40장 계산</span></div>
+        <div class="sk-scroll"><table class="sk-table" id="dCls"></table></div>
+        <p class="mm-small">gt_fill 은 정답 마스크 / 박스 면적 — 실제 데이터에는 없는, 모의 장면에서만 알 수 있는 값입니다.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>전체 데이터 자동 라벨링 비용</h2><span class="mm-tag mm-tag--nb">실습 노트북 기본값</span></div>
+        <div class="sk-controls">
+          <label class="sk-slider"><span class="sk-sl-head">CPU 이미지당 초 <b id="kSecV">2.75</b></span><input type="range" id="kSec" min="0.5" max="6" step="0.05" value="2.75" aria-label="이미지당 초"></label>
+          <label class="sk-slider"><span class="sk-sl-head">GPU 가속 배수 <b id="kGpuV">15</b></span><input type="range" id="kGpu" min="2" max="40" step="1" value="15" aria-label="GPU 가속 배수"></label>
+          <label class="sk-slider"><span class="sk-sl-head">사람이 그릴 때 장당 분 <b id="kManV">5</b></span><input type="range" id="kMan" min="1" max="15" step="0.5" value="5" aria-label="사람 장당 분"></label>
+        </div>
+        <div class="sk-formula" id="kFormula"></div>
+        <p class="mm-small">실습 노트북: 40장 109.9 초, 이미지당 평균 2.75 초 → 전체 15,881장 CPU 12.1 시간 / GPU(약 15배) 0.8 시간 / 사람(장당 5분) 1323 시간.</p>
+        <div class="sk-scroll"><table class="sk-table">
+          <thead><tr><th>단계</th><th>도구</th><th>산출물</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>사람 또는 검출 모형 (YOLO)</td><td>박스 + 클래스</td></tr>
+            <tr><td>2</td><td><b>SAM (박스 프롬프트)</b></td><td>박스마다 픽셀 마스크</td></tr>
+            <tr><td>3</td><td>규칙 기반 필터</td><td>fill_ratio 가 비정상인 마스크 제거</td></tr>
+            <tr><td>4</td><td>사람 검수</td><td>3에서 걸러진 것만 확인</td></tr>
+            <tr><td>5</td><td>경량 모형(U-Net 등) 학습</td><td>현장 배치용 모형</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>VLM 으로 판별하기: 닫힌 어휘 vs 개방형 어휘</h2><span class="mm-tag mm-tag--mock">모의 임베딩 · 점수는 실제 계산</span></div>
+      <p class="sk-lead">물체마다 모의 이미지 임베딩을, 질의마다 텍스트 임베딩을 두고 코사인 유사도를 계산합니다. <b>닫힌 어휘</b>는 정해진 목록 안에서 softmax 로 <b>반드시 하나</b>를 고르고, <b>개방형 어휘</b>는 질의마다 독립 점수를 임계값과 비교해 "없음"도 답할 수 있습니다. 질의 목록은 실습 노트북의 8개입니다.</p>
+      <div class="sk-controls">
+        <label class="sk-group"><span class="sk-label">문장 틀</span>
+          <select class="sk-select" id="vTpl" aria-label="프롬프트 문장 틀">
+            <option value="a photo of {}">a photo of {} (실습 노트북)</option>
+            <option value="{}">{}</option>
+            <option value="an image containing {}">an image containing {}</option>
+            <option value="{} lying on the ground">{} lying on the ground</option>
+          </select></label>
+        <label class="sk-slider"><span class="sk-sl-head">온도 τ (닫힌 어휘) <b id="vTauV">0.05</b></span><input type="range" id="vTau" min="0.01" max="0.3" step="0.01" value="0.05" aria-label="softmax 온도"></label>
+        <label class="sk-slider"><span class="sk-sl-head">임계값 (개방형) <b id="vThrV">0.08</b></span><input type="range" id="vThr" min="0.02" max="0.3" step="0.01" value="0.08" aria-label="개방형 검출 임계값"></label>
+      </div>
+      <div class="sk-group" id="vQueries" role="group" aria-label="텍스트 질의 목록"></div>
+      <div class="mm-split">
+        <div class="mm-col">
+          <h3>물체 하나 들여다보기 (현재 장면)</h3>
+          <div class="mm-objbtns" id="vObjs"></div>
+          <canvas class="mm-cv" id="vCv" width="640" height="360" aria-label="선택한 물체가 표시된 장면"></canvas>
+          <div class="sk-formula">cos(v, t<sub>q</sub>) = v·t<sub>q</sub> / (‖v‖‖t<sub>q</sub>‖)<br>닫힌 어휘: p<sub>q</sub> = exp(cos<sub>q</sub>/τ) / Σ<sub>j</sub> exp(cos<sub>j</sub>/τ)<br>개방형: score<sub>q</sub> = 0.35·σ((cos<sub>q</sub> − 0.55)/0.08), 검출 = max<sub>q</sub> score ≥ 임계값</div>
+        </div>
+        <div class="mm-col">
+          <div class="mm-bars" id="vBars"></div>
+          <p class="sk-note" id="vVerdict"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>닫힌 어휘 혼동표 (40장)</h2><span class="mm-tag mm-tag--mock">계산</span></div>
+        <p class="sk-lead">행 = 시뮬레이터만 아는 실제 도구 종류, 열 = softmax 1위 질의. 라벨이 없는 손도 반드시 목록 중 하나로 분류됩니다.</p>
+        <div class="sk-scroll"><table class="sk-table mm-heat" id="vConf"></table></div>
+        <p class="sk-note" id="vConfNote"></p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>개방형 검출로 클래스 사전 복원 (40장)</h2><span class="mm-tag mm-tag--mock">계산</span></div>
+        <p class="sk-lead">검출 박스를 정답 박스와 IoU ≥ 0.3 으로 매칭해 "어떤 텍스트가 어떤 class id 와 겹치는가"를 셉니다(실습 노트북과 같은 절차).</p>
+        <div class="sk-scroll"><table class="sk-table mm-heat" id="vCross"></table></div>
+        <div class="sk-controls"><button class="sk-btn sk-btn--sm" type="button" id="vReveal" aria-pressed="false">숨은 이름과 비교</button></div>
+        <div class="sk-scroll"><table class="sk-table" id="vDict"></table></div>
+        <p class="sk-note" id="vCrossNote"></p>
+      </div>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>실제 데이터: 텍스트 질의 × 클래스 id 매칭</h2><span class="mm-tag mm-tag--nb">실습 노트북 결과</span></div>
+        <p class="sk-lead">평가용 40장 중 앞 20장, OWL-ViT(owlvit-base-patch32, 임계값 0.08), IoU ≥ 0.3 매칭 → 매칭된 예측 <b>38</b>개 (5.6 초).</p>
+        <div class="sk-scroll"><table class="sk-table mm-heat" id="nbCross"></table></div>
+        <p class="sk-note--warn sk-note">이 표로 data.yaml 의 names 를 <b>확정하면 안 됩니다</b>. ① 점수가 0.1 ~ 0.3 으로 낮음 ② 한 텍스트가 여러 클래스에 퍼지면 정보 없음 ③ 20장은 너무 적음 ④ 무엇보다 <b>정답을 확인할 방법이 없음</b>. 올바른 쓰임은 후보를 좁혀 사람이 확인하는 시간을 줄이는 것입니다.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>실제 데이터: 예시 이미지 1장의 개방형 검출</h2><span class="mm-tag mm-tag--nb">실습 노트북 결과</span></div>
+        <p class="sk-lead">소요 0.34 초, 검출 9개 중 점수 상위 8개 (박스 = 픽셀 코너 좌표).</p>
+        <div class="sk-scroll"><table class="sk-table">
+          <thead><tr><th>질의</th><th>점수</th><th>박스 [x0, y0, x1, y1]</th></tr></thead>
+          <tbody id="nbOwl"></tbody>
+        </table></div>
+        <p class="sk-note">"human hand" 가 4번 검출되었지만 손에는 라벨이 없습니다. 매칭되지 않은 예측은 오탐이거나 라벨이 없는 물체입니다. 박스 y0 = −3 처럼 이미지 밖으로 나간 좌표도 그대로 나옵니다.</p>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>Python 예시</h2><span class="sk-hint">현재 질의 목록·문장 틀·임계값 반영</span></div>
+      <div class="mm-code"><pre id="vCode"></pre><button class="sk-btn sk-btn--sm" type="button" data-copy="vCode">복사</button></div>
+    </div>
+   </div>
+  </section>
+
+  <!-- ================= 5. VQA·이미지 생성 ================= -->
+  <section id="pane-e" role="tabpanel" aria-labelledby="tab-e" hidden>
+   <div class="mm-col">
+    <div class="sk-card">
+      <div class="sk-head"><h2>시각 질의응답(VQA): 이미지에 말로 묻기</h2><span class="mm-tag mm-tag--mock">모의 VLM 답 · 채점은 장면 라벨로 계산</span></div>
+      <p class="sk-lead">실습 노트북의 질문 4개를 현재 장면에 던집니다. 모의 VLM 의 답을 장면 라벨로 채점해 <b>환각 · 계수 오류 · 프롬프트 민감성 · 근거 부재</b>를 확인하세요. 질문 표현을 바꾸면 답이 달라지는지도 봅니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">장면</span><button class="sk-btn sk-btn--sm" type="button" id="qPrev">이전</button><span class="mm-mono" id="qSeed">seed 1</span><button class="sk-btn sk-btn--sm" type="button" id="qNext">다음</button></div>
+        <div class="sk-seg" id="qPhr"><button type="button" data-v="0" aria-pressed="true">질문 표현 A (노트북)</button><button type="button" data-v="1" aria-pressed="false">질문 표현 B (바꿔 말하기)</button></div>
+        <label class="sk-check"><input type="checkbox" id="qGround">근거 영역 요구</label>
+      </div>
+      <div class="mm-split mm-split--even">
+        <div class="mm-col"><canvas class="mm-cv" id="qCv" width="640" height="360" aria-label="질의응답 대상 장면"></canvas></div>
+        <div class="mm-col"><p class="sk-note" id="qNote"></p></div>
+      </div>
+      <div class="sk-scroll"><table class="sk-table" id="qTable"></table></div>
+      <div class="sk-grid2">
+        <div>
+          <h3>실습 노트북의 실제 답 (SmolVLM-500M, CPU 질문당 5 ~ 10초)</h3>
+          <div class="sk-scroll"><table class="sk-table">
+            <thead><tr><th>질문</th><th>답</th><th>초</th></tr></thead>
+            <tbody>
+              <tr><td>What medical tools are visible in this image? List them.</td><td>Aspirator, needle, lancet.</td><td class="n">8.0</td></tr>
+              <tr><td>How many tools are on the tray?</td><td>There are two tools on the tray.</td><td class="n">7.9</td></tr>
+              <tr><td>Is there a tourniquet in this image? Answer yes or no.</td><td>No.</td><td class="n">7.4</td></tr>
+              <tr><td>Is there a defibrillator in this image? Answer yes or no.</td><td>No.</td><td class="n">7.5</td></tr>
+            </tbody>
+          </table></div>
+        </div>
+        <div>
+          <h3>채점하면서 확인할 것</h3>
+          <div class="sk-scroll"><table class="sk-table">
+            <thead><tr><th>확인할 것</th><th>드러나는 문제</th></tr></thead>
+            <tbody>
+              <tr><td>라벨에 없는 물체 이름을 댔는가</td><td><b>환각</b> — "모른다"를 학습하지 않음</td></tr>
+              <tr><td>개수를 정확히 맞혔는가</td><td>세는 능력이 약함 (토큰 생성이지 계산이 아님)</td></tr>
+              <tr><td>표현을 바꾸면 답이 바뀌는가</td><td>프롬프트 민감성 — 재현성 없음</td></tr>
+              <tr><td>어디를 보고 답했는지 알 수 있는가</td><td><b>근거(grounding) 부재</b> — 검증 불가</td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>편집: 물체를 지운 반사실 이미지</h2><span class="mm-tag mm-tag--mock">주변 픽셀 채우기 · 실제 계산</span></div>
+      <p class="sk-lead">마스크 영역을 바깥에서 안쪽으로 한 겹씩, 주변 픽셀의 거리 가중 평균으로 채웁니다(cv2.inpaint 와 같은 "퍼뜨리기" 방식). 지운 뒤에도 도구 분류기가 같은 클래스를 말하면 모형이 <b>도구가 아니라 맥락</b>을 보고 있다는 신호입니다.</p>
+      <div class="sk-controls">
+        <label class="sk-group"><span class="sk-label">지울 물체</span><select class="sk-select" id="eObj" aria-label="지울 물체"></select></label>
+        <div class="sk-group"><span class="sk-label">마스크</span><div class="sk-seg" id="eSrc"><button type="button" data-v="sam" aria-pressed="true">모의 SAM</button><button type="button" data-v="gt" aria-pressed="false">정답</button><button type="button" data-v="box" aria-pressed="false">박스채움</button></div></div>
+        <label class="sk-slider"><span class="sk-sl-head">팽창 커널 <b id="eDilV">7×7</b></span><input type="range" id="eDil" min="1" max="15" step="2" value="7" aria-label="마스크 팽창 커널 크기"></label>
+        <label class="sk-slider"><span class="sk-sl-head">채움 반경 <b id="eRadV">3</b></span><input type="range" id="eRad" min="1" max="6" step="1" value="3" aria-label="채움 반경"></label>
+      </div>
+      <div class="mm-imgrow">
+        <div><canvas class="mm-cv" id="eCv0" width="640" height="360" aria-label="원본"></canvas><p class="mm-cap">원본</p></div>
+        <div><canvas class="mm-cv" id="eCv1" width="640" height="360" aria-label="지울 마스크"></canvas><p class="mm-cap">지울 마스크 (팽창 후)</p></div>
+        <div><canvas class="mm-cv" id="eCv2" width="640" height="360" aria-label="지운 결과"></canvas><p class="mm-cap">채운 결과</p></div>
+      </div>
+      <div class="sk-scroll"><table class="sk-table" id="eTable"></table></div>
+      <p class="sk-note" id="eNote"></p>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>합성: 라벨까지 함께 만들어지는 copy-paste</h2><span class="mm-tag mm-tag--mock">실제 계산</span></div>
+      <p class="sk-lead">마스크로 오린 물체를 다른 장면에 붙이면 <b>새 이미지 + 새 박스 라벨</b>이 동시에 생깁니다. 붙인 뒤 도구 분류기(모의 장면 60장으로 학습한 색 히스토그램 최근접 중심 분류기)가 <b>여전히 같은 클래스로 인식하는지</b> 검증합니다.</p>
+      <div class="sk-controls">
+        <label class="sk-group"><span class="sk-label">오릴 물체</span><select class="sk-select" id="gObj" aria-label="오릴 물체"></select></label>
+        <div class="sk-group"><span class="sk-label">오리기</span><div class="sk-seg" id="gSrc"><button type="button" data-v="sam" aria-pressed="true">모의 SAM 마스크</button><button type="button" data-v="box" aria-pressed="false">박스 그대로</button></div></div>
+        <div class="sk-group"><span class="sk-label">붙일 장면</span><button class="sk-btn sk-btn--sm" type="button" id="gPrev">이전</button><span class="mm-mono" id="gDst">1 / 10</span><button class="sk-btn sk-btn--sm" type="button" id="gNext">다음</button></div>
+        <label class="sk-check"><input type="checkbox" id="gBright">밝기 맞추기</label>
+        <label class="sk-check"><input type="checkbox" id="gVal">이 합성본을 검증 데이터에 넣기</label>
+        <button class="sk-btn sk-btn--primary sk-btn--sm" type="button" id="gRun10">10장 생성해 검증</button>
+      </div>
+      <div class="mm-split">
+        <div class="mm-col">
+          <canvas class="mm-cv" id="gCv" width="640" height="360" aria-label="붙여 넣기 합성 결과와 새 박스"></canvas>
+          <p class="mm-small" id="gClf">분류기 준비 중…</p>
+        </div>
+        <div class="mm-col">
+          <h3>라벨 장부 (YOLO 형식)</h3>
+          <div class="mm-code"><pre id="gLabels"></pre></div>
+          <div class="sk-scroll"><table class="sk-table" id="gChecks"></table></div>
+        </div>
+      </div>
+      <div class="sk-scroll"><table class="sk-table" id="g10"></table></div>
+      <div class="sk-grid2">
+        <div>
+          <h3>실습 노트북의 검증 결과 <span class="mm-tag mm-tag--nb">실습 노트북</span></h3>
+          <p class="mm-small">원본: P01_01_3674 / 박스 index 1 / class 13 / 원본 crop 예측 확률 1.0 / SAM 마스크 픽셀 1381 (ResNet 도구 분류기, crop 64×64)</p>
+          <div class="sk-scroll"><table class="sk-table" id="nbPaste"></table></div>
+        </div>
+        <div>
+          <h3>copy-paste 실무 주의점</h3>
+          <div class="sk-scroll"><table class="sk-table">
+            <thead><tr><th>주의</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr><td>밝기 · 색온도를 맞출 것</td><td>붙인 물체만 튀면 모형이 그 티를 학습</td></tr>
+              <tr><td>겹침(occlusion)을 허용할 것</td><td>항상 온전한 모습만 붙이면 현실과 달라짐</td></tr>
+              <tr><td>물리적으로 불가능한 위치는 피할 것</td><td>천장에 떠 있는 지혈대</td></tr>
+              <tr><td><b>검증 데이터에는 절대 넣지 말 것</b></td><td>합성 데이터로 성능을 재면 부풀려짐</td></tr>
+            </tbody>
+          </table></div>
+          <p class="sk-note">합성본에서 틀린다면 원인은 ① 합성이 부자연스러워 라벨이 깨졌거나 ② 분류기가 배경에 의존해 학습된 것(클립 종속성). 같은 배경에서 <b>위치만 옮겨</b> 붙여 보면 둘을 가를 수 있습니다.</p>
+        </div>
+      </div>
+      <div class="mm-code"><pre id="gCode"></pre><button class="sk-btn sk-btn--sm" type="button" data-copy="gCode">복사</button></div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>확산 모형(Diffusion): 개념과 의료에서의 위험</h2><span class="sk-hint">정방향(잡음 추가)만 실제 계산 · 역방향은 학습된 모형이 필요</span></div>
+      <p class="sk-lead">잡음에서 시작해 조금씩 잡음을 걷어내며 이미지를 만드는 생성 모형입니다. 텍스트 조건(CLIP 계열 인코더)이 "무엇을 그릴지"를 정합니다. 아래는 학습 때 쓰는 <b>정방향 과정</b>을 현재 장면에 적용한 것입니다 (DDPM 표준 설정 β 1e-4 → 0.02, T = 1000).</p>
+      <div class="mm-split">
+        <div class="mm-col">
+          <canvas class="mm-cv" id="fCv" width="640" height="360" aria-label="정방향 확산으로 잡음이 섞인 장면"></canvas>
+          <label class="sk-slider"><span class="sk-sl-head">시점 t <b id="fTV">250</b></span><input type="range" id="fT" min="0" max="1000" step="10" value="250" aria-label="확산 시점 t"></label>
+          <div class="sk-formula" id="fFormula"></div>
+        </div>
+        <div class="mm-col">
+          <div class="sk-scroll"><table class="sk-table">
+            <thead><tr><th>의료 영상 생성의 목적</th><th>내용</th></tr></thead>
+            <tbody>
+              <tr><td>희귀 질환 데이터 부족</td><td>실제 사례가 수십 건뿐인 병변을 합성</td></tr>
+              <tr><td>개인정보</td><td>실제 환자 영상 대신 합성 영상 공유</td></tr>
+              <tr><td>균형 맞추기</td><td>특정 인구집단 · 장비의 표본 부족 보완</td></tr>
+            </tbody>
+          </table></div>
+          <div class="sk-scroll"><table class="sk-table">
+            <thead><tr><th>위험</th><th>설명</th></tr></thead>
+            <tbody>
+              <tr><td class="mm-bad">허위 병변</td><td>없는 병변을 그럴듯하게 그림 → 학습 데이터 오염</td></tr>
+              <tr><td class="mm-bad">분포 이동</td><td>생성 영상만 늘리면 생성물의 특징을 학습</td></tr>
+              <tr><td class="mm-bad">재식별</td><td>학습 데이터를 외워 뱉는 경우 보고됨</td></tr>
+              <tr><td class="mm-bad">규제</td><td>합성 데이터로 학습한 의료기기는 출처·검증 절차 문서화</td></tr>
+            </tbody>
+          </table></div>
+          <p class="sk-note--warn sk-note"><b>원칙</b>: 생성 영상은 <b>학습에만</b>. 검증 · 성능 보고에는 절대 쓰지 않습니다. 실습 노트북은 확산 inpainting(가중치 약 4GB, CPU 1장 3 ~ 10분)을 RUN_DIFFUSION = False 로 두고 개념만 확인합니다.</p>
+        </div>
+      </div>
+    </div>
+   </div>
+  </section>
+
+  <!-- ================= 6. 한계와 안전장치 ================= -->
+  <section id="pane-f" role="tabpanel" aria-labelledby="tab-f" hidden>
+   <div class="mm-col">
+    <div class="sk-card">
+      <div class="sk-head"><h2>한계와 안전장치</h2><span class="sk-hint">실습 노트북의 해석과 Review 를 정리</span></div>
+      <div class="mm-warns">
+        <div class="sk-note sk-note--warn"><h3>SAM 마스크는 정답이 아니다</h3><p>박스채움보다 나을 뿐 <b>또 다른 예측</b>입니다. 규칙 필터(fill_ratio) 없이 그대로 쓰면 SAM 의 실패가 학습 데이터에 그대로 들어갑니다. 걸러진 것은 사람이 검수합니다.</p></div>
+        <div class="sk-note sk-note--warn"><h3>자기 확신은 검증이 아니다</h3><p>iou_scores 평균 0.875 는 SAM 이 <b>스스로 매긴 점수</b>입니다. 정답과 비교한 값이 아니므로 품질 보고의 근거가 될 수 없습니다.</p></div>
+        <div class="sk-note sk-note--warn"><h3>도메인 시프트 · 클립 종속성</h3><p>P05 촬영분만으로 학습한 U-Net 은 다른 시나리오에서 Dice 중앙값 0 으로 무너졌습니다. 평가는 클립·시나리오를 나누어 보고, 배치 현장의 촬영 조건을 포함해야 합니다.</p></div>
+        <div class="sk-note sk-note--warn"><h3>의료 영상에 SAM 을 그대로 쓰지 않는다</h3><p>연조직 경계 · 3D 볼륨 · 창(window) 설정 때문에 실패합니다. 도구 · 기구처럼 자연 영상에 가까운 대상에만 잘 듣습니다. 의료 영상은 MedSAM · SAM 2 계열과 별도 검증이 필요합니다.</p></div>
+        <div class="sk-note sk-note--warn"><h3>개방형 어휘는 탐색 도구</h3><p>텍스트로 클래스를 정의하는 검출은 후보를 좁히는 데 유용하지만 <b>확정 근거로는 부적합</b>합니다. 매칭 표로 클래스 이름을 확정하지 않고, 사람이 crop 을 보고 확인합니다.</p></div>
+        <div class="sk-note sk-note--warn"><h3>VLM 의 답은 최종 결론이 아니다</h3><p>환각 · 계수 오류 · 프롬프트 민감 · <b>근거 부재</b>. 쓰더라도 초안 작성 · 검색 · 요약 보조로, 출력에 근거 영역(박스 · 마스크)을 함께 요구하고, 사람 확인 없이 기록에 남기지 않습니다.</p></div>
+        <div class="sk-note sk-note--warn"><h3>생성 데이터는 학습에만</h3><p>지우기 · 붙여 넣기 · 확산 모형으로 만든 영상은 검증 · 성능 보고에 넣으면 결과가 부풀려집니다. 합성본은 별도 모형으로 검증하고, 출처와 절차를 문서화합니다. 확산 모형은 허위 병변 · 재식별 위험이 있습니다.</p></div>
+        <div class="sk-note sk-note--warn"><h3>현장 처치 판단을 대신하지 않는다</h3><p>도구 탐지 · 판별은 교육 · 기록 · 라벨링 보조입니다. 부상자 처치와 임상 · 작전 판단은 훈련된 사람이 하며, 모형 출력은 사람 검토를 거친 참고 정보로만 씁니다.</p></div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>정리 (Review)</h2><span class="mm-tag mm-tag--nb">실습 노트북</span></div>
+      <div class="sk-scroll"><table class="sk-table">
+        <thead><tr><th>주제</th><th>핵심</th></tr></thead>
+        <tbody>
+          <tr><td>라벨 비용</td><td>분류 : 박스 : 마스크 = 초 : 분 : <b>10분 이상</b> / 분할 라벨은 사람이 만들 수 없는 규모</td></tr>
+          <tr><td>파운데이션 모델</td><td>특정 과제가 아니라 넓은 입력에 대한 일반 능력을 대규모 사전학습으로 획득</td></tr>
+          <tr><td>SAM 구조</td><td>무거운 Image Encoder 는 이미지당 1회, 가벼운 Mask Decoder 는 프롬프트마다</td></tr>
+          <tr><td>프롬프트</td><td>점은 모호(후보 3개) / 박스는 모호성이 거의 없음 → 기존 검출 라벨 재사용</td></tr>
+          <tr><td>마스크 승격</td><td>SAM 마스크는 박스 면적의 약 30% → 박스채움 라벨은 전경을 3배 부풀렸음</td></tr>
+          <tr><td>자기 확신</td><td>iou_scores 는 모형이 스스로 매긴 점수이지 검증 결과가 아님</td></tr>
+          <tr><td>자동 라벨링</td><td>SAM 은 어디만 안다. 무엇은 박스가 알려 줌 / 필터 + 사람 검수 없이 쓰면 오류 전파</td></tr>
+          <tr><td>의료 영상의 SAM</td><td>연조직 경계 · 3D · 창 설정 때문에 그대로는 실패 → MedSAM · SAM 2</td></tr>
+          <tr><td>개방형 어휘 검출</td><td>탐색 도구로는 유용, 확정 근거로는 부적합</td></tr>
+          <tr><td>VLM 의 답</td><td>환각 · 계수 오류 · 프롬프트 민감 · 근거 부재 → 판별의 최종 결론으로 쓸 수 없음</td></tr>
+          <tr><td>이미지 생성</td><td>편집 · 합성 · 확산 / 앞의 둘은 SAM 마스크가 있어야 성립</td></tr>
+          <tr><td>copy-paste</td><td>이미지와 라벨이 함께 생성 / 생성 결과는 반드시 별도 모형으로 검증</td></tr>
+          <tr><td>생성 데이터 원칙</td><td>학습에만 사용 / 검증 · 성능 보고에 넣으면 결과가 부풀려짐</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+   </div>
+  </section>
+
+  <!-- ================= 7. 알고리즘 구성도 ================= -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">강의 슬라이드 3장 · 사례 흐름 · SAM 구조 · VLM 판별과 생성</span></div><div data-ds-diagrams="tccc-tool-detection"></div></section>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20261002c"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261002c"></script>
+<script src="../../assets/diagrams/tccc-tool-detection.js?v=20261002c"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const W = 640, H = 360, N = W * H;
+  const TAU2 = Math.PI * 2;
+
+  /* ---------------- 공통 도구 ---------------- */
+  function rngOf(seed) { let a = seed >>> 0; return function () { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function hashStr(s) { let h = 2166136261 >>> 0; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h >>> 0; }
+  function gauss(r) { let u = 0, v = 0; while (u === 0) u = r(); v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU2 * v); }
+  const f = (v, d = 3) => Number.isFinite(v) ? v.toFixed(d) : "—";
+  const pc = (v, d = 1) => Number.isFinite(v) ? (v * 100).toFixed(d) + "%" : "—";
+  const nf = v => Number(v).toLocaleString("ko-KR");
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+  const mean = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : NaN;
+  function median(a) { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+  function cssv(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+  const _cc = document.createElement("canvas"); _cc.width = _cc.height = 1; const _cx = _cc.getContext("2d", { willReadFrequently: true });
+  function rgbOf(col) { _cx.clearRect(0, 0, 1, 1); _cx.fillStyle = "#000"; _cx.fillStyle = col; _cx.fillRect(0, 0, 1, 1); const d = _cx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2]]; }
+  const DPR = () => Math.min(window.devicePixelRatio || 1, 2);
+  function setupCv(cv, w, h) { const d = DPR(); if (cv.width !== Math.round(w * d)) { cv.width = Math.round(w * d); cv.height = Math.round(h * d); } const c = cv.getContext("2d"); c.setTransform(d, 0, 0, d, 0, 0); c.imageSmoothingEnabled = true; return c; }
+  function newCanvas(w, h) { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; }
+  function segBind(id, cb) { const el = $(id); el.querySelectorAll("button").forEach(b => b.addEventListener("click", () => { el.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); cb(b.dataset.v); })); }
+  function segVal(id) { const b = $(id).querySelector('button[aria-pressed="true"]'); return b ? b.dataset.v : null; }
+  function segSet(id, v) { $(id).querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x.dataset.v === v)); }
+
+  /* ---------------- 모의 도구 7종 + 손 ---------------- */
+  const TYPES = [
+    { ko: "지혈대", en: "tourniquet", ext: 86 },
+    { ko: "외상 가위", en: "trauma shears", ext: 68 },
+    { ko: "거즈", en: "gauze", ext: 54 },
+    { ko: "주사기", en: "syringe", ext: 74 },
+    { ko: "의료용 테이프", en: "medical tape", ext: 28 },
+    { ko: "비인두 기도 튜브", en: "breathing tube", ext: 46 },
+    { ko: "압박 붕대", en: "pressure bandage", ext: 44 },
+    { ko: "손 (라벨 없음)", en: "human hand", ext: 64 }
+  ];
+  const NCLS = 7, HAND = 7;
+  const KCOL = k => cssv("--k" + k);
+
+  function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+  const P = (m, col) => m ? "#fff" : col;
+  const DRAW = [
+    function (c, m) { // 지혈대: 끈 + 막대(windlass) + 빨간 탭
+      rr(c, -75, -11, 150, 22, 8); c.fillStyle = P(m, "#1d1f23"); c.fill();
+      rr(c, -68, -4, 116, 8, 3); c.fillStyle = P(m, "#3c4047"); c.fill();
+      rr(c, -28, -34, 12, 68, 5); c.fillStyle = P(m, "#2b2c2f"); c.fill();
+      rr(c, -2, -15, 22, 30, 4); c.fillStyle = P(m, "#34373c"); c.fill();
+      rr(c, 62, -12, 22, 24, 4); c.fillStyle = P(m, "#c62828"); c.fill();
+    },
+    function (c, m) { // 외상 가위: 날 2개 + 손잡이 고리 2개
+      c.fillStyle = P(m, "#c5cad1");
+      c.beginPath(); c.moveTo(-6, -5); c.lineTo(66, -2); c.lineTo(68, 1); c.lineTo(-6, 3); c.closePath(); c.fill();
+      c.beginPath(); c.moveTo(-6, 2); c.lineTo(60, 7); c.lineTo(58, 10); c.lineTo(-6, 7); c.closePath(); c.fill();
+      c.strokeStyle = P(m, "#1f5fbf"); c.lineCap = "round"; c.lineWidth = 7;
+      c.beginPath(); c.moveTo(-6, -1); c.lineTo(-20, -12); c.stroke();
+      c.beginPath(); c.moveTo(-6, 5); c.lineTo(-20, 16); c.stroke();
+      c.lineWidth = 6;
+      c.beginPath(); c.ellipse(-34, -15, 15, 10, 0.2, 0, TAU2); c.stroke();
+      c.beginPath(); c.ellipse(-34, 19, 15, 10, -0.2, 0, TAU2); c.stroke();
+      c.fillStyle = P(m, "#7d838c"); c.beginPath(); c.arc(-5, 2, 4, 0, TAU2); c.fill();
+    },
+    function (c, m) { // 거즈
+      rr(c, -30, -21, 60, 42, 9); c.fillStyle = P(m, "#ece7da"); c.fill();
+      if (!m) { c.strokeStyle = "#cfc8b6"; c.lineWidth = 2; for (let x = -22; x <= 18; x += 8) { c.beginPath(); c.moveTo(x, -18); c.lineTo(x + 3, 18); c.stroke(); } }
+      rr(c, 26, -15, 26, 30, 3); c.fillStyle = P(m, "#f4f1e9"); c.fill();
+    },
+    function (c, m) { // 주사기 (반투명 몸통)
+      rr(c, -68, -9, 6, 18, 2); c.fillStyle = P(m, "#d6d9db"); c.fill();
+      c.fillStyle = P(m, "#e9eaea"); c.fillRect(-63, -3, 26, 6);
+      rr(c, -42, -14, 5, 28, 2); c.fillStyle = P(m, "#c9d3d8"); c.fill();
+      if (m) { c.fillStyle = "#fff"; c.fillRect(-38, -8, 78, 16); }
+      else {
+        c.fillStyle = "rgba(214,228,234,0.72)"; c.fillRect(-38, -8, 78, 16);
+        c.strokeStyle = "#8fa3ab"; c.lineWidth = 1; c.strokeRect(-37.5, -7.5, 77, 15);
+        c.beginPath(); for (let x = -30; x <= 34; x += 8) { c.moveTo(x, -7); c.lineTo(x, -3); } c.stroke();
+        c.fillStyle = "#3d6fb0"; c.fillRect(-37, -6, 6, 12);
+      }
+      c.fillStyle = P(m, "#3aa35b"); c.fillRect(40, -4, 9, 8);
+      c.fillStyle = P(m, "#9aa0a6"); c.fillRect(49, -1.3, 24, 2.6);
+    },
+    function (c, m) { // 테이프 고리 (가운데 구멍)
+      c.beginPath(); c.arc(0, 0, 27, 0, TAU2); c.arc(0, 0, 13, 0, TAU2, true); c.fillStyle = P(m, "#f1f1ee"); c.fill();
+      if (!m) { c.beginPath(); c.arc(0, 0, 16, 0, TAU2); c.arc(0, 0, 13, 0, TAU2, true); c.fillStyle = "#a8814f"; c.fill(); c.strokeStyle = "#cfcfca"; c.lineWidth = 1; c.beginPath(); c.arc(0, 0, 23, 0, TAU2); c.stroke(); }
+    },
+    function (c, m) { // 비인두 기도 튜브 (휜 관)
+      c.strokeStyle = P(m, "#e0914f"); c.lineWidth = 10; c.lineCap = "round";
+      c.beginPath(); c.arc(0, 30, 44, -2.4, -0.75); c.stroke();
+      c.fillStyle = P(m, "#cf6f26"); c.beginPath(); c.ellipse(-33, 1, 6, 14, -0.75, 0, TAU2); c.fill();
+    },
+    function (c, m) { // 압박 붕대 (국방색 포장)
+      rr(c, -36, -24, 72, 48, 7); c.fillStyle = P(m, "#58673b"); c.fill();
+      if (!m) { c.strokeStyle = "#4a5731"; c.lineWidth = 2; rr(c, -32, -20, 64, 40, 5); c.stroke(); rr(c, -20, -11, 40, 15, 2); c.fillStyle = "#cdc7a3"; c.fill(); c.fillStyle = "#58673b"; c.fillRect(-15, -7, 30, 2); c.fillRect(-15, -2, 22, 2); }
+    },
+    function (c, m) { // 손 + 소매
+      rr(c, -23, 16, 46, 46, 7); c.fillStyle = P(m, "#6b6e47"); c.fill();
+      if (!m) { c.fillStyle = "#4f5535"; c.beginPath(); c.ellipse(-8, 34, 9, 6, 0.4, 0, TAU2); c.fill(); c.fillStyle = "#8a8560"; c.beginPath(); c.ellipse(9, 46, 8, 5, -0.3, 0, TAU2); c.fill(); }
+      const sk = P(m, "#c8957a"); c.fillStyle = sk;
+      c.beginPath(); c.ellipse(0, 0, 19, 23, 0, 0, TAU2); c.fill();
+      for (let i = 0; i < 4; i++) { rr(c, -16 + i * 8.6, -46, 8, 30, 4); c.fill(); }
+      c.save(); c.translate(17, 2); c.rotate(-0.7); rr(c, -4, -26, 9, 26, 4.5); c.fill(); c.restore();
+      if (!m) { c.strokeStyle = "#a9735c"; c.lineWidth = 1.2; for (let i = 1; i < 4; i++) { c.beginPath(); c.moveTo(-16 + i * 8.6 - 0.3, -38); c.lineTo(-16 + i * 8.6 - 0.3, -18); c.stroke(); } }
+    }
+  ];
+
+  /* ---------------- 장면 생성 (seed 고정) ---------------- */
+  const wc = newCanvas(W, H), wx = wc.getContext("2d", { willReadFrequently: true });
+  const mc = newCanvas(W, H), mx = mc.getContext("2d", { willReadFrequently: true });
+  const s1 = newCanvas(42, 24), s1x = s1.getContext("2d");
+  const s2 = newCanvas(162, 92), s2x = s2.getContext("2d");
+
+  function drawBackground(c, r, meta) {
+    const d1 = s1x.createImageData(42, 24);
+    for (let i = 0; i < 42 * 24; i++) {
+      const v = r(), g = r() * 0.6;
+      const R = 96 + 38 * v, G = 90 + 22 * v, B = 56 + 20 * v;
+      d1.data[i * 4] = R * (1 - g) + 84 * g; d1.data[i * 4 + 1] = G * (1 - g) + 98 * g; d1.data[i * 4 + 2] = B * (1 - g) + 58 * g; d1.data[i * 4 + 3] = 255;
+    }
+    s1x.putImageData(d1, 0, 0);
+    c.imageSmoothingEnabled = true; c.imageSmoothingQuality = "high";
+    c.drawImage(s1, 0, 0, 42, 24, -10, -10, W + 20, H + 20);
+    const d2 = s2x.createImageData(162, 92);
+    for (let i = 0; i < 162 * 92; i++) { const v = r(); if (v < 0.5) { d2.data[i * 4 + 3] = (0.5 - v) * 90; } else { d2.data[i * 4] = d2.data[i * 4 + 1] = d2.data[i * 4 + 2] = 255; d2.data[i * 4 + 3] = (v - 0.5) * 60; } }
+    s2x.putImageData(d2, 0, 0);
+    c.drawImage(s2, 0, 0, 162, 92, -2, -2, W + 4, H + 4);
+    if (r() < 0.6) { // 판초 깔개
+      const left = r() < 0.5, xa = 120 + r() * 180, xb = xa + (r() - 0.5) * 160;
+      c.beginPath();
+      if (left) { c.moveTo(-10, -10); c.lineTo(xa, -10); c.lineTo(xb, H + 10); c.lineTo(-10, H + 10); }
+      else { c.moveTo(W + 10, -10); c.lineTo(W - xa, -10); c.lineTo(W - xb, H + 10); c.lineTo(W + 10, H + 10); }
+      c.closePath(); c.fillStyle = "rgba(80,93,60,0.95)"; c.fill();
+      c.strokeStyle = "rgba(58,68,42,0.7)"; c.lineWidth = 2;
+      for (let k = 0; k < 3; k++) { const y0 = r() * H; c.beginPath(); c.moveTo(left ? 0 : W, y0); c.lineTo(left ? xa * 0.8 : W - xa * 0.8, y0 + (r() - 0.5) * 80); c.stroke(); }
+    }
+    meta.leg = null;
+    if (r() < 0.5) { // 부상자 다리 (위장 무늬)
+      const lx = 150 + r() * 340, ly = 110 + r() * 140, la = (r() - 0.5) * 1.4;
+      c.save(); c.translate(lx, ly); c.rotate(la); rr(c, -300, -28, 600, 56, 24); c.clip();
+      c.fillStyle = "#7a7b57"; c.fillRect(-310, -40, 620, 80);
+      const cols = ["#5d6440", "#9a8f68", "#4d4a3a"];
+      for (let k = 0; k < 26; k++) { c.fillStyle = cols[k % 3]; c.beginPath(); c.ellipse(-290 + r() * 580, -28 + r() * 56, 8 + r() * 14, 5 + r() * 8, r() * 3, 0, TAU2); c.fill(); }
+      const gr = c.createLinearGradient(0, -28, 0, 28); gr.addColorStop(0, "rgba(0,0,0,0.28)"); gr.addColorStop(0.3, "rgba(0,0,0,0)"); gr.addColorStop(0.75, "rgba(0,0,0,0)"); gr.addColorStop(1, "rgba(0,0,0,0.32)");
+      c.fillStyle = gr; c.fillRect(-310, -40, 620, 80);
+      c.restore();
+      meta.leg = { x: lx, y: ly, a: la };
+    }
+    const ns = 6 + Math.floor(r() * 8);
+    for (let k = 0; k < ns; k++) { const g = 110 + r() * 50, x = r() * W, y = r() * H, rx = 3 + r() * 6, ry = 2 + r() * 4, a = r() * 3;
+      c.fillStyle = "rgba(40,36,24,0.35)"; c.beginPath(); c.ellipse(x + 1.5, y + 1.5, rx, ry, a, 0, TAU2); c.fill();
+      c.fillStyle = `rgb(${g | 0},${(g - 4) | 0},${(g - 12) | 0})`; c.beginPath(); c.ellipse(x, y, rx, ry, a, 0, TAU2); c.fill(); }
+  }
+
+  function placeObjects(r, meta) {
+    const objs = [];
+    const nT = 2 + Math.floor(r() * 4);
+    const types = [];
+    for (let i = 0; i < nT; i++) { let t = Math.floor(r() * NCLS); if (types.includes(t) && r() < 0.75) t = Math.floor(r() * NCLS); types.push(t); }
+    for (const t of types) {
+      for (let tr = 0; tr < 80; tr++) {
+        const s = 0.82 + 0.3 * r(); let a = r() * TAU2; const R = TYPES[t].ext * s;
+        let x, y;
+        if (t === 0 && meta.leg && r() < 0.8) { const u = (r() - 0.5) * 300; x = meta.leg.x + Math.cos(meta.leg.a) * u; y = meta.leg.y + Math.sin(meta.leg.a) * u; a = meta.leg.a + Math.PI / 2 + (r() - 0.5) * 0.5; }
+        else { x = R + 6 + r() * Math.max(1, W - 2 * R - 12); y = Math.min(R, 120) + 6 + r() * Math.max(1, H - 2 * Math.min(R, 120) - 12); }
+        // 실제 회전 범위로 화면 안 검사 (대략)
+        const ex = Math.abs(Math.cos(a)) * R + Math.abs(Math.sin(a)) * R * 0.45, ey = Math.abs(Math.sin(a)) * R + Math.abs(Math.cos(a)) * R * 0.45;
+        if (x - ex < 4 || x + ex > W - 4 || y - ey < 4 || y + ey > H - 4) continue;
+        let ok = true; for (const o of objs) { const d = Math.hypot(o.x - x, o.y - y); if (d < (TYPES[o.type].ext * o.s + R) * 0.62) { ok = false; break; } }
+        if (!ok) continue;
+        objs.push({ type: t, x, y, a, s }); break;
+      }
+    }
+    if (objs.length && r() < 0.55) { // 도구를 쥔 손
+      const j = Math.floor(r() * objs.length), o = objs[j];
+      const dir = r() * TAU2, dd = TYPES[o.type].ext * o.s * 0.5 + 18;
+      const hx = clamp(o.x + Math.cos(dir) * dd, 34, W - 34), hy = clamp(o.y + Math.sin(dir) * dd, 34, H - 34);
+      const ang = Math.atan2(o.y - hy, o.x - hx) + Math.PI / 2;
+      objs.push({ type: HAND, x: hx, y: hy, a: ang, s: 0.9 + 0.2 * r(), holds: j });
+    }
+    return objs;
+  }
+
+  function drawObj(c, o, mono) { c.save(); c.translate(o.x, o.y); c.rotate(o.a); c.scale(o.s, o.s); DRAW[o.type](c, mono); c.restore(); }
+
+  function makeScene(seed) {
+    const r = rngOf(seed * 9973 + 17), meta = {};
+    wx.setTransform(1, 0, 0, 1, 0, 0); wx.clearRect(0, 0, W, H);
+    drawBackground(wx, r, meta);
+    const objs = placeObjects(r, meta);
+    objs.forEach(o => drawObj(wx, o, false));
+    const id = wx.getImageData(0, 0, W, H), img = id.data;
+    for (let i = 0; i < N; i++) { const n = (r() - 0.5) * 12; img[i * 4] += n; img[i * 4 + 1] += n; img[i * 4 + 2] += n; }
+    const owner = new Int8Array(N).fill(-1);
+    objs.forEach((o, k) => {
+      o.id = k; const R = Math.ceil(TYPES[o.type].ext * o.s * 1.3 + 14);
+      const rx = clamp(Math.floor(o.x - R), 0, W - 1), ry = clamp(Math.floor(o.y - R), 0, H - 1);
+      const rw = clamp(Math.ceil(o.x + R), 1, W) - rx, rh = clamp(Math.ceil(o.y + R), 1, H) - ry;
+      mx.setTransform(1, 0, 0, 1, 0, 0); mx.clearRect(rx, ry, rw, rh);
+      drawObj(mx, o, true);
+      const d = mx.getImageData(rx, ry, rw, rh).data; let full = 0;
+      for (let yy = 0; yy < rh; yy++) for (let xx = 0; xx < rw; xx++) { if (d[(yy * rw + xx) * 4 + 3] > 127) { owner[(ry + yy) * W + rx + xx] = k; full++; } }
+      o.fullPx = full; o.visPx = 0; o.bb = [W, H, 0, 0];
+    });
+    for (let i = 0; i < N; i++) { const k = owner[i]; if (k < 0) continue; const o = objs[k], x = i % W, y = (i / W) | 0; o.visPx++; if (x < o.bb[0]) o.bb[0] = x; if (y < o.bb[1]) o.bb[1] = y; if (x + 1 > o.bb[2]) o.bb[2] = x + 1; if (y + 1 > o.bb[3]) o.bb[3] = y + 1; }
+    objs.forEach(o => { o.vis = o.fullPx ? o.visPx / o.fullPx : 0; if (!o.visPx) o.bb = [0, 0, 0, 0]; });
+    const tools = objs.filter(o => o.type < NCLS && o.visPx > 0);
+    return { seed, img: new Uint8ClampedArray(img), owner, objs, tools, leg: meta.leg, bl: null, cv: null };
+  }
+  function sceneCanvas(sc) {
+    if (sc.cv) return sc.cv;
+    const c = newCanvas(W, H); c.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(sc.img), W, H), 0, 0); sc.cv = c; return c;
+  }
+  function imgCanvas(img) { const c = newCanvas(W, H); c.getContext("2d").putImageData(new ImageData(img, W, H), 0, 0); return c; }
+  function yolo(o) { const b = o.bb; return { cls: o.type, cx: (b[0] + b[2]) / 2 / W, cy: (b[1] + b[3]) / 2 / H, w: (b[2] - b[0]) / W, h: (b[3] - b[1]) / H }; }
+
+  /* ---------------- 픽셀 연산: 흐림, 영역 확장, 박스 프롬프트, Otsu ---------------- */
+  function blurPlanes(img, w, h) {
+    const n = w * h, out = { r: new Float32Array(n), g: new Float32Array(n), b: new Float32Array(n), w, h }, tmp = new Float32Array(n);
+    [["r", 0], ["g", 1], ["b", 2]].forEach(([k, ch]) => {
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let s = 0, c = 0; for (let d = -1; d <= 1; d++) { const xx = x + d; if (xx < 0 || xx >= w) continue; s += img[(y * w + xx) * 4 + ch]; c++; } tmp[y * w + x] = s / c; }
+      const o = out[k];
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let s = 0, c = 0; for (let d = -1; d <= 1; d++) { const yy = y + d; if (yy < 0 || yy >= h) continue; s += tmp[yy * w + x]; c++; } o[y * w + x] = s / c; }
+    });
+    return out;
+  }
+  function ensureBlur(sc) { if (!sc.bl) sc.bl = blurPlanes(sc.img, W, H); return sc.bl; }
+  const STAMP = new Uint32Array(N); let GEN = 1; const QUEUE = new Int32Array(N);
+  function cdist(bl, i, c) { const dr = bl.r[i] - c[0], dg = bl.g[i] - c[1], db = bl.b[i] - c[2]; return Math.sqrt(2 * dr * dr + 4 * dg * dg + 3 * db * db) / 3; }
+  function seedCol(bl, x, y) { let a = 0, b = 0, c = 0, n = 0; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const xx = clamp(x + dx, 0, bl.w - 1), yy = clamp(y + dy, 0, bl.h - 1), i = yy * bl.w + xx; a += bl.r[i]; b += bl.g[i]; c += bl.b[i]; n++; } return [a / n, b / n, c / n]; }
+  function grow(bl, x, y, tol) {
+    const w = bl.w, h = bl.h, n = w * h; x = clamp(Math.round(x), 0, w - 1); y = clamp(Math.round(y), 0, h - 1);
+    const c = seedCol(bl, x, y), m = new Uint8Array(n); GEN++; let hd = 0, tl = 0; const s = y * w + x; QUEUE[tl++] = s; STAMP[s] = GEN; let area = 0;
+    while (hd < tl) {
+      const i = QUEUE[hd++];
+      if (i !== s && cdist(bl, i, c) >= tol) continue;
+      m[i] = 1; area++; const px = i % w;
+      if (px > 0 && STAMP[i - 1] !== GEN) { STAMP[i - 1] = GEN; QUEUE[tl++] = i - 1; }
+      if (px < w - 1 && STAMP[i + 1] !== GEN) { STAMP[i + 1] = GEN; QUEUE[tl++] = i + 1; }
+      if (i >= w && STAMP[i - w] !== GEN) { STAMP[i - w] = GEN; QUEUE[tl++] = i - w; }
+      if (i < n - w && STAMP[i + w] !== GEN) { STAMP[i + w] = GEN; QUEUE[tl++] = i + w; }
+    }
+    return { m, area };
+  }
+  function keepConnected(m, w, h, seeds) {
+    const n = w * h, out = new Uint8Array(n); GEN++; let hd = 0, tl = 0, area = 0;
+    seeds.forEach(p => { const i = clamp(Math.round(p.y), 0, h - 1) * w + clamp(Math.round(p.x), 0, w - 1); if (m[i] && STAMP[i] !== GEN) { STAMP[i] = GEN; QUEUE[tl++] = i; } });
+    while (hd < tl) { const i = QUEUE[hd++]; out[i] = 1; area++; const px = i % w;
+      const nb = [px > 0 ? i - 1 : -1, px < w - 1 ? i + 1 : -1, i >= w ? i - w : -1, i < n - w ? i + w : -1];
+      for (const j of nb) if (j >= 0 && m[j] && STAMP[j] !== GEN) { STAMP[j] = GEN; QUEUE[tl++] = j; } }
+    return { m: out, area };
+  }
+  function maskFromPoints(bl, pos, neg, tol) {
+    const n = bl.w * bl.h; let m = new Uint8Array(n);
+    pos.forEach(p => { const g = grow(bl, p.x, p.y, tol); for (let i = 0; i < n; i++) if (g.m[i]) m[i] = 1; });
+    if (neg.length) {
+      neg.forEach(p => { const g = grow(bl, p.x, p.y, tol * 0.6); for (let i = 0; i < n; i++) if (g.m[i]) m[i] = 0;
+        for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const xx = Math.round(p.x) + dx, yy = Math.round(p.y) + dy; if (xx >= 0 && yy >= 0 && xx < bl.w && yy < bl.h) m[yy * bl.w + xx] = 0; } });
+      return keepConnected(m, bl.w, bl.h, pos);
+    }
+    let a = 0; for (let i = 0; i < n; i++) a += m[i]; return { m, area: a };
+  }
+  function iouMask(a, b) { let I = 0, U = 0; for (let i = 0; i < a.length; i++) { const x = a[i], y = b[i]; if (x && y) I++; if (x || y) U++; } return U ? I / U : 1; }
+  /* 점 프롬프트 후보 3개: ① 클릭한 색에서 번진 부분  ② 그 주변 창(window)에서 배경과 다른 덩어리  ③ 더 넓은 창 */
+  const LEVELS = [[0.8, 16], [2.2, 48]];
+  function pointCandidates(bl, pos, neg, base, levels = LEVELS) {
+    const BW = bl.w, BH = bl.h, n = BW * BH;
+    const c1 = maskFromPoints(bl, pos, neg, base * 0.7), l1 = maskFromPoints(bl, pos, neg, base * 0.6), h1 = maskFromPoints(bl, pos, neg, base * 0.82);
+    const out = [{ m: c1.m, area: c1.area, score: iouMask(l1.m, h1.m) }];
+    let x0 = BW, y0 = BH, x1 = 0, y1 = 0;
+    for (let i = 0; i < n; i++) if (c1.m[i]) { const x = i % BW, y = (i / BW) | 0; if (x < x0) x0 = x; if (y < y0) y0 = y; if (x + 1 > x1) x1 = x + 1; if (y + 1 > y1) y1 = y + 1; }
+    pos.forEach(p => { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x + 1); y1 = Math.max(y1, p.y + 1); });
+    const size = Math.max(x1 - x0, y1 - y0);
+    const negM = new Uint8Array(n);
+    neg.forEach(p => { const g = grow(bl, p.x, p.y, base * 0.6); for (let i = 0; i < n; i++) if (g.m[i]) negM[i] = 1; });
+    levels.forEach(([mul, mn]) => {
+      const mg = Math.max(mn, mul * size), bm = boxMaskBL(bl, [x0 - mg, y0 - mg, x1 + mg, y1 + mg], base * 0.88);
+      const fin = key => { const g = toGlobal(bm, key, BW, BH); for (let i = 0; i < n; i++) { if (c1.m[i]) g[i] = 1; if (negM[i]) g[i] = 0; } return keepConnected(g, BW, BH, pos); };
+      const a = fin("m"), lo = fin("lo"), hi = fin("hi");
+      out.push({ m: a.m, area: a.area, score: iouMask(lo.m, hi.m) });
+    });
+    return out;
+  }
+  function components(m, w, h) { // 4-연결 성분 라벨
+    const lab = new Int32Array(w * h), areas = [0]; let L = 0;
+    for (let s = 0; s < w * h; s++) { if (!m[s] || lab[s]) continue; L++; let hd = 0, tl = 0, a = 0; QUEUE[tl++] = s; lab[s] = L;
+      while (hd < tl) { const i = QUEUE[hd++]; a++; const px = i % w;
+        if (px > 0 && m[i - 1] && !lab[i - 1]) { lab[i - 1] = L; QUEUE[tl++] = i - 1; }
+        if (px < w - 1 && m[i + 1] && !lab[i + 1]) { lab[i + 1] = L; QUEUE[tl++] = i + 1; }
+        if (i >= w && m[i - w] && !lab[i - w]) { lab[i - w] = L; QUEUE[tl++] = i - w; }
+        if (i < w * h - w && m[i + w] && !lab[i + w]) { lab[i + w] = L; QUEUE[tl++] = i + w; } }
+      areas.push(a); }
+    return { lab, areas };
+  }
+  function cleanSmall(m, w, h) {
+    const { lab, areas } = components(m, w, h); const mxA = Math.max(0, ...areas.slice(1)); const keep = areas.map(a => a >= Math.max(12, 0.1 * mxA));
+    let area = 0; const out = new Uint8Array(w * h); for (let i = 0; i < w * h; i++) if (lab[i] && keep[lab[i]]) { out[i] = 1; area++; } return { m: out, area };
+  }
+  function boxMaskBL(bl, box, thr) {
+    const BW = bl.w, BH = bl.h;
+    const x0 = clamp(Math.floor(box[0]), 0, BW - 1), y0 = clamp(Math.floor(box[1]), 0, BH - 1), x1 = clamp(Math.ceil(box[2]), x0 + 1, BW), y1 = clamp(Math.ceil(box[3]), y0 + 1, BH);
+    const w = x1 - x0, h = y1 - y0; if (w < 3 || h < 3) return null;
+    const mg = 4, rx0 = Math.max(0, x0 - mg), ry0 = Math.max(0, y0 - mg), rx1 = Math.min(BW - 1, x1 - 1 + mg), ry1 = Math.min(BH - 1, y1 - 1 + mg);
+    const per = 2 * (rx1 - rx0 + ry1 - ry0), step = Math.max(1, Math.floor(per / 120)), S = [];
+    const add = (x, y) => { const i = y * BW + x; S.push([bl.r[i], bl.g[i], bl.b[i]]); };
+    for (let x = rx0; x <= rx1; x += step) { add(x, ry0); add(x, ry1); }
+    for (let y = ry0; y <= ry1; y += step) { add(rx0, y); add(rx1, y); }
+    const lowT = thr * 0.8, dmap = new Float32Array(w * h);
+    for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
+      const i = (y0 + yy) * BW + x0 + xx; let md = 1e9;
+      for (let k = 0; k < S.length; k++) { const s = S[k], dr = bl.r[i] - s[0], dg = bl.g[i] - s[1], db = bl.b[i] - s[2]; const d = Math.sqrt(2 * dr * dr + 4 * dg * dg + 3 * db * db) / 3; if (d < md) { md = d; if (md < lowT) break; } }
+      dmap[yy * w + xx] = md;
+    }
+    const mk = t => { const m = new Uint8Array(w * h); for (let i = 0; i < w * h; i++) if (dmap[i] > t) m[i] = 1; return cleanSmall(m, w, h); };
+    const mm = mk(thr), lo = mk(thr * 0.8), hi = mk(thr * 1.25);
+    return { x0, y0, w, h, m: mm.m, area: mm.area, score: iouMask(lo.m, hi.m), lo: lo.m, hi: hi.m };
+  }
+  function boxMask(sc, box, thr) { return boxMaskBL(ensureBlur(sc), box, thr); }
+  function toGlobal(bm, key = "m", BW = W, BH = H) { const g = new Uint8Array(BW * BH); if (!bm) return g; const m = bm[key]; for (let yy = 0; yy < bm.h; yy++) for (let xx = 0; xx < bm.w; xx++) if (m[yy * bm.w + xx]) g[(bm.y0 + yy) * BW + bm.x0 + xx] = 1; return g; }
+  function boxIntRect(b) { return [Math.max(0, Math.floor(b[0])), Math.max(0, Math.floor(b[1])), Math.min(W, Math.ceil(b[2])), Math.min(H, Math.ceil(b[3]))]; }
+  function otsuRatio(img, box) {
+    const [x0, y0, x1, y1] = boxIntRect(box); const hist = new Float64Array(256); let n = 0; const g = [];
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const i = (y * W + x) * 4; const v = Math.round(0.299 * img[i] + 0.587 * img[i + 1] + 0.114 * img[i + 2]); hist[v]++; g.push(v); n++; }
+    if (!n) return NaN;
+    let sum = 0; for (let t = 0; t < 256; t++) sum += t * hist[t];
+    let sumB = 0, wB = 0, best = -1, thr = 0;
+    for (let t = 0; t < 256; t++) { wB += hist[t]; if (!wB) continue; const wF = n - wB; if (!wF) break; sumB += t * hist[t]; const mB = sumB / wB, mF = (sum - sumB) / wF, v = wB * wF * (mB - mF) * (mB - mF); if (v > best) { best = v; thr = t; } }
+    let fg = 0; for (const v of g) if (v > thr) fg++; const r = fg / n; return Math.min(r, 1 - r);
+  }
+  function maskIoUWithObj(sc, bm, id) { // 로컬 박스 마스크 vs 정답(보이는) 마스크
+    const o = sc.objs[id]; let I = 0;
+    if (bm) for (let yy = 0; yy < bm.h; yy++) for (let xx = 0; xx < bm.w; xx++) if (bm.m[yy * bm.w + xx] && sc.owner[(bm.y0 + yy) * W + bm.x0 + xx] === id) I++;
+    const U = (bm ? bm.area : 0) + o.visPx - I; return U ? I / U : 0;
+  }
+  function promoteBox(sc, o, box, thr) {
+    const bm = boxMask(sc, box, thr); const [x0, y0, x1, y1] = boxIntRect(box); const boxPx = (x1 - x0) * (y1 - y0);
+    const samPx = bm ? bm.area : 0, fill = samPx / Math.max(1, boxPx);
+    return { bm, cls: o.type, id: o.id, box, score: bm ? bm.score : 0, boxPx, samPx, fill, dice: 2 * samPx / (samPx + boxPx), iou: maskIoUWithObj(sc, bm, o.id), gtFill: o.visPx / Math.max(1, boxPx), otsu: otsuRatio(sc.img, box) };
+  }
+
+  /* ---------------- 그리기 도구 ---------------- */
+  const oc = newCanvas(W, H), ox = oc.getContext("2d");
+  function paintMask(c, m, col, alpha, w = W, h = H) {
+    const rgb = rgbOf(col); if (oc.width !== w) { oc.width = w; oc.height = h; }
+    const id = ox.createImageData(w, h), d = id.data, a = Math.round(alpha * 255);
+    for (let i = 0; i < w * h; i++) if (m[i]) { d[i * 4] = rgb[0]; d[i * 4 + 1] = rgb[1]; d[i * 4 + 2] = rgb[2]; d[i * 4 + 3] = a; }
+    ox.putImageData(id, 0, 0); c.drawImage(oc, 0, 0, w, h);
+    if (oc.width !== W) { oc.width = W; oc.height = H; }
+  }
+  function paintOwner(c, sc, alpha) {
+    const id = ox.createImageData(W, H), d = id.data, a = Math.round(alpha * 255); const cols = TYPES.map((t, k) => rgbOf(KCOL(k)));
+    for (let i = 0; i < N; i++) { const k = sc.owner[i]; if (k < 0) continue; const rgb = cols[sc.objs[k].type]; d[i * 4] = rgb[0]; d[i * 4 + 1] = rgb[1]; d[i * 4 + 2] = rgb[2]; d[i * 4 + 3] = a; }
+    ox.putImageData(id, 0, 0); c.drawImage(oc, 0, 0);
+  }
+  function outlineMask(c, m, col, w = W, h = H) { // 마스크 경계선
+    c.fillStyle = col;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x; if (!m[i]) continue; if (x === 0 || y === 0 || x === w - 1 || y === h - 1 || !m[i - 1] || !m[i + 1] || !m[i - w] || !m[i + w]) c.fillRect(x, y, 1, 1); }
+  }
+  function strokeBox(c, b, col, lw = 2, dash = null, label = null) {
+    c.save(); c.strokeStyle = col; c.lineWidth = lw; if (dash) c.setLineDash(dash); c.strokeRect(b[0] + 0.5, b[1] + 0.5, b[2] - b[0] - 1, b[3] - b[1] - 1); c.restore();
+    if (label) { c.save(); c.font = "600 12px " + cssv("--mono"); const tw = c.measureText(label).width + 8; const ty = b[1] - 17 < 0 ? b[1] + 1 : b[1] - 17; c.fillStyle = col; c.fillRect(b[0], ty, tw, 16); const rgb = rgbOf(col); c.fillStyle = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) > 140 ? "#111" : "#fff"; c.fillText(label, b[0] + 4, ty + 12); c.restore(); }
+  }
+  function dot(c, x, y, col, minus) { c.save(); c.beginPath(); c.arc(x, y, 7, 0, TAU2); c.fillStyle = col; c.fill(); c.lineWidth = 2; c.strokeStyle = "#fff"; c.stroke(); c.strokeStyle = "#fff"; c.lineWidth = 2.2; c.beginPath(); c.moveTo(x - 3.5, y); c.lineTo(x + 3.5, y); if (!minus) { c.moveTo(x, y - 3.5); c.lineTo(x, y + 3.5); } c.stroke(); c.restore(); }
+  function cvPoint(cv, e, w = W, h = H) { const r = cv.getBoundingClientRect(); return { x: clamp((e.clientX - r.left) / r.width * w, 0, w - 1), y: clamp((e.clientY - r.top) / r.height * h, 0, h - 1) }; }
+  function copyBtns() {
+    document.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", () => {
+      const pre = $(b.dataset.copy), txt = pre.textContent;
+      const done = t => { b.textContent = t; setTimeout(() => b.textContent = "복사", 1400); };
+      const fb = () => { const r = document.createRange(); r.selectNodeContents(pre); const s = getSelection(); s.removeAllRanges(); s.addRange(r); done("선택됨"); };
+      if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(() => done("복사됨"), fb); else fb();
+    }));
+  }
+
+  /* ================= 1. 문제·데이터 ================= */
+  let cur = null, curSeed = 29, aSel = 0;
+  const NB_CLS = [ // cls, n_box, aspect_med, area_med, elongation (실습 노트북)
+    [0, 2794, 0.866, 5.825, 1.155], [1, 2166, 1.193, 0.637, 1.193], [2, 2708, 1.159, 1.319, 1.159], [3, 2563, 0.339, 0.721, 2.954],
+    [4, 1561, 0.636, 0.627, 1.571], [5, 2503, 1.009, 0.366, 1.009], [6, 2846, 0.628, 1.385, 1.592], [7, 265, 0.659, 0.560, 1.519],
+    [8, 1297, 1.042, 0.369, 1.042], [9, 1750, 0.812, 1.361, 1.231], [10, 5854, 0.436, 0.935, 2.295], [11, 6459, 0.386, 1.437, 2.590],
+    [12, 5191, 0.335, 2.114, 2.983], [13, 3607, 0.691, 0.947, 1.448], [14, 3365, 0.293, 0.802, 3.416], [15, 143, 0.695, 1.657, 1.440]];
+
+  function drawA() {
+    const c = setupCv($("aCv"), W, H); c.clearRect(0, 0, W, H); c.drawImage(sceneCanvas(cur), 0, 0);
+    if ($("aMask").checked) paintOwner(c, cur, 0.5);
+    if ($("aBox").checked) cur.tools.forEach((o, k) => strokeBox(c, o.bb, KCOL(o.type), k === aSel ? 3.5 : 2, k === aSel ? [6, 3] : null, "id " + o.type));
+  }
+  function renderA() {
+    $("aSeed").textContent = "seed " + curSeed;
+    $("aLegend").innerHTML = TYPES.map((t, k) => `<span><i class="mm-dot" style="background:var(--k${k})"></i>${k < NCLS ? "id " + k : "손 (라벨 없음)"}</span>`).join("");
+    const rows = cur.tools.map(yolo);
+    $("aTable").innerHTML = "<thead><tr><th>#</th><th>cls</th><th>cx</th><th>cy</th><th>w</th><th>h</th><th>xmin</th><th>ymin</th><th>xmax</th><th>ymax</th><th>면적 %</th></tr></thead><tbody>" +
+      rows.map((y, k) => `<tr data-i="${k}" class="${k === aSel ? "mm-sel" : ""}" tabindex="0"><td>${k}</td><td class="n"><i class="mm-dot" style="background:var(--k${y.cls})"></i>${y.cls}</td><td class="n">${f(y.cx, 4)}</td><td class="n">${f(y.cy, 4)}</td><td class="n">${f(y.w, 4)}</td><td class="n">${f(y.h, 4)}</td><td class="n">${f((y.cx - y.w / 2) * W, 1)}</td><td class="n">${f((y.cy - y.h / 2) * H, 1)}</td><td class="n">${f((y.cx + y.w / 2) * W, 1)}</td><td class="n">${f((y.cy + y.h / 2) * H, 1)}</td><td class="n">${f(y.w * y.h * 100, 2)}</td></tr>`).join("") + "</tbody>";
+    $("aTable").querySelectorAll("tr[data-i]").forEach(tr => { const go = () => { aSel = +tr.dataset.i; renderA(); }; tr.addEventListener("click", go); tr.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } }); });
+    const y = rows[aSel] || rows[0];
+    if (y) $("aFormula").innerHTML = `라벨 줄: <b>${y.cls} ${f(y.cx, 6)} ${f(y.cy, 6)} ${f(y.w, 6)} ${f(y.h, 6)}</b> (cls cx cy w h, 0~1 정규화)<br>xmin = (cx − w/2) × 640 = (${f(y.cx, 4)} − ${f(y.w, 4)}/2) × 640 = <b>${f((y.cx - y.w / 2) * W, 1)}</b>　xmax = (cx + w/2) × 640 = <b>${f((y.cx + y.w / 2) * W, 1)}</b><br>ymin = (cy − h/2) × 360 = (${f(y.cy, 4)} − ${f(y.h, 4)}/2) × 360 = <b>${f((y.cy - y.h / 2) * H, 1)}</b>　ymax = <b>${f((y.cy + y.h / 2) * H, 1)}</b><br>box_area_ratio = w × h × 100 = ${f(y.w, 4)} × ${f(y.h, 4)} × 100 = <b>${f(y.w * y.h * 100, 3)} %</b>　가로세로비 = (w×640)/(h×360) = <b>${f(y.w * W / (y.h * H), 3)}</b>`;
+    const areas = rows.map(r => r.w * r.h * 100), n = rows.length, mn = Math.min(...areas), ok1 = n >= 2 && n <= 5, ok2 = mn >= 0.3;
+    const hands = cur.objs.filter(o => o.type === HAND).length;
+    $("aCond").innerHTML = `이 장면: 박스 <b>${n}</b>개 ${ok1 ? '<span class="mm-ok">(2~5 충족)</span>' : '<span class="mm-bad">(2~5 아님)</span>'} · 가장 작은 박스 <b>${f(mn, 2)}%</b> ${ok2 ? '<span class="mm-ok">(≥ 0.3% 충족)</span>' : '<span class="mm-bad">(0.3% 미만)</span>'} → 평가용 서브셋 조건 ${ok1 && ok2 ? "충족" : "불충족"}. ${hands ? "라벨 없는 손 " + hands + "개가 도구를 쥐고 있습니다." : ""}`;
+    $("aCode").textContent = ["import pandas as pd", "", "IMG_W, IMG_H = 640, 360", "# 현재 장면의 YOLO 라벨 (cls cx cy w h)", "rows = [", ...rows.map(r => `    (${r.cls}, ${f(r.cx, 6)}, ${f(r.cy, 6)}, ${f(r.w, 6)}, ${f(r.h, 6)}),`), "]", "df_box = pd.DataFrame(rows, columns=['cls', 'cx', 'cy', 'w', 'h'])", "", "# 정규화 중심 좌표 -> 픽셀 코너 좌표", "df_box['xmin'] = (df_box['cx'] - df_box['w']/2) * IMG_W", "df_box['xmax'] = (df_box['cx'] + df_box['w']/2) * IMG_W", "df_box['ymin'] = (df_box['cy'] - df_box['h']/2) * IMG_H", "df_box['ymax'] = (df_box['cy'] + df_box['h']/2) * IMG_H", "df_box['box_area_ratio'] = df_box['w'] * df_box['h'] * 100   # 이미지 면적 대비 %", "", "ok = (2 <= len(df_box) <= 5) and (df_box['box_area_ratio'].min() >= 0.3)", "print(df_box.round(1)); print('평가용 서브셋 조건 :', ok)"].join("\n");
+    drawA();
+  }
+  let distSort = "id";
+  function renderDist() {
+    const rows = [...NB_CLS].sort((a, b) => distSort === "n" ? b[1] - a[1] : distSort === "el" ? b[4] - a[4] : a[0] - b[0]);
+    const rh = 22, top = 8, wv = 520, bx = 74, bw = 300, mxN = 6459;
+    let s = "";
+    rows.forEach((r, k) => { const y = top + k * rh, w = r[1] / mxN * bw;
+      s += `<text x="0" y="${y + 15}">class ${r[0]}</text><rect class="bar${r[1] < 300 ? " rare" : ""}" x="${bx}" y="${y + 3}" width="${w.toFixed(1)}" height="${rh - 7}" rx="3"></rect><text x="${bx + w + 6}" y="${y + 15}">${nf(r[1])}</text><text class="sub" x="${wv - 2}" y="${y + 15}" text-anchor="end">길쭉 ${r[4].toFixed(2)}</text>`; });
+    const svg = $("distSvg"); svg.setAttribute("viewBox", `0 0 ${wv} ${top + rows.length * rh + 6}`); svg.innerHTML = s;
+    const tot = NB_CLS.reduce((a, r) => a + r[1], 0);
+    $("distKv").innerHTML = `<dt>박스 합계 (16 클래스)</dt><dd>${nf(tot)}</dd><dt>가장 많은 클래스</dt><dd>class 11 · 6,459</dd><dt>가장 적은 클래스</dt><dd>class 15 · 143</dd><dt>최다 / 최소 배수</dt><dd>${(6459 / 143).toFixed(1)} 배</dd><dt>가장 길쭉한 클래스</dt><dd>class 14 · 3.416</dd><dt>면적 중앙값이 가장 큰 클래스</dt><dd>class 0 · 5.825 %</dd>`;
+  }
+  function renderUnet() {
+    const U = [["P01", 6, 0.0, 0.0], ["P02", 14, 0.0392, 0.0], ["P04", 9, 0.0, 0.0], ["P05 (학습한 시나리오)", 11, 0.4541, 0.5144]];
+    $("unetBody").innerHTML = U.map(u => `<tr><td>${u[0]}</td><td class="n">${u[1]}</td><td class="n ${u[2] < 0.1 ? "mm-bad" : ""}">${u[2].toFixed(4)}</td><td class="n">${u[3].toFixed(4)}</td></tr>`).join("");
+    const wsum = U.reduce((a, u) => a + u[1] * u[2], 0), n = U.reduce((a, u) => a + u[1], 0);
+    $("unetFormula").innerHTML = `전체 평균 Dice = Σ nᵢ·Diceᵢ / Σ nᵢ = (6×0 + 14×0.0392 + 9×0 + 11×0.4541) / ${n} = ${wsum.toFixed(4)} / ${n} = <b>${(wsum / n).toFixed(4)}</b>　(중앙값 0.0 / 최저 0.0 / 최고 0.879)`;
+    $("otsuX").textContent = `1 / 0.319 = ${(1 / 0.319).toFixed(2)} → 약 ${(1 / 0.319).toFixed(1)} 배`;
+  }
+
+  /* ================= 2. 모형 구조 ================= */
+  const ARCH = {
+    sam: {
+      vb: "0 0 1180 400",
+      blocks: [
+        { k: "in", x: 20, y: 50, w: 150, h: 74, r: "img", t: ["입력 이미지", "3×360×640"] },
+        { k: "pre", x: 200, y: 50, w: 170, h: 74, r: "img", t: ["전처리", "긴 변 1024 + 패딩", "3×1024×1024"] },
+        { k: "enc", x: 400, y: 40, w: 210, h: 94, r: "img", t: ["Image Encoder", "ViT-B/16 · 12블록", "4096 토큰 × 768"], tH: ["Image Encoder", "ViT-H/16 · 32블록", "4096 토큰 × 1280"] },
+        { k: "emb", x: 640, y: 50, w: 170, h: 74, r: "img", t: ["이미지 임베딩", "256×64×64"] },
+        { k: "pr", x: 20, y: 262, w: 160, h: 74, r: "txt", t: ["프롬프트", "점(±) · 박스 · 마스크"] },
+        { k: "penc", x: 210, y: 252, w: 190, h: 94, r: "txt", t: ["Prompt Encoder", "점 N개 → N×256", "마스크 → 256×64×64"] },
+        { k: "dec", x: 640, y: 240, w: 190, h: 118, r: "fuse", t: ["Mask Decoder", "양방향 Transformer 2층", "토큰 IoU 1 + 마스크 4", "각 256차원"] },
+        { k: "up", x: 860, y: 240, w: 150, h: 118, r: "fuse", t: ["출력 헤드", "업샘플 ×4", "마스크 3×256×256", "IoU 점수 3개"] },
+        { k: "post", x: 1030, y: 240, w: 135, h: 118, r: "fuse", t: ["후처리", "패딩 제거", "원래 크기로", "3×360×640"] }
+      ],
+      arrows: [
+        { to: "pre", r: "img", p: [[170, 87], [200, 87]] }, { to: "enc", r: "img", p: [[370, 87], [400, 87]] }, { to: "emb", r: "img", p: [[610, 87], [640, 87]] },
+        { to: "dec", r: "img", p: [[725, 124], [725, 240]] }, { to: "penc", r: "txt", p: [[180, 299], [210, 299]] }, { to: "dec", r: "txt", p: [[400, 299], [640, 299]] },
+        { to: "up", r: "fuse", p: [[830, 299], [860, 299]] }, { to: "post", r: "fuse", p: [[1010, 299], [1030, 299]] }
+      ],
+      extra: v => `<path class="brk" d="M400 30 V22 H810 V30"></path><text class="note" x="605" y="16" text-anchor="middle">이미지당 1회 · ${v === "h" ? "전체 636M 의 대부분" : "89.7M (전체의 95.7%)"}</text>
+        <path class="brk" d="M640 366 V374 H1010 V366"></path><text class="note" x="825" y="390" text-anchor="middle">프롬프트마다 반복 · Mask Decoder ${v === "h" ? "~4M" : "4.1M (4.3%)"}</text>
+        <text class="note" x="860" y="66">multimask_output=True → 후보 3개</text><text class="note" x="860" y="86">자체 점수 예: [0.566, 0.942, 0.796]</text><text class="note" x="860" y="106">박스 4개 · False → (4, 360, 640)</text><text class="note" x="860" y="126">점수 예: [0.942, 0.948, 0.879, 0.94]</text>
+        <text class="rowlab" x="20" y="36">영상 경로</text><text class="rowlab" x="20" y="248">프롬프트 경로</text>`
+    },
+    vlm: {
+      vb: "0 0 1180 470",
+      blocks: [
+        { k: "c_img", x: 20, y: 30, w: 150, h: 64, r: "img", t: ["박스 crop", "3×224×224"] },
+        { k: "c_enc", x: 200, y: 30, w: 190, h: 64, r: "img", t: ["이미지 인코더", "CLIP ViT-B/32 → 1×512"] },
+        { k: "c_txt", x: 200, y: 106, w: 190, h: 64, r: "txt", t: ["고정 클래스 프롬프트", "K개 → K×512"] },
+        { k: "c_sim", x: 430, y: 68, w: 170, h: 64, r: "fuse", t: ["코사인 유사도", "1×K"] },
+        { k: "c_soft", x: 630, y: 68, w: 190, h: 64, r: "fuse", t: ["softmax(s / τ)", "합 = 1 → 반드시 1개"] },
+        { k: "c_note", x: 850, y: 68, w: 310, h: 64, r: "warn", t: ["목록 밖 물체도 억지로 분류", "새 클래스 = 라벨 수집 + 재학습"] },
+        { k: "o_img", x: 20, y: 212, w: 150, h: 64, r: "img", t: ["이미지", "3×768×768"] },
+        { k: "o_enc", x: 200, y: 212, w: 190, h: 64, r: "img", t: ["ViT-B/32", "24×24 = 576 토큰 × 768"] },
+        { k: "o_head", x: 430, y: 212, w: 170, h: 64, r: "img", t: ["토큰별 헤드", "박스 576×4 · 임베딩 576×512"] },
+        { k: "o_q", x: 20, y: 292, w: 150, h: 64, r: "txt", t: ["텍스트 질의 Q개", "'a photo of a …' Q=8"] },
+        { k: "o_tenc", x: 200, y: 292, w: 190, h: 64, r: "txt", t: ["텍스트 인코더", "Q×512"] },
+        { k: "o_sim", x: 630, y: 252, w: 190, h: 64, r: "fuse", t: ["유사도 로짓 576×Q", "토큰마다 최대 질의"] },
+        { k: "o_thr", x: 850, y: 252, w: 310, h: 64, r: "fuse", t: ["점수 ≥ 0.08 만 박스로", "예시 이미지: 검출 9개 · 0.34초"] },
+        { k: "v_in", x: 20, y: 396, w: 150, h: 64, r: "fuse", t: ["이미지 + 질문", "채팅 틀 한 프롬프트"] },
+        { k: "v_m", x: 200, y: 396, w: 400, h: 64, r: "fuse", t: ["SmolVLM-500M (시각 인코더 + 언어 모형)", "답 토큰을 하나씩 생성 · max_new_tokens=60"] },
+        { k: "v_out", x: 630, y: 396, w: 190, h: 64, r: "txt", t: ["답 문장", "'There are two tools…'"] },
+        { k: "v_warn", x: 850, y: 396, w: 310, h: 64, r: "warn", t: ["근거 영역 없음", "어디를 보고 답했는지 검증 불가"] }
+      ],
+      arrows: [
+        { to: "c_enc", r: "img", p: [[170, 62], [200, 62]] }, { to: "c_sim", r: "img", p: [[390, 62], [410, 62], [410, 90], [430, 90]] }, { to: "c_sim", r: "txt", p: [[390, 138], [410, 138], [410, 112], [430, 112]] },
+        { to: "c_soft", r: "fuse", p: [[600, 100], [630, 100]] }, { to: "c_note", r: "warn", p: [[820, 100], [850, 100]] },
+        { to: "o_enc", r: "img", p: [[170, 244], [200, 244]] }, { to: "o_head", r: "img", p: [[390, 244], [430, 244]] }, { to: "o_sim", r: "img", p: [[600, 244], [615, 244], [615, 274], [630, 274]] },
+        { to: "o_tenc", r: "txt", p: [[170, 324], [200, 324]] }, { to: "o_sim", r: "txt", p: [[390, 324], [615, 324], [615, 296], [630, 296]] }, { to: "o_thr", r: "fuse", p: [[820, 284], [850, 284]] },
+        { to: "v_m", r: "fuse", p: [[170, 428], [200, 428]] }, { to: "v_out", r: "fuse", p: [[600, 428], [630, 428]] }, { to: "v_warn", r: "warn", p: [[820, 428], [850, 428]] }
+      ],
+      extra: () => `<text class="rowlab" x="20" y="20">닫힌 어휘 — 고정 목록 안에서 하나 고르기 (CLIP 제로샷 · YOLO nc=16)</text>
+        <text class="rowlab" x="20" y="202">개방형 어휘 — 질의마다 독립 점수 (OWL-ViT, owlvit-base-patch32)</text>
+        <text class="rowlab" x="20" y="386">시각 질의응답 — 문장으로 답하기</text>`
+    }
+  };
+  const INFO = {
+    in: { t: "입력 이미지", io: "3 × 360 × 640 (RGB)", d: "검증 이미지 1장. 축소본은 모든 이미지가 640×360 으로 같습니다." },
+    pre: { t: "전처리 (SamProcessor)", io: "3×360×640 → 긴 변 1024 로 리사이즈 3×576×1024 → 아래쪽 0 패딩 → 3×1024×1024", f: "scale = 1024 / max(360, 640) = 1.6　→　360 × 1.6 = 576", d: "평균·표준편차로 정규화한 뒤 정사각형으로 맞춥니다. 점·박스 프롬프트 좌표도 같은 배율 1.6 으로 바뀝니다 (reshaped_input_sizes)." },
+    enc: { t: "Image Encoder (ViT)", io: "3×1024×1024 → 16×16 패치 → 64×64 = 4096 토큰 × 768 → ViT 12블록 → neck(합성곱) → 256×64×64", ioH: "3×1024×1024 → 16×16 패치 → 4096 토큰 × 1280 → ViT 32블록 → neck → 256×64×64", f: "Attention(Q, K, V) = softmax(QKᵀ / √d) · V", d: "무거운 부분: 파라미터 89.7M, 전체 93.7M 의 95.7% (sam-vit-base). 이미지당 한 번만 실행하고 결과를 재사용합니다. 윈도 어텐션과 일부 전역 어텐션을 섞어 씁니다.", dH: "가장 큰 공개 SAM (실습 노트북 표기: SAM 은 93M ~ 636M). 출력 임베딩 모양 256×64×64 는 같고, 인코더만 커집니다." },
+    emb: { t: "이미지 임베딩", io: "256 × 64 × 64  (= 4,096 위치 × 256차원)", f: "임베딩 1칸 = 1024 기준 16×16 패치 = 원본 640×360 기준 10×10 픽셀", d: "프롬프트를 바꿔도 다시 계산하지 않는 캐시입니다. 클릭하면 즉시 경계가 나오는 대화형 주석 도구가 가능한 이유입니다." },
+    pr: { t: "프롬프트", io: "점 (x, y, label: 1 포함 / 0 제외) · 박스 (x0, y0, x1, y1) · 대략적 마스크 1×256×256", d: "박스 프롬프트에는 기존 YOLO 라벨을 그대로 씁니다 → 박스(무엇) + SAM(어디). 텍스트 프롬프트는 원 논문에 개념만 있고 공개 가중치에는 없습니다." },
+    penc: { t: "Prompt Encoder", io: "점 N개 → N×256 · 박스 1개 → 2×256 (두 모서리) · 마스크 → 256×64×64 (이미지 임베딩에 더함)", f: "PE(p) = [sin(2π·B·p), cos(2π·B·p)],  p = 정규화 좌표, B = 무작위 행렬", d: "좌표를 위치 인코딩으로 바꾸고 점 종류(포함·제외·박스 모서리)별 학습 임베딩을 더합니다. 매우 가볍습니다." },
+    dec: { t: "Mask Decoder", io: "이미지 임베딩 256×64×64 + 토큰 (IoU 1 + 마스크 4 + 프롬프트 N) × 256 → 갱신된 토큰과 임베딩", f: "토큰 ← 토큰 + CrossAttn(토큰 → 이미지)　·　이미지 ← 이미지 + CrossAttn(이미지 → 토큰)", d: "양방향 Transformer 2층. 파라미터 4.1M (4.3%) 로 프롬프트마다 실행합니다." },
+    up: { t: "출력 헤드", io: "임베딩 업샘플 ×4 → 32×256×256 · 마스크 토큰 MLP → 32 · 내적 → 마스크 로짓 3×256×256 · IoU 토큰 MLP → 점수 3", f: "mask_k = ⟨ MLP_k(마스크 토큰 k), 업샘플 임베딩 ⟩　·　iou_scores = MLP(IoU 토큰)", d: "multimask_output=True 면 후보 3개(부분 · 물체 · 넓게)와 각 후보의 예측 IoU. 이 점수는 정답을 본 것이 아니라 모형의 추정입니다." },
+    post: { t: "후처리 (post_process_masks)", io: "3×256×256 → 1024×1024 확대 → 패딩 제거 1024×576 → 원래 크기 3×360×640 → 로짓 > 0", f: "mask = (logit > 0) ⇔ sigmoid(logit) > 0.5", d: "실습 노트북 출력: 후보 마스크 (3, 360, 640), 자체 점수 [0.566, 0.942, 0.796], 점 프롬프트 1개 2.89 초. 박스 4개를 넣으면 (4, 360, 640)." },
+    c_img: { t: "박스 crop", io: "검출 박스로 자른 영역 → 3×224×224", d: "사람 라벨이나 검출기 박스로 물체를 잘라 CLIP 입력 크기로 맞춥니다." },
+    c_enc: { t: "CLIP 이미지 인코더", io: "3×224×224 → 32×32 패치 → 7×7 = 49 + [CLS] = 50 토큰 × 768 → 투영 1×512", d: "4억 쌍 이미지-알트텍스트로 학습. [CLS] 토큰을 공동 임베딩 공간으로 투영합니다." },
+    c_txt: { t: "고정 클래스 프롬프트", io: "'a photo of a {클래스}' K개 → 텍스트 인코더 → K×512", d: "목록이 미리 고정되어 있습니다. 목록에 없는 물체(예: 손)가 들어와도 K개 중 하나를 고릅니다." },
+    c_sim: { t: "코사인 유사도", io: "1×512 · K×512 → 1×K", f: "s_k = cos(v, t_k) = v·t_k / (‖v‖ ‖t_k‖)", d: "이미지와 문장을 같은 공간에 놓고 비교합니다 (공동 임베딩)." },
+    c_soft: { t: "softmax", io: "1×K → 확률 1×K (합 1)", f: "p_k = exp(s_k / τ) / Σ_j exp(s_j / τ)", d: "확률 합이 1이라 '해당 없음'을 답할 수 없습니다. τ 가 작을수록 1위에 확률이 몰립니다." },
+    c_note: { t: "닫힌 어휘의 한계", io: "YOLO · RT-DETR: nc=16 고정", d: "클래스는 학습 전에 고정, 새 클래스 = 라벨 수집 + 재학습. 해당 클래스 성능이 높아 배치할 최종 모형에 적합합니다." },
+    o_img: { t: "이미지 (OwlViTProcessor)", io: "3×360×640 → 3×768×768", d: "OWL-ViT 는 CLIP 에 검출 헤드를 붙인 개방형 어휘 검출 모형입니다." },
+    o_enc: { t: "ViT-B/32 이미지 인코더", io: "3×768×768 → 32×32 패치 → 24×24 = 576 토큰 × 768", d: "[CLS] 하나가 아니라 패치 토큰 576개를 모두 씁니다 → 위치마다 물체 후보." },
+    o_head: { t: "토큰별 박스 · 클래스 임베딩 헤드", io: "576×768 → 박스 576×4 (cx, cy, w, h) · 클래스 임베딩 576×512", d: "토큰마다 박스 하나와 '이 박스는 무엇처럼 보이는가' 임베딩을 예측합니다." },
+    o_q: { t: "텍스트 질의", io: "tourniquet · surgical scissors · scalpel · syringe · medical gauze · roll of medical tape · breathing tube · human hand", d: "실습 노트북의 질의 8개. 실행할 때 문장으로 클래스를 정하므로 문장 한 줄로 새 클래스를 추가합니다." },
+    o_tenc: { t: "텍스트 인코더", io: "Q개 문장 → Q×512", d: "CLIP 텍스트 인코더로 질의를 같은 공간에 놓습니다." },
+    o_sim: { t: "유사도 로짓", io: "576×512 · Q×512 → 로짓 576×Q → 토큰마다 최대 질의와 점수", f: "score = σ(logit),  label = argmax_q logit", d: "질의끼리 경쟁하지 않는 독립 점수(시그모이드)라, 모든 질의가 낮으면 '없음'이 됩니다." },
+    o_thr: { t: "임계값 → 검출 박스", io: "점수 ≥ 0.08 인 토큰만 박스로 → 원래 크기 좌표 (post_process_grounded_object_detection)", d: "실습 노트북 예시: 검출 9개, 최고 점수 0.207 (surgical scissors). 점수가 0.1 ~ 0.3 수준으로 낮아 탐색 · 라벨링 보조용입니다." },
+    v_in: { t: "이미지 + 질문", io: "messages = [{'role':'user', 'content':[이미지, 질문]}] → apply_chat_template", d: "이미지 자리와 질문 문장을 하나의 프롬프트로 만듭니다." },
+    v_m: { t: "SmolVLM-500M", io: "이미지 토큰 + 질문 토큰 → 답 토큰을 하나씩 생성", d: "약 1GB, CPU 에서 질문당 5 ~ 10초. 현장 모형(GPT-4o · Qwen2.5-VL 72B 등)보다 품질이 낮지만, 크기와 무관한 공통 실패 양상을 보는 것이 목적입니다." },
+    v_out: { t: "답 문장", io: "예: 'There are two tools on the tray.'", d: "세기는 계산이 아니라 토큰 생성입니다. 장면에 없는 쟁반(tray)을 전제한 질문에도 그대로 답합니다." },
+    v_warn: { t: "근거(grounding) 부재", io: "답 문장 = 위치 정보 없음", d: "검출 모형은 틀려도 박스로 어디를 봤는지 드러나지만, VLM 의 문장에는 그 정보가 없습니다. 출력에 근거 영역(박스 · 마스크)을 함께 요구해야 합니다." }
+  };
+  let archKey = "sam", encV = "b", stepI = 0, playT = null;
+  const steps = () => ARCH[archKey].blocks.map(b => b.k);
+  function arrowSvg(a, on) {
+    const p = a.p, d = "M" + p.map(q => q.join(" ")).join(" L"), e = p[p.length - 1], s = p[p.length - 2];
+    const ang = Math.atan2(e[1] - s[1], e[0] - s[0]), L = 9, Wd = 5;
+    const bx = e[0] - Math.cos(ang) * L, by = e[1] - Math.sin(ang) * L;
+    const h = `${e[0]},${e[1]} ${bx - Math.sin(ang) * Wd},${by + Math.cos(ang) * Wd} ${bx + Math.sin(ang) * Wd},${by - Math.cos(ang) * Wd}`;
+    return `<path class="arr ${a.r}${on ? " on" : ""}" d="${d}"></path><polygon class="ah ${a.r}${on ? " on" : ""}" points="${h}"></polygon>`;
+  }
+  function renderArch() {
+    const A = ARCH[archKey], st = steps(), curK = st[stepI];
+    $("encSel").style.display = archKey === "sam" ? "" : "none";
+    let s = A.extra(encV);
+    A.arrows.forEach(a => { const ti = st.indexOf(a.to); s += arrowSvg(a, ti === stepI); });
+    A.blocks.forEach(b => {
+      const t = (encV === "h" && b.tH) ? b.tH : b.t, i = st.indexOf(b.k);
+      s += `<g class="blk ${b.r}${i === stepI ? " on" : ""}" data-k="${b.k}" tabindex="0" role="button" aria-label="${esc(t.join(" "))}"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}"></rect>`;
+      const lh = 17, y0 = b.y + b.h / 2 - (t.length - 1) * lh / 2 + 4;
+      t.forEach((ln, j) => { s += `<text class="${j ? "mono" : "ttl"}" x="${b.x + b.w / 2}" y="${y0 + j * lh}" text-anchor="middle">${esc(ln)}</text>`; });
+      s += "</g>";
+    });
+    const svg = $("archSvg"); svg.setAttribute("viewBox", A.vb); svg.innerHTML = s;
+    svg.querySelectorAll(".blk").forEach(g => { const go = () => { stepI = steps().indexOf(g.dataset.k); renderArch(); }; g.addEventListener("click", go); g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } }); });
+    $("stSteps").innerHTML = st.map((k, i) => `<li class="${i === stepI ? "on" : i < stepI ? "done" : ""}">${i + 1}. ${esc(INFO[k].t.split(" (")[0])}</li>`).join("");
+    const on = $("stSteps").children[stepI]; if (on && on.scrollIntoView && $("pane-b").hidden === false) { const p = $("stSteps"); p.scrollLeft = on.offsetLeft - p.clientWidth / 2 + on.clientWidth / 2; }
+    const I = INFO[curK], bl = A.blocks.find(b => b.k === curK);
+    const io = (encV === "h" && I.ioH) ? I.ioH : I.io, d = (encV === "h" && I.dH) ? I.dH : I.d;
+    $("archPanel").innerHTML = `<span class="mm-small">단계 ${stepI + 1} / ${st.length} · <i class="mm-sw" style="background:var(--role-${bl.r})"></i>${{ img: "영상 경로", txt: archKey === "sam" ? "프롬프트 경로" : "문장 경로", fuse: "결합", warn: "한계" }[bl.r]}</span><h3>${esc(I.t)}</h3><div class="io">${esc(io)}</div>${I.f ? `<div class="sk-formula">${esc(I.f)}</div>` : ""}<p>${esc(d)}</p>`;
+  }
+  function stepTo(i) { const n = steps().length; stepI = (i + n) % n; renderArch(); }
+  function stopPlay() { if (playT) { clearInterval(playT); playT = null; } $("stPlay").textContent = "재생"; }
+  function togglePlay() {
+    if (playT) { stopPlay(); return; }
+    $("stPlay").textContent = "멈춤";
+    playT = setInterval(() => { if (stepI >= steps().length - 1) { stopPlay(); return; } stepTo(stepI + 1); }, +$("stSpd").value * 1000);
+  }
+
+  /* ================= 3. SAM 프롬프트 ================= */
+  const C = { mode: "pos", pos: [], neg: [], box: null, drag: null, cands: [], sel: 0, boxRes: null };
+  function computeC() {
+    const tol = +$("cTol").value; C.cands = []; C.boxRes = null;
+    if (C.box) {
+      const bm = boxMask(cur, C.box, 30 * tol / 34);
+      let g = toGlobal(bm), area = bm ? bm.area : 0;
+      if (C.neg.length && bm) { const bl = ensureBlur(cur); C.neg.forEach(p => { const gg = grow(bl, p.x, p.y, tol * 0.6); for (let i = 0; i < N; i++) if (gg.m[i]) g[i] = 0; }); area = 0; for (let i = 0; i < N; i++) area += g[i]; }
+      C.cands = [{ m: g, area, score: bm ? bm.score : 0 }]; C.sel = 0;
+    } else if (C.pos.length) {
+      C.cands = pointCandidates(ensureBlur(cur), C.pos, C.neg, tol);
+      let b = 0; C.cands.forEach((c, i) => { if (c.score > C.cands[b].score) b = i; }); C.sel = b;
+    }
+  }
+  function gtObjC() {
+    if (C.box) { let best = -1, bi = 0; cur.objs.forEach(o => { const v = boxIoU(o.bb, C.box); if (v > bi) { bi = v; best = o.id; } }); return best; }
+    if (C.pos.length) { const p = C.pos[0]; return cur.owner[Math.round(p.y) * W + Math.round(p.x)]; }
+    return -1;
+  }
+  function boxIoU(a, b) { const x1 = Math.max(a[0], b[0]), y1 = Math.max(a[1], b[1]), x2 = Math.min(a[2], b[2]), y2 = Math.min(a[3], b[3]); const I = Math.max(0, x2 - x1) * Math.max(0, y2 - y1), U = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - I; return U > 0 ? I / U : 0; }
+  function gtMask(id) { const m = new Uint8Array(N); for (let i = 0; i < N; i++) if (cur.owner[i] === id) m[i] = 1; return m; }
+  function drawC() {
+    const c = setupCv($("cCv"), W, H); c.clearRect(0, 0, W, H); c.drawImage(sceneCanvas(cur), 0, 0);
+    const cd = C.cands[C.sel]; if (cd) { paintMask(c, cd.m, cssv("--role-mask"), 0.5); outlineMask(c, cd.m, cssv("--role-mask")); }
+    const bx = C.drag || C.box; if (bx) strokeBox(c, [Math.min(bx[0], bx[2]), Math.min(bx[1], bx[3]), Math.max(bx[0], bx[2]), Math.max(bx[1], bx[3])], cssv("--role-box"), 2.5, [7, 4]);
+    C.pos.forEach(p => dot(c, p.x, p.y, cssv("--role-pos"), false)); C.neg.forEach(p => dot(c, p.x, p.y, cssv("--role-neg"), true));
+    if (!C.cands.length && !C.drag) { c.save(); c.fillStyle = "rgba(0,0,0,0.55)"; c.fillRect(0, H - 30, W, 30); c.fillStyle = "#fff"; c.font = "600 14px " + cssv("--sans"); c.fillText(C.mode === "box" ? "끌어서 박스를 그리세요" : "도구를 클릭해 점 프롬프트를 찍으세요", 12, H - 10); c.restore(); }
+  }
+  function renderC() {
+    $("cSeed").textContent = "seed " + curSeed;
+    const gid = gtObjC(), gm = gid >= 0 ? gtMask(gid) : null;
+    const th = $("cThumbs"); th.innerHTML = "";
+    { let x0 = W, y0 = H, x1 = 0, y1 = 0; const big = C.cands.reduce((a, c) => c.area > a.area && c.area < 0.5 * N ? c : a, C.cands[0] || { m: null, area: 0 });
+      if (big.m) for (let i = 0; i < N; i++) if (big.m[i]) { const x = i % W, y = (i / W) | 0; if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y; }
+      C.pos.forEach(p => { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); });
+      if (C.box) { x0 = Math.min(x0, C.box[0]); y0 = Math.min(y0, C.box[1]); x1 = Math.max(x1, C.box[2]); y1 = Math.max(y1, C.box[3]); }
+      if (x1 < x0) { x0 = 0; y0 = 0; x1 = W; y1 = H; }
+      let w = Math.max(80, x1 - x0 + 40), h = Math.max(45, y1 - y0 + 40); if (w / h > 16 / 9) h = w * 9 / 16; else w = h * 16 / 9; w = Math.min(w, W); h = Math.min(h, H);
+      const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2; C.zoom = [clamp(cx - w / 2, 0, W - w), clamp(cy - h / 2, 0, H - h), w, h]; }
+    C.cands.forEach((cd, i) => {
+      const b = document.createElement("button"); b.type = "button"; b.className = "mm-thumb"; b.setAttribute("aria-pressed", i === C.sel);
+      const iou = gm ? iouMask(cd.m, gm) : NaN; cd.iou = iou;
+      b.innerHTML = `<canvas width="320" height="180" aria-hidden="true"></canvas><b>${C.box ? "박스 마스크" : "후보 " + (i + 1) + ["  부분", "  물체", "  넓게"][i]}</b><span>모의 점수 ${f(cd.score)}<br>면적 ${pc(cd.area / N)}<br>정답 IoU ${f(iou)}</span>`;
+      b.addEventListener("click", () => { C.sel = i; renderC(); });
+      th.appendChild(b);
+      const cc = setupCv(b.querySelector("canvas"), 320, 180), z = C.zoom; cc.save(); cc.scale(320 / z[2], 180 / z[3]); cc.translate(-z[0], -z[1]); cc.drawImage(sceneCanvas(cur), 0, 0); paintMask(cc, cd.m, cssv("--role-mask"), 0.55); outlineMask(cc, cd.m, cssv("--role-mask")); cc.restore();
+    });
+    const cd = C.cands[C.sel];
+    const o = gid >= 0 ? cur.objs[gid] : null;
+    $("cKv").innerHTML = cd ? `<dt>선택</dt><dd>${C.box ? "박스 프롬프트 (multimask_output=False)" : "후보 " + (C.sel + 1) + " / 3"}</dd><dt>모의 자체 점수 (안정도)</dt><dd>${f(cd.score)}</dd><dt>마스크 면적</dt><dd>${nf(cd.area)} px (${pc(cd.area / N)})</dd><dt>가리킨 물체 (정답)</dt><dd>${o ? (o.type < NCLS ? "id " + o.type : "손 (라벨 없음)") : "배경"}</dd><dt>정답 마스크와 IoU</dt><dd>${f(cd.iou)}</dd>` : `<dt>프롬프트</dt><dd>없음</dd>`;
+    let note = "";
+    if (cd) {
+      if (!C.box) {
+        let bi = 0; C.cands.forEach((x, i) => { if ((x.iou || 0) > (C.cands[bi].iou || 0)) bi = i; });
+        let bs = 0; C.cands.forEach((x, i) => { if (x.score > C.cands[bs].score) bs = i; });
+        note = `자체 점수 1위는 <b>후보 ${bs + 1}</b>, 정답 IoU 1위는 <b>후보 ${bi + 1}</b>${bs === bi ? " 로 같습니다." : " 로 <b>다릅니다</b> — 자동 파이프라인이 점수 1위를 고르면 틀린 후보를 씁니다."} `;
+        if (C.cands.some(x => x.area > 0.4 * N)) note += "어떤 후보는 배경까지 크게 번졌습니다. ";
+      } else note = "박스는 모호성이 거의 없어 후보 1개만 씁니다. ";
+      if (!o) note += "점이 배경에 찍혀 비교할 정답 물체가 없습니다.";
+      else if (o.type === HAND) note += "손에는 라벨이 없습니다. SAM 은 무엇을 분할했는지 모릅니다.";
+      else if (o.vis < 0.85) note += `이 도구는 손이나 다른 도구에 ${pc(1 - o.vis, 0)} 가려져 있습니다.`;
+    } else note = "점(+) 모드에서 도구를 클릭하거나, '첫 박스 중심에 점'(실습 노트북과 같은 방식)을 누르세요.";
+    $("cNote").innerHTML = note;
+    const pts = [...C.pos.map(p => [p.x, p.y, 1]), ...C.neg.map(p => [p.x, p.y, 0])];
+    const L = ["import torch", "from PIL import Image", "from transformers import SamModel, SamProcessor", "", "sam_processor = SamProcessor.from_pretrained('facebook/sam-vit-base')", "sam_model     = SamModel.from_pretrained('facebook/sam-vit-base').eval()", "img = Image.open('images/val/<stem>.jpg').convert('RGB')    # 640 x 360", ""];
+    if (C.box) {
+      const b = C.box.map(v => Math.round(v));
+      L.push(`inputs = sam_processor(img, input_boxes=[[[${b.join(", ")}]]], return_tensors='pt')`, "with torch.no_grad():", "    outputs = sam_model(**inputs, multimask_output=False)   # 박스는 모호성이 적어 1개");
+    } else {
+      const P0 = pts.length ? pts : [[320, 180, 1]];
+      L.push(`inputs = sam_processor(img,`, `                       input_points=[[${P0.map(p => `[${Math.round(p[0])}, ${Math.round(p[1])}]`).join(", ")}]],`, `                       input_labels=[[${P0.map(p => p[2]).join(", ")}]],      # 1 = 포함, 0 = 제외`, `                       return_tensors='pt')`, "with torch.no_grad():", "    outputs = sam_model(**inputs, multimask_output=True)    # 후보 마스크 3개");
+    }
+    L.push("", "masks = sam_processor.image_processor.post_process_masks(", "    outputs.pred_masks.cpu(), inputs['original_sizes'].cpu(), inputs['reshaped_input_sizes'].cpu())[0].numpy()[0]", "scores = outputs.iou_scores.cpu().numpy().reshape(-1)     # 모형의 자기 평가 (정답 아님)", "print(masks.shape, [round(float(s), 3) for s in scores])");
+    $("cCode").textContent = L.join("\n");
+    drawC();
+  }
+  function cDemo(e, pickTq) { const o = (pickTq && cur.tools.find(t => t.type === 0)) || cur.tools[0]; if (!o) { renderC(); return; } C.box = null; C.neg = []; C.pos = [{ x: Math.floor((o.bb[0] + o.bb[2]) / 2), y: Math.floor((o.bb[1] + o.bb[3]) / 2) }]; segSet("cMode", "pos"); C.mode = "pos"; computeC(); renderC(); }
+  function bindC() {
+    segBind("cMode", v => { C.mode = v; });
+    const cv = $("cCv");
+    cv.addEventListener("pointerdown", e => {
+      const p = cvPoint(cv, e);
+      if (C.mode === "box") { C.drag = [p.x, p.y, p.x, p.y]; cv.setPointerCapture(e.pointerId); drawC(); return; }
+      if (C.mode === "pos") { if (C.box) { C.box = null; } C.pos.push(p); } else { if (!C.pos.length && !C.box) return; C.neg.push(p); }
+      computeC(); renderC();
+    });
+    cv.addEventListener("pointermove", e => { if (!C.drag) return; const p = cvPoint(cv, e); C.drag[2] = p.x; C.drag[3] = p.y; drawC(); });
+    const end = () => { if (!C.drag) return; const d = C.drag; C.drag = null; const b = [Math.min(d[0], d[2]), Math.min(d[1], d[3]), Math.max(d[0], d[2]), Math.max(d[1], d[3])]; if (b[2] - b[0] > 6 && b[3] - b[1] > 6) { C.box = b; C.pos = []; C.neg = []; computeC(); } renderC(); };
+    cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+    $("cClear").onclick = () => { C.pos = []; C.neg = []; C.box = null; C.cands = []; renderC(); };
+    $("cDemo").onclick = cDemo;
+    $("cGtBox").onclick = () => { const o = cur.tools[C.gtIdx = ((C.gtIdx ?? -1) + 1) % cur.tools.length]; if (!o) return; C.box = o.bb.slice(); C.pos = []; C.neg = []; segSet("cMode", "box"); C.mode = "box"; computeC(); renderC(); };
+    $("cTol").addEventListener("input", () => { $("cTolV").textContent = $("cTol").value; computeC(); renderC(); });
+    $("cPrev").onclick = () => setScene(curSeed - 1); $("cNext").onclick = () => setScene(curSeed + 1);
+  }
+
+  /* --- 박스 → 마스크 승격 (현재 장면) --- */
+  let PR = [];
+  function computePromote() { const thr = +$("pThr").value; PR = cur.tools.map(o => promoteBox(cur, o, o.bb, thr)); }
+  function drawP() {
+    const c = setupCv($("pCv"), W, H); c.clearRect(0, 0, W, H); c.drawImage(sceneCanvas(cur), 0, 0);
+    if ($("pShowFill").checked) PR.forEach(r => { c.save(); c.fillStyle = cssv("--role-warn"); c.globalAlpha = 0.28; c.fillRect(r.box[0], r.box[1], r.box[2] - r.box[0], r.box[3] - r.box[1]); c.restore(); });
+    PR.forEach(r => { const g = toGlobal(r.bm); paintMask(c, g, KCOL(r.cls), 0.55); outlineMask(c, g, KCOL(r.cls)); strokeBox(c, r.box, KCOL(r.cls), 1.6, [5, 3], "id " + r.cls); });
+  }
+  function renderP() {
+    $("pThrV").textContent = $("pThr").value;
+    $("pTable").innerHTML = "<thead><tr><th>#</th><th>cls</th><th>점수</th><th>box_px</th><th>sam_px</th><th>fill</th><th>Dice</th><th>Otsu</th><th>gt_fill</th><th>IoU</th></tr></thead><tbody>" +
+      PR.map((r, k) => `<tr><td>${k}</td><td class="n"><i class="mm-dot" style="background:var(--k${r.cls})"></i>${r.cls}</td><td class="n">${f(r.score)}</td><td class="n">${nf(r.boxPx)}</td><td class="n">${nf(r.samPx)}</td><td class="n">${f(r.fill)}</td><td class="n">${f(r.dice)}</td><td class="n">${f(r.otsu)}</td><td class="n">${f(r.gtFill)}</td><td class="n ${r.iou < 0.5 ? "mm-bad" : ""}">${f(r.iou)}</td></tr>`).join("") + "</tbody>";
+    const mF = mean(PR.map(r => r.fill)), mD = mean(PR.map(r => r.dice)), mS = mean(PR.map(r => r.score)), mO = mean(PR.map(r => r.otsu)), mG = mean(PR.map(r => r.gtFill)), mI = mean(PR.map(r => r.iou));
+    $("pCmp").innerHTML = `<thead><tr><th>지표</th><th>이 장면 (모의)</th><th>실습 노트북 (40장 · 126박스)</th></tr></thead><tbody>
+      <tr><td>자체 품질 점수 평균</td><td class="n">${f(mS)}</td><td class="n">0.875</td></tr>
+      <tr><td>박스 대비 마스크 면적 (fill_ratio)</td><td class="n">${pc(mF)}</td><td class="n">29.5%</td></tr>
+      <tr><td>박스채움 마스크와의 Dice</td><td class="n">${f(mD)}</td><td class="n">0.420</td></tr>
+      <tr><td>박스 안 Otsu 어림값</td><td class="n">${pc(mO)}</td><td class="n">31.9%</td></tr>
+      <tr><td>박스채움의 과대 추정 (1 / fill_ratio)</td><td class="n">${f(1 / mF, 2)} 배</td><td class="n">${(1 / 0.295).toFixed(2)} 배</td></tr>
+      <tr><td>정답 마스크 / 박스 (gt_fill)</td><td class="n">${pc(mG)}</td><td class="mm-small">알 수 없음 (정답 윤곽 없음)</td></tr>
+      <tr><td>정답 마스크와의 IoU</td><td class="n">${f(mI)}</td><td class="mm-small">알 수 없음</td></tr></tbody>`;
+    $("pFormula").innerHTML = `마스크가 박스 안에 있으면 Dice(박스, 마스크) = 2|M| / (|B| + |M|) = 2r / (1 + r),  r = fill_ratio<br>노트북: 2 × 0.295 / 1.295 = ${(2 * 0.295 / 1.295).toFixed(3)} (평균 r 로 계산) vs 박스별 Dice 평균 0.420 — 오목 함수라 평균의 함수 ≥ 함수의 평균<br>이 장면: 2 × ${f(mF)} / (1 + ${f(mF)}) = ${f(2 * mF / (1 + mF))} vs 박스별 평균 ${f(mD)}`;
+    drawP();
+  }
+
+  /* --- 산점도 (실습 노트북 클래스별 결과) --- */
+  const NB_SAM = [[14, 1, 0.122, 0.217, 3.416], [11, 18, 0.211, 0.331, 2.590], [10, 20, 0.222, 0.331, 2.295], [8, 5, 0.229, 0.346, 1.042], [0, 11, 0.249, 0.384, 1.155], [4, 4, 0.250, 0.390, 1.571], [12, 8, 0.251, 0.360, 2.983], [15, 1, 0.293, 0.442, 1.440], [9, 8, 0.294, 0.414, 1.231], [6, 8, 0.301, 0.441, 1.592], [3, 6, 0.327, 0.472, 2.954], [1, 10, 0.345, 0.470, 1.193], [2, 12, 0.346, 0.465, 1.159], [5, 8, 0.486, 0.626, 1.009], [13, 6, 0.563, 0.711, 1.448]];
+  function pearson(x, y, w) { w = w || x.map(() => 1); const sw = w.reduce((a, b) => a + b, 0), mx = x.reduce((a, v, i) => a + w[i] * v, 0) / sw, my = y.reduce((a, v, i) => a + w[i] * v, 0) / sw; let sxy = 0, sxx = 0, syy = 0; x.forEach((v, i) => { sxy += w[i] * (v - mx) * (y[i] - my); sxx += w[i] * (v - mx) ** 2; syy += w[i] * (y[i] - my) ** 2; }); return { r: sxy / Math.sqrt(sxx * syy), b: sxy / sxx, a: my - sxy / sxx * mx }; }
+  function ranks(a) { const idx = a.map((v, i) => [v, i]).sort((p, q) => p[0] - q[0]), r = new Array(a.length); let i = 0; while (i < idx.length) { let j = i; while (j + 1 < idx.length && idx[j + 1][0] === idx[i][0]) j++; for (let k = i; k <= j; k++) r[idx[k][1]] = (i + j) / 2 + 1; i = j + 1; } return r; }
+  function renderScatter() {
+    const x = NB_SAM.map(r => r[4]), y = NB_SAM.map(r => r[2]), w = NB_SAM.map(r => r[1]);
+    const L = 56, R = 540, T = 16, B = 300, X = v => L + (v - 0.8) / (3.6 - 0.8) * (R - L), Y = v => B - (v - 0.1) / (0.6 - 0.1) * (B - T);
+    let s = "";
+    for (let v = 1; v <= 3.5; v += 0.5) s += `<line class="grid" x1="${X(v)}" y1="${T}" x2="${X(v)}" y2="${B}"></line><text x="${X(v)}" y="${B + 16}" text-anchor="middle">${v.toFixed(1)}</text>`;
+    for (let v = 0.1; v <= 0.601; v += 0.1) s += `<line class="grid" x1="${L}" y1="${Y(v)}" x2="${R}" y2="${Y(v)}"></line><text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end">${v.toFixed(1)}</text>`;
+    s += `<line class="ax" x1="${L}" y1="${B}" x2="${R}" y2="${B}"></line><line class="ax" x1="${L}" y1="${T}" x2="${L}" y2="${B}"></line>`;
+    const fit = pearson(x, y, w); s += `<line class="fit" x1="${X(0.9)}" y1="${Y(fit.a + fit.b * 0.9)}" x2="${X(3.5)}" y2="${Y(fit.a + fit.b * 3.5)}"></line>`;
+    NB_SAM.forEach(r => { const rad = 3 + Math.sqrt(r[1]) * 2.2; s += `<circle class="pt" cx="${X(r[4])}" cy="${Y(r[2])}" r="${rad}"><title>class ${r[0]} · n=${r[1]} · fill ${r[2]} · 길쭉 ${r[4]}</title></circle><text class="lab" x="${X(r[4]) + rad + 2}" y="${Y(r[2]) + 4}">${r[0]}</text>`; });
+    s += `<text x="${(L + R) / 2}" y="${B + 34}" text-anchor="middle">박스의 길쭉한 정도 (1 = 정사각형)</text><text x="14" y="${(T + B) / 2}" text-anchor="middle" transform="rotate(-90 14 ${(T + B) / 2})">fill_ratio</text>`;
+    $("scatSvg").innerHTML = s;
+    const p = pearson(x, y), sp = pearson(ranks(x), ranks(y));
+    $("scatFormula").innerHTML = `피어슨 r = ${f(p.r)} · 박스 수 가중 r = ${f(fit.r)} · 스피어만 ρ = ${f(sp.r)} (15개 클래스)<br>가중 회귀선: fill_ratio ≈ ${f(fit.a)} ${fit.b < 0 ? "−" : "+"} ${f(Math.abs(fit.b))} × 길쭉한 정도`;
+  }
+
+  /* --- 의료 영상 모사 (흑백, 저대비) --- */
+  const MW = 320, MH = 320; let MED = null, medPt = { x: 160, y: 160 }, medSel = 0, medC = [];
+  function makeMed() {
+    const c = newCanvas(MW, MH), x = c.getContext("2d"), r = rngOf(77);
+    x.fillStyle = "#0a0a0a"; x.fillRect(0, 0, MW, MH);
+    let g = x.createRadialGradient(160, 165, 40, 160, 165, 160); g.addColorStop(0, "#8a8a8a"); g.addColorStop(1, "#5c5c5c");
+    x.fillStyle = g; x.beginPath(); x.ellipse(160, 165, 136, 138, 0, 0, TAU2); x.fill();
+    [[105, 155, 50, 95], [215, 155, 50, 95]].forEach(([cx, cy, rx, ry]) => { const gg = x.createRadialGradient(cx, cy, 10, cx, cy, ry); gg.addColorStop(0, "#3a3a3a"); gg.addColorStop(1, "#555"); x.fillStyle = gg; x.beginPath(); x.ellipse(cx, cy, rx, ry, 0, 0, TAU2); x.fill(); });
+    x.fillStyle = "rgba(200,200,200,0.35)"; x.beginPath(); x.ellipse(175, 205, 55, 45, -0.3, 0, TAU2); x.fill();
+    x.fillStyle = "rgba(210,210,210,0.45)"; x.fillRect(150, 32, 20, 268);
+    x.strokeStyle = "rgba(190,190,190,0.35)"; x.lineWidth = 6;
+    for (let k = 0; k < 7; k++) { const y = 66 + k * 28; x.beginPath(); x.moveTo(150, y); x.quadraticCurveTo(70, y - 10, 40, y + 40); x.stroke(); x.beginPath(); x.moveTo(170, y); x.quadraticCurveTo(250, y - 10, 280, y + 40); x.stroke(); }
+    const id = x.getImageData(0, 0, MW, MH); for (let i = 0; i < MW * MH; i++) { const v = id.data[i * 4] + (r() - 0.5) * 22; id.data[i * 4] = id.data[i * 4 + 1] = id.data[i * 4 + 2] = v; }
+    x.putImageData(id, 0, 0);
+    MED = { cv: c, bl: blurPlanes(id.data, MW, MH) };
+  }
+  function computeMed() {
+    medC = pointCandidates(MED.bl, [medPt], [], 20, [[0.25, 12], [99, 999]]);
+  }
+  function renderMed() {
+    const c = setupCv($("medCv"), MW, MH); c.clearRect(0, 0, MW, MH); c.drawImage(MED.cv, 0, 0);
+    const cd = medC[medSel]; paintMask(c, cd.m, cssv("--role-mask"), 0.45, MW, MH); dot(c, medPt.x, medPt.y, cssv("--role-pos"), false);
+    const areas = medC.map(x => x.area / (MW * MH));
+    $("medKv").innerHTML = `<dt>점 프롬프트</dt><dd>(${Math.round(medPt.x)}, ${Math.round(medPt.y)})</dd>` + medC.map((x, i) => `<dt><button class="sk-btn sk-btn--sm" type="button" data-mi="${i}" aria-pressed="${i === medSel}">후보 ${i + 1}</button></dt><dd>${pc(areas[i])} · 점수 ${f(x.score, 2)}</dd>`).join("") + `<dt>최대 / 최소 면적</dt><dd>${f(Math.max(...areas) / Math.max(1e-6, Math.min(...areas)), 1)} 배</dd>`;
+    $("medKv").querySelectorAll("[data-mi]").forEach(b => b.addEventListener("click", () => { medSel = +b.dataset.mi; renderMed(); }));
+  }
+
+  /* ================= 4. 자동 라벨링·판별 ================= */
+  const NB = 40, BATCH0 = 4001, BOX_THR = 30;
+  const B = { ready: false, busy: false, src: "gt", recs: [], objs: [], props: [], scenes: [], missed: 0 };
+  let dStep = 0, dPlayT = null, dEx = null;
+  function detBox(o, seed) {
+    const r = rngOf(seed * 131 + o.id * 7 + 3); if (r() < 0.06) return null;
+    const b = o.bb, w = b[2] - b[0], h = b[3] - b[1], j = () => gauss(r) * 0.07;
+    const x0 = clamp(b[0] + j() * w, 0, W - 2), y0 = clamp(b[1] + j() * h, 0, H - 2);
+    return [x0, y0, clamp(b[2] + j() * w, x0 + 2, W), clamp(b[3] + j() * h, y0 + 2, H)];
+  }
+  function computeBatch(done) {
+    B.busy = true; B.ready = false; B.recs = []; B.objs = []; B.props = []; B.scenes = []; B.missed = 0; dEx = null;
+    let i = 0;
+    const step = () => {
+      const t0 = performance.now();
+      while (i < NB && performance.now() - t0 < 45) {
+        const sc = makeScene(BATCH0 + i);
+        sc.tools.forEach(o => {
+          const box = B.src === "gt" ? o.bb.slice() : detBox(o, sc.seed);
+          if (!box) { B.missed++; return; }
+          const r = promoteBox(sc, o, box, BOX_THR); r.scene = i; const bw = box[2] - box[0], bh = box[3] - box[1]; r.elong = Math.max(bw / bh, bh / bw); r.vis = o.vis; B.recs.push(r);
+        });
+        const rr2 = rngOf(sc.seed * 17 + 5);
+        sc.objs.forEach(o => {
+          if (!o.visPx) return;
+          const ob = { scene: i, seed: sc.seed, id: o.id, type: o.type, bb: o.bb.slice(), vis: o.vis, area: o.visPx }; B.objs.push(ob);
+          const b = o.bb, w = b[2] - b[0], h = b[3] - b[1], j = () => gauss(rr2) * 0.1;
+          B.props.push(Object.assign({}, ob, { box: [b[0] + j() * w, b[1] + j() * h, b[2] + j() * w, b[3] + j() * h] }));
+        });
+        for (let k = 0; k < 2; k++) { const w = 40 + rr2() * 120, h = 30 + rr2() * 90, x = rr2() * (W - w), y = rr2() * (H - h); B.props.push({ scene: i, seed: sc.seed, id: 100 + k, type: -1, vis: 1, area: w * h, box: [x, y, x + w, y + h] }); }
+        B.scenes.push({ seed: sc.seed, gt: sc.tools.map(o => ({ cls: o.type, bb: o.bb.slice(), id: o.id })) });
+        i++;
+      }
+      $("dStatus").textContent = `계산 중… ${i} / ${NB} 장`;
+      if (i < NB) setTimeout(step, 0); else { B.ready = true; B.busy = false; $("dStatus").textContent = `모의 장면 ${NB}장 (seed ${BATCH0} ~ ${BATCH0 + NB - 1}) · 박스 프롬프트 배경 거리 임계값 ${BOX_THR}`; if (done) done(); }
+    };
+    step();
+  }
+  function flags(r) { const lo = +$("dLo").value, hi = +$("dHi").value, sm = +$("dSc").value, x = []; if (r.fill < lo) x.push("면적 작음"); if (r.fill > hi) x.push("면적 큼"); if (r.score < sm) x.push("점수 낮음"); return x; }
+  const isBad = r => r.iou < 0.5;
+  const D_STEPS = ["박스 + 클래스", "SAM 마스크 (박스 프롬프트)", "규칙 기반 필터", "사람 검수", "경량 모형 학습용 라벨"];
+  function renderDStage() {
+    $("dSteps").innerHTML = D_STEPS.map((s, i) => `<li class="${i === dStep ? "on" : i < dStep ? "done" : ""}">${i + 1}. ${s}</li>`).join("");
+    if (!B.ready) { $("dStage").innerHTML = '<p class="mm-small">계산 중…</p>'; return; }
+    const R = B.recs, n = R.length, fl = R.map(flags), flagged = R.filter((r, i) => fl[i].length), bad = R.filter(isBad);
+    const tp = R.filter((r, i) => fl[i].length && isBad(r)).length, fp = flagged.length - tp, fn = bad.length - tp, tn = n - tp - fp - fn;
+    let h = "";
+    if (dStep === 0) {
+      const cnt = new Array(NCLS).fill(0); R.forEach(r => cnt[r.cls]++);
+      const gtN = B.scenes.reduce((a, s) => a + s.gt.length, 0);
+      h = `<dl class="sk-kv"><dt>장면</dt><dd>${NB} 장</dd><dt>정답 박스</dt><dd>${gtN} 개 (장면당 ${f(gtN / NB, 2)})</dd><dt>프롬프트로 쓸 박스</dt><dd>${n} 개</dd>${B.src === "det" ? `<dt>모의 검출기가 놓친 물체</dt><dd>${B.missed} 개</dd>` : ""}</dl>
+        <div class="sk-scroll"><table class="sk-table"><thead><tr><th>class id</th>${cnt.map((c, k) => `<th class="c"><i class="mm-dot" style="background:var(--k${k})"></i>${k}</th>`).join("")}</tr></thead><tbody><tr><td>박스 수</td>${cnt.map(c => `<td class="n">${c}</td>`).join("")}</tr></tbody></table></div>
+        <p class="sk-note">박스는 <b>무엇</b>(클래스)을 알려 줍니다. ${B.src === "det" ? "모의 검출기 박스는 위치가 흔들리고 일부 물체를 놓칩니다 — 이 오류가 다음 단계로 그대로 전파됩니다." : "사람이 그린 정답 박스를 그대로 프롬프트로 씁니다."}</p>`;
+    } else if (dStep === 1) {
+      h = `<dl class="sk-kv"><dt>승격한 마스크</dt><dd>${n} 개</dd><dt>모의 자체 점수 평균</dt><dd>${f(mean(R.map(r => r.score)))}</dd><dt>박스 대비 면적 (fill_ratio) 평균</dt><dd>${pc(mean(R.map(r => r.fill)))}</dd><dt>박스채움과의 Dice 평균</dt><dd>${f(mean(R.map(r => r.dice)))}</dd><dt>정답 마스크 / 박스 (gt_fill) 평균</dt><dd>${pc(mean(R.map(r => r.gtFill)))}</dd><dt>정답 IoU 평균 (모의 장면만 앎)</dt><dd>${f(mean(R.map(r => r.iou)))}</dd><dt>정답 IoU &lt; 0.5 (불량)</dt><dd>${bad.length} 개 (${pc(bad.length / n)})</dd></dl>
+        <p class="sk-note">실습 노트북(40장 · 126박스): 점수 평균 0.875 · fill_ratio 29.5% · Dice 0.42 · 이미지당 2.75 초. SAM 은 <b>어디</b>만 알고, 클래스는 박스에서 물려받습니다.</p>`;
+    } else if (dStep === 2) {
+      const why = {}; fl.forEach(x => x.forEach(k => why[k] = (why[k] || 0) + 1));
+      h = `<p class="mm-small">규칙: fill_ratio ∉ [${f(+$("dLo").value, 2)}, ${f(+$("dHi").value, 2)}] 또는 모의 점수 &lt; ${f(+$("dSc").value, 2)} 이면 걸러냄 · 불량 = 정답 IoU &lt; 0.5</p>
+        <div class="sk-scroll"><table class="sk-table"><thead><tr><th></th><th>실제 불량</th><th>실제 양호</th><th>합계</th></tr></thead><tbody>
+        <tr><td>필터에 걸림</td><td class="n">${tp}</td><td class="n">${fp}</td><td class="n">${flagged.length}</td></tr>
+        <tr><td>필터 통과</td><td class="n ${fn ? "mm-bad" : ""}">${fn}</td><td class="n">${tn}</td><td class="n">${n - flagged.length}</td></tr></tbody></table></div>
+        <dl class="sk-kv"><dt>불량을 잡아낸 비율</dt><dd>${bad.length ? pc(tp / bad.length) : "—"} (${tp} / ${bad.length})</dd><dt>걸러진 것 중 실제 불량</dt><dd>${flagged.length ? pc(tp / flagged.length) : "—"}</dd>${Object.keys(why).map(k => `<dt>사유: ${k}</dt><dd>${why[k]}</dd>`).join("")}</dl>`;
+    } else if (dStep === 3) {
+      h = `<dl class="sk-kv"><dt>사람 검수 대상</dt><dd>${flagged.length} / ${n} (${pc(flagged.length / n)})</dd><dt>검수 없이 학습에 들어가는 불량</dt><dd class="${fn ? "mm-bad" : ""}">${fn} 개</dd></dl>
+        <p class="sk-note">사람은 3단계에서 <b>걸러진 것만</b> 봅니다. 필터 범위를 넓히면 검수량이 늘고, 좁히면 놓친 불량이 학습 데이터로 들어갑니다.</p>
+        ${fn ? `<p class="sk-note sk-note--warn">필터를 통과한 불량 ${fn}개는 <b>SAM 의 실패가 학습 데이터에 그대로</b> 들어간 경우입니다. 자기 점수만으로는 막을 수 없습니다.</p>` : ""}`;
+    } else {
+      const keep = n - flagged.length;
+      h = `<dl class="sk-kv"><dt>필터 통과 → 바로 학습용</dt><dd>${keep} 개</dd><dt>검수 후 반영</dt><dd>${flagged.length} 개</dd><dt>그중 섞인 불량 (통과분)</dt><dd>${fn} 개 (${keep ? pc(fn / keep) : "—"})</dd></dl>
+        <p class="sk-note">SAM 은 무겁고(93M ~ 636M) 느리며 클래스를 모릅니다. 그래서 SAM 이 만든 라벨로 <b>작은 모형(U-Net 등)</b>을 학습시켜 현장에 배치합니다 — 지식 증류와 같은 발상. SAM 마스크는 정답이 아니라 <b>또 다른 예측</b>입니다.</p>`;
+    }
+    $("dStage").innerHTML = h;
+    drawD();
+  }
+  function exScene() {
+    const idx = +$("dIdx").value;
+    if (!dEx || dEx.idx !== idx) dEx = { idx, sc: makeScene(BATCH0 + idx) };
+    return dEx;
+  }
+  function drawD() {
+    const c = setupCv($("dCv"), W, H); c.clearRect(0, 0, W, H);
+    if (!B.ready) return;
+    const ex = exScene(); c.drawImage(sceneCanvas(ex.sc), 0, 0);
+    const R = B.recs.filter(r => r.scene === ex.idx);
+    if (B.src === "det" && dStep === 0) ex.sc.tools.forEach(o => { if (!R.some(r => r.id === o.id)) strokeBox(c, o.bb, cssv("--role-gt"), 2, [3, 3], "놓침"); });
+    R.forEach(r => {
+      const g = toGlobal(r.bm), fl = flags(r), col = KCOL(r.cls);
+      if (dStep >= 1) {
+        if (dStep >= 2 && fl.length) { paintMask(c, g, cssv("--role-warn"), dStep === 4 ? 0.25 : 0.5); outlineMask(c, g, cssv("--role-warn")); }
+        else { paintMask(c, g, col, 0.55); outlineMask(c, g, col); }
+      }
+      let lab = "id " + r.cls, bc = col, dash = null;
+      if (dStep === 1) lab += " · " + f(r.fill, 2);
+      if (dStep >= 2 && fl.length) { bc = cssv("--role-warn"); lab = (dStep >= 3 ? "검수 · " : "") + fl[0]; }
+      if (dStep === 3 && !fl.length && isBad(r)) { bc = cssv("--role-warn"); dash = [6, 4]; lab = "놓친 불량 IoU " + f(r.iou, 2); }
+      strokeBox(c, r.box, bc, 2, dash, lab);
+    });
+  }
+  function renderDCls() {
+    if (!B.ready) return;
+    const rows = []; for (let k = 0; k < NCLS; k++) { const R = B.recs.filter(r => r.cls === k); if (!R.length) continue; rows.push([k, R.length, mean(R.map(r => r.fill)), mean(R.map(r => r.gtFill)), mean(R.map(r => r.dice)), mean(R.map(r => r.iou)), median(R.map(r => r.elong))]); }
+    rows.sort((a, b) => a[2] - b[2]);
+    $("dCls").innerHTML = "<thead><tr><th>cls</th><th>n</th><th>fill_ratio</th><th>gt_fill</th><th>Dice(박스, SAM)</th><th>정답 IoU</th><th>길쭉한 정도</th></tr></thead><tbody>" +
+      rows.map(r => `<tr><td class="n"><i class="mm-dot" style="background:var(--k${r[0]})"></i>${r[0]}</td><td class="n">${r[1]}</td><td class="n">${f(r[2])}</td><td class="n">${f(r[3])}</td><td class="n">${f(r[4])}</td><td class="n ${r[5] < 0.5 ? "mm-bad" : ""}">${f(r[5])}</td><td class="n">${f(r[6], 2)}</td></tr>`).join("") + "</tbody>";
+  }
+  function renderCost() {
+    const s = +$("kSec").value, g = +$("kGpu").value, m = +$("kMan").value, n = 15881;
+    $("kSecV").textContent = s.toFixed(2); $("kGpuV").textContent = g; $("kManV").textContent = m;
+    const h = s * n / 3600;
+    $("kFormula").innerHTML = `CPU = ${s.toFixed(2)} 초 × ${nf(n)} 장 / 3600 = <b>${h.toFixed(1)} 시간</b><br>GPU = ${h.toFixed(2)} / ${g} = <b>${(h / g).toFixed(1)} 시간</b><br>사람 = ${m} 분 × ${nf(n)} 장 / 60 = <b>${nf(Math.round(m * n / 60))} 시간</b>　→ 사람 / CPU = ${(m * n / 60 / h).toFixed(0)} 배`;
+  }
+  function stopDPlay() { if (dPlayT) { clearInterval(dPlayT); dPlayT = null; } $("dPlay").textContent = "재생"; }
+  function dStepTo(i) { dStep = clamp(i, 0, D_STEPS.length - 1); renderDStage(); }
+
+  /* --- VLM 판별 (모의 임베딩) --- */
+  const DIM = 16;
+  const CONC = ["tourniquet", "surgical scissors", "medical gauze", "syringe", "roll of medical tape", "breathing tube", "pressure bandage", "human hand", "scalpel", "defibrillator"];
+  const QUERIES = [
+    { c: 0, np: "a tourniquet" }, { c: 1, np: "surgical scissors" }, { c: 8, np: "a scalpel" }, { c: 3, np: "a syringe" },
+    { c: 2, np: "medical gauze" }, { c: 4, np: "a roll of medical tape" }, { c: 5, np: "a breathing tube" }, { c: 7, np: "a human hand" },
+    { c: 6, np: "a pressure bandage", extra: true }, { c: 9, np: "a defibrillator", extra: true }];
+  QUERIES.forEach(q => { q.on = !q.extra; q.short = q.np.replace(/^an? /, ""); });
+  const unit = v => { const n = Math.hypot(...v) || 1; return v.map(x => x / n); };
+  const dotp = (a, b) => a.reduce((s, v, i) => s + v * b[i], 0);
+  const TV = (() => { const M = CONC.map((_, i) => { const v = new Array(DIM).fill(0); v[i] = 1; return v; }); [[1, 8, .75], [2, 6, .6], [2, 4, .4], [3, 5, .4], [3, 8, .3], [0, 6, .3], [0, 5, .2], [4, 6, .25], [7, 0, .15]].forEach(([i, j, m]) => { M[i][j] += m; M[j][i] += m; }); return M.map(unit); })();
+  const CONF = TV.map((v, i) => { let b = -1, bj = 0; TV.forEach((u, j) => { if (j !== i) { const d = dotp(v, u); if (d > b) { b = d; bj = j; } } }); return bj; });
+  const noiseVec = s => { const r = rngOf(s); return Array.from({ length: DIM }, () => gauss(r)); };
+  const tcache = new Map(), icache = new Map();
+  function textEmb(q, tpl) { const k = q.c + "|" + tpl; if (!tcache.has(k)) { const nz = unit(noiseVec(hashStr(tpl + "|" + q.c))), amt = tpl === "a photo of {}" ? 0.12 : 0.32; tcache.set(k, unit(TV[q.c].map((v, i) => v + amt * nz[i]))); } return tcache.get(k); }
+  function imgEmb(o) {
+    const k = o.seed + ":" + o.id; if (icache.has(k)) return icache.get(k);
+    const r = rngOf(o.seed * 1009 + o.id * 31 + 11), gn = unit(Array.from({ length: DIM }, () => gauss(r))); let v;
+    if (o.type < 0) { const base = TV[[2, 6, 4, 1][Math.floor(r() * 4)]]; v = unit(base.map((x, i) => 0.55 * x + gn[i])); }
+    else { const a = 0.5 + 0.5 * o.vis, sig = 0.62 + 0.6 * (1 - o.vis) + (o.area < 2000 ? 0.2 : 0), cf = TV[CONF[o.type]]; v = unit(TV[o.type].map((x, i) => a * x + 0.3 * cf[i] + sig * gn[i])); }
+    icache.set(k, v); return v;
+  }
+  const sig = x => 1 / (1 + Math.exp(-x));
+  function scoreObj(o) {
+    const tpl = $("vTpl").value, tau = +$("vTau").value, Q = QUERIES.filter(q => q.on), v = imgEmb(o);
+    const cos = Q.map(q => dotp(v, textEmb(q, tpl))), mx = Math.max(...cos), ex = cos.map(s => Math.exp((s - mx) / tau)), Z = ex.reduce((a, b) => a + b, 0);
+    const open = cos.map(s => 0.35 * sig((s - 0.55) / 0.08));
+    return { Q, cos, p: ex.map(e => e / Z), open };
+  }
+  const argmax = a => a.reduce((b, v, i) => v > a[b] ? i : b, 0);
+  let vSel = 0;
+  function renderQueries() {
+    $("vQueries").innerHTML = QUERIES.map((q, i) => `<label class="sk-check"><input type="checkbox" data-q="${i}" ${q.on ? "checked" : ""}>${esc(q.short)}${q.extra ? ' <span class="mm-small">(추가)</span>' : ""}</label>`).join("");
+    $("vQueries").querySelectorAll("input").forEach(inp => inp.addEventListener("change", () => { const q = QUERIES[+inp.dataset.q]; q.on = inp.checked; if (!QUERIES.some(x => x.on)) { q.on = true; inp.checked = true; } renderV(); }));
+  }
+  function curObjsV() { return cur.objs.filter(o => o.visPx > 0).map(o => ({ seed: cur.seed, id: o.id, type: o.type, vis: o.vis, area: o.visPx, bb: o.bb })); }
+  function drawV() {
+    const c = setupCv($("vCv"), W, H); c.clearRect(0, 0, W, H); c.drawImage(sceneCanvas(cur), 0, 0);
+    const O = curObjsV(); O.forEach((o, i) => strokeBox(c, o.bb, i === vSel ? cssv("--role-fuse") : cssv("--role-gt"), i === vSel ? 3 : 1.4, i === vSel ? null : [4, 3], i === vSel ? (o.type < NCLS ? "id " + o.type : "라벨 없음") : null));
+  }
+  function renderVInspector() {
+    const O = curObjsV(); if (vSel >= O.length) vSel = 0;
+    $("vObjs").innerHTML = O.map((o, i) => `<button class="sk-btn sk-btn--sm" type="button" data-o="${i}" aria-pressed="${i === vSel}">${o.type < NCLS ? "물체 " + (i + 1) + " · id " + o.type : "물체 " + (i + 1) + " · 라벨 없음"}</button>`).join("");
+    $("vObjs").querySelectorAll("button").forEach(b => b.addEventListener("click", () => { vSel = +b.dataset.o; renderVInspector(); }));
+    const o = O[vSel]; if (!o) return;
+    const S = scoreObj(o), thr = +$("vThr").value, ic = argmax(S.p), io = argmax(S.open);
+    const bar = (lab, v, mxv, col, t) => `<div class="mm-barrow"><span class="lab" title="${esc(lab)}">${esc(lab)}</span><span class="trk"><span class="fil" style="width:${(clamp(v / mxv, 0, 1) * 100).toFixed(1)}%;background:${col}"></span>${t != null ? `<span class="thr" style="left:${(t / mxv * 100).toFixed(1)}%"></span>` : ""}</span><span class="val">${f(v)}</span></div>`;
+    $("vBars").innerHTML = `<h3>닫힌 어휘: softmax 확률 (τ = ${f(+$("vTau").value, 2)})</h3>` + S.Q.map((q, i) => bar(q.short + "  (cos " + f(S.cos[i], 2) + ")", S.p[i], 1, i === ic ? "var(--role-fuse)" : "color-mix(in srgb,var(--role-fuse) 40%,var(--surface-2))")).join("") +
+      `<h3 style="margin-top:8px">개방형 어휘: 질의별 독립 점수 (빨간 선 = 임계값 ${f(thr, 2)})</h3>` + S.Q.map((q, i) => bar(q.short, S.open[i], 0.4, S.open[i] >= thr ? "var(--role-txt)" : "color-mix(in srgb,var(--role-txt) 35%,var(--surface-2))", thr)).join("");
+    const hit = S.open[io] >= thr;
+    const truth = o.type < NCLS ? TYPES[o.type].ko : "손";
+    $("vVerdict").innerHTML = `닫힌 어휘 → <b>${esc(S.Q[ic].short)}</b> (p = ${f(S.p[ic])}, 합 = 1 이라 반드시 하나) · 개방형 → ${hit ? `<b>${esc(S.Q[io].short)}</b> (점수 ${f(S.open[io])})` : "<b>검출 없음</b> (모든 질의가 임계값 미만)"}<br><span class="mm-small">시뮬레이터만 아는 정답: ${truth}${o.vis < 0.85 ? " · " + pc(1 - o.vis, 0) + " 가려짐" : ""}${!S.Q.some(q => q.c === o.type) ? " · <b>질의 목록에 없는 물체</b>" : ""}</span>`;
+    drawV();
+  }
+  let vReveal = false;
+  function renderVBatch() {
+    if (!B.ready) return;
+    const Q = QUERIES.filter(q => q.on), thr = +$("vThr").value;
+    // 닫힌 어휘 혼동표
+    const M = Array.from({ length: 8 }, () => new Array(Q.length).fill(0)); let ok = 0, tot = 0, outList = 0;
+    B.objs.forEach(o => { const S = scoreObj(o), k = argmax(S.p); M[o.type][k]++; if (o.type < NCLS) { tot++; if (Q[k].c === o.type) ok++; if (!Q.some(q => q.c === o.type)) outList++; } });
+    const heat = (v, mxv, col) => `style="background:color-mix(in srgb,${col} ${Math.round(clamp(v / Math.max(1, mxv), 0, 1) * 70)}%,var(--surface))"`;
+    const mxM = Math.max(1, ...M.flat());
+    $("vConf").innerHTML = `<thead><tr><th>실제 \\ 예측</th>${Q.map(q => `<th class="c">${esc(q.short)}</th>`).join("")}</tr></thead><tbody>` + M.map((row, t) => row.some(v => v) ? `<tr><td>${TYPES[t].ko}</td>${row.map((v, j) => `<td class="h" ${heat(v, mxM, Q[j].c === t ? "var(--role-time)" : "var(--role-warn)")}>${v || ""}</td>`).join("")}</tr>` : "").join("") + "</tbody>";
+    const hands = M[7].reduce((a, b) => a + b, 0), handOk = Q.findIndex(q => q.c === 7) >= 0 ? M[7][Q.findIndex(q => q.c === 7)] : 0;
+    $("vConfNote").innerHTML = `도구 ${tot}개 중 정답 질의를 고른 비율 <b>${pc(ok / Math.max(1, tot))}</b>. 질의 목록에 이름이 없는 도구 <b>${outList}</b>개는 맞힐 방법이 없는데도 확률 합 1 로 어딘가에 배정됩니다. ` + (Q.some(q => q.c === 7) ? `손 ${hands}개 중 'human hand' 로 간 것 ${handOk}개.` : `목록에 'human hand' 가 없어 손 ${hands}개가 전부 도구 이름(최다: ${esc(Q[argmax(M[7])].short)})으로 배정되었습니다.`);
+    // 개방형 검출 + IoU 매칭
+    const X = Array.from({ length: Q.length }, () => new Array(NCLS).fill(0)); let det = 0, mt = 0;
+    B.props.forEach(p => { const S = scoreObj(p), k = argmax(S.open); if (S.open[k] < thr) return; det++; const gts = B.scenes[p.scene].gt; let best = 0, bc = -1; gts.forEach(g => { const v = boxIoU(p.box, g.bb); if (v > best) { best = v; bc = g.cls; } }); if (best >= 0.3) { X[k][bc]++; mt++; } });
+    const mxX = Math.max(1, ...X.flat());
+    $("vCross").innerHTML = `<thead><tr><th>질의 \\ class id</th>${Array.from({ length: NCLS }, (_, k) => `<th class="c">${k}</th>`).join("")}</tr></thead><tbody>` + X.map((row, j) => row.some(v => v) ? `<tr><td>${esc(Q[j].short)}</td>${row.map(v => `<td class="h" ${heat(v, mxX, "var(--role-fuse)")}>${v || ""}</td>`).join("")}</tr>` : "").join("") + "</tbody>";
+    const dict = Array.from({ length: NCLS }, (_, k) => { const col = X.map(r => r[k]), n = col.reduce((a, b) => a + b, 0), j = argmax(col); return { k, n, q: n ? Q[j] : null, share: n ? col[j] / n : 0 }; });
+    let right = 0, decided = 0;
+    $("vDict").innerHTML = `<thead><tr><th>class id</th><th>매칭 수</th><th>최다 질의</th><th>비율</th><th>판단</th>${vReveal ? "<th>숨은 이름</th><th>일치</th>" : ""}</tr></thead><tbody>` + dict.map(d => {
+      const verdict = d.n < 5 ? "표본 부족 · 보류" : d.share < 0.6 ? "퍼짐 · 보류" : "후보";
+      const match = d.q && d.q.c === d.k; if (verdict === "후보") { decided++; if (match) right++; }
+      return `<tr><td class="n"><i class="mm-dot" style="background:var(--k${d.k})"></i>${d.k}</td><td class="n">${d.n}</td><td>${d.q ? esc(d.q.short) : "—"}</td><td class="n">${d.n ? pc(d.share, 0) : "—"}</td><td class="${verdict === "후보" ? "" : "mm-small"}">${verdict}</td>${vReveal ? `<td>${TYPES[d.k].ko}</td><td class="${match ? "mm-ok" : "mm-bad"}">${match ? "일치" : "불일치"}</td>` : ""}</tr>`;
+    }).join("") + "</tbody>";
+    $("vCrossNote").innerHTML = `검출 ${det}개 중 정답 박스와 매칭 ${mt}개, 매칭 안 됨 ${det - mt}개 (오탐이거나 라벨 없는 손).` + (vReveal ? ` '후보'로 판단한 ${decided}개 클래스 중 숨은 이름과 일치 <b>${right}</b>개. 이름이 질의 목록에 없는 클래스(압박 붕대)는 비슷한 다른 이름으로 <b>잘못 복원</b>될 수 있습니다 — 그래서 사람이 crop 을 보고 확인합니다.` : " '숨은 이름과 비교'를 눌러 복원 결과를 확인하세요. 실제 데이터에는 이 버튼이 없습니다.");
+  }
+  function renderVCode() {
+    const Q = QUERIES.filter(q => q.on), tpl = $("vTpl").value, thr = +$("vThr").value;
+    $("vCode").textContent = ["import torch", "import numpy as np", "from transformers import OwlViTProcessor, OwlViTForObjectDetection", "", "owl_processor = OwlViTProcessor.from_pretrained('google/owlvit-base-patch32')", "owl_model     = OwlViTForObjectDetection.from_pretrained('google/owlvit-base-patch32').eval()", "", "QUERY_LIST = [", ...Q.map(q => `    '${tpl.replace("{}", q.np)}',`), "]", "", `def owl_detect(img, query_list, threshold=${f(thr, 2)}):`, "    inputs = owl_processor(text=[query_list], images=img, return_tensors='pt')", "    with torch.no_grad():", "        outputs = owl_model(**inputs)", "    target = torch.tensor([[img.size[1], img.size[0]]])      # (height, width)", "    result = owl_processor.post_process_grounded_object_detection(", "        outputs, threshold=threshold, target_sizes=target)[0]", "    return result['boxes'].numpy(), result['scores'].numpy(), result['labels'].numpy()", "", "# 정답 박스와 IoU >= 0.3 으로 매칭 -> 어떤 텍스트가 어떤 class id 와 겹치는가", "match_list = []", "for b, s, l in zip(*owl_detect(img, QUERY_LIST)):", "    iou_list = [compute_iou(b, gt) for gt in gt_list]", "    best = int(np.argmax(iou_list))", "    if iou_list[best] >= 0.3:", "        match_list.append(dict(query=QUERY_LIST[l], cls=cls_list[best], iou=iou_list[best], score=float(s)))", "# pd.crosstab(df_match['query'], df_match['cls'])  -> 후보를 좁히는 용도, names 확정 금지"].join("\n");
+  }
+  function renderV() { $("vTauV").textContent = f(+$("vTau").value, 2); $("vThrV").textContent = f(+$("vThr").value, 2); renderVInspector(); renderVBatch(); renderVCode(); }
+  function renderNb() {
+    const NBX = { q: ["a human hand", "a roll of medical tape", "a syringe", "surgical scissors"], c: [9, 10, 11, 12, 13, 14], v: [[0, 0, 4, 0, 0, 0], [0, 4, 2, 0, 2, 0], [0, 7, 4, 1, 0, 0], [3, 5, 4, 1, 0, 1]] };
+    const mx = 7, tot = NBX.v.flat().reduce((a, b) => a + b, 0);
+    $("nbCross").innerHTML = `<thead><tr><th>질의 \\ cls</th>${NBX.c.map(c => `<th class="c">${c}</th>`).join("")}<th class="c">합</th><th class="c">최다 비율</th></tr></thead><tbody>` +
+      NBX.v.map((r, i) => { const s = r.reduce((a, b) => a + b, 0), m = Math.max(...r); return `<tr><td>${NBX.q[i]}</td>${r.map(v => `<td class="h" style="background:color-mix(in srgb,var(--role-fuse) ${Math.round(v / mx * 70)}%,var(--surface))">${v || 0}</td>`).join("")}<td class="h">${s}</td><td class="h">${pc(m / s, 0)}</td></tr>`; }).join("") + `<tr><td><b>합</b></td>${NBX.c.map((c, j) => `<td class="h"><b>${NBX.v.reduce((a, r) => a + r[j], 0)}</b></td>`).join("")}<td class="h"><b>${tot}</b></td><td></td></tr></tbody>`;
+    const OWL = [["a photo of surgical scissors", 0.207, [323, 278, 444, 357]], ["a photo of a human hand", 0.149, [292, 204, 385, 273]], ["a photo of a human hand", 0.139, [340, 167, 416, 231]], ["a photo of a human hand", 0.139, [412, 146, 490, 206]], ["a photo of medical gauze", 0.104, [112, -3, 353, 257]], ["a photo of a roll of medical tape", 0.102, [339, 215, 408, 268]], ["a photo of a human hand", 0.1, [277, 152, 325, 198]], ["a photo of a roll of medical tape", 0.086, [341, 170, 382, 191]]];
+    $("nbOwl").innerHTML = OWL.map(o => `<tr><td>${o[0]}</td><td class="n">${o[1]}</td><td class="n">[${o[2].join(", ")}]</td></tr>`).join("");
+  }
+
+  /* ================= 5. VQA · 이미지 생성 ================= */
+  const E = { inited: false };
+  const WORD = ["zero", "one", "two", "three", "four", "five", "six", "seven"];
+  const SHORT = ["tourniquet", "scissors", "gauze", "syringe", "tape", "breathing tube", "bandage"];
+  function vlmSee(sc) { // 모의 VLM 지각: 기본 질의 8개 · 기본 문장 틀의 닫힌 어휘 1위
+    const Q = QUERIES.filter(q => !q.extra), tpl = "a photo of {}";
+    return sc.tools.filter(o => o.vis >= 0.6 && o.visPx >= 1500).map(o => { const v = imgEmb({ seed: sc.seed, id: o.id, type: o.type, vis: o.vis, area: o.visPx }); const s = Q.map(q => dotp(v, textEmb(q, tpl))); return Q[argmax(s)]; }).filter(q => q.c !== 7);
+  }
+  const QTXT = [["What medical tools are visible in this image? List them.", "List every medical item you can see."],
+    ["How many tools are on the tray?", "Count the medical tools in this image."],
+    ["Is there a tourniquet in this image? Answer yes or no.", "Do you see a tourniquet? Reply yes or no."],
+    ["Is there a defibrillator in this image? Answer yes or no.", "Can you spot a defibrillator anywhere? Yes or no."]];
+  function vqaAnswers(sc, ph) {
+    const hv = k => rngOf(hashStr(sc.seed + "|" + k + "|" + ph))();
+    const seen = vlmSee(sc), items = []; seen.forEach(q => { if (!items.some(x => x.c === q.c)) items.push(q); });
+    const hallu = ["needle", "lancet", "aspirator", "stethoscope"];
+    const list = items.map(q => q.short.replace("roll of medical ", "").replace("surgical ", "").replace("medical ", ""));
+    let hal = null; if (hv("q1h") < 0.6) { hal = hallu[Math.floor(hv("q1w") * 4)]; list.push(hal); }
+    const a1 = list.length ? list.map((s, i) => i ? s : s[0].toUpperCase() + s.slice(1)).join(", ") + "." : "I cannot identify any tools.";
+    const nTh = ph ? 1200 : 2500, hand = sc.objs.some(o => o.type === HAND); let cnt = sc.tools.filter(o => o.visPx >= nTh).length + (ph && hand ? 1 : 0); cnt = Math.max(1, cnt);
+    const a2 = ph ? `I count ${WORD[cnt] || cnt} items.` : `There ${cnt === 1 ? "is one tool" : "are " + (WORD[cnt] || cnt) + " tools"} on the tray.`;
+    const tq = sc.tools.find(o => o.type === 0), y3 = !!(tq && tq.vis >= 0.75 && tq.visPx >= (ph ? 1800 : 2600));
+    const y4 = ph === 1 && hv("q4") < 0.35;
+    return { items, hal, a: [a1, a2, y3 ? "Yes." : "No.", y4 ? "Yes, there is a defibrillator on the left." : "No."], cnt, y3, y4 };
+  }
+  function renderQ() {
+    $("qSeed").textContent = "seed " + curSeed;
+    const ph = +segVal("qPhr"), A = vqaAnswers(cur, ph), Bo = vqaAnswers(cur, 1 - ph), sc = cur;
+    const gtTypes = [...new Set(sc.tools.map(o => o.type))], nT = sc.tools.length, hasTq = gtTypes.includes(0);
+    const named = A.items.map(q => q.c), wrongName = named.filter(c => !gtTypes.includes(c)).length, missing = gtTypes.filter(t => !named.includes(t)).length;
+    const v1 = [A.hal ? `<span class="mm-bad">환각: ${A.hal}</span>` : "", wrongName ? `<span class="mm-bad">틀린 이름 ${wrongName}</span>` : "", missing ? `누락 ${missing}종` : "", (!A.hal && !wrongName && !missing) ? '<span class="mm-ok">일치</span>' : ""].filter(Boolean).join(" · ");
+    const v2 = A.cnt === nT ? '<span class="mm-ok">정답</span>' : `<span class="mm-bad">계수 오류 (${A.cnt > nT ? "+" : ""}${A.cnt - nT})</span>` + (ph ? "" : " · 없는 쟁반을 전제");
+    const v3 = A.y3 === hasTq ? '<span class="mm-ok">정답</span>' : `<span class="mm-bad">${hasTq ? "놓침 (있는데 No)" : "환각"}</span>`;
+    const v4 = A.y4 ? '<span class="mm-bad">환각</span>' : '<span class="mm-ok">정답</span>';
+    const same = [A.items.map(q => q.c).sort() + "|" + !!A.hal === Bo.items.map(q => q.c).sort() + "|" + !!Bo.hal, A.cnt === Bo.cnt, A.y3 === Bo.y3, A.y4 === Bo.y4];
+    const g = $("qGround").checked ? '<span class="mm-bad">요구했지만 제공 안 됨</span>' : "없음";
+    const gt = [gtTypes.map(t => SHORT[t]).join(", ") || "(없음)", `${nT}개 (쟁반 없음)`, hasTq ? "Yes" : "No", "No"];
+    const ver = [v1, v2, v3, v4];
+    $("qTable").innerHTML = "<thead><tr><th>질문</th><th>모의 VLM 답</th><th>장면 라벨 정답</th><th>판정</th><th>표현을 바꾸면</th><th>근거 영역</th></tr></thead><tbody>" +
+      QTXT.map((q, i) => `<tr><td style="white-space:normal;min-width:200px">${esc(q[ph])}</td><td style="white-space:normal;min-width:150px">${esc(A.a[i])}</td><td>${esc(gt[i])}</td><td>${ver[i]}</td><td>${same[i] ? "같음" : '<span class="mm-bad">답이 바뀜</span>: ' + esc(Bo.a[i])}</td><td>${g}</td></tr>`).join("") + "</tbody>";
+    $("qNote").innerHTML = `모의 VLM 은 장면 라벨을 보지 않고 답합니다(크게 보이는 물체만 '지각', 일부는 비슷한 이름으로 착각, 일정 확률로 없는 물건을 말함). 표현 A/B 를 바꿔 같은 장면에서 답이 달라지는지 보세요. ${$("qGround").checked ? "근거 영역을 요구해도 문장 출력에는 박스·마스크가 없으므로 <b>기록에 남기지 않고 사람이 확인</b>해야 합니다 (회색 점선 = 사람이 대조할 정답 박스)." : "어디를 보고 답했는지 알 수 없는 것이 가장 무거운 문제입니다 — 더 큰 모형으로도 구조적으로 해결되지 않습니다."}`;
+    drawQ();
+  }
+  function drawQ() {
+    const c = setupCv($("qCv"), W, H); c.clearRect(0, 0, W, H); c.drawImage(sceneCanvas(cur), 0, 0);
+    if ($("qGround").checked) cur.tools.forEach(o => strokeBox(c, o.bb, cssv("--role-gt"), 2, [5, 4], "정답 id " + o.type));
+  }
+
+  /* --- 도구 분류기 (색 히스토그램 최근접 중심) --- */
+  const CLF = { ready: false, busy: false, cent: null, acc: NaN };
+  function feat(img, box) {
+    const [x0, y0, x1, y1] = boxIntRect(box), h = new Float64Array(64); let n = 0;
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const i = (y * W + x) * 4; h[(img[i] >> 6) * 16 + (img[i + 1] >> 6) * 4 + (img[i + 2] >> 6)]++; n++; }
+    const v = Array.from(h, x => Math.sqrt(x / Math.max(1, n))); return unit(v);
+  }
+  function classify(img, box) { const v = feat(img, box), s = CLF.cent.map(c => dotp(c, v)), mx = Math.max(...s), ex = s.map(x => Math.exp(25 * (x - mx))), Z = ex.reduce((a, b) => a + b, 0), p = ex.map(e => e / Z), k = argmax(p); return { cls: k, p: p[k], probs: p }; }
+  function trainClf(done) {
+    CLF.busy = true; const sums = Array.from({ length: NCLS }, () => new Array(64).fill(0)); let i = 0, ok = 0, tot = 0;
+    const step = () => {
+      const t0 = performance.now();
+      while (i < 80 && performance.now() - t0 < 45) {
+        const sc = makeScene(i < 60 ? 9001 + i : 9501 + i - 60);
+        sc.tools.forEach(o => { const v = feat(sc.img, o.bb); if (i < 60) v.forEach((x, j) => sums[o.type][j] += x); else { tot++; if (classify(sc.img, o.bb).cls === o.type) ok++; } });
+        i++; if (i === 60) CLF.cent = sums.map(unit);
+      }
+      $("gClf").textContent = `분류기 준비 중… ${i} / 80`;
+      if (i < 80) setTimeout(step, 0); else { CLF.acc = ok / Math.max(1, tot); CLF.ready = true; CLF.busy = false; if (done) done(); }
+    };
+    step();
+  }
+
+  /* --- 지우기 (inpaint) --- */
+  function dilate(m, k) {
+    const r = (k - 1) >> 1; if (r <= 0) return m.slice(); const t = new Uint8Array(N), o = new Uint8Array(N);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { let v = 0; for (let d = -r; d <= r && !v; d++) { const xx = x + d; if (xx >= 0 && xx < W && m[y * W + xx]) v = 1; } t[y * W + x] = v; }
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { let v = 0; for (let d = -r; d <= r && !v; d++) { const yy = y + d; if (yy >= 0 && yy < H && t[yy * W + x]) v = 1; } o[y * W + x] = v; }
+    return o;
+  }
+  function inpaint(img, mask, rad) {
+    const out = new Uint8ClampedArray(img), known = new Uint8Array(N); let left = [];
+    for (let i = 0; i < N; i++) { if (mask[i]) left.push(i); else known[i] = 1; }
+    let guard = 0;
+    while (left.length && guard++ < 400) {
+      const front = [], rest = [];
+      for (const i of left) { const x = i % W, y = (i / W) | 0; let nb = false; for (let dy = -1; dy <= 1 && !nb; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < W && yy < H && known[yy * W + xx]) { nb = true; break; } } (nb ? front : rest).push(i); }
+      if (!front.length) break;
+      const vals = front.map(i => { const x = i % W, y = (i / W) | 0; let s0 = 0, s1 = 0, s2 = 0, ws = 0; for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue; const j = yy * W + xx; if (!known[j]) continue; const d2 = dx * dx + dy * dy; if (d2 > rad * rad) continue; const w = 1 / d2; s0 += w * out[j * 4]; s1 += w * out[j * 4 + 1]; s2 += w * out[j * 4 + 2]; ws += w; } return [s0 / ws, s1 / ws, s2 / ws]; });
+      front.forEach((i, k) => { out[i * 4] = vals[k][0]; out[i * 4 + 1] = vals[k][1]; out[i * 4 + 2] = vals[k][2]; known[i] = 1; });
+      left = rest;
+    }
+    return out;
+  }
+  let ER = null;
+  function fillEraseSel() {
+    const tools = cur.tools; let best = 0, bi = 0;
+    tools.forEach((o, i) => { const bm = boxMask(cur, o.bb, BOX_THR); if (bm && bm.area > best) { best = bm.area; bi = i; } });
+    $("eObj").innerHTML = tools.map((o, i) => `<option value="${i}" ${i === bi ? "selected" : ""}>물체 ${i + 1} · id ${o.type}${i === bi ? " (가장 큰 마스크)" : ""}</option>`).join("");
+  }
+  function computeErase() {
+    const o = cur.tools[+$("eObj").value]; if (!o) { ER = null; return; }
+    const src = segVal("eSrc"); let m;
+    if (src === "sam") m = toGlobal(boxMask(cur, o.bb, BOX_THR)); else if (src === "gt") m = gtMask(o.id); else { m = new Uint8Array(N); const [x0, y0, x1, y1] = boxIntRect(o.bb); for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) m[y * W + x] = 1; }
+    const k = +$("eDil").value, md = dilate(m, k), out = inpaint(cur.img, md, +$("eRad").value);
+    let left = 0; for (let i = 0; i < N; i++) if (cur.owner[i] === o.id && !md[i]) left++;
+    ER = { o, m, md, out, left, area: md.reduce((a, b) => a + b, 0), before: CLF.ready ? classify(cur.img, o.bb) : null, after: CLF.ready ? classify(out, o.bb) : null };
+  }
+  function drawErase() {
+    const c0 = setupCv($("eCv0"), W, H), c1 = setupCv($("eCv1"), W, H), c2 = setupCv($("eCv2"), W, H);
+    [c0, c1, c2].forEach(c => c.clearRect(0, 0, W, H));
+    c0.drawImage(sceneCanvas(cur), 0, 0); if (!ER) return;
+    strokeBox(c0, ER.o.bb, KCOL(ER.o.type), 2, null, "id " + ER.o.type);
+    c1.drawImage(sceneCanvas(cur), 0, 0); c1.save(); c1.fillStyle = "rgba(0,0,0,0.45)"; c1.fillRect(0, 0, W, H); c1.restore(); paintMask(c1, ER.md, cssv("--role-mask"), 0.85);
+    c2.drawImage(imgCanvas(ER.out), 0, 0); strokeBox(c2, ER.o.bb, cssv("--role-gt"), 1.5, [5, 4]);
+  }
+  function renderErase() {
+    $("eDilV").textContent = $("eDil").value + "×" + $("eDil").value; $("eRadV").textContent = $("eRad").value;
+    computeErase(); drawErase();
+    if (!ER) { $("eTable").innerHTML = ""; $("eNote").textContent = "이 장면에는 도구가 없습니다."; return; }
+    const b = ER.before, a = ER.after, oc2 = ER.o.type;
+    $("eTable").innerHTML = `<thead><tr><th>상태 (같은 박스 crop)</th><th>분류기 예측</th><th>확률</th><th>원래 클래스(id ${oc2}) 확률</th></tr></thead><tbody>` +
+      (b ? `<tr><td>원본</td><td class="n">id ${b.cls}</td><td class="n">${f(b.p)}</td><td class="n">${f(b.probs[oc2])}</td></tr><tr><td>지운 뒤</td><td class="n">id ${a.cls}</td><td class="n">${f(a.p)}</td><td class="n">${f(a.probs[oc2])}</td></tr>` : `<tr><td colspan="4">분류기 준비 중…</td></tr>`) + "</tbody>";
+    let note = `채운 픽셀 ${nf(ER.area)}개. `;
+    if (ER.left > 30) note += `<span class="mm-bad">마스크가 물체를 다 덮지 못해 ${nf(ER.left)} px 이 남았습니다</span> — 흔적이 남은 반사실 이미지는 진단을 흐립니다. `;
+    if (segVal("eSrc") === "box") note += "박스채움으로 지우면 배경까지 넓게 번져 '맥락'도 함께 지워집니다. ";
+    if (b && a) note += a.cls === oc2 && a.p > 0.5 ? `<b>지운 뒤에도 원래 클래스(p = ${f(a.p)})</b> — 분류기가 도구가 아닌 주변 맥락(남은 흔적·배경)을 보고 있다는 신호입니다.` : `지운 뒤 원래 클래스 확률이 ${f(b.probs[oc2])} → ${f(a.probs[oc2])} 로 떨어졌습니다. 닫힌 분류기는 물체가 없어도 <b>반드시 어떤 클래스</b>를 답합니다(id ${a.cls}, p = ${f(a.p)}) — 배경만 있는 음성 샘플이 필요한 이유입니다.`;
+    $("eNote").innerHTML = note + " cv2.inpaint 같은 퍼뜨리기 방식은 평평한 배경에서만 자연스럽고, 확산 모형 inpainting 은 자연스럽지만 없던 구조를 지어낼 위험이 있습니다.";
+  }
+
+  /* --- 붙여 넣기 (copy-paste) --- */
+  let GP = { k: 0, res: [] };
+  function fillPasteSel() {
+    let def = -1;
+    cur.tools.forEach((o, i) => { if (def >= 0 || !CLF.ready) return; const c = classify(cur.img, o.bb), bm = boxMask(cur, o.bb, BOX_THR); if (c.cls === o.type && c.p > 0.7 && bm && bm.area > 500) def = i; });
+    GP.defNote = def >= 0 ? "" : " (조건을 만족하는 물체가 없어 가장 큰 마스크로 대체)";
+    if (def < 0) { let best = 0; cur.tools.forEach((o, i) => { const bm = boxMask(cur, o.bb, BOX_THR); if (bm && bm.area > best) { best = bm.area; def = i; } }); }
+    $("gObj").innerHTML = cur.tools.map((o, i) => `<option value="${i}" ${i === def ? "selected" : ""}>물체 ${i + 1} · id ${o.type}${i === def ? " (기본 선택)" : ""}</option>`).join("");
+  }
+  function computePaste() {
+    GP.res = []; const o = cur.tools[+$("gObj").value]; if (!o || !CLF.ready) return;
+    const mode = segVal("gSrc"), bright = $("gBright").checked;
+    let px0, py0, pw, ph, pm;
+    if (mode === "sam") { const bm = boxMask(cur, o.bb, BOX_THR); if (!bm || !bm.area) return; let a = bm.w, b = bm.h, c = 0, d = 0; for (let y = 0; y < bm.h; y++) for (let x = 0; x < bm.w; x++) if (bm.m[y * bm.w + x]) { a = Math.min(a, x); b = Math.min(b, y); c = Math.max(c, x + 1); d = Math.max(d, y + 1); } px0 = bm.x0 + a; py0 = bm.y0 + b; pw = c - a; ph = d - b; pm = new Uint8Array(pw * ph); for (let y = 0; y < ph; y++) for (let x = 0; x < pw; x++) pm[y * pw + x] = bm.m[(y + b) * bm.w + x + a]; }
+    else { const r = boxIntRect(o.bb); px0 = r[0]; py0 = r[1]; pw = r[2] - r[0]; ph = r[3] - r[1]; pm = new Uint8Array(pw * ph).fill(1); }
+    const maskPx = pm.reduce((s, v) => s + v, 0), rng = rngOf(1234), src = cur.img;
+    const lum = (im, i) => 0.299 * im[i] + 0.587 * im[i + 1] + 0.114 * im[i + 2];
+    for (let k = 0; k < 10; k++) {
+      const dst = makeScene(curSeed + 101 + k), out = new Uint8ClampedArray(dst.img);
+      const ty = Math.floor(rng() * (H - ph)), tx = Math.floor(rng() * (W - pw));
+      let lp = 0, ld = 0; for (let y = 0; y < ph; y++) for (let x = 0; x < pw; x++) if (pm[y * pw + x]) { lp += lum(src, ((py0 + y) * W + px0 + x) * 4); ld += lum(dst.img, ((ty + y) * W + tx + x) * 4); }
+      lp /= maskPx; ld /= maskPx; const sc = bright ? clamp(ld / Math.max(1, lp), 0.5, 2) : 1;
+      const cov = new Array(dst.objs.length).fill(0);
+      for (let y = 0; y < ph; y++) for (let x = 0; x < pw; x++) if (pm[y * pw + x]) { const si = ((py0 + y) * W + px0 + x) * 4, di = ((ty + y) * W + tx + x) * 4; out[di] = src[si] * sc; out[di + 1] = src[si + 1] * sc; out[di + 2] = src[si + 2] * sc; const ow = dst.owner[(ty + y) * W + tx + x]; if (ow >= 0) cov[ow]++; }
+      let rs = 0, rn = 0; for (let y = ty - 6; y < ty + ph + 6; y++) for (let x = tx - 6; x < tx + pw + 6; x++) { if (x < 0 || y < 0 || x >= W || y >= H) continue; if (x >= tx && x < tx + pw && y >= ty && y < ty + ph) continue; rs += lum(dst.img, (y * W + x) * 4); rn++; }
+      const box = [tx, ty, tx + pw, ty + ph], cl = classify(out, box);
+      GP.res.push({ dst, out, box, cl, cov, lumP: lp * sc, lumR: rs / Math.max(1, rn), cls: o.type, maskPx, mode });
+    }
+  }
+  function drawPaste() {
+    const c = setupCv($("gCv"), W, H); c.clearRect(0, 0, W, H); const R = GP.res[GP.k]; if (!R) return;
+    c.drawImage(imgCanvas(R.out), 0, 0);
+    R.dst.tools.forEach(o => strokeBox(c, o.bb, cssv("--role-gt"), 1.5, [4, 3], "id " + o.type));
+    strokeBox(c, R.box, cssv("--role-warn"), 2.5, null, "+ id " + R.cls + " (합성)");
+  }
+  function renderPaste() {
+    $("gDst").textContent = (GP.k + 1) + " / 10";
+    if (!CLF.ready) { $("gClf").textContent = "분류기 준비 중…"; return; }
+    $("gClf").textContent = `도구 분류기: 모의 장면 60장 crop 으로 학습, 다른 20장에서 정확도 ${pc(CLF.acc)} (색 히스토그램 4×4×4, 최근접 중심 + softmax)${GP.defNote || ""}`;
+    const R = GP.res[GP.k]; if (!R) { $("gLabels").textContent = ""; $("gChecks").innerHTML = ""; $("g10").innerHTML = ""; drawPaste(); return; }
+    const lines = R.dst.tools.map(o => { const y = yolo(o), cv = R.cov[o.id] / Math.max(1, o.visPx); return `${y.cls} ${f(y.cx, 6)} ${f(y.cy, 6)} ${f(y.w, 6)} ${f(y.h, 6)}` + (cv > 0 ? `   # 가림 ${pc(cv, 0)}${cv > 0.5 ? " -> 갱신·삭제 검토" : ""}` : ""); });
+    const b = R.box; lines.push(`${R.cls} ${f((b[0] + b[2]) / 2 / W, 6)} ${f((b[1] + b[3]) / 2 / H, 6)} ${f((b[2] - b[0]) / W, 6)} ${f((b[3] - b[1]) / H, 6)}   # + 합성 (붙인 위치 = 새 박스)`);
+    $("gLabels").textContent = `# 장면 seed ${R.dst.seed} · new_box = [tx, ty, tx + pw, ty + ph] = [${b.join(", ")}]\n` + lines.join("\n");
+    const occl = R.dst.tools.filter(o => R.cov[o.id] / Math.max(1, o.visPx) > 0.5).length, dl = Math.abs(R.lumP - R.lumR), val = $("gVal").checked;
+    const ck = [["클래스 유지 (분류기)", R.cl.cls === R.cls, `예측 id ${R.cl.cls} · p = ${f(R.cl.p)}`],
+      ["밝기 차이 |붙인 물체 − 주변|", dl <= 25, `${f(R.lumP, 1)} vs ${f(R.lumR, 1)} → ${f(dl, 1)}`],
+      ["기존 라벨 가림", occl === 0, occl ? `${occl}개가 절반 이상 가려짐` : "없음"],
+      ["오리기 방식", R.mode === "sam", R.mode === "sam" ? `마스크 ${nf(R.maskPx)} px 만 붙임` : "배경 사각형이 함께 붙어 티가 남"],
+      ["사용처", !val, val ? "검증 데이터에 넣음 → 성능이 부풀려짐" : "학습 데이터에만"]];
+    $("gChecks").innerHTML = "<thead><tr><th>검증 항목</th><th>결과</th><th>값</th></tr></thead><tbody>" + ck.map(x => `<tr><td>${x[0]}</td><td class="${x[1] ? "mm-ok" : "mm-bad"}">${x[1] ? "통과" : "주의"}</td><td>${esc(x[2])}</td></tr>`).join("") + "</tbody>";
+    if (GP.ran) {
+      const ok = GP.res.filter(r => r.cl.cls === r.cls).length;
+      $("g10").innerHTML = `<thead><tr><th>#</th><th>붙인 장면</th><th>새 박스</th><th>예측 class</th><th>확률</th><th>결과</th></tr></thead><tbody>` + GP.res.map((r, i) => `<tr><td>${i + 1}</td><td class="n">seed ${r.dst.seed}</td><td class="n">[${r.box.join(", ")}]</td><td class="n">${r.cl.cls}</td><td class="n">${f(r.cl.p)}</td><td class="${r.cl.cls === r.cls ? "mm-ok" : "mm-bad"}">${r.cl.cls === r.cls ? "일치" : "불일치"}</td></tr>`).join("") + `<tr><td colspan="6"><b>생성 10 장 중 원래 클래스(id ${R.cls})를 유지한 비율 : ${ok} / 10</b></td></tr></tbody>`;
+    } else $("g10").innerHTML = "";
+    const mode = R.mode;
+    $("gCode").textContent = ["import cv2, numpy as np", "", "# (1) 편집: SAM 마스크로 물체를 지우고 주변 픽셀로 채움", `k = ${$("eDil").value}`, "mask_dilate = cv2.dilate(mask_target, np.ones((k, k), np.uint8), iterations=1)", `img_removed = cv2.inpaint(img_gen, mask_dilate, ${$("eRad").value}, cv2.INPAINT_TELEA)`, "", "# (2) 합성: 오려 붙이고 박스 라벨을 함께 만듦", "def copy_paste(src_img, src_mask, dst_img, rng):", "    ys, xs = np.where(src_mask)", "    y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1", "    patch, patch_mask = src_img[y0:y1, x0:x1], src_mask[y0:y1, x0:x1]" + (mode === "box" ? "    # 박스 그대로: patch_mask[:] = True" : ""), "    ph, pw = patch.shape[:2]", "    ty, tx = int(rng.randint(0, 360 - ph)), int(rng.randint(0, 640 - pw))", "    out = dst_img.copy()", "    region = out[ty:ty+ph, tx:tx+pw]", "    region[patch_mask] = patch[patch_mask]" + ($("gBright").checked ? "    # 밝기 맞춤: patch 에 (주변 평균 / patch 평균) 배율" : ""), "    return out, [tx, ty, tx + pw, ty + ph]          # 붙인 위치가 곧 새 박스", "", "rng_gen = np.random.RandomState(1234)", "ok = 0", "for dst_img in dst_list[:10]:", "    img_new, box_new = copy_paste(src_img, src_mask, dst_img, rng_gen)", "    cls_new, p_new = classify_crop(img_new, box_new)   # 별도 분류기로 검증", "    ok += int(cls_new == src_cls)", "print('원래 클래스를 유지한 비율 :', ok, '/ 10')     # 합성본은 학습에만, 검증 데이터 금지"].join("\n");
+    drawPaste();
+  }
+  function renderNbPaste() {
+    const R = [["P01_01_3700", "0.989"], ["P01_01_3988", "1.0"], ["P01_02_2704", "0.999"], ["P01_02_2924", "1.0"], ["P01_02_2992", "1.0"], ["P02_02_3104", "0.969"], ["P02_02_3166", "1.0"], ["P02_02_3182", "0.996"], ["P02_03_2442", "0.999"], ["P02_03_2566", "0.965"]];
+    $("nbPaste").innerHTML = "<thead><tr><th>붙인 이미지</th><th>예측 class</th><th>확률</th><th>결과</th></tr></thead><tbody>" + R.map(r => `<tr><td class="mm-mono">${r[0]}</td><td class="n">13</td><td class="n">${r[1]}</td><td class="mm-ok">일치</td></tr>`).join("") + `<tr><td colspan="4"><b>생성 10 장 중 원래 클래스(13)를 유지한 비율 : 10 / 10</b></td></tr></tbody>`;
+  }
+
+  /* --- 확산 정방향 --- */
+  let FN = null;
+  const ABAR = (() => { const T = 1000, a = new Float64Array(T + 1); a[0] = 1; for (let s = 1; s <= T; s++) { const b = 1e-4 + (0.02 - 1e-4) * (s - 1) / (T - 1); a[s] = a[s - 1] * (1 - b); } return a; })();
+  function renderF() {
+    const t = +$("fT").value; $("fTV").textContent = t;
+    if (!FN || FN.seed !== curSeed) { const r = rngOf(curSeed * 7 + 99), e = new Float32Array(N * 3); for (let i = 0; i < N * 3; i++) e[i] = gauss(r); FN = { seed: curSeed, e }; }
+    const ab = ABAR[t], sa = Math.sqrt(ab), sb = Math.sqrt(1 - ab), out = new Uint8ClampedArray(N * 4), img = cur.img;
+    for (let i = 0; i < N; i++) for (let ch = 0; ch < 3; ch++) { const x0 = img[i * 4 + ch] / 127.5 - 1; out[i * 4 + ch] = ((sa * x0 + sb * FN.e[i * 3 + ch]) + 1) * 127.5; } for (let i = 0; i < N; i++) out[i * 4 + 3] = 255;
+    const c = setupCv($("fCv"), W, H); c.clearRect(0, 0, W, H); c.drawImage(imgCanvas(out), 0, 0);
+    const bt = t ? 1e-4 + (0.02 - 1e-4) * (t - 1) / 999 : 0;
+    $("fFormula").innerHTML = `x<sub>t</sub> = √ᾱ<sub>t</sub> · x<sub>0</sub> + √(1 − ᾱ<sub>t</sub>) · ε,　ε ~ N(0, I),　ᾱ<sub>t</sub> = Π<sub>s≤t</sub> (1 − β<sub>s</sub>)<br>t = ${t}: β<sub>t</sub> = ${t ? bt.toExponential(2) : "—"} · ᾱ<sub>t</sub> = ${ab.toExponential(3)} · √ᾱ = ${f(sa)} · √(1−ᾱ) = ${f(sb)} · 신호 대 잡음 ᾱ/(1−ᾱ) = ${t ? (ab / (1 - ab)).toExponential(2) : "∞"}`;
+  }
+  function drawF() { renderF(); }
+
+  /* ================= 전역: 장면 전환 · 탭 · 테마 ================= */
+  function setScene(seed) {
+    curSeed = Math.max(1, seed); cur = makeScene(curSeed); aSel = 0;
+    C.pos = []; C.neg = []; C.box = null; C.cands = []; C.gtIdx = -1; vSel = 0;
+    computePromote(); renderA(); cDemo(null, true); renderP(); renderVInspector();
+    if (E.inited) initEScene();
+  }
+  function initEScene() {
+    renderQ(); fillEraseSel(); renderErase(); fillPasteSel(); GP.k = 0; GP.ran = false; computePaste(); renderPaste(); renderF();
+  }
+  function onTab(k) {
+    if (k === "d" && !B.ready && !B.busy) computeBatch(() => { renderDStage(); renderDCls(); renderVBatch(); });
+    if (k === "e" && !E.inited) {
+      E.inited = true; renderQ(); renderF(); fillEraseSel(); renderErase();
+      trainClf(() => { fillPasteSel(); computePaste(); renderPaste(); renderErase(); });
+    }
+    if (k === "b") renderArch();
+  }
+  function redrawAll() {
+    drawA(); drawC(); renderC(); drawP(); renderMed(); drawV();
+    if (B.ready) drawD();
+    if (E.inited) { drawQ(); drawErase(); drawPaste(); renderF(); }
+  }
+
+  /* --- 안쪽 탭 (URL 해시 연동, ←/→ 키 이동) --- */
+  const tabs = [...document.querySelectorAll(".sk-tab")];
+  function show(t) {
+    tabs.forEach(b => { const on = b === t; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1; document.getElementById(b.getAttribute("aria-controls")).hidden = !on; });
+    history.replaceState(null, "", "#" + t.id.replace("tab-", ""));
+    onTab(t.id.replace("tab-", ""));
+  }
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => show(b));
+    b.addEventListener("keydown", e => { const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return; const n = tabs[(i + d + tabs.length) % tabs.length]; show(n); n.focus(); e.preventDefault(); });
+  });
+  document.addEventListener("keydown", e => {
+    const t = e.target; if (t.closest && (t.closest(".sk-tab") || t.matches("input,select,textarea"))) return;
+    const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return;
+    if (!$("pane-b").hidden) { stopPlay(); stepTo(stepI + d); e.preventDefault(); }
+    else if (!$("pane-d").hidden && B.ready) { stopDPlay(); dStepTo(dStep + d); e.preventDefault(); }
+  });
+
+  /* --- 바인딩 --- */
+  $("aPrev").onclick = () => setScene(curSeed - 1); $("aNext").onclick = () => setScene(curSeed + 1);
+  $("aRand").onclick = () => setScene(1 + Math.floor(Math.random() * 999));
+  $("aBox").onchange = drawA; $("aMask").onchange = drawA;
+  segBind("distSort", v => { distSort = v; renderDist(); });
+  segBind("archSel", v => { archKey = v; stepI = 0; stopPlay(); renderArch(); });
+  segBind("encSel", v => { encV = v; renderArch(); });
+  $("stFirst").onclick = () => { stopPlay(); stepTo(0); }; $("stPrev").onclick = () => { stopPlay(); stepTo(stepI - 1); }; $("stNext").onclick = () => { stopPlay(); stepTo(stepI + 1); };
+  $("stPlay").onclick = togglePlay;
+  $("stSpd").addEventListener("input", () => { $("stSpdV").textContent = (+$("stSpd").value).toFixed(1) + " 초"; if (playT) { stopPlay(); togglePlay(); } });
+  bindC();
+  $("pThr").addEventListener("input", () => { computePromote(); renderP(); });
+  $("pShowFill").onchange = drawP;
+  $("medCv").addEventListener("pointerdown", e => { medPt = cvPoint($("medCv"), e, MW, MH); computeMed(); renderMed(); });
+  segBind("dSrc", v => { B.src = v; stopDPlay(); computeBatch(() => { renderDStage(); renderDCls(); renderVBatch(); }); renderDStage(); });
+  ["dLo", "dHi", "dSc"].forEach(id => $(id).addEventListener("input", () => { $(id + "V").textContent = f(+$(id).value, 2); renderDStage(); }));
+  $("dIdx").addEventListener("input", () => { $("dIdxV").textContent = (+$("dIdx").value + 1) + " / " + NB; drawD(); });
+  $("dFirst").onclick = () => { stopDPlay(); dStepTo(0); }; $("dPrevS").onclick = () => { stopDPlay(); dStepTo(dStep - 1); }; $("dNextS").onclick = () => { stopDPlay(); dStepTo(dStep + 1); };
+  $("dPlay").onclick = () => { if (dPlayT) { stopDPlay(); return; } if (dStep >= D_STEPS.length - 1) dStepTo(0); $("dPlay").textContent = "멈춤"; dPlayT = setInterval(() => { if (dStep >= D_STEPS.length - 1) { stopDPlay(); return; } dStepTo(dStep + 1); }, +$("dSpd").value * 1000); };
+  $("dSpd").addEventListener("input", () => { $("dSpdV").textContent = (+$("dSpd").value).toFixed(1) + " 초"; });
+  ["kSec", "kGpu", "kMan"].forEach(id => $(id).addEventListener("input", renderCost));
+  ["vTau", "vThr"].forEach(id => $(id).addEventListener("input", renderV)); $("vTpl").addEventListener("change", renderV);
+  $("vReveal").onclick = () => { vReveal = !vReveal; $("vReveal").setAttribute("aria-pressed", vReveal); $("vReveal").textContent = vReveal ? "숨은 이름 가리기" : "숨은 이름과 비교"; renderVBatch(); };
+  $("qPrev").onclick = () => setScene(curSeed - 1); $("qNext").onclick = () => setScene(curSeed + 1);
+  segBind("qPhr", () => renderQ()); $("qGround").onchange = renderQ;
+  $("eObj").onchange = renderErase; segBind("eSrc", renderErase);
+  ["eDil", "eRad"].forEach(id => $(id).addEventListener("change", () => { renderErase(); if (CLF.ready) renderPaste(); }));
+  ["eDil", "eRad"].forEach(id => $(id).addEventListener("input", () => { $("eDilV").textContent = $("eDil").value + "×" + $("eDil").value; $("eRadV").textContent = $("eRad").value; }));
+  $("gObj").onchange = () => { GP.k = 0; GP.ran = false; computePaste(); renderPaste(); };
+  segBind("gSrc", () => { GP.ran = false; computePaste(); renderPaste(); });
+  $("gBright").onchange = () => { computePaste(); renderPaste(); }; $("gVal").onchange = renderPaste;
+  $("gPrev").onclick = () => { GP.k = (GP.k + 9) % 10; renderPaste(); }; $("gNext").onclick = () => { GP.k = (GP.k + 1) % 10; renderPaste(); };
+  $("gRun10").onclick = () => { if (!CLF.ready) return; GP.ran = true; renderPaste(); };
+  $("fT").addEventListener("input", renderF);
+  copyBtns();
+
+  new MutationObserver(redrawAll).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  if (window.matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener("change", redrawAll);
+
+  /* --- 시작 --- */
+  cur = makeScene(curSeed); computePromote();
+  renderA(); renderDist(); renderUnet(); renderArch(); cDemo(null, true); renderP(); renderScatter();
+  makeMed(); computeMed(); renderMed(); renderQueries(); renderV(); renderNb(); renderNbPaste(); renderCost(); renderDStage();
+  const start = document.getElementById("tab-" + location.hash.slice(1)); if (start) show(start);
+})();
+</script>
+</body>
+</html>
