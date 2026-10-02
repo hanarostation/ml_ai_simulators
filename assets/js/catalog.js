@@ -5,7 +5,7 @@
      1) templates/simulator-template.html 을 복사해
         simulators/<분류 폴더>/<파일명>.html 로 저장하고 내용을 채웁니다.
      2) 아래 SIMULATORS 배열에 항목 하나를 추가합니다.
-        - category : "ml" | "nn" | "cv" | "nlp"  (CATEGORIES의 id)
+        - category : "ml" | "nn" | "cv" | "nlp" | "ts"  (CATEGORIES의 id)
         - href     : index.html 기준 상대 경로
         - title / summary / tags : 카드에 보이는 글
         - requires : (선택) TensorFlow.js를 쓰면 "tfjs"
@@ -20,7 +20,9 @@ window.DS_CATEGORIES = [
   { id: "cv",  label: "컴퓨터 비전", en: "Computer Vision",   folder: "simulators/cv/",
     blurb: "합성곱·풀링·객체 탐지처럼 이미지를 다루는 모델의 계산을 눈으로 확인합니다." },
   { id: "nlp", label: "자연어처리",  en: "NLP", folder: "simulators/nlp/",
-    blurb: "토픽 모델링, Seq2Seq, Attention, 트랜스포머까지 문장을 다루는 모델을 한 단계씩 풀어 봅니다." }
+    blurb: "토픽 모델링, Seq2Seq, Attention, 트랜스포머까지 문장을 다루는 모델을 한 단계씩 풀어 봅니다." },
+  { id: "ts",  label: "시계열 분석", en: "Time Series", folder: "simulators/ts/",
+    blurb: "추세·계절성 분해부터 ETS·ARIMA·Prophet, 롤링 예측까지 시간 순서가 있는 데이터를 예측하는 과정을 따라갑니다." }
 ];
 
 window.DS_SIMULATORS = [
@@ -275,5 +277,43 @@ window.DS_SIMULATORS = [
     tags: ["Transformer", "Positional Encoding", "Self-Attention"],
     requires: "tfjs",
     glyph: "tr"
+  },
+
+  /* ---------- 시계열 분석 ---------- */
+  {
+    id: "classical-forecasting",
+    category: "ts",
+    href: "simulators/ts/classical-forecasting.html",
+    title: "전통적 시계열 모형 (Naive · ETS · Theta)",
+    summary: "나이브 계열·지수평활(SES·Holt·Holt-Winters)·Theta가 예측값을 어디서 가져오는지 한 단계씩 따라가고, 시계열 분해와 MAE·RMSE·MAPE·MASE로 모든 모형을 비교합니다.",
+    tags: ["시계열 예측", "지수평활", "Theta", "MASE"],
+    glyph: "ets"
+  },
+  {
+    id: "arima",
+    category: "ts",
+    href: "simulators/ts/arima.html",
+    title: "ARIMA 계열 (AR · MA · ARIMA · SARIMAX · VAR)",
+    summary: "정상성 확인, 차분, ACF/PACF로 차수 고르기, 적합, 잔차 진단, 예측까지 Box–Jenkins 순서를 따라가고, 외생 변수 효과와 VAR의 그랜저 인과·충격반응을 확인합니다.",
+    tags: ["ARIMA · SARIMAX", "ACF/PACF", "단위근 검정", "VAR"],
+    glyph: "arima"
+  },
+  {
+    id: "rolling-prediction",
+    category: "ts",
+    href: "simulators/ts/rolling-prediction.html",
+    title: "롤링 예측 (Time Shift · Walk-forward)",
+    summary: "shift로 시계열을 지도학습 표로 바꾸고, 예측 원점을 한 칸씩 굴리며 학습 → 예측 → 실제값 공개 → 오차 기록을 반복합니다. TimeSeriesSplit과 다중 스텝 전략도 비교합니다.",
+    tags: ["Time Shift", "워크포워드 검증", "TimeSeriesSplit", "데이터 누수"],
+    glyph: "rolling"
+  },
+  {
+    id: "prophet",
+    category: "ts",
+    href: "simulators/ts/prophet.html",
+    title: "Prophet 시계열 모형",
+    summary: "응급실 일별 내원 수를 추세·변화점, 푸리에 계절성, 명절 효과로 나눠 하나씩 쌓아 보고, 예측 구간과 교차검증·하이퍼파라미터 튜닝까지 확인합니다.",
+    tags: ["Prophet", "변화점", "푸리에 계절성", "교차검증"],
+    glyph: "prophet"
   }
 ];

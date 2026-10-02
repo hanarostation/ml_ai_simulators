@@ -1,0 +1,1540 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Prophet 시계열 모형 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 파랑 = 학습 데이터 · 주황 = 예측·예측 구간 · 회색 = 실제 미래(검증)
+   보라 = 추세 g(t) · 청록 = 주간 계절성 · 갈색 = 연간 계절성 · 분홍 = 휴일 h(t) · 연두 = 사용자 계절성 · 빨강 = 의미 있는 변화점 */
+:root{ --sk-accent: var(--cat-ts);
+  --c-data:#2563EB; --c-fc:#EA580C; --c-act:#6B7280; --c-trend:#7C3AED; --c-week:#0E7490; --c-year:#A16207;
+  --c-hol:#DB2777; --c-mon:#4D7C0F; --c-cp:#DC2626; --c-truth:#1F2937; --c-good:#15803D; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --c-data:#6AA5FF; --c-fc:#FF914D; --c-act:#A3ABB8; --c-trend:#B294FF; --c-week:#22D3EE; --c-year:#FACC15;
+  --c-hol:#F472B6; --c-mon:#A3E635; --c-cp:#F87171; --c-truth:#E5E7EB; --c-good:#4ADE80; } }
+:root[data-theme="dark"]{
+  --c-data:#6AA5FF; --c-fc:#FF914D; --c-act:#A3ABB8; --c-trend:#B294FF; --c-week:#22D3EE; --c-year:#FACC15;
+  --c-hol:#F472B6; --c-mon:#A3E635; --c-cp:#F87171; --c-truth:#E5E7EB; --c-good:#4ADE80; }
+
+.pr-pane{display:flex;flex-direction:column;gap:16px}
+.pr-cv{display:block;width:100%;border-radius:10px;border:1px solid var(--line);background:var(--surface);touch-action:pan-y}
+.pr-cv--main{aspect-ratio:16/6.2}
+.pr-cv--mid{aspect-ratio:16/7}
+.pr-cv--strip{aspect-ratio:16/3.6}
+.pr-cv--sq{aspect-ratio:4/3}
+.pr-cv--wide{aspect-ratio:16/8}
+@media (max-width:620px){
+  .pr-cv--main,.pr-cv--mid,.pr-cv--wide{aspect-ratio:4/3.3}
+  .pr-cv--strip{aspect-ratio:16/7}
+}
+.pr-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.pr-grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.pr-side{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(280px,1fr);gap:18px;align-items:start}
+@media (max-width:1080px){.pr-grid3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:900px){.pr-grid,.pr-grid3,.pr-side{grid-template-columns:minmax(0,1fr)}}
+.pr-col{display:flex;flex-direction:column;gap:10px;min-width:0}
+.pr-box{display:flex;flex-direction:column;gap:6px;min-width:0}
+.pr-box h3{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pr-box h3 .sk-hint{font-weight:500}
+.pr-ctl{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px 20px;align-items:end}
+.pr-ctl .sk-slider{min-width:0}
+.pr-row{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.pr-sub{font-size:12.5px;color:var(--muted);margin:0}
+.pr-txt{font-size:13.5px;color:var(--text);margin:0;line-height:1.6}
+.pr-txt b{color:var(--ink)}
+.pr-mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.pr-formula{white-space:pre-wrap;margin:0}
+.pr-formula .on{font-weight:700;color:var(--ink)}
+.pr-formula .off{color:var(--faint)}
+.pr-formula .tr{color:var(--c-trend)} .pr-formula .wk{color:var(--c-week)} .pr-formula .yr{color:var(--c-year)}
+.pr-formula .ho{color:var(--c-hol)} .pr-formula .mo{color:var(--c-mon)} .pr-formula .fc{color:var(--c-fc)}
+.pr-legend i{border-radius:3px}
+.pr-legend i.ln{height:0;width:20px;border-radius:0;border-top:3px solid;background:none!important;vertical-align:3px}
+.pr-legend i.ln.dash{border-top-style:dashed}
+.pr-legend i.dot{border-radius:50%;width:9px;height:9px}
+.pr-legend i.band{opacity:.35}
+.pr-steps{display:flex;gap:6px;list-style:none;margin:0;padding:0 0 2px;overflow-x:auto}
+.pr-steps li{flex:1 0 auto}
+.pr-steps button{appearance:none;font:inherit;width:100%;border:0;border-radius:8px;padding:7px 10px;font-size:12.5px;font-weight:600;background:var(--surface-2);color:var(--faint);white-space:nowrap;cursor:pointer}
+.pr-steps button.done{color:var(--muted)}
+.pr-steps button.on{background:var(--ink);color:var(--on-ink)}
+.pr-steps button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.pr-kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--ink)}
+details.pr-more{font-size:13.5px;color:var(--muted)}
+details.pr-more>summary{cursor:pointer;font-weight:600;color:var(--ink);padding:2px 0}
+details.pr-more>summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+details.pr-more[open]>summary{margin-bottom:10px}
+.pr-ta{width:100%;min-height:120px;font-family:var(--mono);font-size:12.5px;resize:vertical}
+.pr-flash{font-size:13px;color:var(--c-good);font-weight:600}
+.pr-warn{color:var(--c-cp);font-weight:600}
+.pr-code{white-space:pre;margin:0;max-height:640px;overflow:auto;font-size:12.5px;line-height:1.6}
+.pr-tablewrap:has(table:empty){display:none}
+.pr-tablewrap{overflow:auto;border:1px solid var(--line);border-radius:8px;max-width:100%}
+.pr-table td.best{font-weight:700;outline:2px solid var(--ink);outline-offset:-2px}
+.pr-table tr.me td{font-weight:700}
+.pr-table td.c{text-align:center}
+.pr-ind td.dot{text-align:center;font-size:15px;line-height:1;color:var(--faint)}
+.pr-ind td.dot.on{color:var(--c-hol)}
+.pr-ind tr.hd td{background:color-mix(in srgb,var(--c-hol) 9%,transparent)}
+.pr-ind th.v{text-align:center;padding:6px 5px;font-size:11.5px;line-height:1.25}
+.pr-ind th.v span{display:block;font-family:var(--mono);font-weight:600}
+.pr-holtbl td{vertical-align:middle}
+.pr-holtbl .sk-slider{min-width:120px}
+.pr-chip{display:inline-block;font-family:var(--mono);font-size:11.5px;border:1px solid var(--line-strong);border-radius:6px;padding:1px 5px;margin:1px 2px;color:var(--muted)}
+.pr-chip.out{opacity:.5}
+.pr-swatch{display:inline-block;width:10px;height:10px;border-radius:3px;vertical-align:-1px;margin-right:6px}
+.pr-cells{grid-template-columns:repeat(25,minmax(0,1fr))}
+.pr-cells .c{min-width:26px;height:26px;font-size:12px}
+.pr-cells .c.one{background:color-mix(in srgb,var(--c-trend) 22%,var(--surface));border-color:var(--c-trend)}
+.pr-cells .c.sig{box-shadow:inset 0 -3px 0 var(--c-cp)}
+.pr-prog{font-size:13px;color:var(--muted);font-family:var(--mono)}
+.pr-badge{display:inline-flex;align-items:center;font-size:12px;font-weight:700;border-radius:999px;padding:1px 9px;background:var(--surface-2);border:1px solid var(--line);color:var(--muted)}
+.pr-tune td.v{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
+.pr-numin{width:78px}
+@media (max-width:520px){
+  .sk-controls{gap:10px 12px}
+  .pr-ctl{grid-template-columns:minmax(0,1fr)}
+  .pr-cells .c{min-width:24px;height:24px;font-size:11px}
+}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+      <a href="../../index.html#ts" style="--c:var(--cat-ts)" aria-current="page">시계열 분석</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">Prophet 시계열 모형 시뮬레이터</h1>
+      <p class="ds-hero__lede">일별 응급실 내원 환자 수를 y(t) = g(t) + s(t) + h(t) + ε<sub>t</sub> 로 나눠 봅니다. 추세·변화점, 푸리에 계절성, 명절 효과를 하나씩 조작하며 Prophet이 예측선과 예측 구간을 어떻게 만드는지 확인합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <!-- 공통 데이터 -->
+  <section class="sk-card" aria-labelledby="dataTitle">
+    <div class="sk-head"><h2 id="dataTitle">데이터: 일별 응급실 내원 환자 수</h2><span class="sk-hint pr-mono" id="dataInfo"></span></div>
+    <div class="sk-formula pr-formula">y(t) = <span class="tr">g(t) 추세</span> + <span class="wk">s(t) 계절성(주간·연간)</span> + <span class="ho">h(t) 휴일 효과</span> + ε<sub>t</sub> 잡음</div>
+    <details class="pr-more" id="dataMore">
+      <summary>숨은 성분 강도 · seed · CSV 붙여 넣기</summary>
+      <div class="pr-col">
+        <p class="pr-sub">예제 데이터는 아래 성분을 더해 만든 합성 데이터입니다(2023-01-01 ~ 2025-09-30). 각 성분의 숨은 정답을 알고 있으므로 Prophet이 얼마나 잘 찾아내는지 비교할 수 있습니다.</p>
+        <div class="pr-ctl" id="dataSliders"></div>
+        <div class="sk-controls">
+          <label class="sk-check"><input type="checkbox" id="dMissing" checked>결측 구간(2024-07-08~21 전산 장애)</label>
+          <label class="sk-check"><input type="checkbox" id="dOutliers" checked>이상값 4개(대형 사고·입력 오류)</label>
+          <label class="sk-check"><input type="checkbox" id="dMult">승법으로 생성(계절 효과가 수준에 비례)</label>
+        </div>
+        <div class="sk-controls">
+          <span class="sk-label">seed</span>
+          <div class="sk-group">
+            <button class="sk-btn sk-btn--sm" type="button" id="seedDown" aria-label="seed 줄이기">−</button>
+            <input class="sk-input pr-numin pr-mono" type="number" id="seed" value="1" min="1" max="9999" aria-label="seed">
+            <button class="sk-btn sk-btn--sm" type="button" id="seedUp" aria-label="seed 늘리기">+</button>
+          </div>
+          <button class="sk-btn sk-btn--sm" type="button" id="dataReset">기본값으로</button>
+        </div>
+        <details class="pr-more">
+          <summary>내 데이터 붙여 넣기 (CSV: ds,y)</summary>
+          <div class="pr-col">
+            <textarea class="sk-input pr-ta" id="csvIn" spellcheck="false" aria-label="CSV 입력" placeholder="ds,y&#10;2024-01-01,132&#10;2024-01-02,141&#10;..."></textarea>
+            <div class="sk-controls">
+              <button class="sk-btn sk-btn--primary" type="button" id="csvApply">적용</button>
+              <button class="sk-btn" type="button" id="csvExample">예제 데이터로 돌아가기</button>
+              <button class="sk-btn" type="button" id="csvCopy">현재 데이터 CSV 복사</button>
+              <span class="pr-flash" id="csvMsg" role="status"></span>
+            </div>
+            <p class="pr-sub">날짜는 YYYY-MM-DD, 하루 간격 자료를 권장합니다. 최소 60행. 붙여 넣은 데이터에는 숨은 정답과 실제 미래값이 없으므로 검증은 "마지막 h일 떼어 검증"으로 합니다.</p>
+          </div>
+        </details>
+      </div>
+    </details>
+    <p class="sk-note"><b>근사 적합 안내</b> · 이 화면은 Prophet과 같은 설계 행렬(변화점 a(t), 푸리에 기저, 휴일 지시 행렬)과 같은 사전분포(δ ~ Laplace(0, τ), β ~ N(0, σ²))를 쓰지만, Stan의 MAP(L-BFGS) 대신 <b>반복 가중 최소제곱(IRLS)으로 라플라스 사전분포를 근사</b>하고 로지스틱·승법은 가우스-뉴턴으로 풉니다. 실제 prophet 패키지와 계수·예측이 조금 다를 수 있습니다(같은 데이터에서 예측값 차이 약 1명 이내).</p>
+  </section>
+
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button class="sk-tab" role="tab" id="tab-stack" aria-controls="pane-stack" aria-selected="true"><span class="sk-num">1</span>구성 요소로 쌓기</button>
+    <button class="sk-tab" role="tab" id="tab-trend" aria-controls="pane-trend" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>추세와 변화점</button>
+    <button class="sk-tab" role="tab" id="tab-season" aria-controls="pane-season" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>계절성: 푸리에 급수</button>
+    <button class="sk-tab" role="tab" id="tab-holiday" aria-controls="pane-holiday" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>휴일·이벤트 효과</button>
+    <button class="sk-tab" role="tab" id="tab-forecast" aria-controls="pane-forecast" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>예측·교차검증</button>
+    <button class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>코드</button>
+  </nav>
+
+  <!-- ========== 1. 구성 요소로 쌓기 ========== -->
+  <section class="pr-pane" id="pane-stack" role="tabpanel" aria-labelledby="tab-stack">
+    <div class="sk-card">
+      <div class="sk-head"><h2>성분을 하나씩 더해 예측선 만들기</h2><span class="sk-hint"><span class="pr-kbd">→</span> 다음 성분 · <span class="pr-kbd">←</span> 이전</span></div>
+      <p class="sk-lead">한 번 적합한 모형의 성분을 추세부터 차례로 더합니다. 성분이 하나 더해질 때마다 주황 예측선이 파란 원본에 가까워지고 오차가 줄어듭니다.</p>
+      <ol class="pr-steps" id="stSteps" aria-label="쌓는 단계"></ol>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button class="sk-btn sk-btn--sm" type="button" id="stFirst">처음</button>
+          <button class="sk-btn sk-btn--sm" type="button" id="stPrev">이전</button>
+          <button class="sk-btn sk-btn--sm" type="button" id="stNext">다음</button>
+          <button class="sk-btn sk-btn--sm sk-btn--primary" type="button" id="stPlay">재생</button>
+        </div>
+        <div class="sk-group"><span class="sk-label">속도</span>
+          <div class="sk-seg" id="stSpeed"><button type="button" data-v="slow" aria-pressed="false">느리게</button><button type="button" data-v="mid" aria-pressed="true">보통</button><button type="button" data-v="fast" aria-pressed="false">빠르게</button></div></div>
+        <div class="sk-group"><span class="sk-label">구간</span>
+          <div class="sk-seg" id="stView"><button type="button" data-v="all" aria-pressed="true">전체</button><button type="button" data-v="recent" aria-pressed="false">최근 150일</button></div></div>
+      </div>
+      <div class="sk-formula pr-formula" id="stFormula"></div>
+      <canvas class="pr-cv pr-cv--main" id="stMain" aria-label="원본 데이터와 성분을 누적한 예측선"></canvas>
+      <div class="sk-legend pr-legend"><span><i class="ln" style="border-color:var(--c-data)"></i>원본(학습 데이터)</span><span><i class="ln" style="border-color:var(--c-fc)"></i>누적 예측선 ŷ</span><span><i class="ln dash" style="border-color:var(--c-act)"></i>예측 시작</span></div>
+      <div class="pr-side">
+        <div class="sk-stats" id="stStats"></div>
+        <div class="pr-tablewrap"><table class="sk-table" id="stTable"></table></div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>성분별 그림 (plot_components)</h2>
+        <label class="sk-check"><input type="checkbox" id="stTruth" checked>숨은 실제 성분 겹쳐 보기</label></div>
+      <p class="sk-lead" id="compLead">Prophet의 <span class="pr-mono">m.plot_components(forecast)</span>처럼 성분을 따로 그립니다. 점선은 데이터를 만들 때 쓴 숨은 정답입니다(평균 수준은 추세가 흡수하므로 모양을 비교하세요).</p>
+      <div class="pr-grid" id="compGrid">
+        <div class="pr-box"><h3><span class="pr-swatch" style="background:var(--c-trend)"></span>추세 g(t)<span class="sk-hint">음영 = 추세 불확실성</span></h3><canvas class="pr-cv pr-cv--wide" id="cpTrend" aria-label="추세 성분"></canvas></div>
+        <div class="pr-box"><h3><span class="pr-swatch" style="background:var(--c-week)"></span>주간 계절성 (월~일)</h3><canvas class="pr-cv pr-cv--wide" id="cpWeek" aria-label="요일별 주간 계절성 막대"></canvas></div>
+        <div class="pr-box"><h3><span class="pr-swatch" style="background:var(--c-year)"></span>연간 계절성 (1월~12월)</h3><canvas class="pr-cv pr-cv--wide" id="cpYear" aria-label="연간 계절성 곡선"></canvas></div>
+        <div class="pr-box"><h3><span class="pr-swatch" style="background:var(--c-hol)"></span>휴일 효과 (날짜 오프셋별)</h3><canvas class="pr-cv pr-cv--wide" id="cpHol" aria-label="휴일 효과 막대"></canvas></div>
+        <div class="pr-box" id="cpMonBox" hidden><h3><span class="pr-swatch" style="background:var(--c-mon)"></span>사용자 계절성 (월 주기 30.5일)</h3><canvas class="pr-cv pr-cv--wide" id="cpMon" aria-label="월 주기 계절성 곡선"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 2. 추세와 변화점 ========== -->
+  <section class="pr-pane" id="pane-trend" role="tabpanel" aria-labelledby="tab-trend" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>구간 선형 추세와 변화점</h2><span class="sk-hint">빨간 점선 = |δ| ≥ 0.01 인 변화점 (add_changepoints_to_plot 기준)</span></div>
+      <p class="sk-lead">Prophet은 앞쪽 changepoint_range(기본 80%) 구간에 변화점 후보 n_changepoints개를 고르게 깔고, 각 지점에서 기울기 변화량 δ를 추정합니다. δ에는 라플라스 사전분포가 걸려 대부분 0 근처로 눌리고, 꼭 필요한 곳만 살아남습니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">성장 방식</span>
+          <div class="sk-seg" id="trGrowth"><button type="button" data-v="linear" aria-pressed="true">선형 linear</button><button type="button" data-v="logistic" aria-pressed="false">로지스틱 logistic</button></div></div>
+        <div class="sk-group"><span class="sk-label">changepoint_prior_scale</span>
+          <button class="sk-btn sk-btn--sm" type="button" data-cps="0.001">0.001 뻣뻣</button>
+          <button class="sk-btn sk-btn--sm" type="button" data-cps="0.05">0.05 기본</button>
+          <button class="sk-btn sk-btn--sm" type="button" data-cps="0.5">0.5 유연</button></div>
+      </div>
+      <div class="pr-ctl" id="trSliders"></div>
+      <div class="sk-formula pr-formula" id="trFormula"></div>
+      <canvas class="pr-cv pr-cv--main" id="trMain" aria-label="데이터, 적합된 추세, 변화점 후보"></canvas>
+      <div class="sk-legend pr-legend"><span><i class="ln" style="border-color:var(--c-data);opacity:.5"></i>원본</span><span><i class="ln" style="border-color:var(--c-trend)"></i>추세 g(t)</span><span><i class="ln dash" style="border-color:var(--c-cp)"></i>의미 있는 변화점</span><span><i class="ln dash" style="border-color:var(--line-strong)"></i>변화점 후보</span><span><i class="ln dash" style="border-color:var(--c-truth)"></i>숨은 실제 추세 · ▲ 실제 변화 시점</span><span id="trCapLg" hidden><i class="ln dash" style="border-color:var(--c-fc)"></i>cap / floor</span></div>
+      <h3>각 변화점의 기울기 변화량 δ<sub>j</sub></h3>
+      <canvas class="pr-cv pr-cv--strip" id="trDelta" aria-label="변화점별 기울기 변화량 막대"></canvas>
+      <div class="sk-stats" id="trStats"></div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>지시 벡터 a(t): 어느 변화점을 지났나</h2><span class="sk-hint">a<sub>j</sub>(t) = 1 if t ≥ s<sub>j</sub></span></div>
+      <p class="sk-lead">시점 t를 옮기면 이미 지난 변화점 칸이 1로 켜집니다. 켜진 칸의 δ만 기울기에 더해지고, γ<sub>j</sub> = −s<sub>j</sub>δ<sub>j</sub> 가 절편을 고쳐 추세선이 끊어지지 않게 합니다.</p>
+      <div class="sk-slider"><div class="sk-sl-head"><span>시점 t</span><b id="atLbl"></b></div><input type="range" id="atSl" min="0" max="1000" value="620" aria-label="시점 t 선택"></div>
+      <div class="sk-scroll"><div class="sk-mat pr-cells" id="atCells" aria-label="a(t) 벡터"></div></div>
+      <div class="sk-formula pr-formula" id="atCalc"></div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>미래 추세의 불확실성 (팬 차트)</h2><button class="sk-btn sk-btn--sm" type="button" id="fanResample">다시 뽑기</button></div>
+      <p class="sk-lead">Prophet은 미래에도 과거와 같은 빈도로 변화점이 생긴다고 가정합니다. 과거 변화점 개수로 정한 비율의 포아송 과정으로 미래 변화점을 뽑고, 크기는 Laplace(0, λ = 평균 |δ|)에서 뽑아 추세 경로를 여러 개 만듭니다. 멀리 갈수록 변화점이 쌓일 기회가 많아 경로가 부채꼴로 퍼집니다.</p>
+      <div class="pr-ctl" id="fanSliders"></div>
+      <canvas class="pr-cv pr-cv--main" id="trFan" aria-label="미래 추세 표본 경로 팬 차트"></canvas>
+      <div class="sk-legend pr-legend"><span><i class="ln" style="border-color:var(--c-trend)"></i>과거 추세</span><span><i class="ln" style="border-color:var(--c-fc);opacity:.45"></i>미래 추세 표본 경로</span><span><i class="band" style="background:var(--c-fc)"></i>추세 80% 구간</span></div>
+      <div class="sk-stats" id="fanStats"></div>
+      <p class="sk-note">위의 <b>0.5 유연</b> 버튼으로 changepoint_prior_scale을 키워 보세요. 과거 δ가 커지면 λ = 평균|δ|도 커져 미래 경로가 크게 벌어지고, 예측 구간(5번 탭)도 넓어집니다. 반대로 0.001이면 미래 추세가 거의 한 줄입니다.</p>
+    </div>
+  </section>
+
+  <!-- ========== 3. 계절성: 푸리에 급수 ========== -->
+  <section class="pr-pane" id="pane-season" role="tabpanel" aria-labelledby="tab-season" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>사인·코사인을 더해 계절 패턴 만들기</h2><span class="sk-hint"><span class="pr-kbd">→</span> 항 하나 더하기</span></div>
+      <p class="sk-lead">계절성은 주기 P의 푸리에 급수 s(t) = Σ<sub>n=1..N</sub> [a<sub>n</sub> cos(2πnt/P) + b<sub>n</sub> sin(2πnt/P)] 입니다. 기저 곡선은 고정이고, 학습하는 것은 계수 a<sub>n</sub>, b<sub>n</sub>뿐이라 회귀 문제가 됩니다. N(fourier_order)이 클수록 더 빠른 출렁임까지 표현합니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">계절성</span>
+          <div class="sk-seg" id="snTarget"><button type="button" data-v="weekly" aria-pressed="false">주간 P=7</button><button type="button" data-v="yearly" aria-pressed="true">연간 P=365.25</button><button type="button" data-v="monthly" aria-pressed="false">월 주기 P=30.5</button></div></div>
+        <label class="sk-check"><input type="checkbox" id="snOn" checked><span id="snOnLbl">모형에 사용</span></label>
+        <button class="sk-btn sk-btn--sm" type="button" id="snAddMon">+ 월 주기 계절성 추가 (add_seasonality)</button>
+      </div>
+      <div class="pr-ctl" id="snSliders"></div>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button class="sk-btn sk-btn--sm" type="button" id="snFirst">처음</button>
+          <button class="sk-btn sk-btn--sm" type="button" id="snPrev">이전</button>
+          <button class="sk-btn sk-btn--sm" type="button" id="snNext">다음</button>
+          <button class="sk-btn sk-btn--sm sk-btn--primary" type="button" id="snPlay">재생</button>
+        </div>
+        <span class="pr-badge" id="snStepLbl"></span>
+      </div>
+      <div class="sk-formula pr-formula" id="snFormula"></div>
+      <div class="pr-grid">
+        <div class="pr-box"><h3>① 기저 함수 sin(2πnt/P), cos(2πnt/P)<span class="sk-hint">실선 sin · 점선 cos</span></h3><canvas class="pr-cv pr-cv--sq" id="snBasis" aria-label="푸리에 기저 함수"></canvas></div>
+        <div class="pr-box"><h3>② 계수를 곱한 항과 누적 합<span class="sk-hint">굵은 선 = 지금까지의 합</span></h3><canvas class="pr-cv pr-cv--sq" id="snSum" aria-label="계수를 곱한 푸리에 항과 누적 합"></canvas></div>
+      </div>
+      <div class="sk-legend pr-legend" id="snLegend"></div>
+      <p class="sk-note" id="snNote" hidden></p>
+      <details class="pr-more"><summary>추정된 계수 표 (a<sub>n</sub> = cos 계수, b<sub>n</sub> = sin 계수)</summary><div class="pr-tablewrap"><table class="sk-table" id="snCoef"></table></div></details>
+    </div>
+    <div class="pr-grid">
+      <div class="sk-card">
+        <div class="sk-head"><h2>N이 크면: 과적합</h2><span class="sk-hint pr-prog" id="ovProg"></span></div>
+        <p class="sk-lead">마지막 180일을 떼어 두고 N만 바꿔 다시 적합합니다. 학습 오차는 N이 클수록 계속 줄지만, 검증 오차는 어느 지점부터 다시 커집니다.</p>
+        <canvas class="pr-cv pr-cv--sq" id="snOver" aria-label="푸리에 차수별 학습·검증 RMSE"></canvas>
+        <div class="sk-legend pr-legend"><span><i class="ln" style="border-color:var(--c-data)"></i>학습 RMSE</span><span><i class="ln" style="border-color:var(--c-fc)"></i>검증 RMSE (마지막 180일)</span><span><i class="ln dash" style="border-color:var(--ink)"></i>현재 N</span></div>
+        <p class="pr-txt" id="ovTxt"></p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>가법 vs 승법 (seasonality_mode)</h2></div>
+        <p class="sk-lead">가법은 y = g + s (요일 효과가 늘 같은 명수), 승법은 y = g·(1 + s) (요일 효과가 수준에 비례). 추세가 오를 때 요일 차이도 커지는 데이터라면 승법이 맞습니다.</p>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">모형</span>
+            <div class="sk-seg" id="snMode"><button type="button" data-v="additive" aria-pressed="true">가법 additive</button><button type="button" data-v="multiplicative" aria-pressed="false">승법 multiplicative</button></div></div>
+          <label class="sk-check"><input type="checkbox" id="snDataMult">데이터를 승법으로 생성</label>
+        </div>
+        <canvas class="pr-cv pr-cv--sq" id="snModeCv" aria-label="첫 달과 마지막 달의 요일 효과 크기 비교"></canvas>
+        <div class="sk-legend pr-legend"><span><i style="background:var(--c-week);opacity:.45"></i>첫 4주(2023년 1월)</span><span><i style="background:var(--c-week)"></i>마지막 4주</span></div>
+        <div class="pr-tablewrap"><table class="sk-table" id="snModeTbl"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 4. 휴일·이벤트 효과 ========== -->
+  <section class="pr-pane" id="pane-holiday" role="tabpanel" aria-labelledby="tab-holiday" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>휴일 표 (holidays 데이터프레임)</h2>
+        <label class="sk-check"><input type="checkbox" id="hoOn" checked>휴일 효과 사용</label></div>
+      <p class="sk-lead">휴일마다 날짜 목록과 lower_window(며칠 전부터), upper_window(며칠 후까지)를 줍니다. 창 안의 날짜 하나하나가 별도 열(설날_-1, 설날_+0 …)이 되어 각자 효과 계수를 가집니다.</p>
+      <div class="pr-tablewrap"><table class="sk-table pr-holtbl" id="hoTable"></table></div>
+      <div class="pr-ctl" id="hoSliders"></div>
+    </div>
+    <div class="pr-grid">
+      <div class="sk-card">
+        <div class="sk-head"><h2>휴일 지시 행렬</h2>
+          <select class="sk-select" id="hoOcc" aria-label="볼 명절 선택"></select></div>
+        <p class="sk-lead">행 = 날짜, 열 = 휴일 특성. 그 날짜가 열의 (휴일 + 오프셋)에 해당하면 1(●)입니다. 이 0/1 열들이 설계 행렬에 그대로 붙습니다.</p>
+        <div class="pr-tablewrap"><table class="sk-table pr-ind" id="hoInd"></table></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>휴일 특성별 효과 계수</h2></div>
+        <p class="sk-lead">막대 = 추정한 효과, 점 = 데이터를 만들 때 쓴 숨은 효과. 창을 넓혀 +2일(연휴 다음 날 감소)을 넣어 보세요.</p>
+        <canvas class="pr-cv pr-cv--sq" id="hoCoef" aria-label="휴일 특성별 효과 막대"></canvas>
+        <div class="sk-legend pr-legend" id="hoLegend"></div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>휴일을 넣기 전과 후</h2><span class="sk-hint">명절 주변 = 휴일 당일 −2 ~ +3일</span></div>
+      <p class="sk-lead">같은 설정에서 휴일만 빼고 다시 적합한 모형(회색 점선)과 비교합니다. 휴일이 없으면 명절 급증을 연간 계절성이나 잡음으로 떠넘겨 그 주변 오차가 커집니다.</p>
+      <canvas class="pr-cv pr-cv--mid" id="hoZoom" aria-label="선택한 명절 주변의 휴일 포함·제외 적합 비교"></canvas>
+      <div class="sk-legend pr-legend"><span><i class="ln" style="border-color:var(--c-data)"></i>원본</span><span><i class="ln dash" style="border-color:var(--c-act)"></i>휴일 없이 적합</span><span><i class="ln" style="border-color:var(--c-fc)"></i>휴일 넣고 적합</span><span><i class="band" style="background:var(--c-hol)"></i>휴일 창</span></div>
+      <div class="pr-tablewrap"><table class="sk-table" id="hoCmp"></table></div>
+    </div>
+  </section>
+
+  <!-- ========== 5. 예측과 불확실성 · 교차검증 ========== -->
+  <section class="pr-pane" id="pane-forecast" role="tabpanel" aria-labelledby="tab-forecast" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>예측선과 예측 구간</h2><span class="sk-hint">yhat · yhat_lower · yhat_upper</span></div>
+      <p class="sk-lead">make_future_dataframe(periods)로 미래 날짜를 만들고 predict 합니다. 예측 구간은 (미래 변화점을 뽑은) 추세 경로 + 관측 잡음 σ를 표본으로 만들어 분위수를 잡은 것입니다(MAP 적합에서는 계절성 계수의 불확실성은 들어가지 않음).</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">방식</span>
+          <div class="sk-seg" id="fcMode"><button type="button" data-v="future" aria-pressed="true">미래 예측</button><button type="button" data-v="holdout" aria-pressed="false">마지막 h일 떼어 검증</button></div></div>
+        <div class="sk-group"><span class="sk-label">보기</span>
+          <div class="sk-seg" id="fcView"><button type="button" data-v="recent" aria-pressed="true">최근 1년 + 예측</button><button type="button" data-v="all" aria-pressed="false">전체</button></div></div>
+        <label class="sk-check"><input type="checkbox" id="fc95">95% 구간도 표시</label>
+      </div>
+      <div class="pr-ctl" id="fcSliders"></div>
+      <canvas class="pr-cv pr-cv--main" id="fcMain" aria-label="학습 데이터, 예측선, 예측 구간, 실제 미래값"></canvas>
+      <div class="sk-legend pr-legend"><span><i class="ln" style="border-color:var(--c-data)"></i>학습 구간</span><span><i class="ln dash" style="border-color:var(--c-act)"></i>실제 미래(검증)</span><span><i class="ln" style="border-color:var(--c-fc)"></i>예측 yhat</span><span><i class="band" style="background:var(--c-fc)"></i><span id="fcBandLbl">80% 예측 구간</span></span><span><i class="ln dash" style="border-color:var(--muted)"></i>예측 시작</span></div>
+      <div class="sk-stats" id="fcStats"></div>
+      <div class="pr-tablewrap"><table class="sk-table" id="fcTbl"></table></div>
+      <p class="pr-sub">MASE = MAE ÷ (학습 구간에서 7일 전 값으로 예측한 계절 나이브의 MAE). 1보다 작으면 계절 나이브보다 낫습니다. MAPE는 실제값이 0에 가까우면 터지므로 sMAPE와 함께 봅니다.</p>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>교차검증: cross_validation(initial, period, horizon)</h2><span class="pr-prog" id="cvProg" role="status"></span></div>
+      <p class="sk-lead">마지막 컷오프 = 마지막 날짜 − horizon, 거기서 period씩 거슬러 올라가며 컷오프를 만들고(initial 이후까지), 컷오프마다 그 전까지로 다시 적합해 다음 horizon일을 예측합니다. 결과를 예측 거리(horizon)별로 모아 performance_metrics가 이동 평균(rolling_window = 0.1)으로 오차를 냅니다.</p>
+      <div class="pr-ctl" id="cvSliders"></div>
+      <div class="sk-controls"><button class="sk-btn sk-btn--primary" type="button" id="cvRun">교차검증 실행</button>
+        <div class="sk-group"><span class="sk-label">지표</span>
+          <div class="sk-seg" id="cvMetric"><button type="button" data-v="mape" aria-pressed="true">MAPE</button><button type="button" data-v="rmse" aria-pressed="false">RMSE</button><button type="button" data-v="mae" aria-pressed="false">MAE</button><button type="button" data-v="coverage" aria-pressed="false">구간 포함률</button></div></div></div>
+      <div class="pr-grid">
+        <div class="pr-box"><h3>롤링 원점 격자<span class="sk-hint">파랑 = 학습, 주황 = 예측 구간</span></h3><canvas class="pr-cv pr-cv--sq" id="cvGrid" aria-label="교차검증 컷오프별 학습·예측 구간"></canvas></div>
+        <div class="pr-box"><h3 id="cvCurveTitle">예측 거리별 MAPE</h3><canvas class="pr-cv pr-cv--sq" id="cvCurve" aria-label="예측 거리별 오차 곡선"></canvas></div>
+      </div>
+      <div class="pr-tablewrap"><table class="sk-table" id="cvTbl"></table></div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>하이퍼파라미터 격자 탐색</h2><span class="pr-prog" id="tuProg" role="status"></span></div>
+      <p class="sk-lead">changepoint_prior_scale × seasonality_prior_scale 4×4 = 16개 조합마다 위와 같은 교차검증을 돌려 전체 RMSE(rolling_window = 1)를 비교합니다. 칸이 진할수록 오차가 큽니다.</p>
+      <div class="sk-controls"><button class="sk-btn sk-btn--primary" type="button" id="tuRun">격자 탐색 실행</button><button class="sk-btn" type="button" id="tuApply" disabled>최적 조합 적용</button></div>
+      <div class="pr-tablewrap"><table class="sk-table pr-tune" id="tuTbl"></table></div>
+      <p class="pr-txt" id="tuTxt"></p>
+    </div>
+  </section>
+
+  <!-- ========== 6. 코드 ========== -->
+  <section class="pr-pane" id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>prophet 코드 (현재 설정 반영)</h2>
+        <div class="sk-group"><button class="sk-btn sk-btn--primary sk-btn--sm" type="button" id="codeCopy">복사</button><span class="pr-flash" id="codeMsg" role="status"></span></div></div>
+      <p class="sk-lead">다른 탭에서 바꾼 성장 방식, 사전분포 크기, 푸리에 차수, 휴일 창, 예측 기간, 교차검증 설정이 그대로 들어갑니다. <span class="pr-mono">pip install prophet</span></p>
+      <div class="sk-controls">
+        <label class="sk-check"><input type="checkbox" id="codeReg">외부 변수 예시 포함 (add_regressor: 일 평균 기온)</label>
+        <label class="sk-check"><input type="checkbox" id="codeTune" checked>격자 탐색 코드 포함</label>
+        <label class="sk-check"><input type="checkbox" id="codeKr">공휴일 패키지로 만들기 (holidays.KR)</label>
+      </div>
+      <pre class="sk-formula pr-code" id="codeOut" tabindex="0" aria-label="파이썬 코드"></pre>
+    </div>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20261002a"></script>
+<script>
+(function () {
+  "use strict";
+  /* ENGINE START — Prophet 근사 엔진 (순수 JS) */
+  const DAY = 86400000;
+  const dayOf = (y, m, d) => Math.round(Date.UTC(y, m - 1, d) / DAY);
+  const dateOf = n => new Date(n * DAY);
+  const iso = n => dateOf(n).toISOString().slice(0, 10);
+  const parseISO = s => { const m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(String(s).trim()); return m ? dayOf(+m[1], +m[2], +m[3]) : NaN; };
+  function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function gauss(r) { let u = 0; while (u === 0) u = r(); const v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+  function laplace(r, b) { const u = r() - 0.5; return -b * Math.sign(u) * Math.log(1 - 2 * Math.abs(u)); }
+  function poisson(r, lam) { if (lam <= 0) return 0; if (lam > 50) return Math.max(0, Math.round(lam + Math.sqrt(lam) * gauss(r)));
+    const L = Math.exp(-lam); let k = 0, p = 1; do { k++; p *= r(); } while (p > L); return k - 1; }
+  /* numpy.round 과 같은 반올림(0.5는 짝수 쪽) */
+  function roundHalfEven(x) { const f = Math.floor(x), d = x - f; if (Math.abs(d - 0.5) < 1e-9) return f % 2 === 0 ? f : f + 1; return d > 0.5 ? f + 1 : f; }
+  function linspace(a, b, n) { if (n === 1) return [a]; const s = (b - a) / (n - 1), o = []; for (let i = 0; i < n; i++) o.push(a + i * s); o[n - 1] = b; return o; }
+
+  /* 한국 공휴일(당일 기준). lower/upper window 로 앞뒤 날짜를 포함 */
+  const HOLIDAY_DATES = {
+    seollal: ["2023-01-22", "2024-02-10", "2025-01-29", "2026-02-17", "2027-02-07"],
+    chuseok: ["2023-09-29", "2024-09-17", "2025-10-06", "2026-09-25", "2027-09-15"],
+    xmas: ["2023-12-25", "2024-12-25", "2025-12-25", "2026-12-25", "2027-12-25"]
+  };
+
+  /* ---- 설계 행렬 ---- */
+  function fourierCols(name, period, order, mode, prior) {
+    const c = []; for (let n = 1; n <= order; n++) for (const f of ["sin", "cos"]) c.push({ group: name, kind: f, n, period, mode, prior });
+    return c;
+  }
+  function featureColumns(spec) {
+    const cols = [];
+    (spec.custom || []).forEach(s => { if (s.on) cols.push(...fourierCols(s.name, s.period, s.order, spec.mode, spec.seasScale)); });
+    if (spec.yearly.on) cols.push(...fourierCols("yearly", 365.25, spec.yearly.order, spec.mode, spec.seasScale));
+    if (spec.weekly.on) cols.push(...fourierCols("weekly", 7, spec.weekly.order, spec.mode, spec.seasScale));
+    if (spec.holOn) spec.holidays.forEach(h => { if (!h.on) return;
+      const days = h.dates.map(parseISO);
+      for (let o = h.lower; o <= h.upper; o++) cols.push({ group: "holidays", hol: h.key, kind: "hol", off: o, set: new Set(days.map(d => d + o)),
+        label: h.name + "_" + (o >= 0 ? "+" : "-") + Math.abs(o), mode: spec.mode, prior: spec.holScale }); });
+    return cols;
+  }
+  function featureValue(c, d) {
+    if (c.kind === "hol") return c.set.has(d) ? 1 : 0;
+    const x = 2 * Math.PI * c.n * d / c.period; /* d = 1970-01-01 기준 일수 (Prophet 정의) */
+    return c.kind === "sin" ? Math.sin(x) : Math.cos(x);
+  }
+  function setupModel(ds, y, spec) {
+    const n = ds.length, start = ds[0], end = ds[n - 1], tScale = Math.max(1, end - start);
+    const logistic = spec.growth === "logistic";
+    const floor = logistic ? spec.floor : 0;
+    let yScale = 0; for (let i = 0; i < n; i++) yScale = Math.max(yScale, Math.abs(y[i] - floor)); if (yScale === 0) yScale = 1;
+    const histSize = Math.floor(n * spec.cpRange); let nCp = Math.min(spec.nCp, histSize - 1); if (nCp < 0) nCp = 0;
+    let cpDay = [];
+    if (nCp > 0) cpDay = linspace(0, histSize - 1, nCp + 1).map(roundHalfEven).slice(1).map(i => ds[i]);
+    const cpT = cpDay.map(d => (d - start) / tScale);
+    const cols = featureColumns(spec);
+    return { spec, ds, y, n, start, tScale, logistic, floor, yScale, cap: logistic ? (spec.cap - floor) / yScale : 0,
+      cpDay, cpT, S: cpT.length, cols, K: cols.length, P: 2 + cpT.length + cols.length,
+      mulMask: cols.map(c => c.mode === "multiplicative") };
+  }
+  function featRows(M, ds) { const K = M.K, X = new Float64Array(ds.length * K);
+    for (let i = 0; i < ds.length; i++) for (let j = 0; j < K; j++) X[i * K + j] = featureValue(M.cols[j], ds[i]); return X; }
+
+  /* ---- 대칭 양의 정부호 풀이 (촐레스키) ---- */
+  function cholSolve(A, b, P) {
+    const L = new Float64Array(P * P);
+    for (let i = 0; i < P; i++) for (let j = 0; j <= i; j++) {
+      let s = A[i * P + j]; for (let k = 0; k < j; k++) s -= L[i * P + k] * L[j * P + k];
+      if (i === j) L[i * P + i] = Math.sqrt(Math.max(s, 1e-12)); else L[i * P + j] = s / L[j * P + j];
+    }
+    const z = new Float64Array(P);
+    for (let i = 0; i < P; i++) { let s = b[i]; for (let k = 0; k < i; k++) s -= L[i * P + k] * z[k]; z[i] = s / L[i * P + i]; }
+    const x = new Float64Array(P);
+    for (let i = P - 1; i >= 0; i--) { let s = z[i]; for (let k = i + 1; k < P; k++) s -= L[k * P + i] * x[k]; x[i] = s / L[i * P + i]; }
+    return x;
+  }
+
+  /* ---- 추세 g(t) (축척된 단위) ---- */
+  function zLin(M, th, t, extraT, extraD) {
+    let z = th[0] * t + th[1];
+    for (let j = 0; j < M.S; j++) if (t >= M.cpT[j]) z += th[2 + j] * (t - M.cpT[j]);
+    if (extraT) for (let j = 0; j < extraT.length; j++) if (t >= extraT[j]) z += extraD[j] * (t - extraT[j]);
+    return z;
+  }
+  const sigm = z => 1 / (1 + Math.exp(-z));
+  function trendAt(M, th, t, eT, eD) { const z = zLin(M, th, t, eT, eD); return M.logistic ? M.cap * sigm(z) : z; }
+
+  /* ---- MAP 근사 적합 ----
+     목적함수(축척 단위): RSS/(2σ²) + Σ|δ|/τ + Σβ²/(2s²) + (k²+m²)/(2·5²)
+     라플라스 사전분포 |δ| 는 반복 가중 최소제곱(IRLS)으로, 비선형(로지스틱·승법)은 가우스-뉴턴으로 근사 */
+  function fitModel(M, opt = {}) {
+    const n = M.n, P = M.P, S = M.S, K = M.K, maxIter = opt.maxIter || 80;
+    const t = new Float64Array(n), ys = new Float64Array(n);
+    for (let i = 0; i < n; i++) { t[i] = (M.ds[i] - M.start) / M.tScale; ys[i] = (M.y[i] - M.floor) / M.yScale; }
+    const X = opt.X || featRows(M, M.ds);
+    const tau = M.spec.cpScale, epsD = 1e-4 * Math.max(tau, 1e-3);
+    const th = new Float64Array(P);
+    /* 초기값: 선형 = 첫/끝 점, 로지스틱 = logit 의 직선 적합 */
+    if (!M.logistic) { const k = (ys[n - 1] - ys[0]) / Math.max(1e-9, t[n - 1] - t[0]); th[0] = k; th[1] = ys[0] - k * t[0]; }
+    else { let sx = 0, sy = 0, sxx = 0, sxy = 0;
+      for (let i = 0; i < n; i++) { const p = Math.min(0.98, Math.max(0.02, ys[i] / M.cap)), z = Math.log(p / (1 - p)); sx += t[i]; sy += z; sxx += t[i] * t[i]; sxy += t[i] * z; }
+      const k = (n * sxy - sx * sy) / Math.max(1e-9, n * sxx - sx * sx); th[0] = k; th[1] = (sy - k * sx) / n; }
+    const anyMul = M.mulMask.some(Boolean), linear = !M.logistic && !anyMul;
+    const prec = j => j < 2 ? 1 / 25 : (j < 2 + S ? 0 : 1 / (M.cols[j - 2 - S].prior ** 2));
+    const lam = (j, s2) => j >= 2 && j < 2 + S ? s2 / (tau * Math.max(Math.abs(th[j]), epsD)) : s2 * prec(j);
+    const rowJ = new Float64Array(P);
+    function evalRow(i, th_) { /* 예측값과 야코비안 한 줄 */
+      const ti = t[i]; let z = th_[0] * ti + th_[1]; rowJ[0] = ti; rowJ[1] = 1;
+      for (let j = 0; j < S; j++) { const h = ti >= M.cpT[j] ? ti - M.cpT[j] : 0; rowJ[2 + j] = h; z += th_[2 + j] * h; }
+      let g = z, dg = 1;
+      if (M.logistic) { const s = sigm(z); g = M.cap * s; dg = M.cap * s * (1 - s); }
+      let sm = 0, sa = 0; const off = i * K;
+      for (let c = 0; c < K; c++) { const v = X[off + c] * th_[2 + S + c]; if (M.mulMask[c]) sm += v; else sa += v; }
+      const mult = 1 + sm;
+      for (let j = 0; j < 2 + S; j++) rowJ[j] *= dg * mult;
+      for (let c = 0; c < K; c++) rowJ[2 + S + c] = M.mulMask[c] ? g * X[off + c] : X[off + c];
+      return g * mult + sa;
+    }
+    function objective(th_, s2) { let rss = 0; for (let i = 0; i < n; i++) { const r = ys[i] - evalRow(i, th_); rss += r * r; }
+      let pen = (th_[0] ** 2 + th_[1] ** 2) / 50; for (let j = 0; j < S; j++) pen += Math.abs(th_[2 + j]) / tau;
+      for (let c = 0; c < K; c++) pen += th_[2 + S + c] ** 2 / (2 * M.cols[c].prior ** 2);
+      return { rss, obj: rss / (2 * s2) + pen }; }
+    let G = null, Xty = null, yy = 0;
+    if (linear) { /* 선형·가법: JᵀJ 를 한 번만 계산 */
+      G = new Float64Array(P * P); Xty = new Float64Array(P);
+      for (let i = 0; i < n; i++) { evalRow(i, th); for (let a = 0; a < P; a++) { const v = rowJ[a]; if (v === 0) continue; Xty[a] += v * ys[i];
+        for (let b = 0; b <= a; b++) G[a * P + b] += v * rowJ[b]; } yy += ys[i] * ys[i]; }
+      for (let a = 0; a < P; a++) for (let b = 0; b < a; b++) G[b * P + a] = G[a * P + b];
+    }
+    let s2 = objective(th, 1).rss / n || 1e-4, iters = 0, mu = 1e-3;
+    for (let it = 0; it < maxIter; it++) {
+      iters = it + 1; let maxStep = 0;
+      if (linear) {
+        const A = Float64Array.from(G); for (let j = 0; j < P; j++) A[j * P + j] += lam(j, s2) + 1e-10;
+        const nth = cholSolve(A, Xty, P);
+        for (let j = 0; j < P; j++) { maxStep = Math.max(maxStep, Math.abs(nth[j] - th[j])); th[j] = nth[j]; }
+        let rss = yy; for (let a = 0; a < P; a++) { rss -= 2 * th[a] * Xty[a]; let s = 0; for (let b = 0; b < P; b++) s += G[a * P + b] * th[b]; rss += th[a] * s; }
+        s2 = Math.max(1e-10, rss / n);
+      } else {
+        const A = new Float64Array(P * P), g = new Float64Array(P);
+        for (let i = 0; i < n; i++) { const r = ys[i] - evalRow(i, th);
+          for (let a = 0; a < P; a++) { const v = rowJ[a]; if (v === 0) continue; g[a] += v * r; for (let b = 0; b <= a; b++) A[a * P + b] += v * rowJ[b]; } }
+        for (let a = 0; a < P; a++) for (let b = 0; b < a; b++) A[b * P + a] = A[a * P + b];
+        for (let j = 0; j < P; j++) { const l = lam(j, s2); A[j * P + j] += l; g[j] -= l * th[j]; }
+        const f0 = objective(th, s2).obj; let ok = false;
+        for (let tr = 0; tr < 8 && !ok; tr++) {
+          const Ad = Float64Array.from(A); for (let j = 0; j < P; j++) Ad[j * P + j] *= 1 + mu;
+          const d = cholSolve(Ad, g, P), nt = Float64Array.from(th); let ms = 0;
+          for (let j = 0; j < P; j++) { nt[j] += d[j]; ms = Math.max(ms, Math.abs(d[j])); }
+          const f1 = objective(nt, s2);
+          if (f1.obj <= f0 + 1e-12 || ms < 1e-9) { th.set(nt); maxStep = ms; mu = Math.max(1e-7, mu / 4); s2 = Math.max(1e-10, f1.rss / n); ok = true; }
+          else mu *= 8;
+        }
+        if (!ok) break;
+      }
+      if (it > 3 && maxStep < 1e-7) break;
+    }
+    return { M, th, sigma: Math.sqrt(s2), iters, X, t };
+  }
+
+  /* ---- 예측 ---- */
+  function predict(F, ds, opt = {}) {
+    const M = F.M, th = F.th, S = M.S, K = M.K, n = ds.length, X = featRows(M, ds);
+    const out = { ds, trend: new Float64Array(n), yhat: new Float64Array(n), groups: {}, mulGroups: {} };
+    const gnames = [...new Set(M.cols.map(c => c.group))];
+    gnames.forEach(g => out.groups[g] = new Float64Array(n));
+    const holCol = M.cols.map(c => c.kind === "hol");
+    out.holEach = {}; M.cols.forEach(c => { if (c.kind === "hol" && !out.holEach[c.hol]) out.holEach[c.hol] = new Float64Array(n); });
+    for (let i = 0; i < n; i++) {
+      const tt = (ds[i] - M.start) / M.tScale, g = trendAt(M, th, tt);
+      let sm = 0, sa = 0;
+      for (let c = 0; c < K; c++) { const v = X[i * K + c] * th[2 + S + c]; const col = M.cols[c];
+        if (M.mulMask[c]) { sm += v; out.groups[col.group][i] += v; if (holCol[c]) out.holEach[col.hol][i] += v; }
+        else { sa += v; out.groups[col.group][i] += v * M.yScale; if (holCol[c]) out.holEach[col.hol][i] += v * M.yScale; } }
+      out.trend[i] = g * M.yScale + M.floor;
+      out.yhat[i] = out.trend[i] * (1 + sm) + sa * M.yScale;
+    }
+    out.mul = M.spec.mode === "multiplicative";
+    if (opt.samples) Object.assign(out, uncertainty(F, ds, X, opt));
+    return out;
+  }
+  /* Prophet sample_predictive_trend 방식: 미래 구간(t>1)에 변화점을 포아송 과정으로, 크기는 Laplace(0, mean|δ|) 로 뽑음 */
+  function trendPaths(F, ds, nS, seed) {
+    const M = F.M, th = F.th, rng = mulberry32(seed), n = ds.length;
+    const tt = ds.map(d => (d - M.start) / M.tScale), T = Math.max(...tt);
+    let lam = 1e-8; for (let j = 0; j < M.S; j++) lam += Math.abs(th[2 + j]) / Math.max(1, M.S);
+    const paths = [], cps = [];
+    for (let s = 0; s < nS; s++) {
+      const nc = T > 1 ? poisson(rng, M.S * (T - 1)) : 0, eT = [], eD = [];
+      for (let q = 0; q < nc; q++) eT.push(1 + rng() * (T - 1)); eT.sort((a, b) => a - b);
+      for (let q = 0; q < nc; q++) eD.push(laplace(rng, lam));
+      const p = new Float64Array(n); for (let i = 0; i < n; i++) p[i] = trendAt(M, th, tt[i], eT, eD) * M.yScale + M.floor;
+      paths.push(p); cps.push(eT.map((x, q) => ({ t: x, d: eD[q], day: M.start + x * M.tScale })));
+    }
+    return { paths, cps, lam, T };
+  }
+  function quantile(sorted, q) { const p = (sorted.length - 1) * q, i = Math.floor(p), f = p - i; return i + 1 < sorted.length ? sorted[i] * (1 - f) + sorted[i + 1] * f : sorted[i]; }
+  function uncertainty(F, ds, X, opt) {
+    const M = F.M, th = F.th, S = M.S, K = M.K, n = ds.length, nS = opt.samples, w = opt.width || 0.8;
+    const TP = trendPaths(F, ds, nS, opt.seed || 7), rng = mulberry32((opt.seed || 7) * 31 + 1);
+    const sm = new Float64Array(n), sa = new Float64Array(n);
+    for (let i = 0; i < n; i++) for (let c = 0; c < K; c++) { const v = X[i * K + c] * th[2 + S + c]; if (M.mulMask[c]) sm[i] += v; else sa[i] += v * M.yScale; }
+    const lo = new Float64Array(n), hi = new Float64Array(n), tlo = new Float64Array(n), thi = new Float64Array(n), col = new Float64Array(nS), tcol = new Float64Array(nS);
+    const lo95 = new Float64Array(n), hi95 = new Float64Array(n);
+    const noise = TP.paths.map(() => { const a = new Float64Array(n); for (let i = 0; i < n; i++) a[i] = gauss(rng) * F.sigma * M.yScale; return a; });
+    for (let i = 0; i < n; i++) {
+      for (let s = 0; s < nS; s++) { const tr = TP.paths[s][i]; tcol[s] = tr; col[s] = tr * (1 + sm[i]) + sa[i] + noise[s][i]; }
+      col.sort(); tcol.sort();
+      lo[i] = quantile(col, (1 - w) / 2); hi[i] = quantile(col, 1 - (1 - w) / 2);
+      lo95[i] = quantile(col, 0.025); hi95[i] = quantile(col, 0.975);
+      tlo[i] = quantile(tcol, (1 - w) / 2); thi[i] = quantile(tcol, 1 - (1 - w) / 2);
+    }
+    return { lo, hi, lo95, hi95, tlo, thi, paths: TP.paths, futureCps: TP.cps, lamFuture: TP.lam, Tmax: TP.T };
+  }
+
+  /* ---- 교차검증 (prophet.diagnostics 흉내) ---- */
+  function cvCutoffs(ds, initial, period, horizon) {
+    const mn = ds[0], mx = ds[ds.length - 1]; let c = mx - horizon; if (c < mn) return [];
+    const has = (a, b) => ds.some(d => d > a && d <= b), res = [c];
+    while (res[res.length - 1] >= mn + initial) {
+      c -= period;
+      if (!has(c, c + horizon) && c > mn) { let cl = mn; for (const d of ds) if (d <= c) cl = d; c = cl - horizon; }
+      res.push(c);
+    }
+    res.pop(); return res.reverse();
+  }
+  function rollingMeanByH(x, h, w) { /* prophet.diagnostics.rolling_mean_by_h */
+    const by = new Map(); x.forEach((v, i) => { const e = by.get(h[i]) || [0, 0]; e[0] += v; e[1]++; by.set(h[i], e); });
+    const hs = [...by.keys()].sort((a, b) => a - b), xs = hs.map(k => by.get(k)[0]), ns = hs.map(k => by.get(k)[1]);
+    let ti = hs.length - 1, xsum = 0, nsum = 0; const rx = new Array(hs.length).fill(NaN);
+    for (let i = hs.length - 1; i >= 0; i--) { xsum += xs[i]; nsum += ns[i];
+      while (nsum >= w) { const exN = nsum - w, exX = exN * xs[i] / ns[i]; rx[ti] = (xsum - exX) / w; xsum -= xs[ti]; nsum -= ns[ti]; ti--; } }
+    return { h: hs.slice(ti + 1), v: rx.slice(ti + 1) };
+  }
+  function perfMetrics(rows, rollingWindow = 0.1) { /* rows: {h, y, yhat} */
+    const w = Math.max(1, Math.floor(rollingWindow * rows.length)), h = rows.map(r => r.h);
+    const se = rows.map(r => (r.y - r.yhat) ** 2), ae = rows.map(r => Math.abs(r.y - r.yhat)), ape = rows.map(r => Math.abs((r.y - r.yhat) / r.y));
+    const mse = rollingMeanByH(se, h, w), mae = rollingMeanByH(ae, h, w), mape = rollingMeanByH(ape, h, w);
+    const cov = rollingMeanByH(rows.map(r => (r.y >= r.lo && r.y <= r.hi) ? 1 : 0), h, w);
+    return { h: mse.h, rmse: mse.v.map(Math.sqrt), mae: mae.v, mape: mape.v, coverage: cov.v, w };
+  }
+
+  /* ---- 예제 데이터: 일별 응급실 내원 환자 수 (숨은 성분을 알고 있는 합성 데이터) ---- */
+  const GEN = { start: dayOf(2023, 1, 1), end: dayOf(2025, 9, 30), fut: 400, cp: [dayOf(2024, 3, 1), dayOf(2025, 4, 1)],
+    week: [-10, 18, 6, -1, -4, -2, -7], /* 일 월 화 수 목 금 토 */
+    hol: { seollal: { "-1": 22, "0": 48, "1": 30, "2": -14 }, chuseok: { "-1": 22, "0": 48, "1": 30, "2": -14 }, xmas: { "0": 14 } },
+    gap: [dayOf(2024, 7, 8), dayOf(2024, 7, 21)],
+    out: [[dayOf(2023, 8, 12), 75], [dayOf(2024, 5, 3), 60], [dayOf(2024, 11, 20), null], [dayOf(2025, 6, 14), 55]] };
+  function genER(o) {
+    const rng = mulberry32(o.seed * 7919 + 13), N = GEN.end - GEN.start + 1 + GEN.fut;
+    const hd = {}; Object.keys(GEN.hol).forEach(k => HOLIDAY_DATES[k].forEach(s => { const d0 = parseISO(s);
+      Object.entries(GEN.hol[k]).forEach(([off, v]) => { hd[d0 + +off] = (hd[d0 + +off] || 0) + v; }); }));
+    const jan15 = dayOf(2023, 1, 15), jul25 = dayOf(2023, 7, 25), w = 2 * Math.PI / 365.25;
+    const all = [];
+    for (let i = 0; i < N; i++) {
+      const d = GEN.start + i, dt = dateOf(d);
+      const tr = 110 + 0.012 * i + o.trend * (0.05 * Math.max(0, d - GEN.cp[0]) - 0.045 * Math.max(0, d - GEN.cp[1]));
+      const wk = o.weekly * GEN.week[dt.getUTCDay()];
+      const yr = o.yearly * (14 * Math.cos(w * (d - jan15)) + 5 * Math.cos(2 * w * (d - jul25)));
+      const ho = o.hol * (hd[d] || 0);
+      const mo = o.monthly * 8 * Math.cos(2 * Math.PI * (dt.getUTCDate() - 1) / 30.5);
+      const sea = wk + yr + ho + mo;
+      const mean = o.mult ? tr * (1 + sea / 110) : tr + sea;
+      let y = Math.max(0, Math.round(mean + o.noise * 6 * gauss(rng)));
+      all.push({ d, y, tr, wk, yr, ho, mo, mean });
+    }
+    if (o.outliers) GEN.out.forEach(([d, v]) => { const r = all[d - GEN.start]; if (r) r.y = v == null ? 4 : r.y + v; });
+    const hist = all.filter(r => r.d <= GEN.end && !(o.missing && r.d >= GEN.gap[0] && r.d <= GEN.gap[1]));
+    return { ds: hist.map(r => r.d), y: hist.map(r => r.y), all, fut: all.filter(r => r.d > GEN.end) };
+  }
+
+  function cvRun(ds, y, spec, initial, period, horizon, opt = {}) {
+    const cuts = cvCutoffs(ds, initial, period, horizon), rows = [];
+    cuts.forEach((c, ci) => {
+      const tr = [], ty = []; ds.forEach((d, i) => { if (d <= c) { tr.push(d); ty.push(y[i]); } });
+      const F = fitModel(setupModel(tr, ty, spec), { maxIter: opt.maxIter });
+      const te = [], tey = []; ds.forEach((d, i) => { if (d > c && d <= c + horizon) { te.push(d); tey.push(y[i]); } });
+      const P = predict(F, te, opt.samples ? { samples: opt.samples, width: opt.width || 0.8, seed: 11 + ci } : {});
+      te.forEach((d, i) => rows.push({ ci, cutoff: c, ds: d, h: d - c, y: tey[i], yhat: P.yhat[i], lo: P.lo ? P.lo[i] : NaN, hi: P.hi ? P.hi[i] : NaN }));
+    });
+    return { cuts, rows };
+  }
+  /* ENGINE END */
+
+  /* ================= 공통 도구 ================= */
+  const $ = id => document.getElementById(id);
+  const reduceMotion = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const range = (a, b) => { const o = []; for (let d = a; d <= b; d++) o.push(d); return o; };
+  const DOW = ["일", "월", "화", "수", "목", "금", "토"];
+  function fmt(v, d = 2) { if (!isFinite(v)) return "–"; const r = Number(v.toFixed(d)); return (Object.is(r, -0) ? 0 : r).toFixed(d); }
+  function fmtS(v, s = 3) { if (!isFinite(v)) return "–"; if (v === 0) return "0"; const a = Math.abs(v);
+    if (a >= 1000) return v.toFixed(0); if (a >= 1) return v.toFixed(Math.max(0, s - 1 - Math.floor(Math.log10(a)))); return v.toPrecision(Math.max(1, s - 1)); }
+  const fmtAxis = v => { const a = Math.abs(v); return a >= 1000 ? (v / 1000).toFixed(1) + "k" : a >= 10 || v === 0 ? String(Math.round(v)) : a >= 1 ? v.toFixed(1) : v.toFixed(2); };
+  const isMul = () => S.spec.mode === "multiplicative";
+  const unitFmt = (v, mul) => mul ? (v * 100).toFixed(1) + "%" : fmt(v, 1) + "명";
+  const pctAxis = v => (v * 100).toFixed(Math.abs(v) < 0.1 ? 1 : 0) + "%";
+  const md = d => { const t = dateOf(d); return (t.getUTCMonth() + 1) + "/" + t.getUTCDate(); };
+  const isoDow = d => iso(d) + " (" + DOW[dateOf(d).getUTCDay()] + ")";
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  /* ================= 상태 ================= */
+  const HOL_DEF = [
+    { key: "seollal", name: "설날", lower: -1, upper: 1, on: true },
+    { key: "chuseok", name: "추석", lower: -1, upper: 1, on: true },
+    { key: "xmas", name: "크리스마스", lower: 0, upper: 0, on: true }];
+  const HOL_COLOR = { seollal: "--c-hol", chuseok: "--c-year", xmas: "--c-week" };
+  const DATA_DEF = { seed: 1, trend: 1, weekly: 1, yearly: 1, hol: 1, monthly: 0, noise: 1, missing: true, outliers: true, mult: false };
+  const SPEC_DEF = { growth: "linear", cap: 180, floor: 0, nCp: 25, cpRange: 0.8, cpScale: 0.05, mode: "additive",
+    yearly: { on: true, order: 10 }, weekly: { on: true, order: 3 }, custom: [{ name: "monthly", period: 30.5, order: 5, on: false }],
+    seasScale: 10, holOn: true, holScale: 10, holidays: HOL_DEF.map(h => ({ ...h, dates: HOLIDAY_DATES[h.key] })) };
+  const S = { data: { ...DATA_DEF }, csv: null, spec: clone(SPEC_DEF), horizon: 90, width: 0.8, show95: false,
+    st: { stage: 99, alpha: 1, speed: "mid", view: "all", playing: false, timer: 0, raf: 0 },
+    atFrac: 0.62, fanSeed: 1, fanN: 40,
+    sn: { target: "yearly", step: 99, playing: false, timer: 0 },
+    ho: { occ: "seollal|2024-02-10" },
+    fc: { mode: "future", view: "recent" },
+    cv: { initial: 730, period: 45, horizon: 90, metric: "mape" },
+    truth: true, code: { reg: false, tune: true, kr: false } };
+
+  /* ================= 데이터 ================= */
+  let D = null, dataVer = 0;
+  const cache = new Map();
+  function buildData() {
+    dataVer++; cache.clear(); Object.values(jobs).forEach(j => j.cancel = true);
+    if (S.csv) D = { ds: S.csv.ds, y: S.csv.y, all: null, fut: [], csv: true };
+    else { const G = genER(S.data); D = { ds: G.ds, y: G.y, all: G.all, fut: G.fut, csv: false }; }
+    D.start = D.ds[0]; D.end = D.ds[D.ds.length - 1];
+    D.ymap = new Map(D.ds.map((d, i) => [d, D.y[i]]));
+    D.days = range(D.start, D.end); D.yFull = D.days.map(d => D.ymap.has(d) ? D.ymap.get(d) : NaN);
+    D.ymax = Math.max(...D.y); D.ymean = D.y.reduce((a, b) => a + b, 0) / D.y.length;
+    D.meanTr = D.all ? D.all.filter(r => r.d <= D.end).reduce((a, r) => a + r.tr, 0) / (D.end - D.start + 1) : NaN;
+    D.truthAt = d => D.all ? D.all[d - GEN.start] : null;
+    const capMin = Math.max(2, Math.round(D.ymax * 0.5)), capMax = Math.max(capMin + 10, Math.round(D.ymax * 2));
+    capSl && capSl.setRange(capMin, capMax);
+    if (S.spec.cap < capMin || S.spec.cap > capMax) S.spec.cap = Math.round(clamp(D.ymax * 1.15, capMin, capMax));
+    floorSl && floorSl.setRange(0, Math.max(1, Math.round(D.ymean * 0.8)));
+    if (S.spec.floor >= S.spec.cap) S.spec.floor = 0;
+    syncAll();
+  }
+  function getFit(spec, trainEnd) {
+    const k = dataVer + "|" + JSON.stringify(spec) + "|" + (trainEnd == null ? "" : trainEnd);
+    let r = cache.get(k); if (r) return r;
+    let ds = D.ds, y = D.y;
+    if (trainEnd != null) { const n = ds.findIndex(d => d > trainEnd); if (n >= 0) { ds = ds.slice(0, n); y = y.slice(0, n); } }
+    const M = setupModel(ds, y, spec), nonlin = M.logistic || M.mulMask.some(Boolean);
+    const F = fitModel(M, { maxIter: nonlin ? 40 : 80 });
+    r = { M, F, k, trainEnd: trainEnd == null ? D.end : trainEnd }; cache.set(k, r);
+    if (cache.size > 60) cache.delete(cache.keys().next().value);
+    return r;
+  }
+  function getPred(fit, a, b, samples) {
+    const k = fit.k + "|p|" + a + "|" + b + "|" + (samples ? samples + ":" + S.width : "");
+    let P = cache.get(k); if (P) return P;
+    const days = range(a, b);
+    P = predict(fit.F, days, samples ? { samples, width: S.width, seed: 7 } : {}); P.days = days; P.a = a;
+    cache.set(k, P); if (cache.size > 60) cache.delete(cache.keys().next().value);
+    return P;
+  }
+  const mainFit = () => getFit(S.spec);
+  const mainPred = s => getPred(mainFit(), D.start, D.end + S.horizon, s || 0);
+  function errStats(ys, fs) { let n = 0, se = 0, ae = 0, ape = 0, sape = 0, nz = 0;
+    for (let i = 0; i < ys.length; i++) { const y = ys[i], f = fs[i]; if (!isFinite(y) || !isFinite(f)) continue; const e = y - f; n++; se += e * e; ae += Math.abs(e);
+      if (Math.abs(y) > 1e-8) { ape += Math.abs(e / y); nz++; } sape += (Math.abs(y) + Math.abs(f)) > 0 ? 2 * Math.abs(e) / (Math.abs(y) + Math.abs(f)) : 0; }
+    return { n, rmse: Math.sqrt(se / n), mae: ae / n, mape: ape / Math.max(1, nz), smape: sape / n }; }
+  function truthScale() { if (!D.all) return null; const mm = isMul(), dm = S.data.mult;
+    if (!mm) return dm ? D.meanTr / 110 : 1; return dm ? 1 / 110 : 1 / D.meanTr; }
+  function groupAt(F, pred, days) { const M = F.M, nS = M.S, unit = M.spec.mode === "multiplicative" ? 1 : M.yScale, out = new Float64Array(days.length);
+    M.cols.forEach((c, j) => { if (!pred(c)) return; const b = F.th[2 + nS + j] * unit; if (!b) return; days.forEach((d, i) => out[i] += featureValue(c, d) * b); });
+    return out; }
+
+  /* ================= 비동기 작업 (교차검증·격자 탐색·차수 비교) ================= */
+  const jobs = {};
+  function runJob(name, key, tasks, onStep, onDone) {
+    const J = jobs[name]; if (J && J.key === key && !J.cancel) return J;
+    if (J) J.cancel = true;
+    const job = { key, i: 0, n: tasks.length, running: true, done: false, cancel: false, results: [] }; jobs[name] = job;
+    const step = () => { if (job.cancel) return; const t0 = performance.now();
+      while (job.i < job.n && performance.now() - t0 < 35) { job.results.push(tasks[job.i]()); job.i++; }
+      if (onStep) onStep(job);
+      if (job.i < job.n) setTimeout(step, 0); else { job.running = false; job.done = true; if (onDone) onDone(job); } };
+    setTimeout(step, 0); return job;
+  }
+
+  /* ================= 그리기 도구 ================= */
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  function pal() { return { data: css("--c-data"), fc: css("--c-fc"), act: css("--c-act"), trend: css("--c-trend"), week: css("--c-week"), year: css("--c-year"),
+    hol: css("--c-hol"), mon: css("--c-mon"), cp: css("--c-cp"), truth: css("--c-truth"), good: css("--c-good"), ink: css("--ink"), text: css("--text"),
+    muted: css("--muted"), faint: css("--faint"), line: css("--line"), lineS: css("--line-strong"), surface: css("--surface"), s2: css("--surface-2"),
+    mono: css("--mono") || "monospace", sans: css("--sans") || "sans-serif" }; }
+  function fitCanvas(cv) { const w = cv.clientWidth, h = cv.clientHeight; if (w < 10 || h < 10) return null;
+    const dpr = Math.min(3, window.devicePixelRatio || 1), W = Math.round(w * dpr), H = Math.round(h * dpr);
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h); return { ctx, w, h }; }
+  function niceStep(range_, n) { const raw = range_ / Math.max(1, n), p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p; return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p; }
+  function yTicks(a, b, n) { const s = niceStep(b - a, n), o = []; for (let v = Math.ceil(a / s) * s; v <= b + s * 1e-9; v += s) o.push(Math.abs(v) < s * 1e-9 ? 0 : v); return o; }
+  function dateTicks(x0, x1, maxN) {
+    const span = x1 - x0, out = [];
+    if (span > 80) {
+      const step = [1, 2, 3, 6, 12].find(s => span / 30.44 / s <= maxN) || 12;
+      const d0 = dateOf(x0), y = d0.getUTCFullYear(); let m = d0.getUTCMonth() + (d0.getUTCDate() > 1 ? 1 : 0);
+      while (m % step) m++;
+      for (let k = 0; k < 300; k++) { const day = Math.round(Date.UTC(y, m, 1) / DAY); if (day > x1) break;
+        const dt = dateOf(day), mm = dt.getUTCMonth(); out.push({ x: day, label: mm === 0 ? String(dt.getUTCFullYear()) : (mm + 1) + "월" }); m += step; }
+      if (out.length && !/^\d{4}$/.test(out[0].label)) { const dt = dateOf(out[0].x); out[0].label = String(dt.getUTCFullYear()).slice(2) + "." + (dt.getUTCMonth() + 1); }
+    } else {
+      const step = [1, 2, 7, 14, 28].find(s => span / s <= maxN) || 28;
+      let d = Math.ceil(x0); if (step >= 7) while ((d - 4) % 7 !== 0) d++;
+      for (; d <= x1; d += step) out.push({ x: d, label: md(d) });
+    }
+    return out;
+  }
+  function polyline(ctx, xs, ys, sx, sy, lo, hi) { ctx.beginPath(); let pen = false;
+    for (let i = 0; i < xs.length; i++) { const x = xs[i], y = ys[i]; if (!isFinite(y) || x < lo || x > hi) { pen = false; continue; }
+      const X = sx(x), Y = sy(y); if (pen) ctx.lineTo(X, Y); else { ctx.moveTo(X, Y); pen = true; } } ctx.stroke(); }
+  function plot(cv, o) { cv._o = o; drawPlot(cv); hoverBind(cv); }
+  function drawPlot(cv) {
+    const o = cv._o; if (!o) return; const R = fitCanvas(cv); if (!R) return; const { ctx, w, h } = R, K = pal(), small = w < 480;
+    const pad = { l: o.padL || (small ? 40 : 50), r: o.padR || 12, t: o.padT || 12, b: (small ? 24 : 26) + (o.groups ? 18 : 0) };
+    const [x0, x1] = o.x; let y0, y1;
+    if (o.y) [y0, y1] = o.y; else {
+      let lo = Infinity, hi = -Infinity; const inc = v => { if (isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } };
+      (o.yInclude || []).forEach(inc);
+      o.layers.forEach(L => { if (L.noScale || !L.xs) return; const xs = L.xs;
+        const each = arr => { for (let i = 0; i < xs.length; i++) if (xs[i] >= x0 && xs[i] <= x1) inc(arr[i]); };
+        if (L.type === "band") { each(L.lo); each(L.hi); } else if (L.type === "paths") L.ys.forEach(each); else if (L.ys) { each(L.ys); if (L.type === "bars") inc(0); } });
+      if (!isFinite(lo)) { lo = 0; hi = 1; } if (hi - lo < 1e-9) { hi += 1; lo -= 1; }
+      const m = (hi - lo) * 0.07; y0 = lo - m; y1 = hi + m;
+    }
+    const pw = w - pad.l - pad.r, ph = h - pad.t - pad.b;
+    const sx = x => pad.l + (x - x0) / (x1 - x0) * pw, sy = y => pad.t + (1 - (y - y0) / (y1 - y0)) * ph;
+    ctx.font = `${small ? 10.5 : 11.5}px ${K.mono}`; ctx.lineJoin = "round";
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    (o.yt || yTicks(y0, y1, small ? 4 : 5)).forEach(v => { const Y = sy(v); ctx.strokeStyle = K.line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad.l, Y); ctx.lineTo(w - pad.r, Y); ctx.stroke();
+      ctx.fillStyle = K.muted; ctx.fillText((o.yFmt || fmtAxis)(v), pad.l - 5, Y); });
+    const xt = o.xTicks ? o.xTicks(x0, x1, small) : dateTicks(x0, x1, small ? 4 : 9);
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    let lastR = -1e9;
+    xt.forEach(t => { const X = sx(t.x); if (X < pad.l - 1 || X > w - pad.r + 1) return;
+      if (!o.noXGrid) { ctx.strokeStyle = K.line; ctx.globalAlpha = .55; ctx.beginPath(); ctx.moveTo(X, pad.t); ctx.lineTo(X, pad.t + ph); ctx.stroke(); ctx.globalAlpha = 1; }
+      const tw = ctx.measureText(t.label).width; if (X - tw / 2 < lastR + 4) return; lastR = X + tw / 2;
+      ctx.fillStyle = t.color || K.muted; ctx.fillText(t.label, X, pad.t + ph + 5); });
+    if (o.groups) { ctx.font = `600 ${small ? 11 : 12}px ${K.sans}`; o.groups.forEach(g => { ctx.fillStyle = g.color || K.ink; ctx.fillText(g.label, (sx(g.a) + sx(g.b)) / 2, pad.t + ph + (small ? 22 : 24)); }); ctx.font = `${small ? 10.5 : 11.5}px ${K.mono}`; }
+    if (o.yLabel) { ctx.save(); ctx.fillStyle = K.faint; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.font = `${small ? 10.5 : 11}px ${K.sans}`; ctx.fillText(o.yLabel, pad.l + 4, pad.t + 2); ctx.restore(); }
+    ctx.save(); ctx.beginPath(); ctx.rect(pad.l, pad.t, pw, ph); ctx.clip();
+    (o.shades || []).forEach(s => { ctx.fillStyle = s.color; ctx.globalAlpha = s.alpha == null ? .12 : s.alpha; ctx.fillRect(sx(s.a), pad.t, sx(s.b) - sx(s.a), ph); ctx.globalAlpha = 1;
+      if (s.label && sx(s.b) - sx(s.a) > 60) { ctx.fillStyle = K.muted; ctx.font = `${small ? 10.5 : 11.5}px ${K.sans}`; ctx.textAlign = "center"; ctx.fillText(s.label, (sx(s.a) + sx(s.b)) / 2, pad.t + 4); ctx.font = `${small ? 10.5 : 11.5}px ${K.mono}`; } });
+    if (y0 < 0 && y1 > 0 && o.zero !== false) { ctx.strokeStyle = K.lineS; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(pad.l, sy(0)); ctx.lineTo(w - pad.r, sy(0)); ctx.stroke(); }
+    const span = x1 - x0, lo = x0 - span * 0.03, hi = x1 + span * 0.03;
+    o.layers.forEach(L => {
+      ctx.globalAlpha = L.alpha == null ? 1 : L.alpha; ctx.setLineDash(L.dash || []);
+      if (L.type === "band") { ctx.fillStyle = L.color; ctx.beginPath(); let st = false;
+        for (let i = 0; i < L.xs.length; i++) { if (L.xs[i] < lo || L.xs[i] > hi || !isFinite(L.hi[i])) continue; const X = sx(L.xs[i]), Y = sy(L.hi[i]); if (st) ctx.lineTo(X, Y); else { ctx.moveTo(X, Y); st = true; } }
+        for (let i = L.xs.length - 1; i >= 0; i--) { if (L.xs[i] < lo || L.xs[i] > hi || !isFinite(L.lo[i])) continue; ctx.lineTo(sx(L.xs[i]), sy(L.lo[i])); }
+        ctx.closePath(); ctx.fill(); }
+      else if (L.type === "line") { ctx.strokeStyle = L.color; ctx.lineWidth = L.w || 1.6; polyline(ctx, L.xs, L.ys, sx, sy, lo, hi); }
+      else if (L.type === "hbars") { const hh = Math.min(16, ph / L.n * 0.55);
+        L.rows.forEach(r => { ctx.fillStyle = r.color; ctx.globalAlpha = r.alpha == null ? 1 : r.alpha; ctx.fillRect(sx(r.a), sy(r.y) - hh / 2, Math.max(2, sx(r.b) - sx(r.a)), hh); }); }
+      else if (L.type === "paths") { ctx.strokeStyle = L.color; ctx.lineWidth = L.w || 1; L.ys.forEach(ys => polyline(ctx, L.xs, ys, sx, sy, lo, hi)); }
+      else if (L.type === "dots") { ctx.fillStyle = L.color; const r = L.r || 2;
+        for (let i = 0; i < L.xs.length; i++) { const y = L.ys[i]; if (!isFinite(y) || L.xs[i] < lo || L.xs[i] > hi) continue; ctx.beginPath(); ctx.arc(sx(L.xs[i]), sy(y), r, 0, 7); ctx.fill();
+          if (L.ring) { ctx.strokeStyle = L.ring; ctx.lineWidth = 1.2; ctx.stroke(); } } }
+      else if (L.type === "bars") { const bw = Math.max(1, Math.abs(sx(L.bw || 0.7) - sx(0))), Y0 = sy(0);
+        for (let i = 0; i < L.xs.length; i++) { const y = L.ys[i]; if (!isFinite(y)) continue; ctx.fillStyle = L.colors ? L.colors[i] : L.color;
+          ctx.globalAlpha = L.alphas ? L.alphas[i] : (L.alpha == null ? 1 : L.alpha); const X = sx(L.xs[i]) - bw / 2 + (L.off || 0) * bw, Y = sy(y);
+          ctx.fillRect(X, Math.min(Y, Y0), bw, Math.max(1, Math.abs(Y - Y0))); } }
+      ctx.globalAlpha = 1; ctx.setLineDash([]);
+    });
+    (o.hlines || []).forEach(l => { ctx.strokeStyle = l.color; ctx.lineWidth = l.w || 1.3; ctx.setLineDash(l.dash || [5, 4]); ctx.beginPath(); ctx.moveTo(pad.l, sy(l.y)); ctx.lineTo(w - pad.r, sy(l.y)); ctx.stroke(); ctx.setLineDash([]);
+      if (l.label) { ctx.fillStyle = l.color; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.font = `600 ${small ? 10.5 : 11.5}px ${K.sans}`; ctx.fillText(l.label, pad.l + 6, sy(l.y) - 2); ctx.font = `${small ? 10.5 : 11.5}px ${K.mono}`; } });
+    (o.vlines || []).forEach(l => { const X = sx(l.x); ctx.strokeStyle = l.color; ctx.globalAlpha = l.alpha == null ? 1 : l.alpha; ctx.lineWidth = l.w || 1.3; ctx.setLineDash(l.dash || []);
+      ctx.beginPath(); ctx.moveTo(X, pad.t); ctx.lineTo(X, pad.t + ph); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+      if (l.label) { ctx.fillStyle = l.labelColor || l.color; ctx.font = `600 ${small ? 10.5 : 11.5}px ${K.sans}`; ctx.textBaseline = "top"; const tw = ctx.measureText(l.label).width;
+        const right = X + 5 + tw < w - pad.r; ctx.textAlign = right ? "left" : "right"; ctx.fillText(l.label, right ? X + 5 : X - 5, pad.t + (l.labelY || 4)); ctx.font = `${small ? 10.5 : 11.5}px ${K.mono}`; } });
+    (o.marks || []).forEach(m => { const X = sx(m.x), Y = pad.t + ph; ctx.fillStyle = m.color; ctx.beginPath(); ctx.moveTo(X, Y - 11); ctx.lineTo(X - 6, Y - 1); ctx.lineTo(X + 6, Y - 1); ctx.closePath(); ctx.fill(); });
+    ctx.restore();
+    ctx.strokeStyle = K.lineS; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, pad.t + ph); ctx.lineTo(w - pad.r, pad.t + ph); ctx.stroke();
+    cv._F = { sx, sy, x0, x1, y0, y1, pad, pw, ph, w, h };
+    if (cv._hx != null && o.hover) drawHover(ctx, cv, o, K, small);
+  }
+  function drawHover(ctx, cv, o, K, small) {
+    const F = cv._F, H = o.hover, xs = H.xs; if (!xs.length) return;
+    let a = 0, b = xs.length - 1; while (b - a > 1) { const m = (a + b) >> 1; if (xs[m] < cv._hx) a = m; else b = m; }
+    const i = Math.abs(xs[a] - cv._hx) <= Math.abs(xs[b] - cv._hx) ? a : b, X = F.sx(xs[i]);
+    ctx.strokeStyle = K.muted; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(X, F.pad.t); ctx.lineTo(X, F.pad.t + F.ph); ctx.stroke(); ctx.setLineDash([]);
+    const rows = H.rows.map(r => ({ r, v: r.get(i) })).filter(e => isFinite(e.v));
+    rows.forEach(e => { if (e.r.dot === false) return; const Y = F.sy(e.v); if (Y < F.pad.t || Y > F.pad.t + F.ph) return; ctx.beginPath(); ctx.arc(X, Y, 3.5, 0, 7); ctx.fillStyle = e.r.color; ctx.fill(); ctx.strokeStyle = K.surface; ctx.lineWidth = 1.5; ctx.stroke(); });
+    const lines = [H.title(i)].concat(rows.map(e => e.r.name + "  " + e.r.fmt(e.v)));
+    ctx.font = `${small ? 11 : 12}px ${K.sans}`; const lh = small ? 15 : 17, bw = Math.max(...lines.map(s => ctx.measureText(s).width)) + 28, bh = lines.length * lh + 10;
+    let bx = X + 12; if (bx + bw > F.w - 4) bx = X - 12 - bw; bx = Math.max(4, bx); const by = F.pad.t + 6;
+    ctx.fillStyle = K.surface; ctx.strokeStyle = K.lineS; ctx.globalAlpha = .96; ctx.fillRect(bx, by, bw, bh); ctx.globalAlpha = 1; ctx.strokeRect(bx + .5, by + .5, bw, bh);
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    lines.forEach((s, k) => { const Y = by + 5 + lh * k + lh / 2; if (k > 0) { ctx.fillStyle = rows[k - 1].r.color; ctx.fillRect(bx + 8, Y - 4, 9, 9); }
+      ctx.fillStyle = k === 0 ? K.ink : K.text; ctx.font = (k === 0 ? "600 " : "") + `${small ? 11 : 12}px ${K.sans}`; ctx.fillText(s, bx + (k > 0 ? 22 : 8), Y); });
+  }
+  function hoverBind(cv) { if (cv._hb) return; cv._hb = true;
+    cv.addEventListener("pointermove", e => { const F = cv._F, o = cv._o; if (!F || !o || !o.hover) return; const r = cv.getBoundingClientRect(), px = e.clientX - r.left;
+      const nx = (px < F.pad.l || px > F.w - F.pad.r) ? null : F.x0 + (px - F.pad.l) / F.pw * (F.x1 - F.x0); if (nx === cv._hx) return; cv._hx = nx; drawPlot(cv); });
+    cv.addEventListener("pointerleave", () => { if (cv._hx == null) return; cv._hx = null; drawPlot(cv); }); }
+  const catTicks = labels => () => labels.map((l, i) => ({ x: i, label: l }));
+
+  /* ================= 조작 부품 ================= */
+  const SL = [], SNSL = [], SEG = [];
+  function syncAll() { SL.forEach(f => f()); SNSL.forEach(f => f()); SEG.forEach(f => f()); }
+  function mkSlider(host, o) {
+    const wrap = document.createElement("div"); wrap.className = "sk-slider";
+    wrap.innerHTML = `<div class="sk-sl-head"><span>${o.label}</span><b></b></div><input type="range" aria-label="${esc(o.aria || o.label.replace(/<[^>]+>/g, ""))}">`;
+    (typeof host === "string" ? $(host) : host).appendChild(wrap);
+    const inp = wrap.querySelector("input"), lb = wrap.querySelector("b"); let mn = o.min, mx = o.max;
+    const L = v => Math.log10(v);
+    const toV = r => o.log ? Number(Math.pow(10, L(mn) + r / 1000 * (L(mx) - L(mn))).toPrecision(2)) : +r;
+    const toR = v => o.log ? Math.round((L(v) - L(mn)) / (L(mx) - L(mn)) * 1000) : v;
+    const setR = () => { if (o.log) { inp.min = 0; inp.max = 1000; inp.step = 1; } else { inp.min = mn; inp.max = mx; inp.step = o.step || 1; } };
+    const sync = () => { const v = o.get(); inp.value = toR(v); lb.textContent = (o.fmt || String)(v); };
+    setR();
+    inp.addEventListener("input", () => { o.set(clamp(toV(+inp.value), mn, mx)); lb.textContent = (o.fmt || String)(o.get()); schedule(); });
+    sync(); (o.list || SL).push(sync);
+    return { sync, inp, setRange(a, b) { mn = a; mx = b; setR(); sync(); } };
+  }
+  function seg(id, get, set) { const el = $(id);
+    const sync = () => el.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === String(get()))));
+    el.querySelectorAll("button").forEach(b => b.addEventListener("click", () => { set(b.dataset.v); sync(); schedule(); }));
+    SEG.push(sync); sync(); }
+  function check(id, get, set) { const el = $(id); el.checked = get(); el.addEventListener("change", () => { set(el.checked); schedule(); }); SEG.push(() => { el.checked = get(); }); }
+  function statHTML(list) { return list.map(([k, v]) => `<div class="sk-stat"><b>${v}</b><span>${k}</span></div>`).join(""); }
+  async function copyText(txt, msgEl) { let ok = false;
+    try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(txt); ok = true; } } catch (e) { ok = false; }
+    if (!ok) { try { const ta = document.createElement("textarea"); ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); ok = document.execCommand("copy"); ta.remove(); } catch (e) { ok = false; } }
+    msgEl.textContent = ok ? "복사했습니다" : "복사하지 못했습니다. 직접 선택해 복사하세요"; setTimeout(() => { msgEl.textContent = ""; }, 2200); }
+
+  /* ================= 데이터 패널 ================= */
+  let capSl = null, floorSl = null;
+  const dataSlider = (key, label, max, step) => mkSlider("dataSliders", { label, min: 0, max, step, get: () => S.data[key], set: v => { S.data[key] = v; S.csv = null; buildData(); }, fmt: v => "× " + fmt(v, 1) });
+  dataSlider("trend", "추세 변화 (2024-03 신규 병동 개원)", 2, 0.1);
+  dataSlider("weekly", "주간 효과 (월요일 많음)", 2, 0.1);
+  dataSlider("yearly", "연간 효과 (겨울 증가)", 2, 0.1);
+  dataSlider("hol", "명절 효과 (설날·추석 급증)", 2, 0.1);
+  dataSlider("monthly", "월 주기 효과 (월초 증가)", 2, 0.1);
+  dataSlider("noise", "잡음 크기", 3, 0.1);
+  [["dMissing", "missing"], ["dOutliers", "outliers"], ["dMult", "mult"]].forEach(([id, k]) => check(id, () => S.data[k], v => { S.data[k] = v; S.csv = null; buildData(); }));
+  const setSeed = v => { S.data.seed = clamp(Math.round(v) || 1, 1, 9999); $("seed").value = S.data.seed; S.csv = null; buildData(); schedule(); };
+  $("seed").addEventListener("change", () => setSeed(+$("seed").value));
+  $("seedUp").onclick = () => setSeed(S.data.seed + 1); $("seedDown").onclick = () => setSeed(S.data.seed - 1);
+  $("dataReset").onclick = () => { S.data = { ...DATA_DEF }; S.csv = null; $("seed").value = 1; buildData(); schedule(); };
+  function parseCSV(txt) {
+    const rows = txt.trim().split(/\r?\n/).map(l => l.split(/[,\t;]/).map(s => s.trim().replace(/^"|"$/g, ""))); const out = new Map();
+    rows.forEach(r => { if (r.length < 2) return; const d = parseISO(r[0]), y = parseFloat(r[1]); if (isFinite(d) && isFinite(y)) out.set(d, y); });
+    const ds = [...out.keys()].sort((a, b) => a - b); return { ds, y: ds.map(d => out.get(d)) }; }
+  $("csvApply").onclick = () => { const r = parseCSV($("csvIn").value);
+    if (r.ds.length < 60) { $("csvMsg").textContent = `읽은 행이 ${r.ds.length}개입니다. 60행 이상 필요합니다.`; return; }
+    S.csv = r; S.fc.mode = "holdout"; buildData(); $("csvMsg").textContent = `${r.ds.length}행을 적용했습니다.`; schedule(); };
+  $("csvExample").onclick = () => { S.csv = null; S.fc.mode = "future"; buildData(); $("csvMsg").textContent = "예제 데이터로 돌아왔습니다."; schedule(); };
+  $("csvCopy").onclick = () => copyText("ds,y\n" + D.ds.map((d, i) => iso(d) + "," + D.y[i]).join("\n"), $("csvMsg"));
+  function renderDataInfo() {
+    const miss = (D.end - D.start + 1) - D.ds.length;
+    $("dataInfo").textContent = `${iso(D.start)} ~ ${iso(D.end)} · ${D.ds.length}행 · 결측 ${miss}일 · 평균 ${fmt(D.ymean, 1)}명/일${D.csv ? " · 붙여 넣은 데이터" : ""}`;
+    $("stTruth").disabled = !D.all;
+  }
+
+  /* ================= 1. 구성 요소로 쌓기 ================= */
+  function stages() { const sp = S.spec, st = [{ key: "trend", lbl: "추세 g(t)", cls: "tr", f: "g(t)" }];
+    if (sp.weekly.on) st.push({ key: "weekly", lbl: "+ 주간 계절성", cls: "wk", f: "s주간(t)" });
+    if (sp.yearly.on) st.push({ key: "yearly", lbl: "+ 연간 계절성", cls: "yr", f: "s연간(t)" });
+    if (sp.holOn && sp.holidays.some(h => h.on)) st.push({ key: "holidays", lbl: "+ 휴일 효과", cls: "ho", f: "h(t)" });
+    if (sp.custom[0].on) st.push({ key: "monthly", lbl: "+ 월 주기", cls: "mo", f: "s월(t)" });
+    return st; }
+  function stackLine(P, list, alpha) { const n = P.days.length, out = new Float64Array(n);
+    for (let i = 0; i < n; i++) { let s = 0; for (let j = 1; j < list.length; j++) { const g = P.groups[list[j].key]; if (g) s += (j === list.length - 1 ? alpha : 1) * g[i]; }
+      out[i] = P.mul ? P.trend[i] * (1 + s) : P.trend[i] + s; } return out; }
+  function histErr(P, line) { const ys = [], fs = []; D.ds.forEach((d, k) => { ys.push(D.y[k]); fs.push(line[d - P.a]); }); return errStats(ys, fs); }
+  function stGo(i, animate) { const st = stages(); const prev = Math.min(S.st.stage, st.length - 1); S.st.stage = clamp(i, 0, st.length - 1);
+    cancelAnimationFrame(S.st.raf);
+    if (animate && !reduceMotion && S.st.stage === prev + 1) { const t0 = performance.now(), dur = 520;
+      const tick = now => { S.st.alpha = Math.min(1, (now - t0) / dur); renderStack(S.st.alpha < 1); if (S.st.alpha < 1) S.st.raf = requestAnimationFrame(tick); };
+      S.st.alpha = 0; S.st.raf = requestAnimationFrame(tick); }
+    else { S.st.alpha = 1; renderStack(); } }
+  function stStop() { S.st.playing = false; clearTimeout(S.st.timer); $("stPlay").textContent = "재생"; }
+  function stPlay() { if (S.st.playing) { stStop(); return; } const st = stages(); S.st.playing = true; $("stPlay").textContent = "멈춤";
+    if (S.st.stage >= st.length - 1) stGo(0, false);
+    const gap = { slow: 1700, mid: 1100, fast: 600 }[S.st.speed];
+    const loop = () => { if (!S.st.playing) return; if (S.st.stage >= stages().length - 1) { stStop(); return; } stGo(S.st.stage + 1, true); S.st.timer = setTimeout(loop, gap); };
+    S.st.timer = setTimeout(loop, gap * 0.6); }
+  $("stFirst").onclick = () => { stStop(); stGo(0, false); };
+  $("stPrev").onclick = () => { stStop(); stGo(S.st.stage - 1, false); };
+  $("stNext").onclick = () => { stStop(); stGo(S.st.stage + 1, true); };
+  $("stPlay").onclick = stPlay;
+  seg("stSpeed", () => S.st.speed, v => S.st.speed = v);
+  seg("stView", () => S.st.view, v => S.st.view = v);
+  check("stTruth", () => S.truth, v => S.truth = v);
+  function renderStack(light) {
+    const st = stages(); S.st.stage = Math.min(S.st.stage, st.length - 1); const k = S.st.stage, K = pal(), mul = isMul();
+    const P = mainPred(0), cur = st.slice(0, k + 1), line = stackLine(P, cur, S.st.alpha);
+    $("stSteps").innerHTML = st.map((s, i) => `<li><button type="button" data-i="${i}" class="${i === k ? "on" : i < k ? "done" : ""}" aria-current="${i === k ? "step" : "false"}">${i + 1}. ${s.lbl}</button></li>`).join("");
+    $("stSteps").querySelectorAll("button").forEach(b => b.onclick = () => { stStop(); stGo(+b.dataset.i, +b.dataset.i === S.st.stage + 1); });
+    const terms = st.map((s, i) => `<span class="${s.cls} ${i <= k ? "on" : "off"}">${s.f}</span>`);
+    $("stFormula").innerHTML = "<span class=\"fc on\">ŷ(t)</span> = " + (mul ? terms[0] + " · (1 + " + (terms.slice(1).join(" + ") || "0") + ")" : terms.join(" + "))
+      + `\n<span class="off">${mul ? "승법 모드: 계절·휴일 성분은 추세에 대한 비율(%)" : "가법 모드: 모든 성분을 명(人) 단위로 더함"} · 지금 ${k + 1}/${st.length}단계</span>`;
+    const x0 = S.st.view === "all" ? D.start : D.end - 150, x1 = D.end + Math.min(S.horizon, S.st.view === "all" ? S.horizon : 60);
+    plot($("stMain"), { x: [x0, x1], yLabel: mul ? "명 (승법)" : "명",
+      layers: [{ type: "line", xs: D.days, ys: D.yFull, color: K.data, w: S.st.view === "all" ? 1 : 1.5, alpha: .7 },
+        { type: "line", xs: P.days, ys: line, color: K.fc, w: 2.2 }],
+      vlines: [{ x: D.end, color: K.muted, dash: [5, 4], label: "예측 시작" }],
+      hover: { xs: P.days, title: i => isoDow(P.days[i]), rows: [{ name: "원본", color: K.data, get: i => D.ymap.has(P.days[i]) ? D.ymap.get(P.days[i]) : NaN, fmt: v => fmt(v, 0) + "명" },
+        { name: "ŷ", color: K.fc, get: i => line[i], fmt: v => fmt(v, 1) + "명" }] } });
+    if (light) return;
+    const errs = st.map((s, i) => histErr(P, stackLine(P, st.slice(0, i + 1), 1))), e = errs[k];
+    $("stStats").innerHTML = statHTML([["학습 RMSE", fmt(e.rmse, 1)], ["학습 MAE", fmt(e.mae, 1)], ["학습 MAPE", fmt(e.mape * 100, 1) + "%"], ["관측 잡음 σ", fmt(mainFit().F.sigma * mainFit().M.yScale, 1)]]);
+    $("stTable").innerHTML = "<thead><tr><th>단계</th><th>성분</th><th class=\"n\">RMSE</th><th class=\"n\">MAE</th><th class=\"n\">MAPE</th></tr></thead><tbody>" +
+      st.map((s, i) => `<tr class="${i === k ? "me" : ""}"><td>${i + 1}</td><td>${s.lbl}</td><td class="n">${fmt(errs[i].rmse, 2)}</td><td class="n">${fmt(errs[i].mae, 2)}</td><td class="n">${fmt(errs[i].mape * 100, 2)}%</td></tr>`).join("") + "</tbody>";
+    renderComponents(P);
+  }
+  function renderComponents(Pm) {
+    const K = pal(), fit = mainFit(), F = fit.F, M = fit.M, mul = isMul(), yf = mul ? pctAxis : fmtAxis, uf = v => unitFmt(v, mul);
+    const ts = S.truth && D.all ? truthScale() : null;
+    const Pu = mainPred(300);
+    const trL = [{ type: "band", xs: Pu.days, lo: Pu.tlo, hi: Pu.thi, color: K.trend, alpha: .18 }, { type: "line", xs: Pu.days, ys: Pu.trend, color: K.trend, w: 2.2 }];
+    if (ts != null) trL.push({ type: "line", xs: Pu.days, ys: Pu.days.map(d => (D.truthAt(d) || {}).tr), color: K.truth, dash: [5, 4], w: 1.3, alpha: .8 });
+    plot($("cpTrend"), { x: [D.start, D.end + S.horizon], layers: trL, yLabel: "명", vlines: [{ x: D.end, color: K.muted, dash: [5, 4] }],
+      hover: { xs: Pu.days, title: i => iso(Pu.days[i]), rows: [{ name: "추세", color: K.trend, get: i => Pu.trend[i], fmt: v => fmt(v, 1) + "명" }, { name: "하한", color: K.trend, dot: false, get: i => Pu.tlo[i], fmt: v => fmt(v, 1) }, { name: "상한", color: K.trend, dot: false, get: i => Pu.thi[i], fmt: v => fmt(v, 1) }] } });
+    // 주간
+    const mon = dayOf(2025, 1, 6), wkDays = range(mon, mon + 6), wl = ["월", "화", "수", "목", "금", "토", "일"];
+    const wv = M.cols.some(c => c.group === "weekly") ? groupAt(F, c => c.group === "weekly", wkDays) : new Float64Array(7);
+    const wLay = [{ type: "bars", xs: [0, 1, 2, 3, 4, 5, 6], ys: [...wv], color: K.week, bw: 0.62 }];
+    if (ts != null) wLay.push({ type: "dots", xs: [0, 1, 2, 3, 4, 5, 6], ys: wkDays.map(d => GEN.week[dateOf(d).getUTCDay()] * S.data.weekly * ts), color: K.truth, r: 4, ring: K.surface });
+    plot($("cpWeek"), { x: [-0.6, 6.6], xTicks: catTicks(wl), noXGrid: true, layers: wLay, yFmt: yf, yLabel: mul ? "추세 대비 %" : "명",
+      hover: { xs: [0, 1, 2, 3, 4, 5, 6], title: i => wl[i] + "요일", rows: [{ name: "추정", color: K.week, get: i => wv[i], fmt: uf }].concat(ts != null ? [{ name: "숨은 정답", color: K.truth, get: i => GEN.week[(i + 1) % 7] * S.data.weekly * ts, fmt: uf }] : []) } });
+    // 연간
+    const y0 = dayOf(2025, 1, 1), yDays = range(y0, y0 + 364), yx = yDays.map(d => d - y0);
+    const yv = M.cols.some(c => c.group === "yearly") ? groupAt(F, c => c.group === "yearly", yDays) : new Float64Array(365);
+    const yLay = [{ type: "line", xs: yx, ys: yv, color: K.year, w: 2.2 }];
+    const yTruth = d => { const w = 2 * Math.PI / 365.25; return S.data.yearly * (14 * Math.cos(w * (d - dayOf(2023, 1, 15))) + 5 * Math.cos(2 * w * (d - dayOf(2023, 7, 25)))); };
+    if (ts != null) yLay.push({ type: "line", xs: yx, ys: yDays.map(d => yTruth(d) * ts), color: K.truth, dash: [5, 4], w: 1.3 });
+    const monthTicks = () => range(1, 12).map(m => ({ x: dayOf(2025, m, 1) - y0, label: m + "월" }));
+    plot($("cpYear"), { x: [0, 364], xTicks: monthTicks, layers: yLay, yFmt: yf, yLabel: mul ? "추세 대비 %" : "명",
+      hover: { xs: yx, title: i => md(yDays[i]), rows: [{ name: "추정", color: K.year, get: i => yv[i], fmt: uf }].concat(ts != null ? [{ name: "숨은 정답", color: K.truth, get: i => yTruth(yDays[i]) * ts, fmt: uf }] : []) } });
+    // 휴일
+    drawHolBars($("cpHol"), F, M, ts);
+    // 월 주기
+    const monOn = S.spec.custom[0].on; $("cpMonBox").hidden = !monOn;
+    if (monOn) { const P0 = S.spec.custom[0].period, md0 = dayOf(2025, 1, 1), mDays = range(md0, md0 + Math.floor(P0)), mx = mDays.map(d => d - md0);
+      const mv = groupAt(F, c => c.group === "monthly", mDays), mLay = [{ type: "line", xs: mx, ys: mv, color: K.mon, w: 2.2 }];
+      if (ts != null) mLay.push({ type: "line", xs: mx, ys: mDays.map(d => S.data.monthly * 8 * Math.cos(2 * Math.PI * (dateOf(d).getUTCDate() - 1) / 30.5) * ts), color: K.truth, dash: [5, 4], w: 1.3 });
+      plot($("cpMon"), { x: [0, mx[mx.length - 1]], xTicks: () => [0, 5, 10, 15, 20, 25, 30].filter(v => v <= P0).map(v => ({ x: v, label: v + "일" })), layers: mLay, yFmt: yf, yLabel: mul ? "추세 대비 %" : "명",
+        hover: { xs: mx, title: i => "주기 안 " + mx[i] + "일째", rows: [{ name: "추정", color: K.mon, get: i => mv[i], fmt: uf }] } }); }
+  }
+  function holCols(M) { return M.cols.map((c, j) => ({ c, j })).filter(e => e.c.kind === "hol"); }
+  function drawHolBars(cv, F, M, ts) {
+    const K = pal(), mul = isMul(), unit = mul ? 1 : M.yScale, hc = holCols(M);
+    if (!hc.length) { plot(cv, { x: [0, 1], y: [0, 1], xTicks: () => [], layers: [], hlines: [{ y: 0.5, color: K.faint, dash: [2, 3], label: "휴일 효과를 쓰지 않는 모형입니다" }] }); return; }
+    const xs = [], vals = [], cols = [], labels = [], groups = [], truth = []; let x = 0, prev = null, ga = 0;
+    hc.forEach((e, k) => { if (prev !== null && prev !== e.c.hol) { groups.push({ a: ga, b: x - 1, label: hname(prev), color: css(HOL_COLOR[prev]) }); x += 0.7; ga = x; }
+      prev = e.c.hol; xs.push(x); vals.push(F.th[2 + M.S + e.j] * unit); cols.push(css(HOL_COLOR[e.c.hol])); labels.push({ x, label: (e.c.off >= 0 ? "+" : "") + e.c.off });
+      truth.push(ts != null ? ((GEN.hol[e.c.hol] || {})[String(e.c.off)] || 0) * S.data.hol * ts : NaN); x += 1; });
+    groups.push({ a: ga, b: x - 1, label: hname(prev), color: css(HOL_COLOR[prev]) });
+    const lay = [{ type: "bars", xs, ys: vals, colors: cols, bw: 0.66 }];
+    if (ts != null) lay.push({ type: "dots", xs, ys: truth, color: K.truth, r: 3.6, ring: K.surface });
+    plot(cv, { x: [-0.7, x - 0.3], xTicks: () => labels, noXGrid: true, groups, layers: lay, yFmt: mul ? pctAxis : fmtAxis, yLabel: mul ? "추세 대비 %" : "명",
+      hover: { xs, title: i => M.cols[hc[i].j].label, rows: [{ name: "추정", color: cols[0], get: i => vals[i], fmt: v => unitFmt(v, mul) }].concat(ts != null ? [{ name: "숨은 정답", color: K.truth, get: i => truth[i], fmt: v => unitFmt(v, mul) }] : []) } });
+  }
+  const hname = key => (S.spec.holidays.find(h => h.key === key) || {}).name || key;
+
+  /* ================= 2. 추세와 변화점 ================= */
+  mkSlider("trSliders", { label: "changepoint_prior_scale τ", min: 0.001, max: 0.5, log: true, get: () => S.spec.cpScale, set: v => S.spec.cpScale = v, fmt: v => String(v) });
+  mkSlider("trSliders", { label: "n_changepoints (후보 수)", min: 0, max: 50, step: 1, get: () => S.spec.nCp, set: v => S.spec.nCp = v });
+  mkSlider("trSliders", { label: "changepoint_range (후보 구간)", min: 0.5, max: 1, step: 0.05, get: () => S.spec.cpRange, set: v => S.spec.cpRange = Math.round(v * 100) / 100, fmt: v => Math.round(v * 100) + "%" });
+  capSl = mkSlider("trSliders", { label: "cap 상한 (명/일, 로지스틱)", min: 100, max: 400, step: 1, get: () => S.spec.cap, set: v => { S.spec.cap = Math.max(v, S.spec.floor + 5); } });
+  floorSl = mkSlider("trSliders", { label: "floor 하한 (명/일, 로지스틱)", min: 0, max: 100, step: 1, get: () => S.spec.floor, set: v => { S.spec.floor = Math.min(v, S.spec.cap - 5); } });
+  seg("trGrowth", () => S.spec.growth, v => S.spec.growth = v);
+  document.querySelectorAll("[data-cps]").forEach(b => b.onclick = () => { S.spec.cpScale = +b.dataset.cps; syncAll(); schedule(); });
+  mkSlider("fanSliders", { label: "예측 기간 periods (일)", min: 14, max: 365, step: 1, get: () => S.horizon, set: v => S.horizon = v, fmt: v => v + "일" });
+  mkSlider("fanSliders", { label: "그릴 표본 경로 수", min: 5, max: 100, step: 5, get: () => S.fanN, set: v => S.fanN = v, fmt: v => v + "개" });
+  $("atSl").addEventListener("input", () => { S.atFrac = +$("atSl").value / 1000; renderAt(); });
+  $("fanResample").onclick = () => { S.fanSeed++; renderTrend(); };
+  function slopePerDay(M, th, nOn) { let k = th[0]; for (let j = 0; j < nOn; j++) k += th[2 + j]; return k * M.yScale / M.tScale; }
+  function logisticGammas(M, th) { const k = th[0], m = -th[1] / k, g = []; let kc = k, sumG = 0;
+    for (let j = 0; j < M.S; j++) { const kn = kc + th[2 + j]; const gj = (M.cpT[j] - m - sumG) * (1 - kc / kn); g.push(gj); sumG += gj; kc = kn; } return { m, g }; }
+  function renderTrend() {
+    const K = pal(), fit = mainFit(), M = fit.M, F = fit.F, P = mainPred(0), lg = M.logistic, sig = j => Math.abs(F.th[2 + j]) >= 0.01;
+    $("trCapLg").hidden = !lg; capSl.inp.disabled = !lg; floorSl.inp.disabled = !lg;
+    const nsig = M.cpDay.filter((d, j) => sig(j)).length, sumAbs = M.cpDay.reduce((a, d, j) => a + Math.abs(F.th[2 + j]), 0);
+    $("trFormula").innerHTML = lg
+      ? `g(t) = C / (1 + exp(−(k + a(t)ᵀδ)·(t − (m + a(t)ᵀγ))))      C = cap, γ는 곡선이 끊기지 않도록 정함\nt = (날짜 − ${iso(M.start)}) / ${M.tScale}일 ∈ [0, 1],   y는 (y − floor) / ${fmt(M.yScale, 0)} 로 축척\nδⱼ ~ Laplace(0, τ = ${S.spec.cpScale})  →  목적함수에 Σ|δⱼ| / τ 벌점`
+      : `g(t) = (k + a(t)ᵀδ)·t + (m + a(t)ᵀγ),   γⱼ = −sⱼ·δⱼ\nt = (날짜 − ${iso(M.start)}) / ${M.tScale}일 ∈ [0, 1],   y는 y / ${fmt(M.yScale, 0)} 로 축척 (y_scale = max|y|)\nδⱼ ~ Laplace(0, τ = ${S.spec.cpScale})  →  목적함수에 Σ|δⱼ| / τ 벌점 (τ가 작을수록 δ가 0으로 눌림)`;
+    const cpEnd = M.ds[Math.max(0, Math.floor(M.n * S.spec.cpRange) - 1)];
+    const lay = [{ type: "line", xs: D.days, ys: D.yFull, color: K.data, w: 1, alpha: .38 }];
+    if (S.truth && D.all) lay.push({ type: "line", xs: P.days, ys: P.days.map(d => (D.truthAt(d) || {}).tr), color: K.truth, dash: [5, 4], w: 1.3, alpha: .85 });
+    lay.push({ type: "line", xs: P.days, ys: P.trend, color: K.trend, w: 2.6 });
+    const vl = M.cpDay.map((d, j) => sig(j) ? { x: d, color: K.cp, dash: [5, 3], w: 1.6 } : { x: d, color: K.lineS, dash: [2, 3], w: 1 });
+    trAtLine = { x: 0, color: K.ink, w: 1.4, label: "t" };
+    vl.push(trAtLine);
+    const hl = lg ? [{ y: S.spec.cap, color: K.fc, label: "cap " + S.spec.cap }, { y: S.spec.floor, color: K.fc, label: "floor " + S.spec.floor }] : [];
+    plot($("trMain"), { x: [D.start, D.end + S.horizon], layers: lay, vlines: vl, hlines: hl, yInclude: lg ? [S.spec.cap, S.spec.floor] : [], yLabel: "명",
+      shades: [{ a: cpEnd, b: D.end, color: K.faint, alpha: .1, label: "변화점 후보 없음" }],
+      marks: S.truth && D.all && S.data.trend > 0 ? GEN.cp.map(x => ({ x, color: K.truth })) : [],
+      hover: { xs: P.days, title: i => iso(P.days[i]), rows: [{ name: "추세", color: K.trend, get: i => P.trend[i], fmt: v => fmt(v, 1) + "명" }] } });
+    const dl = M.cpDay.map((d, j) => F.th[2 + j]), bw = (D.end + S.horizon - D.start) / 90;
+    plot($("trDelta"), { x: [D.start, D.end + S.horizon], layers: [{ type: "bars", xs: M.cpDay, ys: dl, colors: dl.map((v, j) => sig(j) ? K.cp : K.trend), alphas: dl.map((v, j) => sig(j) ? 1 : .55), bw }],
+      hlines: [{ y: 0.01, color: K.faint, dash: [3, 3], w: 1 }, { y: -0.01, color: K.faint, dash: [3, 3], w: 1 }], yInclude: [0.02, -0.02], yFmt: v => fmtS(v, 2), padT: 8,
+      hover: { xs: M.cpDay, title: i => "변화점 " + (i + 1) + " · " + iso(M.cpDay[i]), rows: [{ name: "δ", color: K.trend, get: i => dl[i], fmt: v => fmt(v, 4) }, { name: "기울기 변화(명/일)", color: K.cp, dot: false, get: i => dl[i] * M.yScale / M.tScale, fmt: v => fmt(v, 3) }] } });
+    const stats = lg ? [["k (성장률)", fmt(F.th[0], 3)], ["m (중심 t)", fmt(-F.th[1] / F.th[0], 3)], ["의미 있는 변화점", nsig + " / " + M.S], ["Σ|δ|", fmt(sumAbs, 3)], ["cap", S.spec.cap + "명"]]
+      : [["k (축척)", fmt(F.th[0], 4)], ["m (축척)", fmt(F.th[1], 4)], ["처음 기울기", fmt(slopePerDay(M, F.th, 0), 3) + "명/일"], ["마지막 기울기", fmt(slopePerDay(M, F.th, M.S), 3) + "명/일"], ["의미 있는 변화점", nsig + " / " + M.S], ["Σ|δ|", fmt(sumAbs, 3)]];
+    $("trStats").innerHTML = statHTML(stats);
+    renderAt(); renderFan();
+  }
+  let trAtLine = null;
+  function renderAt() {
+    const fit = mainFit(), M = fit.M, F = fit.F, th = F.th, lg = M.logistic;
+    $("atSl").value = Math.round(S.atFrac * 1000);
+    const d = D.start + Math.round(S.atFrac * (D.end - D.start)), t = (d - M.start) / M.tScale, a = M.cpT.map(s => t >= s ? 1 : 0);
+    $("atLbl").textContent = isoDow(d) + " · t = " + fmt(t, 4);
+    if (trAtLine) { trAtLine.x = d; drawPlot($("trMain")); }
+    $("atCells").style.gridTemplateColumns = `repeat(${Math.max(1, M.S)}, 26px)`;
+    $("atCells").innerHTML = M.S ? a.map((v, j) => `<div class="c ${v ? "one" : ""} ${Math.abs(th[2 + j]) >= 0.01 ? "sig" : ""}" title="s${j + 1} = ${iso(M.cpDay[j])} (t=${fmt(M.cpT[j], 3)}), δ = ${fmt(th[2 + j], 4)}">${v}</div>`).join("") : `<div class="c">없음</div>`;
+    const on = a.reduce((s, v) => s + v, 0); let aD = 0, aG = 0; for (let j = 0; j < M.S; j++) if (a[j]) { aD += th[2 + j]; aG += -M.cpT[j] * th[2 + j]; }
+    if (!lg) { const g = (th[0] + aD) * t + (th[1] + aG);
+      $("atCalc").textContent = `a(t): 켜진 칸 ${on}개 / ${M.S}개\n기울기  k + a(t)ᵀδ = ${fmt(th[0], 4)} + (${fmt(aD, 4)}) = ${fmt(th[0] + aD, 4)}   → 하루 ${fmt((th[0] + aD) * M.yScale / M.tScale, 3)}명씩\n절편    m + a(t)ᵀγ = ${fmt(th[1], 4)} + (${fmt(aG, 4)}) = ${fmt(th[1] + aG, 4)}\ng(t) = ${fmt(th[0] + aD, 4)} × ${fmt(t, 4)} + ${fmt(th[1] + aG, 4)} = ${fmt(g, 4)}  →  × y_scale ${fmt(M.yScale, 0)} = ${fmt(g * M.yScale, 1)}명`; }
+    else { const LG = logisticGammas(M, th); let gs = 0; for (let j = 0; j < M.S; j++) if (a[j]) gs += LG.g[j]; const kk = th[0] + aD, mm = LG.m + gs, g = M.cap / (1 + Math.exp(-kk * (t - mm)));
+      $("atCalc").textContent = `a(t): 켜진 칸 ${on}개 / ${M.S}개\n성장률  k + a(t)ᵀδ = ${fmt(th[0], 4)} + (${fmt(aD, 4)}) = ${fmt(kk, 4)}\n중심    m + a(t)ᵀγ = ${fmt(LG.m, 4)} + (${fmt(gs, 4)}) = ${fmt(mm, 4)}\ng(t) = ${fmt(M.cap, 3)} / (1 + exp(−${fmt(kk, 4)} × (${fmt(t, 4)} − ${fmt(mm, 4)}))) = ${fmt(g, 4)}  →  × ${fmt(M.yScale, 0)} + floor ${M.floor} = ${fmt(g * M.yScale + M.floor, 1)}명`; }
+  }
+  function renderFan() {
+    const K = pal(), fit = mainFit(), M = fit.M, F = fit.F, a = Math.max(D.start, D.end - 365), b = D.end + S.horizon, days = range(a, b);
+    const TP = trendPaths(F, days, 400, 100 + S.fanSeed), n = days.length, lo = new Float64Array(n), hi = new Float64Array(n), mid = new Float64Array(n), col = new Float64Array(400);
+    for (let i = 0; i < n; i++) { for (let s = 0; s < 400; s++) col[s] = TP.paths[s][i]; col.sort(); lo[i] = quantile(col, 0.1); hi[i] = quantile(col, 0.9); mid[i] = quantile(col, 0.5); }
+    const hist = days.map((d, i) => d <= D.end ? TP.paths[0][i] : NaN), fut = TP.paths.slice(0, S.fanN).map(p => p.map((v, i) => days[i] >= D.end ? v : NaN));
+    plot($("trFan"), { x: [a, b], yLabel: "추세 (명)", layers: [{ type: "band", xs: days, lo: lo.map((v, i) => days[i] >= D.end ? v : NaN), hi: hi.map((v, i) => days[i] >= D.end ? v : NaN), color: K.fc, alpha: .2 },
+      { type: "paths", xs: days, ys: fut, color: K.fc, alpha: .32, w: 1 }, { type: "line", xs: days, ys: hist, color: K.trend, w: 2.6 }],
+      vlines: [{ x: D.end, color: K.muted, dash: [5, 4], label: "예측 시작" }],
+      hover: { xs: days, title: i => iso(days[i]), rows: [{ name: "추세(중앙)", color: K.trend, get: i => mid[i], fmt: v => fmt(v, 1) + "명" }, { name: "10%", color: K.fc, get: i => days[i] > D.end ? lo[i] : NaN, fmt: v => fmt(v, 1) }, { name: "90%", color: K.fc, get: i => days[i] > D.end ? hi[i] : NaN, fmt: v => fmt(v, 1) }] } });
+    const iH = n - 1, i30 = Math.min(n - 1, days.indexOf(D.end + 30)), exp = M.S * (TP.T - 1);
+    const cnt = TP.cps.reduce((s, c) => s + c.length, 0) / TP.cps.length;
+    $("fanStats").innerHTML = statHTML([["과거 변화점 수 S", M.S], ["미래 끝 t = T", fmt(TP.T, 3)], ["기대 미래 변화점 S·(T−1)", fmt(exp, 2)], ["표본 평균 개수", fmt(cnt, 2)], ["λ = 평균|δ|", fmt(TP.lam, 4)],
+      ["30일 뒤 80% 폭", i30 > 0 ? fmt(hi[i30] - lo[i30], 1) + "명" : "–"], [S.horizon + "일 뒤 80% 폭", fmt(hi[iH] - lo[iH], 1) + "명"]]);
+  }
+
+  /* ================= 3. 계절성: 푸리에 급수 ================= */
+  const SN = { weekly: { P: 7, max: 10, color: "--c-week", name: "주간" }, yearly: { P: 365.25, max: 40, color: "--c-year", name: "연간" }, monthly: { P: 30.5, max: 15, color: "--c-mon", name: "월 주기" } };
+  const snSeason = () => S.sn.target === "monthly" ? S.spec.custom[0] : S.spec[S.sn.target];
+  function buildSnSliders() { const host = $("snSliders"); host.innerHTML = ""; SNSL.length = 0;
+    mkSlider(host, { list: SNSL, label: "fourier_order N (" + SN[S.sn.target].name + ")", min: 1, max: SN[S.sn.target].max, step: 1, get: () => snSeason().order, set: v => { snSeason().order = v; S.sn.step = 99; } });
+    if (S.sn.target === "monthly") mkSlider(host, { list: SNSL, label: "period P (일)", min: 10, max: 60, step: 0.5, get: () => S.spec.custom[0].period, set: v => S.spec.custom[0].period = v, fmt: v => fmt(v, 1) });
+    mkSlider(host, { list: SNSL, label: "seasonality_prior_scale", min: 0.01, max: 10, log: true, get: () => S.spec.seasScale, set: v => S.spec.seasScale = v, fmt: v => String(v) });
+  }
+  seg("snTarget", () => S.sn.target, v => { S.sn.target = v; S.sn.step = 99; snStop(); buildSnSliders(); });
+  $("snOn").addEventListener("change", () => { snSeason().on = $("snOn").checked; S.sn.step = 99; schedule(); });
+  $("snAddMon").onclick = () => { const c = S.spec.custom[0]; c.on = !c.on; if (c.on) { S.sn.target = "monthly"; buildSnSliders(); } S.sn.step = 99; syncAll(); schedule(); };
+  seg("snMode", () => S.spec.mode, v => S.spec.mode = v);
+  check("snDataMult", () => S.data.mult, v => { S.data.mult = v; S.csv = null; buildData(); });
+  function snStop() { S.sn.playing = false; clearTimeout(S.sn.timer); $("snPlay").textContent = "재생"; }
+  function snGo(i) { const N = snSeason().order; S.sn.step = clamp(i, 1, N); renderSeasonTop(); }
+  $("snFirst").onclick = () => { snStop(); snGo(1); };
+  $("snPrev").onclick = () => { snStop(); snGo(Math.min(S.sn.step, snSeason().order) - 1); };
+  $("snNext").onclick = () => { snStop(); snGo(Math.min(S.sn.step, snSeason().order) + 1); };
+  $("snPlay").onclick = () => { if (S.sn.playing) { snStop(); return; } S.sn.playing = true; $("snPlay").textContent = "멈춤";
+    const N = snSeason().order; if (S.sn.step >= N) snGo(1);
+    const loop = () => { if (!S.sn.playing) return; if (S.sn.step >= snSeason().order) { snStop(); return; } snGo(S.sn.step + 1); S.sn.timer = setTimeout(loop, reduceMotion ? 1400 : 900); };
+    S.sn.timer = setTimeout(loop, 700); };
+  function snRef() { return S.sn.target === "weekly" ? dayOf(2025, 1, 6) : dayOf(2025, 1, 1); }
+  function snTicks() { const t = S.sn.target, r = snRef();
+    if (t === "weekly") return () => ["월", "화", "수", "목", "금", "토", "일", "월"].map((l, i) => ({ x: i, label: l }));
+    if (t === "yearly") return () => range(1, 12).map(m => ({ x: dayOf(2025, m, 1) - r, label: m + "월" }));
+    return () => [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60].filter(v => v <= S.spec.custom[0].period).map(v => ({ x: v, label: v + "일" })); }
+  function renderSeason() { renderSeasonTop(); renderOverfit(); renderMode(); }
+  function renderSeasonTop() {
+    const K = pal(), t = S.sn.target, info = SN[t], sea = snSeason(), P0 = t === "monthly" ? sea.period : info.P, N = sea.order, col = css(info.color), mul = isMul();
+    $("snOn").checked = sea.on; $("snOnLbl").textContent = t === "monthly" ? "모형에 사용 (add_seasonality)" : (t === "yearly" ? "yearly_seasonality 사용" : "weekly_seasonality 사용");
+    $("snAddMon").textContent = S.spec.custom[0].on ? "− 월 주기 계절성 빼기" : "+ 월 주기 계절성 추가 (add_seasonality)";
+    const step = Math.min(S.sn.step, N); S.sn.step = step;
+    $("snStepLbl").textContent = `항 ${step} / ${N} 더함`;
+    const fit = mainFit(), F = fit.F, M = fit.M, unit = mul ? 1 : M.yScale, ref = snRef();
+    const colsIdx = n => ({ s: M.cols.findIndex(c => c.group === t && c.kind === "sin" && c.n === n), c: M.cols.findIndex(c => c.group === t && c.kind === "cos" && c.n === n) });
+    const coef = range(1, N).map(n => { const ix = colsIdx(n); return { n, a: ix.c >= 0 ? F.th[2 + M.S + ix.c] * unit : 0, b: ix.s >= 0 ? F.th[2 + M.S + ix.s] * unit : 0 }; });
+    $("snFormula").innerHTML = `s(t) = Σ<sub>n=1..${N}</sub> [aₙ·cos(2πnt/${fmt(P0, P0 % 1 ? 2 : 0)}) + bₙ·sin(2πnt/${fmt(P0, P0 % 1 ? 2 : 0)})]   (t = 1970-01-01부터 일수, 특성 ${2 * N}개)\n` +
+      `지금 그린 합 = ` + coef.slice(0, Math.min(step, 4)).map(c => `<span class="${t === "weekly" ? "wk" : t === "yearly" ? "yr" : "mo"} on">${fmt(c.a, mul ? 4 : 2)}·cos${c.n > 1 ? "(" + c.n + "·)" : ""} + ${fmt(c.b, mul ? 4 : 2)}·sin${c.n > 1 ? "(" + c.n + "·)" : ""}</span>`).join(" + ") + (step > 4 ? " + …" : "") +
+      (sea.on ? "" : `\n<span class="off">이 계절성은 지금 모형에서 빠져 있어 계수가 0입니다. "사용"을 켜면 적합합니다.</span>`);
+    // ① 기저
+    const npt = t === "yearly" ? 365 : 240, xs = range(0, npt).map(i => i / npt * P0), rows = Math.min(N, 8);
+    const cv = $("snBasis"), R = fitCanvas(cv);
+    if (R) { const { ctx, w, h } = R, small = w < 480, padL = small ? 34 : 40, padR = 8, padT = 6, padB = small ? 22 : 24, rh = (h - padT - padB) / rows;
+      ctx.font = `${small ? 10.5 : 11.5}px ${K.mono}`; ctx.textBaseline = "middle"; ctx.textAlign = "right";
+      const sx = x => padL + x / P0 * (w - padL - padR);
+      for (let r = 0; r < rows; r++) { const n = r + 1, cy = padT + rh * (r + .5), amp = rh * 0.38, on = n <= step, cur = n === step;
+        if (cur) { ctx.fillStyle = col; ctx.globalAlpha = .1; ctx.fillRect(padL, padT + rh * r + 1, w - padL - padR, rh - 2); ctx.globalAlpha = 1; }
+        ctx.fillStyle = on ? K.ink : K.faint; ctx.fillText("n=" + n, padL - 4, cy);
+        ctx.strokeStyle = K.line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(padL, cy); ctx.lineTo(w - padR, cy); ctx.stroke();
+        [["sin", []], ["cos", [4, 3]]].forEach(([f, dash]) => { ctx.strokeStyle = on ? col : K.faint; ctx.globalAlpha = on ? (cur ? 1 : .7) : .45; ctx.lineWidth = cur ? 2 : 1.3; ctx.setLineDash(dash); ctx.beginPath();
+          xs.forEach((x, i) => { const v = featureValue({ kind: f, n, period: P0 }, ref + x); const X = sx(x), Y = cy - v * amp; if (i) ctx.lineTo(X, Y); else ctx.moveTo(X, Y); }); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }); }
+      ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillStyle = K.muted; let lastR = -1e9;
+      snTicks()().forEach(tk => { if (tk.x > P0 + 1e-9) return; const X = sx(tk.x), tw = ctx.measureText(tk.label).width; if (X - tw / 2 < lastR + 4) return; lastR = X + tw / 2; ctx.fillText(tk.label, X, h - padB + 5); });
+      cv._o = null; }
+    // ② 계수 곱한 항 + 누적 합
+    const term = (c, x) => c.a * featureValue({ kind: "cos", n: c.n, period: P0 }, ref + x) + c.b * featureValue({ kind: "sin", n: c.n, period: P0 }, ref + x);
+    const cum = xs.map(x => coef.slice(0, step).reduce((s, c) => s + term(c, x), 0)), full = xs.map(x => coef.reduce((s, c) => s + term(c, x), 0));
+    const lay = coef.slice(0, step).map((c, k) => ({ type: "line", xs, ys: xs.map(x => term(c, x)), color: col, w: k === step - 1 ? 1.8 : 1, alpha: k === step - 1 ? .75 : .32 }));
+    lay.push({ type: "line", xs, ys: full, color: K.ink, w: 1.3, dash: [5, 4], alpha: .7 }, { type: "line", xs, ys: cum, color: col, w: 3 });
+    const ts = S.truth && D.all ? truthScale() : null; let tr = null;
+    if (ts != null) { const f = t === "weekly" ? (x => GEN.week[dateOf(ref + Math.round(x)).getUTCDay()] * S.data.weekly) : t === "yearly" ? (x => { const w = 2 * Math.PI / 365.25, d = ref + x; return S.data.yearly * (14 * Math.cos(w * (d - dayOf(2023, 1, 15))) + 5 * Math.cos(2 * w * (d - dayOf(2023, 7, 25)))); }) : (x => S.data.monthly * 8 * Math.cos(2 * Math.PI * x / 30.5));
+      if (t === "weekly") { const ix = range(0, 7); tr = { xs: ix, ys: ix.map(x => f(x) * ts) }; lay.push({ type: "dots", xs: ix, ys: tr.ys, color: K.truth, r: 3.5, ring: K.surface }); }
+      else { tr = { xs, ys: xs.map(x => f(x) * ts) }; lay.push({ type: "line", xs, ys: tr.ys, color: K.truth, w: 1.3, dash: [2, 3] }); } }
+    if (t === "weekly") { const ix = range(0, 7); lay.push({ type: "dots", xs: ix, ys: ix.map(x => coef.slice(0, step).reduce((s, c) => s + term(c, x), 0)), color: col, r: 4, ring: K.surface }); }
+    plot($("snSum"), { x: [0, P0], xTicks: snTicks(), layers: lay, yFmt: mul ? pctAxis : fmtAxis, yLabel: mul ? "추세 대비 %" : "명",
+      hover: { xs, title: i => t === "weekly" ? ["월", "화", "수", "목", "금", "토", "일"][Math.floor(xs[i]) % 7] + "요일 +" + fmt(xs[i] % 1, 2) + "일" : (t === "yearly" ? md(ref + Math.round(xs[i])) : fmt(xs[i], 1) + "일째"),
+        rows: [{ name: `합 (n≤${step})`, color: col, get: i => cum[i], fmt: v => unitFmt(v, mul) }, { name: "전체 N항", color: K.ink, get: i => full[i], fmt: v => unitFmt(v, mul) }] } });
+    $("snLegend").innerHTML = `<span><i class="ln" style="border-color:${col};opacity:.5"></i>aₙcos + bₙsin (항별)</span><span><i class="ln" style="border-color:${col}"></i>n=1..${step} 누적 합</span><span><i class="ln dash" style="border-color:var(--ink)"></i>전체 ${N}항 합 (모형이 쓰는 값)</span>` + (ts != null ? `<span><i class="${t === "weekly" ? "dot" : "ln dash"}" style="${t === "weekly" ? "background" : "border-color"}:var(--c-truth)"></i>숨은 정답</span>` : "");
+    const notes = [];
+    if (t === "weekly" && N > 3) notes.push(`<b>일별 데이터에서 주간 N &gt; 3은 새 정보가 없습니다.</b> 정수 날짜에서는 sin(2π·4t/7) = −sin(2π·3t/7)처럼 n=4 이상이 n≤3 항과 겹칩니다(에일리어싱). 그래서 Prophet 기본값이 weekly_seasonality=3 입니다.`);
+    if (t === "yearly" && N >= 20) notes.push(`<b>N=${N}은 1년에 ${N}번까지 출렁일 수 있습니다.</b> 3년 남짓한 데이터에서는 명절·잡음까지 계절성으로 외워 과적합되기 쉽습니다(아래 학습·검증 오차 비교).`);
+    if (t === "monthly" && !S.spec.custom[0].on) notes.push(`월 주기 계절성은 아직 모형에 없습니다. 위의 <b>+ 월 주기 계절성 추가</b> 버튼은 <span class="pr-mono">m.add_seasonality(name="monthly", period=30.5, fourier_order=5)</span>와 같습니다. 데이터 패널의 "월 주기 효과"를 올리면 효과가 생깁니다.`);
+    if (N > rows) notes.unshift(`① 기저 그림에는 n=1~${rows}만 보입니다(n=${rows + 1}~${N} 생략). ② 합에는 모든 항이 들어갑니다.`);
+    $("snNote").hidden = !notes.length; $("snNote").innerHTML = notes.join("<br>");
+    $("snCoef").innerHTML = `<thead><tr><th>n</th><th class="n">aₙ (cos)</th><th class="n">bₙ (sin)</th><th class="n">진폭 √(a²+b²)</th></tr></thead><tbody>` +
+      coef.map(c => `<tr class="${c.n === step ? "me" : ""}"><td>${c.n}</td><td class="n">${fmt(c.a, mul ? 4 : 3)}</td><td class="n">${fmt(c.b, mul ? 4 : 3)}</td><td class="n">${unitFmt(Math.hypot(c.a, c.b), mul)}</td></tr>`).join("") + "</tbody>";
+  }
+  const OV_N = { weekly: [1, 2, 3, 4, 5, 6, 8, 10], yearly: [1, 2, 3, 5, 8, 10, 15, 20, 30, 40], monthly: [1, 2, 3, 5, 8, 10, 15] };
+  function renderOverfit() {
+    const t = S.sn.target, sea = snSeason(), K = pal(), list = OV_N[t], hold = 180, trainEnd = D.end - hold, cv = $("snOver");
+    if (!sea.on || D.ds.length < 400) { plot(cv, { x: [0, 1], y: [0, 1], xTicks: () => [], layers: [], hlines: [{ y: 0.5, color: K.faint, dash: [2, 3], label: sea.on ? "데이터가 짧아 비교할 수 없습니다" : "이 계절성을 모형에 넣으면 비교합니다" }] }); $("ovTxt").textContent = ""; $("ovProg").textContent = ""; return; }
+    const base = clone(S.spec), key = dataVer + "|ov|" + t + "|" + JSON.stringify(Object.assign(clone(base), { [t === "monthly" ? "custom" : t]: null }));
+    const tasks = list.map(N => () => { const sp = clone(base); if (t === "monthly") sp.custom[0].order = N; else sp[t].order = N;
+      const fit = getFit(sp, trainEnd), P = getPred(fit, D.start, D.end, 0), tr = [], tf = [], vy = [], vf = [];
+      D.ds.forEach((d, k) => { (d <= trainEnd ? tr : vy).push(D.y[k]); (d <= trainEnd ? tf : vf).push(P.yhat[d - D.start]); });
+      return { N, train: errStats(tr, tf).rmse, test: errStats(vy, vf).rmse }; });
+    const draw = job => { const R = job.results; $("ovProg").textContent = job.done ? "" : `계산 중 ${job.i}/${job.n}`; if (!R.length) return;
+      const xs = R.map(r => r.N), cur = sea.order, best = R.reduce((b, r) => r.test < b.test ? r : b, R[0]);
+      plot(cv, { x: [0, list[list.length - 1] + 1], xTicks: () => list.map(n => ({ x: n, label: String(n) })), yLabel: "RMSE (명)", noXGrid: true,
+        layers: [{ type: "line", xs, ys: R.map(r => r.train), color: K.data, w: 2 }, { type: "dots", xs, ys: R.map(r => r.train), color: K.data, r: 3 },
+          { type: "line", xs, ys: R.map(r => r.test), color: K.fc, w: 2 }, { type: "dots", xs, ys: R.map(r => r.test), color: K.fc, r: 3 }],
+        vlines: [{ x: cur, color: K.ink, w: 1.2, dash: [3, 3], label: "현재 N=" + cur }],
+        hover: { xs, title: i => "N = " + xs[i], rows: [{ name: "학습", color: K.data, get: i => R[i].train, fmt: v => fmt(v, 2) }, { name: "검증", color: K.fc, get: i => R[i].test, fmt: v => fmt(v, 2) }] } });
+      if (job.done) $("ovTxt").innerHTML = `검증 RMSE가 가장 작은 차수는 <b>N = ${best.N}</b> (${fmt(best.test, 2)}명). N=${R[R.length - 1].N}에서는 학습 ${fmt(R[R.length - 1].train, 2)} / 검증 ${fmt(R[R.length - 1].test, 2)}명.`; };
+    const job = runJob("over", key, tasks, j => { if (!$("pane-season").hidden) draw(j); }, j => { if (!$("pane-season").hidden) draw(j); });
+    if (job.results.length) draw(job);
+  }
+  function renderMode() {
+    const K = pal(), mul = isMul(), specs = { additive: Object.assign(clone(S.spec), { mode: "additive" }), multiplicative: Object.assign(clone(S.spec), { mode: "multiplicative" }) };
+    const first = range(dayOf(2023, 1, 2), dayOf(2023, 1, 29)).filter(d => d >= D.start && d <= D.end), lastEnd = D.end, last = range(lastEnd - 27, lastEnd);
+    const res = {};
+    Object.entries(specs).forEach(([m, sp]) => { const fit = getFit(sp), P = getPred(fit, D.start, D.end, 0);
+      const eff = days => { const s = new Array(7).fill(0), c = new Array(7).fill(0); days.forEach(d => { const i = d - D.start; if (i < 0 || i >= P.days.length) return; const wd = (dateOf(d).getUTCDay() + 6) % 7; const g = P.groups.weekly ? P.groups.weekly[i] : 0; s[wd] += P.mul ? P.trend[i] * g : g; c[wd]++; }); return s.map((v, k) => c[k] ? v / c[k] : NaN); };
+      const ys = [], fs = []; D.ds.forEach((d, k) => { ys.push(D.y[k]); fs.push(P.yhat[d - D.start]); });
+      res[m] = { f: eff(first.length ? first : range(D.start, D.start + 27)), l: eff(last), e: errStats(ys, fs) }; });
+    const r = res[S.spec.mode], wl = ["월", "화", "수", "목", "금", "토", "일"], x = [0, 1, 2, 3, 4, 5, 6];
+    plot($("snModeCv"), { x: [-0.6, 6.6], xTicks: catTicks(wl), noXGrid: true, yLabel: "요일 효과 (명) · " + (mul ? "승법 모형" : "가법 모형"),
+      layers: [{ type: "bars", xs: x, ys: r.f, color: K.week, alpha: .45, bw: 0.36, off: -0.5 }, { type: "bars", xs: x, ys: r.l, color: K.week, bw: 0.36, off: 0.5 }],
+      hover: { xs: x, title: i => wl[i] + "요일", rows: [{ name: "첫 4주", color: K.week, get: i => r.f[i], fmt: v => fmt(v, 1) + "명" }, { name: "마지막 4주", color: K.week, get: i => r.l[i], fmt: v => fmt(v, 1) + "명" }] } });
+    let truthRow = "";
+    if (D.all) { const tf = D.all[dayOf(2023, 1, 16) - GEN.start].tr, tl = D.all[D.end - 14 - GEN.start].tr, mon = GEN.week[1] * S.data.weekly;
+      truthRow = `<tr><td>숨은 정답 (${S.data.mult ? "승법" : "가법"} 생성)</td><td class="n">–</td><td class="n">${fmt(S.data.mult ? mon * tf / 110 : mon, 1)}</td><td class="n">${fmt(S.data.mult ? mon * tl / 110 : mon, 1)}</td><td></td></tr>`; }
+    $("snModeTbl").innerHTML = `<thead><tr><th>모형</th><th class="n">학습 RMSE</th><th class="n">월요일 효과 (첫 4주)</th><th class="n">월요일 효과 (마지막 4주)</th><th>사용 중</th></tr></thead><tbody>` +
+      ["additive", "multiplicative"].map(m => `<tr class="${m === S.spec.mode ? "me" : ""}"><td>${m === "additive" ? "가법 additive" : "승법 multiplicative"}</td><td class="n">${fmt(res[m].e.rmse, 2)}</td><td class="n">${fmt(res[m].f[0], 1)}</td><td class="n">${fmt(res[m].l[0], 1)}</td><td>${m === S.spec.mode ? "●" : ""}</td></tr>`).join("") + truthRow + "</tbody>";
+  }
+
+  /* ================= 4. 휴일·이벤트 효과 ================= */
+  function buildHolTable() {
+    const tb = $("hoTable"); tb.innerHTML = `<thead><tr><th>사용</th><th>holiday</th><th>ds (당일)</th><th>lower_window</th><th>upper_window</th><th class="n">특성 열</th></tr></thead><tbody></tbody>`;
+    const body = tb.querySelector("tbody");
+    S.spec.holidays.forEach(h => { const tr = document.createElement("tr");
+      tr.innerHTML = `<td><label class="sk-check"><input type="checkbox" aria-label="${h.name} 사용"></label></td><td><span class="pr-swatch" style="background:var(${HOL_COLOR[h.key]})"></span><b>${h.name}</b></td>
+        <td style="white-space:normal;min-width:180px">${h.dates.map(s => `<span class="pr-chip" data-d="${s}">${s}</span>`).join("")}</td><td class="lw"></td><td class="uw"></td><td class="n cols"></td>`;
+      body.appendChild(tr); const cb = tr.querySelector("input"); cb.checked = h.on; cb.addEventListener("change", () => { h.on = cb.checked; schedule(); }); SEG.push(() => { cb.checked = h.on; });
+      mkSlider(tr.querySelector(".lw"), { label: "전", aria: h.name + " lower_window", min: -3, max: 0, step: 1, get: () => h.lower, set: v => h.lower = v, fmt: v => String(v) });
+      mkSlider(tr.querySelector(".uw"), { label: "후", aria: h.name + " upper_window", min: 0, max: 3, step: 1, get: () => h.upper, set: v => h.upper = v, fmt: v => "+" + v }); });
+  }
+  check("hoOn", () => S.spec.holOn, v => S.spec.holOn = v);
+  mkSlider("hoSliders", { label: "holidays_prior_scale", min: 0.01, max: 10, log: true, get: () => S.spec.holScale, set: v => S.spec.holScale = v, fmt: v => String(v) });
+  $("hoOcc").addEventListener("change", () => { S.ho.occ = $("hoOcc").value; schedule(); });
+  function occList() { const out = []; S.spec.holidays.forEach(h => h.dates.forEach(s => { const d = parseISO(s); if (d >= D.start && d <= D.end) out.push({ v: h.key + "|" + s, d, label: `${s.slice(0, 4)} ${h.name} (${s.slice(5)})` }); })); return out.sort((a, b) => a.d - b.d); }
+  function renderHoliday() {
+    const K = pal(), fit = mainFit(), M = fit.M, F = fit.F, mul = isMul(), unit = mul ? 1 : M.yScale;
+    $("hoTable").querySelectorAll("tbody tr").forEach((tr, i) => { const h = S.spec.holidays[i]; tr.querySelector(".cols").textContent = h.on && S.spec.holOn ? (h.upper - h.lower + 1) + "개" : "–";
+      tr.querySelectorAll(".pr-chip").forEach(c => { const d = parseISO(c.dataset.d); c.classList.toggle("out", d < D.start || d > D.end); c.title = d > D.end ? "학습 기간 뒤(미래 예측에 쓰임)" : d < D.start ? "학습 기간 앞" : "학습 기간 안"; }); });
+    const occ = occList(); if (!occ.find(o => o.v === S.ho.occ) && occ.length) S.ho.occ = (occ.find(o => o.v.startsWith("seollal|2024")) || occ[0]).v;
+    $("hoOcc").innerHTML = occ.map(o => `<option value="${o.v}" ${o.v === S.ho.occ ? "selected" : ""}>${o.label}</option>`).join("");
+    const od = occ.length ? parseISO(S.ho.occ.split("|")[1]) : D.start + 30;
+    // 지시 행렬
+    const hc = holCols(M), rows = range(od - 4, od + 5);
+    const P = mainPred(0), hEff = d => P.groups.holidays ? P.groups.holidays[d - D.start] : 0;
+    $("hoInd").innerHTML = hc.length ? `<thead><tr><th>날짜</th><th>요일</th>${hc.map(e => `<th class="v" style="color:var(${HOL_COLOR[e.c.hol]})">${esc(hname(e.c.hol))}<span>${e.c.off >= 0 ? "+" : ""}${e.c.off}</span></th>`).join("")}<th class="n">y</th><th class="n">h(t)</th></tr></thead><tbody>` +
+      rows.map(d => { const any = hc.some(e => e.c.set.has(d)); return `<tr class="${any ? "hd" : ""}"><td class="pr-mono">${iso(d).slice(5)}</td><td>${DOW[dateOf(d).getUTCDay()]}</td>${hc.map(e => `<td class="dot ${e.c.set.has(d) ? "on" : ""}">${e.c.set.has(d) ? "●" : "·"}</td>`).join("")}<td class="n">${D.ymap.has(d) ? D.ymap.get(d) : "–"}</td><td class="n">${d <= D.end + S.horizon && d >= D.start ? unitFmt(hEff(d), mul) : "–"}</td></tr>`; }).join("") + "</tbody>"
+      : `<tbody><tr><td>휴일 효과를 쓰지 않는 모형입니다. 위에서 "휴일 효과 사용"을 켜세요.</td></tr></tbody>`;
+    drawHolBars($("hoCoef"), F, M, S.truth && D.all ? truthScale() : null);
+    $("hoLegend").innerHTML = S.spec.holidays.filter(h => h.on).map(h => `<span><i style="background:var(${HOL_COLOR[h.key]})"></i>${h.name}</span>`).join("") + (D.all ? `<span><i class="dot" style="background:var(--c-truth)"></i>숨은 정답</span>` : "") + `<span>단위: ${mul ? "추세 대비 %" : "명"}</span>`;
+    // 넣기 전/후
+    const fit0 = getFit(Object.assign(clone(S.spec), { holOn: false })), P0 = getPred(fit0, D.start, D.end, 0), P1 = getPred(fit, D.start, D.end, 0);
+    const near = new Set(); S.spec.holidays.forEach(h => h.dates.forEach(s => { const d = parseISO(s); for (let o = -2; o <= 3; o++) near.add(d + o); }));
+    const day0 = new Set(S.spec.holidays.flatMap(h => h.dates.map(parseISO)));
+    const summ = Pp => { const a = [[], []], b = [[], []], c = [[], []]; let bias = 0, nb = 0, mx = 0;
+      D.ds.forEach((d, k) => { const f = Pp.yhat[d - D.start], y = D.y[k]; a[0].push(y); a[1].push(f); if (near.has(d)) { b[0].push(y); b[1].push(f); mx = Math.max(mx, Math.abs(y - f)); } if (day0.has(d)) { bias += y - f; nb++; } });
+      return { all: errStats(a[0], a[1]).rmse, near: errStats(b[0], b[1]).rmse, mx, bias: nb ? bias / nb : NaN }; };
+    const s0 = summ(P0), s1 = summ(P1);
+    $("hoCmp").innerHTML = `<thead><tr><th>모형</th><th class="n">전체 RMSE</th><th class="n">명절 주변 RMSE</th><th class="n">명절 주변 최대 오차</th><th class="n">명절 당일 평균 잔차 (y − ŷ)</th></tr></thead><tbody>` +
+      `<tr><td>휴일 없이</td><td class="n">${fmt(s0.all, 2)}</td><td class="n">${fmt(s0.near, 2)}</td><td class="n">${fmt(s0.mx, 1)}</td><td class="n">${fmt(s0.bias, 1)}</td></tr>` +
+      `<tr class="me"><td>휴일 넣고 (현재 설정)</td><td class="n">${fmt(s1.all, 2)}</td><td class="n">${fmt(s1.near, 2)}</td><td class="n">${fmt(s1.mx, 1)}</td><td class="n">${fmt(s1.bias, 1)}</td></tr></tbody>`;
+    const a = Math.max(D.start, od - 14), b = Math.min(D.end, od + 14), win = [];
+    S.spec.holidays.forEach(h => { if (!h.on || !S.spec.holOn) return; h.dates.forEach(s => { const d = parseISO(s); if (d + h.upper >= a && d + h.lower <= b) win.push({ a: d + h.lower - 0.5, b: d + h.upper + 0.5, color: css(HOL_COLOR[h.key]), alpha: .14 }); }); });
+    const dd = range(a, b);
+    plot($("hoZoom"), { x: [a, b], yLabel: "명", shades: win,
+      layers: [{ type: "line", xs: D.days, ys: D.yFull, color: K.data, w: 1.6 }, { type: "dots", xs: D.days, ys: D.yFull, color: K.data, r: 2.4 },
+        { type: "line", xs: P0.days, ys: P0.yhat, color: K.act, w: 1.8, dash: [5, 4] }, { type: "line", xs: P1.days, ys: P1.yhat, color: K.fc, w: 2.2 }],
+      hover: { xs: dd, title: i => isoDow(dd[i]), rows: [{ name: "원본", color: K.data, get: i => D.ymap.has(dd[i]) ? D.ymap.get(dd[i]) : NaN, fmt: v => fmt(v, 0) + "명" },
+        { name: "휴일 없이", color: K.act, get: i => P0.yhat[dd[i] - D.start], fmt: v => fmt(v, 1) }, { name: "휴일 넣고", color: K.fc, get: i => P1.yhat[dd[i] - D.start], fmt: v => fmt(v, 1) }] } });
+  }
+
+  /* ================= 5. 예측 · 교차검증 ================= */
+  seg("fcMode", () => S.fc.mode, v => S.fc.mode = v);
+  seg("fcView", () => S.fc.view, v => S.fc.view = v);
+  check("fc95", () => S.show95, v => S.show95 = v);
+  mkSlider("fcSliders", { label: "예측 기간 h (periods, 일)", min: 14, max: 365, step: 1, get: () => S.horizon, set: v => S.horizon = v, fmt: v => v + "일" });
+  mkSlider("fcSliders", { label: "interval_width (예측 구간)", min: 0.5, max: 0.95, step: 0.05, get: () => S.width, set: v => S.width = Math.round(v * 100) / 100, fmt: v => Math.round(v * 100) + "%" });
+  mkSlider("cvSliders", { label: "initial (첫 학습 길이)", min: 180, max: 900, step: 15, get: () => S.cv.initial, set: v => S.cv.initial = v, fmt: v => v + "일" });
+  mkSlider("cvSliders", { label: "period (컷오프 간격)", min: 7, max: 180, step: 1, get: () => S.cv.period, set: v => S.cv.period = v, fmt: v => v + "일" });
+  mkSlider("cvSliders", { label: "horizon (예측 거리)", min: 7, max: 180, step: 1, get: () => S.cv.horizon, set: v => S.cv.horizon = v, fmt: v => v + "일" });
+  seg("cvMetric", () => S.cv.metric, v => S.cv.metric = v);
+  function renderForecast() { renderFcMain(); renderCV(); renderTune(); }
+  function renderFcMain() {
+    const K = pal(), h = S.horizon, hold = S.fc.mode === "holdout", trainEnd = hold ? D.end - h : D.end;
+    if (hold && trainEnd - D.start < 120) { $("fcStats").innerHTML = statHTML([["안내", "학습 기간이 너무 짧습니다"]]); return; }
+    const fit = getFit(S.spec, hold ? trainEnd : null), P = getPred(fit, D.start, trainEnd + h, 300);
+    const test = hold ? D.ds.map((d, k) => ({ d, y: D.y[k] })).filter(r => r.d > trainEnd) : D.fut.filter(r => r.d <= trainEnd + h).map(r => ({ d: r.d, y: r.y }));
+    const trainY = D.days.map((d, i) => d <= trainEnd ? D.yFull[i] : NaN), x0 = S.fc.view === "all" ? D.start : Math.max(D.start, trainEnd - 365);
+    const futMask = (arr) => P.days.map((d, i) => d >= trainEnd ? arr[i] : NaN);
+    const lay = [];
+    if (S.show95) lay.push({ type: "band", xs: P.days, lo: futMask(P.lo95), hi: futMask(P.hi95), color: K.fc, alpha: .13 });
+    lay.push({ type: "band", xs: P.days, lo: futMask(P.lo), hi: futMask(P.hi), color: K.fc, alpha: .26 });
+    lay.push({ type: "line", xs: D.days, ys: trainY, color: K.data, w: 1.3 });
+    if (test.length) lay.push({ type: "line", xs: test.map(r => r.d), ys: test.map(r => r.y), color: K.act, w: 1.5, dash: [4, 3] });
+    lay.push({ type: "line", xs: P.days, ys: P.days.map((d, i) => d <= trainEnd ? P.yhat[i] : NaN), color: K.fc, w: 1.2, alpha: .55 });
+    lay.push({ type: "line", xs: P.days, ys: futMask(P.yhat), color: K.fc, w: 2.4 });
+    const tmap = new Map(test.map(r => [r.d, r.y]));
+    $("fcBandLbl").textContent = Math.round(S.width * 100) + "% 예측 구간" + (S.show95 ? " · 연한 음영 95%" : "");
+    plot($("fcMain"), { x: [x0, trainEnd + h], layers: lay, yLabel: "명", vlines: [{ x: trainEnd, color: K.muted, dash: [2, 3], w: 1.5, label: hold ? "검증 시작" : "예측 시작" }],
+      hover: { xs: P.days, title: i => isoDow(P.days[i]), rows: [{ name: "학습", color: K.data, get: i => P.days[i] <= trainEnd && D.ymap.has(P.days[i]) ? D.ymap.get(P.days[i]) : NaN, fmt: v => fmt(v, 0) },
+        { name: "실제", color: K.act, get: i => tmap.has(P.days[i]) ? tmap.get(P.days[i]) : NaN, fmt: v => fmt(v, 0) }, { name: "yhat", color: K.fc, get: i => P.yhat[i], fmt: v => fmt(v, 1) },
+        { name: "하한", color: K.fc, dot: false, get: i => P.days[i] > trainEnd ? P.lo[i] : NaN, fmt: v => fmt(v, 1) }, { name: "상한", color: K.fc, dot: false, get: i => P.days[i] > trainEnd ? P.hi[i] : NaN, fmt: v => fmt(v, 1) }] } });
+    // 평가
+    const tr = D.ds.map((d, k) => ({ d, y: D.y[k] })).filter(r => r.d <= trainEnd), tmapT = new Map(tr.map(r => [r.d, r.y]));
+    let sc = 0, nsc = 0; tr.forEach(r => { if (tmapT.has(r.d - 7)) { sc += Math.abs(r.y - tmapT.get(r.d - 7)); nsc++; } }); sc = nsc ? sc / nsc : NaN;
+    const lastY = tr[tr.length - 1].y, snaive = d => { let k = Math.ceil((d - trainEnd) / 7); while (k < 60) { const v = tmapT.get(d - 7 * k); if (v != null) return v; k++; } return lastY; };
+    const iw = P.days.map((d, i) => d > trainEnd ? P.hi[i] - P.lo[i] : NaN).filter(isFinite);
+    if (!test.length) {
+      $("fcStats").innerHTML = statHTML([["예측 기간", h + "일"], ["평균 구간 폭", fmt(iw.reduce((a, b) => a + b, 0) / iw.length, 1) + "명"], ["마지막 날 yhat", fmt(P.yhat[P.yhat.length - 1], 1) + "명"]]);
+      $("fcTbl").innerHTML = `<tbody><tr><td>붙여 넣은 데이터에는 실제 미래값이 없습니다. "마지막 h일 떼어 검증"으로 바꾸면 오차를 계산합니다.</td></tr></tbody>`; return; }
+    const ys = test.map(r => r.y), at = r => r.d - D.start;
+    const models = [["나이브 (마지막 값 유지)", test.map(() => lastY)], ["계절 나이브 (7일 전 값)", test.map(r => snaive(r.d))], ["Prophet 추세 g(t)만", test.map(r => P.trend[at(r)])], ["Prophet (현재 설정)", test.map(r => P.yhat[at(r)])]];
+    const ev = models.map(([n, f]) => ({ n, e: errStats(ys, f) })), cov = test.filter(r => r.y >= P.lo[at(r)] && r.y <= P.hi[at(r)]).length / test.length, pe = ev[3].e;
+    $("fcStats").innerHTML = statHTML([["MAE", fmt(pe.mae, 1)], ["RMSE", fmt(pe.rmse, 1)], ["MAPE", fmt(pe.mape * 100, 1) + "%"], ["sMAPE", fmt(pe.smape * 100, 1) + "%"], ["MASE", fmt(pe.mae / sc, 2)],
+      [Math.round(S.width * 100) + "% 구간 포함률", fmt(cov * 100, 0) + "%"], ["평균 구간 폭", fmt(iw.reduce((a, b) => a + b, 0) / iw.length, 1) + "명"]]);
+    const best = ev.reduce((b, e) => e.e.rmse < b.e.rmse ? e : b, ev[0]);
+    $("fcTbl").innerHTML = `<thead><tr><th>모형 (${hold ? "마지막 " + h + "일 검증" : "숨겨 둔 실제 미래 " + test.length + "일"})</th><th class="n">MAE</th><th class="n">RMSE</th><th class="n">MAPE</th><th class="n">sMAPE</th><th class="n">MASE</th></tr></thead><tbody>` +
+      ev.map(e => `<tr class="${e === best ? "me" : ""}"><td>${e.n}${e === best ? " · 최저" : ""}</td><td class="n">${fmt(e.e.mae, 2)}</td><td class="n">${fmt(e.e.rmse, 2)}</td><td class="n">${fmt(e.e.mape * 100, 2)}%</td><td class="n">${fmt(e.e.smape * 100, 2)}%</td><td class="n">${fmt(e.e.mae / sc, 3)}</td></tr>`).join("") + "</tbody>";
+  }
+  function cvKey() { return dataVer + "|cv|" + JSON.stringify(S.spec) + "|" + S.cv.initial + "|" + S.cv.period + "|" + S.cv.horizon + "|" + S.width; }
+  function cvTasks(spec, cuts, samples, collect) { return cuts.map((c, ci) => () => {
+    const fit = getFit(spec, c), te = [], tey = []; D.ds.forEach((d, i) => { if (d > c && d <= c + S.cv.horizon) { te.push(d); tey.push(D.y[i]); } });
+    const P = predict(fit.F, te, samples ? { samples, width: S.width, seed: 11 + ci } : {});
+    return te.map((d, i) => ({ ci, cutoff: c, d, h: d - c, y: tey[i], yhat: P.yhat[i], lo: P.lo ? P.lo[i] : NaN, hi: P.hi ? P.hi[i] : NaN })); }); }
+  $("cvRun").onclick = () => { if (jobs.cv) jobs.cv.cancel = true; delete jobs.cv; renderCV(true); };
+  function renderCV(force) {
+    const K = pal(), cuts = cvCutoffs(D.ds, S.cv.initial, S.cv.period, S.cv.horizon);
+    if (!cuts.length) { $("cvProg").textContent = "컷오프가 없습니다: initial + horizon이 데이터 길이보다 깁니다."; return; }
+    const key = cvKey(), J = jobs.cv;
+    const draw = job => { $("cvProg").textContent = job.done ? `컷오프 ${cuts.length}개 · 예측 ${job.results.flat().length}행` : `적합 중 ${job.i}/${job.n}`;
+      const H = S.cv.horizon, n = cuts.length, hrows = [];
+      cuts.forEach((c, i) => { hrows.push({ y: n - i, a: D.start, b: c, color: K.data, alpha: .55 }, { y: n - i, a: c, b: Math.min(D.end, c + H), color: K.fc }); });
+      plot($("cvGrid"), { x: [D.start, D.end], y: [0.3, n + 0.7], yt: range(1, n), yFmt: v => "#" + (n - v + 1), padL: 40, layers: [{ type: "hbars", n, rows: hrows }],
+        hover: { xs: cuts, title: i => `#${i + 1} 컷오프 ${iso(cuts[i])} → ${iso(Math.min(D.end, cuts[i] + H))}까지 예측`, rows: [] } });
+      const rows = job.results.flat(); if (!rows.length) return;
+      const pm = perfMetrics(rows), met = S.cv.metric, mv = pm[met], mul = met === "mape" || met === "coverage";
+      const raw = met === "coverage" ? null : rows.map(r => met === "mape" ? Math.abs((r.y - r.yhat) / r.y) : Math.abs(r.y - r.yhat));
+      $("cvCurveTitle").textContent = "예측 거리별 " + { mape: "MAPE", rmse: "RMSE", mae: "MAE", coverage: Math.round(S.width * 100) + "% 구간 포함률" }[met];
+      const lay2 = []; if (raw) lay2.push({ type: "dots", xs: rows.map(r => r.h), ys: raw, color: K.act, r: 1.6, alpha: .35, noScale: met === "rmse" });
+      lay2.push({ type: "line", xs: pm.h, ys: mv, color: K.fc, w: 2.4 });
+      plot($("cvCurve"), { x: [0, S.cv.horizon + 1], xTicks: (a, b, small) => yTicks(1, S.cv.horizon, small ? 4 : 6).filter(v => v >= 1).map(v => ({ x: v, label: v + "일" })), layers: lay2, yFmt: mul ? pctAxis : fmtAxis,
+        yInclude: met === "coverage" ? [0, 1, S.width] : [0], hlines: met === "coverage" ? [{ y: S.width, color: K.muted, dash: [4, 3], label: "목표 " + Math.round(S.width * 100) + "%" }] : [],
+        y: met === "mape" ? [0, Math.max(...mv) * 1.6] : null,
+        hover: { xs: pm.h, title: i => "horizon " + pm.h[i] + "일", rows: [{ name: met.toUpperCase(), color: K.fc, get: i => mv[i], fmt: v => mul ? fmt(v * 100, 2) + "%" : fmt(v, 2) }] } });
+      const pick = [7, 14, 30, 60, 90, 120, 180].filter(v => v <= S.cv.horizon), at = v => { let b = 0; pm.h.forEach((x, i) => { if (Math.abs(x - v) < Math.abs(pm.h[b] - v)) b = i; }); return b; };
+      $("cvTbl").innerHTML = `<thead><tr><th>horizon</th><th class="n">RMSE</th><th class="n">MAE</th><th class="n">MAPE</th><th class="n">coverage</th></tr></thead><tbody>` +
+        (pick.length ? pick : [S.cv.horizon]).map(v => { const i = at(v); return `<tr><td>${pm.h[i]}일</td><td class="n">${fmt(pm.rmse[i], 2)}</td><td class="n">${fmt(pm.mae[i], 2)}</td><td class="n">${fmt(pm.mape[i] * 100, 2)}%</td><td class="n">${fmt(pm.coverage[i] * 100, 1)}%</td></tr>`; }).join("") +
+        `</tbody><caption class="pr-sub" style="caption-side:bottom;text-align:left;padding-top:6px">rolling_window = 0.1 → 이동 평균에 ${pm.w}행씩 사용 (performance_metrics 와 같은 계산)</caption>`;
+    };
+    if (J && J.key === key && !J.cancel) { draw(J); return; }
+    const tasks = cvTasks(clone(S.spec), cuts, 100);
+    runJob("cv", key, tasks, j => { if (!$("pane-forecast").hidden) draw(j); }, j => { if (!$("pane-forecast").hidden) draw(j); });
+    draw(jobs.cv);
+  }
+  const TU = { cps: [0.001, 0.01, 0.1, 0.5], sps: [0.01, 0.1, 1, 10] };
+  let tuBest = null;
+  $("tuRun").onclick = () => {
+    const cuts = cvCutoffs(D.ds, S.cv.initial, S.cv.period, S.cv.horizon); if (!cuts.length) { $("tuProg").textContent = "컷오프가 없습니다."; return; }
+    const tasks = []; TU.cps.forEach(a => TU.sps.forEach(b => { const sp = Object.assign(clone(S.spec), { cpScale: a, seasScale: b }); cvTasks(sp, cuts, 0).forEach(t => tasks.push(() => ({ a, b, rows: t() }))); }));
+    if (jobs.tune) jobs.tune.cancel = true; delete jobs.tune;
+    runJob("tune", tuKey(), tasks, j => { if (!$("pane-forecast").hidden) renderTune(); }, j => { if (!$("pane-forecast").hidden) renderTune(); });
+    renderTune(); };
+  $("tuApply").onclick = () => { if (!tuBest) return; S.spec.cpScale = tuBest.a; S.spec.seasScale = tuBest.b; syncAll(); schedule(); };
+  function tuKey() { const sp = clone(S.spec); delete sp.cpScale; delete sp.seasScale; return dataVer + "|tu|" + JSON.stringify(sp) + "|" + S.cv.initial + "|" + S.cv.period + "|" + S.cv.horizon; }
+  function renderTune() {
+    const J = jobs.tune; tuBest = null; $("tuApply").disabled = true;
+    if (!J || J.key !== tuKey()) { $("tuTbl").innerHTML = ""; $("tuTxt").textContent = `버튼을 누르면 16개 조합 × 컷오프 수만큼 적합합니다${mainFit().M.logistic || isMul() ? " (로지스틱·승법은 시간이 더 걸립니다)" : ""}.`; $("tuProg").textContent = J && J.key !== tuKey() ? "설정이 바뀌었습니다. 다시 실행하세요." : ""; return; }
+    $("tuProg").textContent = J.done ? "완료" : `적합 중 ${J.i}/${J.n}`;
+    const agg = {}; J.results.forEach(r => { const k = r.a + "|" + r.b; (agg[k] = agg[k] || []).push(...r.rows); });
+    const cell = {}; Object.entries(agg).forEach(([k, rows]) => { const e = errStats(rows.map(r => r.y), rows.map(r => r.yhat)); cell[k] = e; });
+    const vals = Object.values(cell).map(e => e.rmse), lo = Math.min(...vals), hi = Math.max(...vals), nCut = cvCutoffs(D.ds, S.cv.initial, S.cv.period, S.cv.horizon).length;
+    if (J.done) { let b = null; Object.entries(cell).forEach(([k, e]) => { if (!b || e.rmse < b.e.rmse) b = { k, e }; }); const [a, s] = b.k.split("|").map(Number); tuBest = { a, b: s, e: b.e }; $("tuApply").disabled = false; }
+    $("tuTbl").innerHTML = `<thead><tr><th>cps ＼ sps</th>${TU.sps.map(s => `<th class="n">${s}</th>`).join("")}</tr></thead><tbody>` +
+      TU.cps.map(a => `<tr><th>${a}</th>${TU.sps.map(s => { const e = cell[a + "|" + s]; if (!e) return `<td class="v">…</td>`; const t = hi > lo ? (e.rmse - lo) / (hi - lo) : 0;
+        const isB = tuBest && tuBest.a === a && tuBest.b === s, isCur = S.spec.cpScale === a && S.spec.seasScale === s;
+        return `<td class="v ${isB ? "best" : ""}" style="background:color-mix(in srgb, var(--c-fc) ${Math.round(6 + t * 44)}%, var(--surface))" title="MAPE ${fmt(e.mape * 100, 2)}%">${fmt(e.rmse, 2)}${isCur ? " ◀" : ""}<br><span class="pr-sub">${fmt(e.mape * 100, 1)}%</span></td>`; }).join("")}</tr>`).join("") + "</tbody>";
+    $("tuTxt").innerHTML = tuBest ? `칸 위 = 전체 RMSE, 아래 = MAPE (컷오프 ${nCut}개 · horizon ${S.cv.horizon}일). 최적: <b>changepoint_prior_scale = ${tuBest.a}, seasonality_prior_scale = ${tuBest.b}</b> (RMSE ${fmt(tuBest.e.rmse, 2)}). ◀ = 현재 설정. 차이가 작다면 기본값을 그대로 써도 됩니다.` : "";
+  }
+
+  /* ================= 6. 코드 ================= */
+  check("codeReg", () => S.code.reg, v => S.code.reg = v);
+  check("codeTune", () => S.code.tune, v => S.code.tune = v);
+  check("codeKr", () => S.code.kr, v => S.code.kr = v);
+  $("codeCopy").onclick = () => copyText($("codeOut").textContent, $("codeMsg"));
+  function genCode() {
+    const sp = S.spec, lg = sp.growth === "logistic", hols = sp.holOn ? sp.holidays.filter(h => h.on) : [], L = [], cust = sp.custom[0];
+    const win = (o, lower) => o === 0 ? "당일만" : lower ? `${-o}일 전부터` : `${o}일 뒤까지`;
+    L.push("import itertools", "import pandas as pd", "from prophet import Prophet", "from prophet.diagnostics import cross_validation, performance_metrics", "from prophet.plot import add_changepoints_to_plot, plot_cross_validation_metric");
+    if (S.code.kr && hols.length) L.push("import holidays as kr_holidays   # pip install holidays");
+    L.push("", "# 1) 데이터: ds(날짜) · y(값) 두 열 — 일별 응급실 내원 환자 수", 'df = pd.read_csv("er_daily_visits.csv", parse_dates=["ds"])');
+    if (!S.csv && S.data.missing) L.push("# 결측일(전산 장애 기간)은 행이 없거나 y=NaN 이면 적합에서 자동으로 빠집니다");
+    if (!S.csv && S.data.outliers) L.push('# 이상값은 y를 None 으로 바꾸는 편이 안전합니다. 예: df.loc[df["ds"] == "2024-11-20", "y"] = None');
+    if (lg) L.push(`df["cap"] = ${sp.cap}     # 상한: 응급실이 하루에 받을 수 있는 최대 환자 수`, `df["floor"] = ${sp.floor}`);
+    if (S.code.reg) L.push('df["temp"] = ...       # 외부 변수(일 평균 기온) — 미래 기간 값도 필요합니다');
+    if (hols.length) {
+      L.push("", "# 2) 한국 공휴일 데이터프레임: holiday, ds, lower_window, upper_window");
+      if (S.code.kr) {
+        L.push(`kr = kr_holidays.KR(years=range(2023, 2028))`, "def holiday_df(name, label, lower, upper):", "    days = [d for d, n in kr.items() if n == name]",
+          '    return pd.DataFrame({"holiday": label, "ds": pd.to_datetime(days), "lower_window": lower, "upper_window": upper})', "");
+        const kn = { seollal: "설날", chuseok: "추석", xmas: "기독탄신일" };
+        hols.forEach(h => L.push(`${h.key} = holiday_df("${kn[h.key]}", "${h.name}", ${h.lower}, ${h.upper})`));
+      } else hols.forEach(h => { L.push(`${h.key} = pd.DataFrame({`, `    "holiday": "${h.name}",`, `    "ds": pd.to_datetime([${h.dates.map(s => `"${s}"`).join(", ")}]),`,
+        `    "lower_window": ${h.lower},   # ${win(h.lower, true)}`, `    "upper_window": ${h.upper},   # ${win(h.upper, false)}`, "})"); });
+      L.push(`holidays = pd.concat([${hols.map(h => h.key).join(", ")}], ignore_index=True)`, '# 공휴일 전체를 한꺼번에 넣으려면: m.add_country_holidays(country_name="KR")');
+    }
+    const args = [`growth="${sp.growth}"`, `n_changepoints=${sp.nCp}`, `changepoint_range=${sp.cpRange}`, `changepoint_prior_scale=${sp.cpScale}`, `seasonality_mode="${sp.mode}"`,
+      `yearly_seasonality=${sp.yearly.on ? sp.yearly.order : "False"}`, `weekly_seasonality=${sp.weekly.on ? sp.weekly.order : "False"}`, "daily_seasonality=False", `seasonality_prior_scale=${Number(sp.seasScale).toFixed(Math.max(1, (String(sp.seasScale).split(".")[1] || "").length))}`];
+    if (hols.length) args.push("holidays=holidays", `holidays_prior_scale=${Number(sp.holScale).toFixed(Math.max(1, (String(sp.holScale).split(".")[1] || "").length))}`);
+    args.push(`interval_width=${S.width}`);
+    L.push("", "# 3) 모형: y(t) = g(t) + s(t) + h(t) + ε", "m = Prophet(", ...args.map(a => "    " + a + ","), ")");
+    if (cust.on) L.push(`m.add_seasonality(name="monthly", period=${cust.period}, fourier_order=${cust.order})`);
+    if (S.code.reg) L.push('m.add_regressor("temp")');
+    L.push("m.fit(df)", "", `# 4) 예측: ${S.horizon}일 뒤까지`, `future = m.make_future_dataframe(periods=${S.horizon})`);
+    if (lg) L.push(`future["cap"] = ${sp.cap}`, `future["floor"] = ${sp.floor}`);
+    if (S.code.reg) L.push('future["temp"] = ...   # 미래 기온 예보 값');
+    L.push("forecast = m.predict(future)", 'print(forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail())', "",
+      "fig1 = m.plot(forecast)", "add_changepoints_to_plot(fig1.gca(), m, forecast)   # 빨간 선 = |δ| ≥ 0.01 변화점", "fig2 = m.plot_components(forecast)   # 추세 · 휴일 · 주간 · 연간 성분",
+      "print(m.params[\"delta\"].round(4))   # 변화점별 기울기 변화량 δ", "",
+      "# 5) 교차검증", `df_cv = cross_validation(m, initial="${S.cv.initial} days", period="${S.cv.period} days", horizon="${S.cv.horizon} days")`,
+      "df_p = performance_metrics(df_cv)   # rolling_window=0.1", 'print(df_p[["horizon", "rmse", "mae", "mape", "coverage"]].head())', 'fig3 = plot_cross_validation_metric(df_cv, metric="mape")');
+    if (S.code.tune) {
+      const base = args.filter(a => !/^changepoint_prior_scale|^seasonality_prior_scale|^interval_width/.test(a));
+      L.push("", "# 6) 하이퍼파라미터 격자 탐색", "param_grid = {", '    "changepoint_prior_scale": [0.001, 0.01, 0.1, 0.5],', '    "seasonality_prior_scale": [0.01, 0.1, 1.0, 10.0],', "}",
+        "all_params = [dict(zip(param_grid, v)) for v in itertools.product(*param_grid.values())]", "rmses = []", "for params in all_params:",
+        "    mt = Prophet(" + base.join(", ") + ", **params)");
+      if (cust.on) L.push(`    mt.add_seasonality(name="monthly", period=${cust.period}, fourier_order=${cust.order})`);
+      if (S.code.reg) L.push('    mt.add_regressor("temp")');
+      L.push("    mt.fit(df)", `    cv = cross_validation(mt, initial="${S.cv.initial} days", period="${S.cv.period} days", horizon="${S.cv.horizon} days", parallel="processes")`,
+        '    rmses.append(performance_metrics(cv, rolling_window=1)["rmse"].values[0])', "tuning = pd.DataFrame(all_params)", 'tuning["rmse"] = rmses', 'print(tuning.sort_values("rmse").head())');
+    }
+    return L.join("\n");
+  }
+  function renderCode() { $("codeOut").textContent = genCode(); }
+
+  /* ================= 탭 · 렌더링 ================= */
+  const tabs = [...document.querySelectorAll(".sk-tab")];
+  const activeTab = () => (tabs.find(b => b.getAttribute("aria-selected") === "true") || tabs[0]).id.replace("tab-", "");
+  function show(t) {
+    tabs.forEach(b => { const on = b === t; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1; $(b.getAttribute("aria-controls")).hidden = !on; });
+    history.replaceState(null, "", "#" + t.id.replace("tab-", "")); stStop(); snStop(); render();
+  }
+  tabs.forEach((b, i) => { b.addEventListener("click", () => show(b));
+    b.addEventListener("keydown", e => { const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return;
+      const n = tabs[(i + d + tabs.length) % tabs.length]; show(n); n.focus(); e.preventDefault(); }); });
+  document.addEventListener("keydown", e => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return; const tg = e.target;
+    if (tg && (/^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName) || tg.getAttribute("role") === "tab" || tg.isContentEditable)) return;
+    const d = e.key === "ArrowRight" ? 1 : -1, t = activeTab();
+    if (t === "stack") { stStop(); stGo(S.st.stage + d, d > 0); e.preventDefault(); }
+    else if (t === "season") { snStop(); snGo(Math.min(S.sn.step, snSeason().order) + d); e.preventDefault(); }
+  });
+  let rq = 0; function schedule() { if (rq) return; rq = requestAnimationFrame(() => { rq = 0; render(); }); }
+  function render() {
+    renderDataInfo(); syncAll();
+    const t = activeTab();
+    try { ({ stack: renderStack, trend: renderTrend, season: renderSeason, holiday: renderHoliday, forecast: renderForecast, code: renderCode })[t](); }
+    catch (err) { console.error(err); }
+  }
+  function redrawAll() { document.querySelectorAll("canvas.pr-cv").forEach(cv => { if (cv._o && cv.offsetParent) drawPlot(cv); }); if (activeTab() === "season") renderSeasonTop(); }
+  new MutationObserver(redrawAll).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  if (window.matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener("change", redrawAll);
+  let rz = 0; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(render, 120); });
+
+  /* ================= 시작 ================= */
+  buildSnSliders();
+  buildHolTable();
+  buildData();
+  const start = $("tab-" + location.hash.slice(1)); if (start) show(start); else render();
+})();
+</script>
+</body>
+</html>

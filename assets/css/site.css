@@ -25,6 +25,7 @@
   --cat-nn: #7C3AED;
   --cat-cv: #0D9488;
   --cat-nlp: #2F6FDB;
+  --cat-ts: #2B8A3E;
 
   --sans: "IBM Plex Sans KR", "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --mono: "IBM Plex Mono", "D2Coding", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
@@ -44,7 +45,7 @@
     --bg: #0F1319; --surface: #171C25; --surface-2: #1E2430; --ink: #E7EAF1; --text: #CDD3DE;
     --muted: #A0A8B8; --faint: #737D90; --line: #2B3240; --line-strong: #3B4454; --on-ink: #10131A;
     --accent: #6C9BF2; --accent-soft: #1B2A45; --focus: #6C9BF2;
-    --cat-ml: #F0874A; --cat-nn: #B294FF; --cat-cv: #33D1BD; --cat-nlp: #6C9BF2;
+    --cat-ml: #F0874A; --cat-nn: #B294FF; --cat-cv: #33D1BD; --cat-nlp: #6C9BF2; --cat-ts: #51CF66;
     --shadow: 0 1px 2px rgba(0, 0, 0, .3); --shadow-lift: 0 10px 28px rgba(0, 0, 0, .45);
   }
 }
@@ -53,7 +54,7 @@
   --bg: #0F1319; --surface: #171C25; --surface-2: #1E2430; --ink: #E7EAF1; --text: #CDD3DE;
   --muted: #A0A8B8; --faint: #737D90; --line: #2B3240; --line-strong: #3B4454; --on-ink: #10131A;
   --accent: #6C9BF2; --accent-soft: #1B2A45; --focus: #6C9BF2;
-  --cat-ml: #F0874A; --cat-nn: #B294FF; --cat-cv: #33D1BD; --cat-nlp: #6C9BF2;
+  --cat-ml: #F0874A; --cat-nn: #B294FF; --cat-cv: #33D1BD; --cat-nlp: #6C9BF2; --cat-ts: #51CF66;
   --shadow: 0 1px 2px rgba(0, 0, 0, .3); --shadow-lift: 0 10px 28px rgba(0, 0, 0, .45);
 }
 

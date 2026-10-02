@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="assets/css/site.css?v=20260930c">
+<link rel="stylesheet" href="assets/css/site.css?v=20261002a">
 <style>
 /* ---------- 메인 페이지 전용 ---------- */
 .home { max-width: var(--max); width: 100%; margin: 0 auto; padding: 0 var(--gutter) 56px; }
@@ -25,7 +25,7 @@
 .stat span { font-size: 13px; color: var(--muted); font-weight: 600; }
 
 /* 탭 */
-.tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 6px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; }
+.tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; padding: 6px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; }
 .tab {
   appearance: none; font: inherit; cursor: pointer; border: 1px solid transparent; background: transparent; color: var(--muted);
   border-radius: 10px; padding: 11px 14px; display: flex; align-items: center; justify-content: center; gap: 9px;
@@ -85,7 +85,7 @@
 @media (max-width: 900px) {
   .intro { grid-template-columns: minmax(0, 1fr); padding-top: 32px; }
   .intro__title { font-size: 32px; }
-  .tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 520px) {
   .intro__title { font-size: 27px; }
@@ -115,6 +115,7 @@
       <a href="#nn" style="--c:var(--cat-nn)">신경망</a>
       <a href="#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
       <a href="#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+      <a href="#ts" style="--c:var(--cat-ts)">시계열 분석</a>
     </nav>
     <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
   </div>
@@ -129,7 +130,7 @@
     </div>
     <div class="intro__stats" aria-label="요약">
       <div class="stat"><b id="statSims">0</b><span>시뮬레이터</span></div>
-      <div class="stat"><b id="statCats">4</b><span>분야</span></div>
+      <div class="stat"><b id="statCats">5</b><span>분야</span></div>
     </div>
   </section>
 
@@ -150,8 +151,8 @@
   </div>
 </footer>
 
-<script src="assets/js/catalog.js?v=20260930c"></script>
-<script src="assets/js/site.js?v=20260930c"></script>
+<script src="assets/js/catalog.js?v=20261002a"></script>
+<script src="assets/js/site.js?v=20261002a"></script>
 <script>
 (function () {
   var CATS = window.DS_CATEGORIES, SIMS = window.DS_SIMULATORS;
@@ -317,6 +318,25 @@
       '<circle cx="74" cy="50" r="32" fill="var(--cat-nlp)" opacity=".25" stroke="var(--cat-nlp)" stroke-width="1.6"/><circle cx="116" cy="50" r="32" fill="var(--cat-ml)" opacity=".25" stroke="var(--cat-ml)" stroke-width="1.6"/>' +
       '<path d="M95 26 A32 32 0 0 1 95 74 A32 32 0 0 1 95 26Z" fill="currentColor" opacity=".45"/>' +
       '<text x="58" y="55" font-size="15" fill="currentColor" font-family="sans-serif" font-weight="700">A</text><text x="124" y="55" font-size="15" fill="currentColor" font-family="sans-serif" font-weight="700">B</text></svg>',
+    ts: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true"><path d="M16 88h160M16 88V10" stroke="var(--faint)" stroke-width="1.4"/>' +
+      '<path d="M18 70 L30 58 L42 66 L54 50 L66 58 L78 44 L90 52 L102 36 L114 46" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/>' +
+      '<path d="M114 46 L126 30 L138 40 L150 24 L162 34 L174 18" stroke="currentColor" stroke-width="2.4" stroke-dasharray="5 4"/>' +
+      '<path d="M114 46 L126 22 L138 30 L150 12 L162 22 L174 6 L174 30 L162 46 L150 36 L138 50 L126 38 Z" fill="currentColor" opacity=".15"/>' +
+      '<path d="M114 10V88" stroke="var(--faint)" stroke-width="1.2" stroke-dasharray="3 3"/></svg>',
+    ets: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true"><path d="M16 88h160" stroke="var(--faint)" stroke-width="1.4"/>' +
+      [0, 1, 2, 3, 4, 5, 6, 7].map(function (i) { var h = [10, 13, 18, 24, 31, 40, 52, 66][i]; return '<rect x="' + (20 + i * 12) + '" y="' + (88 - h) + '" width="8" height="' + h + '" rx="2" fill="currentColor" opacity="' + (0.25 + i * 0.09) + '"/>'; }).join("") +
+      '<path d="M120 58 C 132 40, 140 66, 150 48 S 166 40, 176 36" stroke="var(--cat-ml)" stroke-width="2.4"/><path d="M120 10V88" stroke="var(--faint)" stroke-width="1.2" stroke-dasharray="3 3"/></svg>',
+    arima: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true"><path d="M16 50h160" stroke="var(--faint)" stroke-width="1.2"/>' +
+      [1, .72, .5, .34, .22, .14, .08, .04, .02].map(function (v, i) { return '<rect x="' + (20 + i * 17) + '" y="' + (50 - v * 40) + '" width="9" height="' + (v * 40) + '" rx="2" fill="currentColor" opacity=".8"/>'; }).join("") +
+      [.6, -.35, .12, 0, 0, 0, 0, 0, 0].map(function (v, i) { var h = Math.abs(v) * 40; return h ? '<rect x="' + (31 + i * 17) + '" y="' + (v > 0 ? 50 - h : 50) + '" width="5" height="' + h + '" rx="1.5" fill="var(--cat-ml)"/>' : ''; }).join("") +
+      '<rect x="14" y="40" width="166" height="20" fill="currentColor" opacity=".08"/></svg>',
+    rolling: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      [0, 1, 2, 3, 4].map(function (r) { var tr = 50 + r * 20; return '<rect x="16" y="' + (10 + r * 17) + '" width="' + tr + '" height="11" rx="3" fill="var(--cat-nlp)" opacity=".7"/><rect x="' + (18 + tr) + '" y="' + (10 + r * 17) + '" width="22" height="11" rx="3" fill="var(--cat-ml)" opacity=".85"/>'; }).join("") +
+      '<path d="M150 18 C 168 40, 168 60, 150 84" stroke="var(--faint)" stroke-width="1.6"/><path d="M146 80 l4 5 5-3" stroke="var(--faint)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    prophet: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      '<path d="M16 76 L70 62 L176 30" stroke="currentColor" stroke-width="2.6"/><path d="M70 14V90" stroke="var(--cat-ml)" stroke-width="1.4" stroke-dasharray="3 3"/>' +
+      '<path d="M16 46 C 24 34, 32 34, 40 46 S 56 58, 64 46 S 80 34, 88 46 S 104 58, 112 46 S 128 34, 136 46 S 152 58, 160 46 S 172 38, 176 42" stroke="var(--cat-nn)" stroke-width="1.8" opacity=".85"/>' +
+      [44, 124].map(function (x) { return '<rect x="' + x + '" y="72" width="8" height="18" rx="2" fill="var(--cat-ml)" opacity=".8"/>'; }).join("") + '</svg>',
     cv: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
       (function () { var s = ""; for (var r = 0; r < 5; r++) for (var c = 0; c < 5; c++) s += '<rect x="' + (20 + c * 15) + '" y="' + (13 + r * 15) + '" width="14" height="14" fill="currentColor" opacity="' + (0.1 + ((r * 7 + c * 3) % 9) / 12).toFixed(2) + '"/>'; return s; })() +
       '<rect x="34" y="27" width="44" height="44" stroke="var(--ink)" stroke-width="2"/><path d="M100 50h14" stroke="var(--faint)" stroke-width="2"/>' +

@@ -1,0 +1,1433 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>롤링 예측 시뮬레이터 (Time Shift · Walk-forward) | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261002a">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261002a">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 파랑 = 학습 구간·특성 / 주황 = 예측·목표·평가(test) / 회색 = 실제 미래 / 빨강 = 누수 / 초록 = 올바른 방법 / 보라 = 롤링 창·직접 전략 / 청록 = 달력 특성·다중 출력 */
+:root{ --sk-accent: var(--cat-ts);
+  --c-train:#2563EB; --c-fc:#EA580C; --c-leak:#DC2626; --c-ok:#15803D; --c-cv:#7C3AED; --c-mo:#0D9488; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --c-train:#6AA5FF; --c-fc:#FF914D; --c-leak:#FF6B6B; --c-ok:#4ADE80; --c-cv:#B294FF; --c-mo:#33D1BD; } }
+:root[data-theme="dark"]{ --c-train:#6AA5FF; --c-fc:#FF914D; --c-leak:#FF6B6B; --c-ok:#4ADE80; --c-cv:#B294FF; --c-mo:#33D1BD; }
+
+.rp-train{color:var(--c-train)} .rp-fc{color:var(--c-fc)} .rp-leak{color:var(--c-leak)} .rp-ok{color:var(--c-ok)} .rp-cv{color:var(--c-cv)} .rp-mo{color:var(--c-mo)}
+.rp-kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--ink)}
+.rp-note-leak{border-left-color:var(--c-leak);background:color-mix(in srgb,var(--c-leak) 8%,var(--surface))}
+.rp-note-ok{border-left-color:var(--c-ok);background:color-mix(in srgb,var(--c-ok) 8%,var(--surface))}
+.rp-note-fc{border-left-color:var(--c-fc);background:color-mix(in srgb,var(--c-fc) 8%,var(--surface))}
+.rp-cv-canvas{display:block;width:100%;max-width:100%}
+.rp-legend i.ln{height:3px;width:16px;border-radius:2px;vertical-align:3px}
+.rp-legend i.dash{height:0;width:16px;border-top:2px dashed var(--muted);border-radius:0;vertical-align:3px;background:none}
+.rp-legend i.band{opacity:.35}
+.rp-row{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+@media (max-width:1080px){.rp-row{grid-template-columns:minmax(0,1fr)}}
+.rp-info{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:9px;min-width:0}
+.rp-info h3{margin:0;font-size:14.5px}
+.rp-info p{margin:0;font-size:13px;color:var(--muted)}
+.rp-info .sk-kv{font-size:13px}
+.rp-info .sk-kv dd{overflow-wrap:anywhere}
+.rp-info .sk-formula{font-size:12.5px;background:var(--surface);white-space:pre-wrap;overflow-wrap:anywhere}
+.rp-cap{margin:0;min-height:3.1em;font-size:14.5px;line-height:1.6}
+.rp-cap b{color:var(--ink)}
+.rp-cap code,.rp-lead code,.sk-note code,.rp-info code{font-family:var(--mono);font-size:.92em;background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:0 4px;color:var(--ink)}
+.rp-opts .sk-slider{min-width:150px}
+.rp-opts label.rp-sel{display:inline-flex;align-items:center;gap:6px}
+.rp-err{font-family:var(--mono);font-size:13px;border:1.5px solid var(--c-leak);color:var(--c-leak);background:color-mix(in srgb,var(--c-leak) 8%,var(--surface));border-radius:8px;padding:9px 12px;overflow-wrap:anywhere;margin:0}
+.rp-msg{font-size:13px;color:var(--muted);min-height:1.2em}
+.rp-msg.bad{color:var(--c-leak)}
+
+/* ---------- 데이터 카드 ---------- */
+.rp-data{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:12px 20px;align-items:start}
+@media (max-width:1000px){.rp-data{grid-template-columns:minmax(0,1fr)}}
+.rp-data textarea{width:100%;min-height:150px;font-family:var(--mono);font-size:12.5px;resize:vertical}
+details.rp-more{font-size:13.5px;color:var(--muted)}
+details.rp-more summary{cursor:pointer;font-weight:600;color:var(--ink)}
+details.rp-more summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+details.rp-more[open] summary{margin-bottom:8px}
+.rp-seed{width:84px}
+
+/* ---------- 1. Time Shift 표 ---------- */
+.rp-tbl{width:auto;min-width:100%}
+.rp-tbl th,.rp-tbl td{padding:0 8px;height:30px;line-height:1.15}
+.rp-tbl thead th{height:auto;padding:5px 8px;vertical-align:bottom;z-index:2}
+.rp-tbl th .cd{display:block;font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--faint)}
+.rp-tbl td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.rp-tbl td.dt{font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+.rp-tbl td.dt.we{color:var(--c-fc)}
+.rp-tbl th.g-y{box-shadow:inset 0 3px 0 var(--ink)}
+.rp-tbl th.g-lag{box-shadow:inset 0 3px 0 var(--c-train)}
+.rp-tbl th.g-roll{box-shadow:inset 0 3px 0 var(--c-cv)}
+.rp-tbl th.g-cal{box-shadow:inset 0 3px 0 var(--c-mo)}
+.rp-tbl th.g-tgt{box-shadow:inset 0 3px 0 var(--c-fc)}
+.rp-tbl td.na{color:var(--c-leak);font-weight:700;background:color-mix(in srgb,var(--c-leak) 14%,var(--surface))}
+.rp-tbl td.cal0{color:var(--faint)}
+.rp-tbl td.tg{background:color-mix(in srgb,var(--c-fc) 7%,var(--surface))}
+.rp-tbl td.tg.na{background:color-mix(in srgb,var(--c-leak) 14%,var(--surface))}
+.rp-tbl tr.hasna td:first-child{box-shadow:inset 3px 0 0 var(--c-leak)}
+.rp-tbl tbody tr{cursor:pointer}
+.rp-tbl tbody tr:hover td{background-image:linear-gradient(color-mix(in srgb,var(--ink) 4%,transparent),color-mix(in srgb,var(--ink) 4%,transparent))}
+.rp-tbl tbody tr:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.rp-tbl tr.sel td{box-shadow:inset 0 0 0 9999px color-mix(in srgb,var(--sk-accent) 9%,transparent)}
+.rp-tbl tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--sk-accent),inset 0 0 0 9999px color-mix(in srgb,var(--sk-accent) 9%,transparent)}
+.rp-tbl td.srcf{outline:2px solid var(--c-train);outline-offset:-3px;border-radius:4px}
+.rp-tbl td.srct{outline:2px solid var(--c-fc);outline-offset:-3px;border-radius:4px}
+.rp-tbl td.srcl{outline:2px solid var(--c-leak);outline-offset:-3px;border-radius:4px;background:color-mix(in srgb,var(--c-leak) 12%,var(--surface))}
+.rp-tbl tr.gone td{animation:rp-gone .7s ease-in forwards}
+.rp-tbl .in{display:inline-block;animation:rp-slide .75s cubic-bezier(.3,.7,.3,1)}
+.rp-tbl .fadein{display:inline-block;animation:rp-fade .6s ease-out}
+@keyframes rp-slide{from{transform:translateY(var(--dy));opacity:.35}to{transform:none;opacity:1}}
+@keyframes rp-fade{from{opacity:0}to{opacity:1}}
+@keyframes rp-gone{0%{opacity:1}100%{opacity:.08;text-decoration:line-through}}
+.rp-dir{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:14px;align-items:center}
+@media (max-width:900px){.rp-dir{grid-template-columns:minmax(0,1fr)}}
+.rp-svg{width:100%;max-width:470px}
+.rp-svg svg{display:block;width:100%;height:auto}
+.rp-svg .cell{fill:var(--surface);stroke:var(--line-strong);stroke-width:1.2}
+.rp-svg .cell.na{fill:color-mix(in srgb,var(--c-leak) 16%,var(--surface));stroke:var(--c-leak)}
+.rp-svg .cell.f{stroke:var(--c-train);stroke-width:1.6}
+.rp-svg .cell.t{stroke:var(--c-fc);stroke-width:1.6}
+.rp-svg .tx{font-family:var(--mono);font-size:11px;fill:var(--ink);text-anchor:middle;dominant-baseline:middle}
+.rp-svg .tx.na{fill:var(--c-leak);font-weight:700}
+.rp-svg .hd{font-family:var(--mono);font-size:11px;font-weight:600;fill:var(--ink);text-anchor:middle}
+.rp-svg .lb{font-family:var(--sans);font-size:11.5px;font-weight:700;text-anchor:middle}
+.rp-svg .lb.f{fill:var(--c-train)} .rp-svg .lb.t{fill:var(--c-fc)}
+.rp-svg .ar{fill:none;stroke-width:1.8}
+.rp-svg .ar.f{stroke:var(--c-train)} .rp-svg .ar.t{stroke:var(--c-fc)}
+.rp-svg .ah.f{fill:var(--c-train)} .rp-svg .ah.t{fill:var(--c-fc)}
+.rp-leakgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:900px){.rp-leakgrid{grid-template-columns:minmax(0,1fr)}}
+.rp-flowcard{border:2px solid var(--r);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0;background:color-mix(in srgb,var(--r) 4%,var(--surface))}
+.rp-flowcard h3{margin:0;font-size:15px;color:var(--r)}
+.rp-flowcard .sk-formula{background:var(--surface)}
+.rp-flowcard .rp-tbl{min-width:0;width:100%}
+.rp-big{font-family:var(--mono);font-weight:600;font-size:21px;color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* ---------- 2. 분할 격자 ---------- */
+.rp-split{display:flex;flex-direction:column;gap:6px}
+.rp-split h3{margin:6px 0 2px;font-size:15px}
+.rp-gr{display:grid;grid-template-columns:58px minmax(0,1fr) 128px;gap:8px;align-items:center;border-radius:7px;padding:2px 4px;transition:opacity .25s}
+.rp-gr.dim{opacity:.22}
+.rp-gr.on{background:color-mix(in srgb,var(--sk-accent) 9%,var(--surface));box-shadow:0 0 0 1.5px var(--sk-accent)}
+.rp-gr .lb{font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap}
+.rp-gr .ct{font-size:11.5px;color:var(--muted);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rp-cells{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:1px;height:20px}
+.rp-cells i{display:block;border-radius:2px;background:var(--surface-2);border:1px solid var(--line)}
+.rp-cells i.tr{background:color-mix(in srgb,var(--c-train) 55%,var(--surface));border-color:var(--c-train)}
+.rp-cells i.te{background:color-mix(in srgb,var(--c-fc) 60%,var(--surface));border-color:var(--c-fc)}
+.rp-cells i.gap{background:repeating-linear-gradient(135deg,var(--surface-2) 0 3px,color-mix(in srgb,var(--faint) 45%,var(--surface-2)) 3px 5px);border-color:var(--line-strong)}
+.rp-cells i.lk{background:color-mix(in srgb,var(--c-leak) 60%,var(--surface));border-color:var(--c-leak)}
+.rp-axis{display:grid;grid-template-columns:58px minmax(0,1fr) 128px;gap:8px;padding:0 4px}
+.rp-axis .tk{position:relative;height:16px;font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+.rp-axis .tk span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+@media (max-width:620px){.rp-gr,.rp-axis{grid-template-columns:44px minmax(0,1fr)}.rp-gr .ct,.rp-axis>span:last-child{display:none}.rp-cells{gap:0}.rp-cells i{border-width:.5px}}
+.rp-print{margin:0;font-family:var(--mono);font-size:12.5px;line-height:1.65;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;overflow-x:auto;white-space:pre;color:var(--text)}
+.rp-print b{color:var(--ink)}
+
+/* ---------- 3·4·5 ---------- */
+.rp-stats .sk-stat{min-width:104px}
+.rp-stats .sk-stat b{font-size:18px}
+.rp-tblc td.best{font-weight:700;color:var(--ink);background:color-mix(in srgb,var(--c-ok) 12%,var(--surface))}
+.rp-tblc tr.cur td:first-child{box-shadow:inset 3px 0 0 var(--sk-accent)}
+.rp-tblc td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.rp-mini{width:100%}
+.rp-mini td,.rp-mini th{padding:4px 6px;font-size:12.5px}
+.rp-mini td.n{font-family:var(--mono);text-align:right}
+.rp-mini tr.pend td{color:var(--faint)}
+.rp-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.rp-chip{display:flex;flex-direction:column;align-items:center;min-width:62px;border:1.6px solid var(--r);border-radius:9px;padding:4px 7px;background:color-mix(in srgb,var(--r) 10%,var(--surface));font-size:11px;color:var(--muted);line-height:1.25}
+.rp-chip b{font-family:var(--mono);font-size:13.5px;color:var(--ink);font-weight:600}
+.rp-chip.pred{border-style:dashed}
+.rp-chip.out{--r:var(--c-fc);box-shadow:0 0 0 2px color-mix(in srgb,var(--c-fc) 35%,transparent)}
+.rp-chips .arr{color:var(--faint);font-weight:700}
+.rp-ebars{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:3px;align-items:end;height:70px;border-bottom:1px solid var(--line-strong)}
+.rp-ebars div{display:flex;gap:1px;align-items:end;height:100%}
+.rp-ebars span{flex:1 1 0;border-radius:2px 2px 0 0;min-height:1px}
+.rp-ebars span.r{background:var(--c-fc)} .rp-ebars span.d{background:var(--c-cv)} .rp-ebars span.x{background:var(--line)}
+.rp-ebar-x{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:3px;font-family:var(--mono);font-size:10.5px;color:var(--faint);text-align:center}
+.rp-code{margin:0;font-family:var(--mono);font-size:13px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto;white-space:pre;color:var(--ink);tab-size:4;max-height:640px;overflow-y:auto}
+.rp-code .cm{color:var(--muted)} .rp-code .kw{color:var(--c-cv);font-weight:600} .rp-code .st{color:var(--c-mo)} .rp-code .hl{background:color-mix(in srgb,var(--c-fc) 16%,transparent);border-radius:3px}
+.sk-stepper li{cursor:default}
+@media (max-width:620px){
+  .sk-seg{display:flex;flex-wrap:wrap;gap:1px;background:var(--line-strong);max-width:100%}
+  .sk-seg button{flex:1 1 auto}
+  .sk-seg button + button{border-left:0}
+  .sk-group{max-width:100%}
+}
+@media (max-width:520px){ .sk-slider{min-width:0;width:100%} .rp-opts .sk-slider{min-width:0} .rp-opts label.rp-sel{width:100%} .rp-opts label.rp-sel .sk-select{flex:1} .rp-chip{min-width:52px} }
+@media (prefers-reduced-motion: reduce){
+  .rp-tbl .in,.rp-tbl .fadein,.rp-tbl tr.gone td{animation:none}
+  .rp-gr{transition:none}
+}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+      <a href="../../index.html#ts" style="--c:var(--cat-ts)" aria-current="page">시계열 분석</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">롤링 예측 시뮬레이터 (Time Shift · Walk-forward)</h1>
+      <p class="ds-hero__lede">시계열을 shift로 밀고 당겨 지도학습 표(특성 · 목표)로 바꾸고, 예측 시점을 한 칸씩 굴리며 학습 → 예측 → 실제값 공개 → 오차 기록을 반복합니다. 무작위 분할이 왜 누수인지, 재학습 주기 · 다중 스텝 전략 · 한 번 예측과 롤링 예측의 차이를 숫자로 확인합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+
+  <!-- ================= 데이터 ================= -->
+  <div class="sk-card">
+    <div class="sk-head"><h2>데이터: <span id="dName">일별 응급실 내원 환자 수</span></h2><span class="sk-hint" id="dInfo"></span></div>
+    <div class="rp-data">
+      <div class="sk-controls rp-opts">
+        <label class="rp-sel"><span class="sk-label">데이터</span>
+          <select class="sk-select" id="dKind">
+            <option value="er">일별 응급실 내원 환자 수 (명)</option>
+            <option value="bed">일별 병상 점유율 (%)</option>
+            <option value="ili">일별 독감 유사 질환(ILI) 외래 비율 (1,000명당)</option>
+          </select></label>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="dTrend">추세 강도</label><b id="dTrendV">1.0</b></div><input type="range" id="dTrend" min="0" max="2" step="0.1" value="1"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="dSeason">주간 계절성</label><b id="dSeasonV">1.0</b></div><input type="range" id="dSeason" min="0" max="2" step="0.1" value="1"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="dNoise">잡음</label><b id="dNoiseV">1.0</b></div><input type="range" id="dNoise" min="0" max="2" step="0.1" value="1"></div>
+        <label class="rp-sel"><span class="sk-label">seed</span><input class="sk-input rp-seed" id="dSeed" type="number" min="1" max="9999" step="1" value="7"></label>
+        <button type="button" class="sk-btn sk-btn--sm" id="dReseed">다시 뽑기</button>
+        <label class="sk-check"><input type="checkbox" id="dHol" checked>명절 효과 (추석 9/24–26)</label>
+      </div>
+      <div>
+        <canvas class="rp-cv-canvas" id="dSpark" aria-label="현재 시계열 전체 모양 (작은 선 그래프)"></canvas>
+      </div>
+    </div>
+    <details class="rp-more" id="dCsvBox">
+      <summary>CSV로 보기 · 붙여 넣기 (날짜,값)</summary>
+      <p class="sk-lead" style="margin-bottom:6px">아래 내용을 <code id="dFile">er_visits.csv</code>로 저장하면 코드 탭의 파이썬 코드가 같은 숫자를 냅니다. 자기 데이터(하루 간격, 40~400행)를 붙여 넣고 [적용]을 눌러도 됩니다.</p>
+      <textarea class="sk-input" id="dCsv" spellcheck="false" aria-label="현재 데이터 CSV"></textarea>
+      <div class="sk-controls" style="margin-top:8px">
+        <button type="button" class="sk-btn sk-btn--sm sk-btn--primary" id="dApply">적용</button>
+        <button type="button" class="sk-btn sk-btn--sm" id="dDefault">생성 데이터로 돌아가기</button>
+        <span class="rp-msg" id="dMsg" aria-live="polite"></span>
+      </div>
+    </details>
+  </div>
+
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button type="button" class="sk-tab" role="tab" id="tab-shift" aria-controls="pane-shift" aria-selected="true"><span class="sk-num">1</span>Time Shift</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-split" aria-controls="pane-split" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>분할: 무작위 금지</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-walk" aria-controls="pane-walk" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>롤링(워크포워드) 예측</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-multi" aria-controls="pane-multi" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>다중 스텝 전략</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-once" aria-controls="pane-once" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>한 번 vs 롤링</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>코드</button>
+  </nav>
+
+  <!-- ================= 1. Time Shift ================= -->
+  <section id="pane-shift" role="tabpanel" aria-labelledby="tab-shift">
+    <div class="sk-card">
+      <div class="sk-head"><h2>시계열 → 지도학습 표 (앞 20일)</h2>
+        <div class="sk-legend"><span><i style="background:var(--ink)"></i>원본 y</span><span><i style="background:var(--c-train)"></i>lag 특성</span><span><i style="background:var(--c-cv)"></i>롤링 특성</span><span><i style="background:var(--c-mo)"></i>달력 특성</span><span><i style="background:var(--c-fc)"></i>목표</span><span><i style="background:var(--c-leak)"></i>NaN</span></div>
+      </div>
+      <div class="rp-dir">
+        <div>
+          <p class="sk-lead">행 하나 = 하루(t). <b>특성</b>은 <code>shift(k)</code>로 과거 값을 아래로 밀어 붙이고, <b>목표</b>는 <code>shift(−h)</code>로 미래 값을 위로 당겨 붙입니다. 행 t의 특성은 모두 <b>t−1까지</b>의 값이므로 목표 y(t)는 "1스텝 앞" 예측입니다.</p>
+          <div class="sk-formula" id="t1Formula"></div>
+        </div>
+        <div class="rp-svg" aria-hidden="true">
+          <svg viewBox="0 0 470 182">
+            <defs>
+              <marker id="ahf" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah f" d="M0 0L10 5L0 10z"/></marker>
+              <marker id="aht" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah t" d="M0 0L10 5L0 10z"/></marker>
+            </defs>
+            <text class="lb f" x="235" y="12">특성: 과거를 아래로 ↓</text>
+            <text class="lb t" x="395" y="12">목표: 미래를 위로 ↑</text>
+            <text class="hd" x="70" y="30">y</text><text class="hd" x="235" y="30">y.shift(2)</text><text class="hd" x="395" y="30">y.shift(−1)</text>
+            <g id="svgCols"></g>
+            <path class="ar f" d="M100 49 C 160 49, 160 101, 202 101" marker-end="url(#ahf)"/>
+            <path class="ar t" d="M100 75 C 260 75, 290 49, 362 49" marker-end="url(#aht)"/>
+            <text class="lb f" x="152" y="96">2칸 ↓</text>
+            <text class="lb t" x="300" y="78">1칸 ↑</text>
+          </svg>
+        </div>
+      </div>
+      <div class="sk-controls rp-opts">
+        <div class="sk-slider"><div class="sk-sl-head"><label for="t1K">lag 개수 K</label><b id="t1KV">3</b></div><input type="range" id="t1K" min="1" max="7" step="1" value="3"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="t1W">롤링 창 w</label><b id="t1WV">3</b></div><input type="range" id="t1W" min="2" max="7" step="1" value="3"></div>
+        <label class="sk-check"><input type="checkbox" id="t1Rm" checked>이동평균</label>
+        <label class="sk-check"><input type="checkbox" id="t1Rs">이동표준편차</label>
+        <label class="sk-check"><input type="checkbox" id="t1Dow">요일 더미</label>
+        <label class="sk-check"><input type="checkbox" id="t1Wk" checked>주말 더미</label>
+      </div>
+      <div class="sk-controls rp-opts">
+        <div class="sk-group"><span class="sk-label">목표</span>
+          <div class="sk-seg" id="t1Mode" role="group" aria-label="예측 목표"><button type="button" data-v="one" aria-pressed="false">1스텝 앞 y(t)</button><button type="button" data-v="h" aria-pressed="false">h스텝 앞 하나</button><button type="button" data-v="multi" aria-pressed="true">1…h스텝 (다중 출력)</button></div></div>
+        <div class="sk-slider" id="t1HBox"><div class="sk-sl-head"><label for="t1H">h</label><b id="t1HV">3</b></div><input type="range" id="t1H" min="2" max="7" step="1" value="3"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="t1Start">표 시작일</label><b id="t1StartV">07-01</b></div><input type="range" id="t1Start" min="0" max="100" step="1" value="0"></div>
+      </div>
+      <div class="sk-controls" data-player="t1"></div>
+      <ol class="sk-stepper" id="t1Stepper"></ol>
+      <p class="rp-cap" id="t1Cap" aria-live="polite"></p>
+      <div class="rp-row">
+        <div class="sk-scroll"><table class="sk-table rp-tbl" id="t1Tbl"></table></div>
+        <aside class="rp-info" id="t1Info" aria-live="polite"></aside>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>누수 경고: 롤링 특성은 shift(1) 먼저</h2><span class="sk-hint">행을 누르면 창(window)에 들어간 날이 표시됩니다</span></div>
+      <p class="sk-lead">목표가 y(t)인 표에서 이동평균을 <b>현재값 포함</b>으로 만들면, 특성 안에 정답 y(t)가 1/w만큼 섞입니다. 학습·검증 점수는 좋아 보이지만, 실제로 예측할 때는 y(t)를 아직 모르므로 이 특성을 만들 수조차 없습니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">잘못된 방식</span>
+          <div class="sk-seg" id="t1Leak" role="group" aria-label="잘못된 롤링 방식"><button type="button" data-v="plain" aria-pressed="true">rolling(w) — shift 없음</button><button type="button" data-v="center" aria-pressed="false">rolling(w, center=True)</button></div></div>
+        <span class="sk-hint">창 크기 w는 위 슬라이더와 같습니다</span>
+      </div>
+      <div class="rp-leakgrid">
+        <div class="rp-flowcard" style="--r:var(--c-leak)">
+          <h3 id="t1LkTitle">잘못된 예</h3>
+          <div class="sk-formula" id="t1LkF"></div>
+          <div class="sk-scroll"><table class="sk-table rp-tbl" id="t1LkTbl"></table></div>
+          <div class="sk-stats rp-stats" id="t1LkStats"></div>
+        </div>
+        <div class="rp-flowcard" style="--r:var(--c-ok)">
+          <h3 id="t1OkTitle">올바른 예</h3>
+          <div class="sk-formula" id="t1OkF"></div>
+          <div class="sk-scroll"><table class="sk-table rp-tbl" id="t1OkTbl"></table></div>
+          <div class="sk-stats rp-stats" id="t1OkStats"></div>
+        </div>
+      </div>
+      <p class="sk-note rp-note-leak" id="t1LkNote"></p>
+    </div>
+  </section>
+
+  <!-- ================= 2. 분할 ================= -->
+  <section id="pane-split" role="tabpanel" aria-labelledby="tab-split" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>같은 데이터, 세 가지 분할</h2>
+        <div class="sk-legend"><span><i style="background:var(--c-train)"></i>학습(train)</span><span><i style="background:var(--c-fc)"></i>평가(test)</span><span><i style="background:var(--faint)"></i>gap (버림)</span><span><i style="background:var(--surface-2);border:1px solid var(--line-strong)"></i>사용 안 함</span><span><i style="background:var(--c-leak)"></i>test보다 미래인 학습 표본 (누수)</span></div>
+      </div>
+      <p class="sk-lead">칸 하나 = 시간 순서대로 놓인 표본 하나(왼쪽이 과거). 시계열에서는 <b>학습 데이터가 항상 평가 데이터보다 과거</b>여야 합니다. 아래 TimeSeriesSplit 인덱스는 scikit-learn과 같은 규칙으로 계산합니다.</p>
+      <div class="sk-controls rp-opts">
+        <div class="sk-slider"><div class="sk-sl-head"><label for="t2N">표본 수 n</label><b id="t2NV">30</b></div><input type="range" id="t2N" min="12" max="60" step="1" value="30"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="t2K">n_splits</label><b id="t2KV">5</b></div><input type="range" id="t2K" min="2" max="8" step="1" value="5"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="t2Ts">test_size</label><b id="t2TsV">None</b></div><input type="range" id="t2Ts" min="0" max="12" step="1" value="0"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="t2Gap">gap</label><b id="t2GapV">0</b></div><input type="range" id="t2Gap" min="0" max="6" step="1" value="0"></div>
+      </div>
+      <div class="sk-controls rp-opts">
+        <div class="sk-group"><span class="sk-label">학습 창</span>
+          <div class="sk-seg" id="t2Win" role="group" aria-label="학습 창 방식"><button type="button" data-v="exp" aria-pressed="true">확장 창 (expanding)</button><button type="button" data-v="slide" aria-pressed="false">고정 창 (sliding)</button></div></div>
+        <div class="sk-slider" id="t2MtsBox" hidden><div class="sk-sl-head"><label for="t2Mts">max_train_size</label><b id="t2MtsV">10</b></div><input type="range" id="t2Mts" min="2" max="40" step="1" value="10"></div>
+      </div>
+      <div class="sk-controls" data-player="t2"></div>
+      <p class="rp-cap" id="t2Cap" aria-live="polite"></p>
+      <div class="rp-split" id="t2Grids"></div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>TimeSeriesSplit 출력</h2><span class="sk-hint">for tr, te in tscv.split(X): print(tr, te)</span></div>
+        <pre class="rp-print" id="t2Print" tabindex="0" aria-label="TimeSeriesSplit 인덱스"></pre>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>규칙 정리</h2></div>
+        <div class="sk-formula" id="t2Rule"></div>
+        <p class="sk-note rp-note-leak"><b>무작위 K-fold</b> — 학습 칸 중 빨간 칸은 평가 구간보다 미래입니다. "내일을 알고 어제를 맞히는" 셈이라 교차검증 점수가 실제 운영 성능보다 좋게 나옵니다.</p>
+        <p class="sk-note"><b>gap</b> — 학습 끝과 평가 시작 사이를 비웁니다. 특성에 긴 롤링 창이 있거나, 예측 결과를 며칠 뒤에 쓰는 경우(보고 지연)처럼 경계 근처 정보가 섞일 때 씁니다.</p>
+        <p class="sk-note rp-note-ok"><b>확장 vs 고정</b> — 확장 창은 데이터가 쌓일수록 학습이 길어지고, 고정 창(max_train_size)은 최근 패턴만 반영합니다. 구조가 자주 바뀌는 데이터라면 고정 창이 유리할 수 있습니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 3. 롤링(워크포워드) 예측 ================= -->
+  <section id="pane-walk" role="tabpanel" aria-labelledby="tab-walk" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>모형과 롤링 설정</h2><span class="sk-hint">모형 설정은 4·5번 화면과 코드에도 쓰입니다</span></div>
+      <div class="sk-controls rp-opts">
+        <div class="sk-group"><span class="sk-label">모형</span>
+          <div class="sk-seg" id="t3Model" role="group" aria-label="예측 모형"><button type="button" data-v="naive" aria-pressed="false">나이브</button><button type="button" data-v="snaive" aria-pressed="false">계절 나이브</button><button type="button" data-v="ma" aria-pressed="false">이동평균</button><button type="button" data-v="lr" aria-pressed="true">선형회귀(lag)</button><button type="button" data-v="ses" aria-pressed="false">지수평활</button></div></div>
+        <div class="sk-slider" id="mPBox"><div class="sk-sl-head"><label for="mP">lag 개수 p</label><b id="mPV">7</b></div><input type="range" id="mP" min="1" max="14" step="1" value="7"></div>
+        <label class="sk-check" id="mDowBox"><input type="checkbox" id="mDow">요일 더미 추가</label>
+        <div class="sk-slider" id="mMBox" hidden><div class="sk-sl-head"><label for="mM">이동평균 창 m</label><b id="mMV">7</b></div><input type="range" id="mM" min="2" max="28" step="1" value="7"></div>
+        <label class="sk-check" id="mAutoBox" hidden><input type="checkbox" id="mAuto" checked>α 자동 (학습 SSE 최소, 격자 탐색)</label>
+        <div class="sk-slider" id="mABox" hidden><div class="sk-sl-head"><label for="mA">평활 계수 α</label><b id="mAV">0.30</b></div><input type="range" id="mA" min="0.05" max="0.95" step="0.05" value="0.3"></div>
+      </div>
+      <div class="sk-controls rp-opts">
+        <div class="sk-slider"><div class="sk-sl-head"><label for="t3T0">초기 학습 길이</label><b id="t3T0V">70일</b></div><input type="range" id="t3T0" min="28" max="100" step="1" value="70"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="t3H">예측 길이 h</label><b id="t3HV">7일</b></div><input type="range" id="t3H" min="1" max="14" step="1" value="7"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="t3Stride">원점 간격</label><b id="t3StrideV">1일</b></div><input type="range" id="t3Stride" min="1" max="7" step="1" value="1"></div>
+      </div>
+      <div class="sk-controls rp-opts">
+        <div class="sk-group"><span class="sk-label">학습 창</span>
+          <div class="sk-seg" id="t3Win" role="group" aria-label="학습 창"><button type="button" data-v="exp" aria-pressed="true">확장</button><button type="button" data-v="slide" aria-pressed="false">고정(이동)</button></div></div>
+        <div class="sk-slider" id="t3LBox" hidden><div class="sk-sl-head"><label for="t3L">고정 창 길이</label><b id="t3LV">42일</b></div><input type="range" id="t3L" min="21" max="100" step="1" value="42"></div>
+        <div class="sk-group"><span class="sk-label">재학습</span>
+          <div class="sk-seg" id="t3Re" role="group" aria-label="재학습 주기"><button type="button" data-v="each" aria-pressed="true">매 스텝</button><button type="button" data-v="k" aria-pressed="false">매 k스텝</button><button type="button" data-v="once" aria-pressed="false">한 번만</button></div></div>
+        <div class="sk-slider" id="t3KBox" hidden><div class="sk-sl-head"><label for="t3K">k</label><b id="t3KV">7</b></div><input type="range" id="t3K" min="2" max="14" step="1" value="7"></div>
+      </div>
+      <p class="rp-err" id="t3Err" hidden></p>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>예측 원점을 한 칸씩 굴리기</h2>
+        <div class="sk-legend rp-legend"><span><i class="ln" style="background:var(--c-train)"></i>학습 구간</span><span><i class="dash"></i>실제 미래</span><span><i class="ln" style="background:var(--c-fc)"></i>예측</span><span><i class="band" style="background:var(--c-fc)"></i>80% · 95% 구간</span><span><i class="ln" style="background:var(--c-fc);opacity:.35"></i>지난 원점의 예측</span></div>
+      </div>
+      <div class="sk-controls" data-player="t3"></div>
+      <ol class="sk-stepper" id="t3Stepper"><li>① 학습</li><li>② h스텝 예측</li><li>③ 실제값 공개</li><li>④ 오차 기록</li></ol>
+      <p class="rp-cap" id="t3Cap" aria-live="polite"></p>
+      <div class="rp-row">
+        <div style="min-width:0;display:flex;flex-direction:column;gap:10px">
+          <canvas class="rp-cv-canvas" id="t3Chart" aria-label="롤링 예측 차트: 학습 구간, 현재 원점의 예측과 예측 구간, 공개된 실제값"></canvas>
+          <div class="sk-head"><h3>원점별 오차 (그 원점의 h스텝 MAE)</h3><span class="sk-hint">점선 = 누적 MAE</span></div>
+          <canvas class="rp-cv-canvas" id="t3Err2" aria-label="원점별 MAE 막대와 누적 MAE 선"></canvas>
+          <div class="sk-stats rp-stats" id="t3Stats"></div>
+        </div>
+        <aside class="rp-info" id="t3Info" aria-live="polite"></aside>
+      </div>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>재학습 주기 비교</h2><span class="sk-hint" id="t3ReHint"></span></div>
+        <div class="sk-scroll"><table class="sk-table rp-tblc" id="t3ReTbl"></table></div>
+        <p class="sk-note" id="t3ReNote"></p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>모형 비교 (같은 롤링 설정)</h2><span class="sk-hint">초록 = 가장 좋음</span></div>
+        <div class="sk-scroll"><table class="sk-table rp-tblc" id="t3MTbl"></table></div>
+        <p class="sk-hint" style="margin:0">MASE = MAE ÷ (초기 학습 구간에서 나이브 1스텝 예측의 MAE). 1보다 작으면 "어제 값 그대로"보다 낫습니다. MAPE는 실제값이 0에 가까우면 커지므로 주의.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 4. 다중 스텝 전략 ================= -->
+  <section id="pane-multi" role="tabpanel" aria-labelledby="tab-multi" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>h스텝을 어떻게 예측할까: 재귀 · 직접 · 다중 출력</h2>
+        <div class="sk-legend rp-legend"><span><i class="ln" style="background:var(--c-fc)"></i>재귀 (recursive)</span><span><i class="ln" style="background:var(--c-cv)"></i>직접 (direct)</span><span><i class="ln" style="background:var(--c-mo)"></i>다중 출력 (MIMO)</span><span><i class="dash"></i>실제</span></div>
+      </div>
+      <div class="sk-grid3">
+        <p class="sk-note rp-note-fc"><b>재귀</b> — 1스텝 모형 하나. ŷ(T+1)을 입력 창에 다시 넣어 ŷ(T+2)를 만듭니다. 모형은 하나지만 앞 단계 오차가 다음 입력으로 흘러 들어가 쌓입니다.</p>
+        <p class="sk-note" style="border-left-color:var(--c-cv);background:color-mix(in srgb,var(--c-cv) 8%,var(--surface))"><b>직접</b> — h마다 모형을 따로 학습합니다 (y(T+j) ← 실제 lag). 오차가 되먹임되지 않지만 모형이 h개, 먼 h일수록 학습 행이 줄어듭니다.</p>
+        <p class="sk-note" style="border-left-color:var(--c-mo);background:color-mix(in srgb,var(--c-mo) 8%,var(--surface))"><b>다중 출력</b> — 출력 h개를 한 번에 학습합니다. 목표 h개가 모두 있는 행만 쓰므로 직접 전략보다 행이 조금 적습니다. 선형회귀에서는 출력별 최소제곱이 독립이라 직접 전략과 거의 같습니다.</p>
+      </div>
+      <div class="sk-controls rp-opts">
+        <div class="sk-slider"><div class="sk-sl-head"><label for="t4P">lag 개수 p</label><b id="t4PV">7</b></div><input type="range" id="t4P" min="1" max="14" step="1" value="7"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="t4H">예측 길이 H</label><b id="t4HV">14</b></div><input type="range" id="t4H" min="2" max="14" step="1" value="14"></div>
+        <label class="sk-check"><input type="checkbox" id="t4Dow">요일 더미 추가</label>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="t4T0">초기 학습 길이</label><b id="t4T0V">70일</b></div><input type="range" id="t4T0" min="35" max="90" step="1" value="70"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="t4O">애니메이션 원점</label><b id="t4OV">-</b></div><input type="range" id="t4O" min="0" max="10" step="1" value="0"></div>
+      </div>
+      <div class="sk-controls" data-player="t4"></div>
+      <p class="rp-cap" id="t4Cap" aria-live="polite"></p>
+      <div class="rp-row">
+        <div style="min-width:0;display:flex;flex-direction:column;gap:10px">
+          <div class="sk-head"><h3>재귀 전략의 입력 창</h3><span class="sk-hint">파란 칸 = 실제값, 주황 점선 칸 = 앞에서 예측한 값(되먹임)</span></div>
+          <div class="rp-chips" id="t4Chips"></div>
+          <canvas class="rp-cv-canvas" id="t4Chart" aria-label="한 원점에서 세 전략의 예측 경로와 실제값"></canvas>
+          <div class="sk-head"><h3>스텝별 절대오차 |e| (이 원점)</h3><span class="sk-legend"><span><i style="background:var(--c-fc)"></i>재귀</span><span><i style="background:var(--c-cv)"></i>직접</span></span></div>
+          <div class="rp-ebars" id="t4Bars"></div><div class="rp-ebar-x" id="t4BarsX"></div>
+        </div>
+        <aside class="rp-info" id="t4Info" aria-live="polite"></aside>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>horizon별 오차: 모든 원점 평균</h2><span class="sk-hint" id="t4Hint"></span></div>
+      <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+        <canvas class="rp-cv-canvas" id="t4HChart" aria-label="예측 거리 h에 따른 MAE 곡선: 재귀, 직접, 다중 출력, 나이브"></canvas>
+        <div class="sk-scroll"><table class="sk-table rp-tblc" id="t4Tbl"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 5. 한 번 vs 롤링 ================= -->
+  <section id="pane-once" role="tabpanel" aria-labelledby="tab-once" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>같은 모형, 두 가지 사용법</h2><span class="sk-hint">모형의 세부 설정(p, m, α 등)은 3번 화면 값</span></div>
+      <div class="sk-controls rp-opts">
+        <div class="sk-group"><span class="sk-label">모형</span>
+          <div class="sk-seg" id="t5Model" role="group" aria-label="예측 모형"><button type="button" data-v="naive" aria-pressed="false">나이브</button><button type="button" data-v="snaive" aria-pressed="false">계절 나이브</button><button type="button" data-v="ma" aria-pressed="false">이동평균</button><button type="button" data-v="lr" aria-pressed="true">선형회귀(lag)</button><button type="button" data-v="ses" aria-pressed="false">지수평활</button></div></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="t5Lt">평가 기간</label><b id="t5LtV">30일</b></div><input type="range" id="t5Lt" min="14" max="40" step="1" value="30"></div>
+        <div class="sk-group"><span class="sk-label">롤링 갱신</span>
+          <div class="sk-seg" id="t5Upd" role="group" aria-label="롤링 갱신 방식"><button type="button" data-v="input" aria-pressed="true">새 값만 반영 (계수 고정)</button><button type="button" data-v="refit" aria-pressed="false">매일 재학습</button></div></div>
+      </div>
+      <div class="sk-grid2">
+        <div class="rp-flowcard" style="--r:var(--c-fc)">
+          <h3>① 학습 끝에서 한 번에 <span id="t5L1">30</span>일 예측</h3>
+          <canvas class="rp-cv-canvas" id="t5C1" aria-label="한 번에 여러 날 예측한 결과"></canvas>
+          <div class="sk-stats rp-stats" id="t5S1"></div>
+        </div>
+        <div class="rp-flowcard" style="--r:var(--c-cv)">
+          <h3>② 하루씩 실제값을 반영하는 1스텝 롤링 예측</h3>
+          <canvas class="rp-cv-canvas" id="t5C2" aria-label="하루씩 굴린 1스텝 롤링 예측 결과"></canvas>
+          <div class="sk-stats rp-stats" id="t5S2"></div>
+        </div>
+      </div>
+      <div class="sk-head"><h3>평가 기간 날짜별 절대오차</h3><span class="sk-legend"><span><i style="background:var(--c-fc)"></i>① 한 번 예측</span><span><i style="background:var(--c-cv)"></i>② 롤링 예측</span></span></div>
+      <canvas class="rp-cv-canvas" id="t5C3" aria-label="날짜별 절대오차 비교"></canvas>
+      <p class="sk-note" id="t5Note"></p>
+      <p class="sk-note rp-note-ok"><b>실무에서는</b> 새 데이터가 들어올 때마다 예측을 갱신합니다. 오늘 밤 내원 수가 집계되면 내일 예측을 다시 계산하고, 계수 재학습은 주 1회처럼 정해진 주기로 합니다. 한 번 예측(①)은 "평가 기간 끝까지 새 정보 없이 맞힌다"는 훨씬 어려운 문제입니다. 학습 끝 무렵의 특이값(예: 추석 직후)이 예측 전체에 남고, 예측 구간도 점점 넓어집니다. 두 방식의 오차는 서로 다른 문제의 점수이므로 섞어 비교하면 안 됩니다.</p>
+    </div>
+  </section>
+
+  <!-- ================= 6. 코드 ================= -->
+  <section id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>pandas · scikit-learn: shift, rolling, TimeSeriesSplit, 워크포워드 루프</h2><span class="sk-hint">1 · 2 · 3번 화면 설정이 반영됩니다</span></div>
+      <div class="sk-controls">
+        <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="c1Copy">코드 복사</button>
+        <span class="sk-hint" id="c1Msg" aria-live="polite"></span>
+      </div>
+      <pre class="rp-code" id="c1Code" tabindex="0" aria-label="pandas와 scikit-learn 코드"></pre>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>statsmodels: 한 번 예측 vs 롤링 예측</h2><span class="sk-hint">5번 화면 설정이 반영됩니다</span></div>
+      <div class="sk-controls">
+        <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="c2Copy">코드 복사</button>
+        <span class="sk-hint" id="c2Msg" aria-live="polite"></span>
+      </div>
+      <pre class="rp-code" id="c2Code" tabindex="0" aria-label="statsmodels 코드"></pre>
+      <p class="sk-note"><b>append vs refit</b> — <code>res.append(new, refit=False)</code>는 계수를 그대로 두고 새 관측만 이어 붙여 다음 예측의 입력을 갱신합니다. <code>refit=True</code>면 늘어난 데이터로 계수를 다시 추정합니다. 3번 화면의 "재학습" 설정이 이 차이입니다.</p>
+    </div>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20261002a"></script>
+<script>
+(function () {
+"use strict";
+const $ = id => document.getElementById(id);
+const RM = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ============================================================
+   공통 도구
+   ============================================================ */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function gauss(r){let u=0;while(!u)u=r();const v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function shuffle(a,r){for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function fmt(v,d=2){ if(v===null||v===undefined||Number.isNaN(v)) return "NaN"; if(!isFinite(v)) return v>0?"∞":"−∞";
+  let s=v.toFixed(d); if(/^-0(\.0+)?$/.test(s)) s=s.slice(1); return s.replace("-","−"); }
+const mean = a => a.reduce((s,v)=>s+v,0)/a.length;
+function std1(a){const m=mean(a);return Math.sqrt(a.reduce((s,v)=>s+(v-m)*(v-m),0)/(a.length-1));}
+function rng(a,b){const r=[];for(let i=a;i<=b;i++)r.push(i);return r;}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function segInit(el,cb){el.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{segSet(el,b.dataset.v);cb(b.dataset.v);}));}
+function segSet(el,v){el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x.dataset.v===String(v)?"true":"false"));}
+function bindRange(id,show,cb){const el=$(id),out=$(id+"V");const f=()=>{const v=+el.value;if(out)out.textContent=show?show(v):v;cb&&cb(v);};el.addEventListener("input",f);
+  return{set(v){el.value=v;if(out)out.textContent=show?show(+el.value):el.value;},get:()=>+el.value,el,setMax(m){el.max=m;}};}
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function pal(){return{train:css("--c-train"),fc:css("--c-fc"),leak:css("--c-leak"),ok:css("--c-ok"),cv:css("--c-cv"),mo:css("--c-mo"),
+  ink:css("--ink"),text:css("--text"),muted:css("--muted"),faint:css("--faint"),line:css("--line"),lineS:css("--line-strong"),surface:css("--surface"),s2:css("--surface-2"),mono:css("--mono"),sans:css("--sans")};}
+
+/* 최소제곱 (Householder QR) */
+function lstsq(X,y){
+  const n=X.length,p=X[0].length,A=X.map(r=>r.slice()),b=y.slice();
+  for(let k=0;k<p;k++){
+    let nr=0;for(let i=k;i<n;i++)nr+=A[i][k]*A[i][k];nr=Math.sqrt(nr);if(nr<1e-12)continue;
+    const al=A[k][k]>0?-nr:nr,v=new Array(n).fill(0);for(let i=k;i<n;i++)v[i]=A[i][k];v[k]-=al;
+    let vn=0;for(let i=k;i<n;i++)vn+=v[i]*v[i];if(vn<1e-300)continue;
+    for(let j=k;j<p;j++){let s=0;for(let i=k;i<n;i++)s+=v[i]*A[i][j];s=2*s/vn;for(let i=k;i<n;i++)A[i][j]-=s*v[i];}
+    let s=0;for(let i=k;i<n;i++)s+=v[i]*b[i];s=2*s/vn;for(let i=k;i<n;i++)b[i]-=s*v[i];
+  }
+  const be=new Array(p).fill(0);
+  for(let k=p-1;k>=0;k--){let s=b[k];for(let j=k+1;j<p;j++)s-=A[k][j]*be[j];be[k]=Math.abs(A[k][k])<1e-9?0:s/A[k][k];}
+  return be;
+}
+const dot=(a,b)=>{let s=0;for(let i=0;i<a.length;i++)s+=a[i]*b[i];return s;};
+
+/* ---------- 캔버스 ---------- */
+function prep(cv,h){
+  const dpr=Math.max(1,window.devicePixelRatio||1);const w=Math.max(220,Math.floor(cv.parentElement.clientWidth||cv.clientWidth||600));
+  cv.style.height=h+"px";cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);
+  const c=cv.getContext("2d");c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);return{c,w,h};
+}
+function niceTicks(a,b,n){const span=b-a||1;const raw=span/Math.max(1,n);const mag=Math.pow(10,Math.floor(Math.log10(raw)));const st=[1,2,2.5,5,10].map(x=>x*mag).find(x=>x>=raw)||10*mag;
+  const t=[];for(let v=Math.ceil(a/st)*st;v<=b+1e-9;v+=st)t.push(+v.toFixed(10));return{t,st};}
+function axes(cv,h,o){
+  const {c,w}=prep(cv,h),P=pal();
+  const L=o.padL??(w<480?40:48),R=o.padR??12,T=o.padT??16,B=o.padB??24;
+  const X=i=>L+(i-o.x0)/((o.x1-o.x0)||1)*(w-L-R);
+  const Y=v=>T+(1-(v-o.ymin)/((o.ymax-o.ymin)||1))*(h-T-B);
+  c.font=`11px ${P.mono}`;c.textBaseline="middle";
+  const {t,st}=niceTicks(o.ymin,o.ymax,Math.max(2,Math.floor((h-T-B)/42)));
+  const dec=st<1?(st<0.1?2:1):0;
+  t.forEach(v=>{const y=Math.round(Y(v))+.5;c.strokeStyle=P.line;c.lineWidth=1;c.beginPath();c.moveTo(L,y);c.lineTo(w-R,y);c.stroke();
+    c.fillStyle=P.faint;c.textAlign="right";c.fillText(v.toFixed(dec),L-5,y);});
+  // x 라벨
+  c.textAlign="center";c.textBaseline="top";c.fillStyle=P.faint;
+  const pxPer=(w-L-R)/((o.x1-o.x0)||1);
+  if(o.xlab==="num"){const {t:xt}=niceTicks(o.x0,o.x1,Math.max(2,Math.floor((w-L-R)/50)));xt.forEach(v=>{if(Number.isInteger(v))c.fillText(String(v),X(v),h-B+6);});}
+  else{
+    const steps=[1,2,7,14,28,56];const stp=steps.find(s=>s*pxPer>=58)||56;
+    for(let i=Math.ceil(o.x0);i<=o.x1;i++){
+      if(stp>=7){if(dowOf(i)!==0)continue;if(Math.round((i-firstMon())/7)%(stp/7)!==0)continue;}
+      else if((i-Math.ceil(o.x0))%stp!==0)continue;
+      c.strokeStyle=P.line;c.beginPath();c.moveTo(Math.round(X(i))+.5,h-B);c.lineTo(Math.round(X(i))+.5,h-B+4);c.stroke();
+      c.fillText(md(i),X(i),h-B+6);
+    }
+  }
+  c.strokeStyle=P.lineS;c.beginPath();c.moveTo(L,h-B+.5);c.lineTo(w-R,h-B+.5);c.stroke();
+  if(o.ylabel){c.save();c.fillStyle=P.faint;c.font=`11px ${P.sans}`;c.textAlign="left";c.textBaseline="top";c.fillText(o.ylabel,L+4,2);c.restore();}
+  return{c,X,Y,L,R,T,B,w,h,P};
+}
+function line(c,pts,col,lw,dash){c.save();c.strokeStyle=col;c.lineWidth=lw||1.6;c.lineJoin="round";if(dash)c.setLineDash(dash);c.beginPath();let st=false;
+  pts.forEach(([x,y])=>{if(!isFinite(y)){st=false;return;}if(!st){c.moveTo(x,y);st=true;}else c.lineTo(x,y);});c.stroke();c.restore();}
+function dots(c,pts,col,r){c.save();c.fillStyle=col;pts.forEach(([x,y])=>{if(!isFinite(y))return;c.beginPath();c.arc(x,y,r||2.2,0,7);c.fill();});c.restore();}
+function band(c,xs,lo,hi,col,a){c.save();c.globalAlpha=a;c.fillStyle=col;c.beginPath();xs.forEach((x,i)=>i?c.lineTo(x,hi[i]):c.moveTo(x,hi[i]));for(let i=xs.length-1;i>=0;i--)c.lineTo(xs[i],lo[i]);c.closePath();c.fill();c.restore();}
+function vdash(g,x,col,label){const c=g.c;c.save();c.strokeStyle=col;c.lineWidth=1.3;c.setLineDash([4,4]);c.beginPath();c.moveTo(Math.round(x)+.5,g.T-4);c.lineTo(Math.round(x)+.5,g.h-g.B);c.stroke();c.restore();
+  if(label){c.save();c.fillStyle=col;c.font=`600 11px ${g.P.sans}`;c.textBaseline="top";const tw=c.measureText(label).width;const right=x+4+tw<g.w-g.R;c.textAlign=right?"left":"right";c.fillText(label,x+(right?4:-4),g.T-2);c.restore();}}
+
+/* ============================================================
+   데이터
+   ============================================================ */
+const DS={
+  er:{name:"일별 응급실 내원 환자 수",unit:"명",dec:0,file:"er_visits.csv"},
+  bed:{name:"일별 병상 점유율",unit:"%",dec:1,file:"bed_occupancy.csv"},
+  ili:{name:"일별 독감 유사 질환(ILI) 외래 비율",unit:"명/1,000명",dec:1,file:"ili_rate.csv"},
+  csv:{name:"붙여 넣은 데이터",unit:"",dec:2,file:"my_series.csv"}
+};
+const D={kind:"er",trend:1,season:1,noise:1,seed:7,hol:true,custom:null};
+let Y=[],DT=[],N=0,META=DS.er,HOLI=[];
+const DOWK="월화수목금토일";
+const dowOf=i=>(new Date(DT[0]+i*864e5).getUTCDay()+6)%7;   // 월=0 … 일=6 (pandas dayofweek)
+let _fm=0;const firstMon=()=>_fm;
+function md(i){const d=new Date(DT[0]+i*864e5);return String(d.getUTCMonth()+1).padStart(2,"0")+"-"+String(d.getUTCDate()).padStart(2,"0");}
+function iso(i){const d=new Date(DT[0]+i*864e5);return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0")+"-"+String(d.getUTCDate()).padStart(2,"0");}
+const mdw=i=>md(i)+"("+DOWK[dowOf(i)]+")";
+const fv=v=>fmt(v,META.dec);
+
+function generate(){
+  if(D.custom){Y=D.custom.y.slice();DT=[D.custom.start];N=Y.length;META=Object.assign({},DS.csv,{dec:D.custom.dec});HOLI=[];}
+  else{
+    META=DS[D.kind];N=120;DT=[Date.UTC(2026,6,1)];Y=[];HOLI=[];
+    const r=mulberry32(D.seed*1013+({er:1,bed:2,ili:3}[D.kind]));let e=0;
+    const hd=[Date.UTC(2026,8,24),Date.UTC(2026,8,25),Date.UTC(2026,8,26)].map(t=>Math.round((t-DT[0])/864e5));
+    for(let i=0;i<N;i++){
+      const dw=dowOf(i),h=D.hol?hd.indexOf(i):-1;if(h>=0)HOLI.push(i);
+      if(D.kind==="er"){
+        const wk=[14,3,0,-3,1,9,15][dw];e=0.45*e+gauss(r)*6.5*D.noise;
+        const v=112+0.12*D.trend*i+wk*D.season+(h>=0?[36,44,28][h]:0)+e;Y.push(Math.max(0,Math.round(v)));
+      }else if(D.kind==="bed"){
+        const wk=[3,4,3.5,2.5,0.5,-5.5,-8][dw];e=0.6*e+gauss(r)*1.2*D.noise;
+        const v=74+0.06*D.trend*i+wk*D.season+(h>=0?[-6,-9,-7][h]:0)+e;Y.push(Math.round(clamp(v,30,99.5)*10)/10);
+      }else{
+        const wk=[1.10,1.04,1.0,0.98,0.97,0.92,0.88][dw];e=0.5*e+gauss(r)*0.05*D.noise;
+        const v=2.6*Math.exp(0.011*D.trend*i)*(1+(wk-1)*D.season)*(h>=0?[1.18,1.26,1.15][h]:1)*(1+e);Y.push(Math.max(0.2,Math.round(v*10)/10));
+      }
+    }
+  }
+  _fm=0;while(dowOf(_fm)!==0)_fm++;
+}
+function csvText(){let s="date,y\n";for(let i=0;i<N;i++)s+=iso(i)+","+Y[i].toFixed(META.dec)+"\n";return s;}
+function parseCSV(txt){
+  const lines=txt.split(/\r?\n/).map(s=>s.trim()).filter(Boolean),out=[];let maxDec=0,gapWarn=false;
+  for(const ln of lines){
+    const parts=ln.split(/[,\t;]/).map(s=>s.trim().replace(/^"|"$/g,""));const vs=parts[parts.length-1];const v=parseFloat(vs);
+    if(!isFinite(v)||!/^-?[\d.]+(e-?\d+)?$/i.test(vs))continue;
+    const dm=(vs.split(".")[1]||"").length;maxDec=Math.max(maxDec,dm);
+    let d=null;if(parts.length>1){const m=parts[0].match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})/);if(m)d=Date.UTC(+m[1],+m[2]-1,+m[3]);}
+    out.push({d,v});
+  }
+  if(out.length<40)return{err:`숫자 행이 ${out.length}개입니다. 40행 이상 필요합니다.`};
+  if(out.length>400)return{err:`행이 ${out.length}개입니다. 400행 이하로 넣어 주세요.`};
+  const start=out[0].d!==null?out[0].d:Date.UTC(2026,6,1);
+  for(let i=1;i<out.length;i++)if(out[i].d!==null&&out[i-1].d!==null&&out[i].d-out[i-1].d!==864e5)gapWarn=true;
+  return{y:out.map(o=>o.v),start,dec:Math.min(3,maxDec),gapWarn};
+}
+
+/* ============================================================
+   탭
+   ============================================================ */
+const TABS=["shift","split","walk","multi","once","code"];let curTab="shift";const onShow={};const players=[];
+function showTab(k,focus){
+  if(!TABS.includes(k))k="shift";
+  TABS.forEach(t=>{const b=$("tab-"+t),p=$("pane-"+t),on=t===k;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;p.hidden=!on;});
+  curTab=k;if(focus)$("tab-"+k).focus();
+  if(location.hash!=="#"+k)history.replaceState(null,"","#"+k);
+  players.forEach(p=>p.stop());
+  onShow[k]&&onShow[k]();
+}
+TABS.forEach(t=>$("tab-"+t).addEventListener("click",()=>showTab(t)));
+document.querySelector(".sk-tabs").addEventListener("keydown",e=>{
+  if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;e.preventDefault();e.stopPropagation();
+  const i=TABS.indexOf(curTab),n=(i+(e.key==="ArrowRight"?1:-1)+TABS.length)%TABS.length;showTab(TABS[n],true);
+});
+window.addEventListener("hashchange",()=>{const k=location.hash.slice(1);if(TABS.includes(k)&&k!==curTab)showTab(k);});
+
+/* ---------- 단계 재생기 ---------- */
+const PL={};
+function makePlayer(pre,api){
+  const host=document.querySelector(`[data-player="${pre}"]`);
+  host.innerHTML=`<div class="sk-group"><button type="button" class="sk-btn sk-btn--sm" id="${pre}First">처음</button><button type="button" class="sk-btn sk-btn--sm" id="${pre}Prev">이전</button><button type="button" class="sk-btn sk-btn--sm" id="${pre}Next">다음</button><button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="${pre}Play" aria-pressed="false">재생</button></div>
+    <div class="sk-slider" style="min-width:140px"><div class="sk-sl-head"><label for="${pre}Speed">속도</label><b id="${pre}SpeedV">1×</b></div><input type="range" id="${pre}Speed" min="0.5" max="4" step="0.5" value="1"></div>
+    <span class="sk-hint">키보드 <span class="rp-kbd">→</span> 다음 · <span class="rp-kbd">←</span> 이전</span>`;
+  const bP=$(pre+"Play"),sp=$(pre+"Speed");let timer=null;
+  function stop(){if(timer){clearTimeout(timer);timer=null;}bP.textContent="재생";bP.setAttribute("aria-pressed","false");}
+  function tick(){if(!api.next()){stop();return;}timer=setTimeout(tick,api.base/(+sp.value));}
+  bP.onclick=()=>{if(timer){stop();return;}if(api.atEnd())api.first();bP.textContent="멈춤";bP.setAttribute("aria-pressed","true");timer=setTimeout(tick,RM?api.base:250);};
+  $(pre+"First").onclick=()=>{stop();api.first();};
+  $(pre+"Prev").onclick=()=>{stop();api.prev();};
+  $(pre+"Next").onclick=()=>{stop();api.next();};
+  sp.addEventListener("input",()=>{$(pre+"SpeedV").textContent=sp.value+"×";});
+  const P={stop,next(){stop();api.next();},prev(){stop();api.prev();},sync(){ $(pre+"First").disabled=api.atStart();$(pre+"Prev").disabled=api.atStart();$(pre+"Next").disabled=api.atEnd(); }};
+  players.push(P);PL[pre]=P;return P;
+}
+document.addEventListener("keydown",e=>{
+  if((e.key!=="ArrowRight"&&e.key!=="ArrowLeft")||e.altKey||e.ctrlKey||e.metaKey)return;
+  const t=e.target;if(t&&(t.closest(".sk-tabs")||/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)||t.closest(".sk-seg")||t.isContentEditable))return;
+  const p={shift:PL.t1,split:PL.t2,walk:PL.t3,multi:PL.t4}[curTab];if(!p)return;
+  e.preventDefault();if(e.key==="ArrowRight")p.next();else p.prev();
+});
+
+/* ============================================================
+   데이터 카드
+   ============================================================ */
+const dTrend=bindRange("dTrend",v=>v.toFixed(1),v=>{D.trend=v;dataChanged();});
+const dSeason=bindRange("dSeason",v=>v.toFixed(1),v=>{D.season=v;dataChanged();});
+const dNoise=bindRange("dNoise",v=>v.toFixed(1),v=>{D.noise=v;dataChanged();});
+$("dKind").onchange=e=>{D.kind=e.target.value;D.custom=null;dataChanged();};
+$("dSeed").onchange=e=>{D.seed=clamp(Math.round(+e.target.value)||1,1,9999);e.target.value=D.seed;dataChanged();};
+$("dReseed").onclick=()=>{D.seed=D.seed%9999+1;$("dSeed").value=D.seed;dataChanged();};
+$("dHol").onchange=e=>{D.hol=e.target.checked;dataChanged();};
+$("dApply").onclick=()=>{const R=parseCSV($("dCsv").value);const m=$("dMsg");
+  if(R.err){m.textContent=R.err;m.className="rp-msg bad";return;}
+  D.custom=R;m.textContent=`${R.y.length}행을 적용했습니다.`+(R.gapWarn?" 날짜 간격이 하루가 아닌 곳이 있어 순서대로 하루 간격으로 봅니다.":"");m.className="rp-msg";dataChanged(true);};
+$("dDefault").onclick=()=>{D.custom=null;$("dMsg").textContent="생성 데이터로 돌아왔습니다.";$("dMsg").className="rp-msg";dataChanged();};
+function drawSpark(){
+  const cv=$("dSpark");if(!cv.offsetParent)return;
+  let lo=Math.min(...Y),hi=Math.max(...Y);const pd=(hi-lo)*.08||1;
+  const g=axes(cv,130,{x0:0,x1:N-1,ymin:lo-pd,ymax:hi+pd,ylabel:META.unit,padT:18});
+  HOLI.forEach(i=>{g.c.save();g.c.globalAlpha=.14;g.c.fillStyle=g.P.fc;const x=g.X(i);g.c.fillRect(x-2,g.T,4,g.h-g.T-g.B);g.c.restore();});
+  if(HOLI.length){g.c.save();g.c.fillStyle=g.P.fc;g.c.font=`600 11px ${g.P.sans}`;g.c.textAlign="center";g.c.textBaseline="top";g.c.fillText("추석",g.X(HOLI[1]||HOLI[0]),2);g.c.restore();}
+  line(g.c,Y.map((v,i)=>[g.X(i),g.Y(v)]),g.P.train,1.5);
+}
+function renderDataCard(skipCsv){
+  $("dName").textContent=META.name;
+  $("dInfo").textContent=`${N}일 · ${iso(0)} ~ ${iso(N-1)} · 평균 ${fmt(mean(Y),META.dec+1)}${META.unit}`;
+  $("dFile").textContent=META.file;
+  if(!skipCsv)$("dCsv").value=csvText();
+  const dis=!!D.custom;["dKind","dTrend","dSeason","dNoise","dSeed","dReseed","dHol"].forEach(id=>$(id).disabled=dis);
+  drawSpark();
+}
+function dataChanged(fromCsv){
+  generate();clampAll();renderDataCard(fromCsv);
+  onShow[curTab]&&onShow[curTab]();
+}
+
+/* ============================================================
+   1. Time Shift
+   ============================================================ */
+const ROWS=20,ROWH=30;
+const T1={K:3,w:3,rm:true,rs:false,dow:false,wk:true,mode:"multi",h:3,start:0,step:-1,sel:7,lsel:6,leak:"plain",dropDone:false,tok:0,anim:null};
+function t1Win(){return Y.slice(T1.start,T1.start+ROWS);}
+function t1Cols(yw){
+  const n=yw.length,cols=[],w=T1.w,at=i=>(i>=0&&i<n)?yw[i]:NaN;
+  for(let k=1;k<=T1.K;k++)cols.push({key:`lag_${k}`,grp:"lag",code:`y.shift(${k})`,dy:-k,dec:META.dec,f:i=>at(i-k),src:i=>[i-k],say:i=>`lag_${k} = y(t−${k}) = ${i-k>=0?"y("+mdw(T1.start+i-k)+")":"표 위쪽 밖 → NaN"}`});
+  if(T1.rm)cols.push({key:`roll_mean_${w}`,grp:"roll",code:`shift(1).rolling(${w}).mean()`,dy:-1,dec:2,f:i=>i-w>=0?mean(yw.slice(i-w,i)):NaN,src:i=>rng(i-w,i-1),say:i=>`roll_mean_${w} = y(t−${w}) … y(t−1)의 평균`});
+  if(T1.rs)cols.push({key:`roll_std_${w}`,grp:"roll",code:`shift(1).rolling(${w}).std()`,dy:-1,dec:2,f:i=>i-w>=0?std1(yw.slice(i-w,i)):NaN,src:i=>rng(i-w,i-1),say:i=>`roll_std_${w} = y(t−${w}) … y(t−1)의 표준편차 (ddof=1)`});
+  if(T1.wk)cols.push({key:"is_weekend",grp:"cal",code:"dayofweek ≥ 5",dec:0,f:i=>dowOf(T1.start+i)>=5?1:0,src:()=>[],say:i=>`is_weekend = ${dowOf(T1.start+i)>=5?1:0} (날짜에서 바로 계산)`});
+  if(T1.dow)for(let d=1;d<=6;d++)cols.push({key:`dow_${d}`,grp:"cal",code:`dayofweek == ${d} (${DOWK[d]})`,dec:0,f:i=>dowOf(T1.start+i)===d?1:0,src:()=>[],say:null});
+  const H=T1.mode==="one"?1:T1.h;const js=T1.mode==="one"?[1]:T1.mode==="h"?[H]:rng(1,H);
+  js.forEach(j=>cols.push({key:`y_h${j}`,grp:"tgt",code:j===1?"y  (= shift(0))":`y.shift(−${j-1})`,dy:j-1,dec:META.dec,f:i=>at(i+j-1),src:i=>[i+j-1],say:i=>`y_h${j} = y(t${j>1?"+"+(j-1):""}) = ${i+j-1<n?"y("+mdw(T1.start+i+j-1)+")":"표 아래쪽 밖 → NaN"}  ← ${j}스텝 앞 목표`}));
+  return cols;
+}
+function t1Steps(cols){
+  const st=[{lab:"원본",n:0,add:[]}];let n=0;
+  for(let i=0;i<cols.length;){
+    const c=cols[i];
+    if(c.grp==="cal"||c.grp==="tgt"){const g=c.grp;const add=[];while(i<cols.length&&cols[i].grp===g){add.push(cols[i].key);i++;n++;}st.push({lab:g==="cal"?"달력 특성":"목표",n,add,grp:g});}
+    else{n++;i++;st.push({lab:c.key.startsWith("roll_mean")?"이동평균":c.key.startsWith("roll_std")?"이동표준편차":c.key,n,add:[c.key],grp:c.grp,col:c});}
+  }
+  st.push({lab:"dropna",n,add:[],drop:true});
+  return st;
+}
+function t1Formula(){
+  const H=T1.mode==="one"?1:T1.h;
+  const tg=T1.mode==="one"?"목표 y_h1 = y(t)":T1.mode==="h"?`목표 y_h${H} = y(t+${H-1}) = y.shift(−${H-1})`:`목표 y_h1 … y_h${H} = y(t) … y(t+${H-1})`;
+  $("t1Formula").innerHTML=`lag_k = y.shift(k) = y(t−k),  k = 1…${T1.K}<br>${T1.rm||T1.rs?`roll_${T1.w} = y.shift(1).rolling(${T1.w}) → y(t−${T1.w}) … y(t−1)<br>`:""}${tg}<br>기준 시점(마지막으로 아는 날) = t−1`;
+}
+function t1SvgCols(){
+  const yw=t1Win().slice(0,5);const g=$("svgCols");let s="";
+  const col=(x,vals,cls)=>vals.forEach((v,i)=>{const na=v===null;s+=`<rect class="cell ${na?"na":cls}" x="${x-30}" y="${38+i*26}" width="60" height="22" rx="4"/><text class="tx${na?" na":""}" x="${x}" y="${49+i*26}">${na?"NaN":fv(v)}</text>`;});
+  col(70,yw,"");col(235,[null,null,yw[0],yw[1],yw[2]],"f");col(395,[yw[1],yw[2],yw[3],yw[4],null],"t");g.innerHTML=s;
+}
+function t1Render(animKeys){
+  const yw=t1Win(),n=yw.length,cols=t1Cols(yw),steps=t1Steps(cols);
+  if(T1.step<0||T1.step>=steps.length)T1.step=steps.length-2;
+  const st=steps[T1.step],vis=cols.slice(0,st.n),drop=!!st.drop;
+  const nanRow=rng(0,n-1).map(i=>vis.some(c=>Number.isNaN(c.f(i))));
+  let top=0;while(top<n&&nanRow[top])top++;let bot=0;while(bot<n&&nanRow[n-1-bot])bot++;
+  const kept=nanRow.filter(x=>!x).length;
+  if(T1.sel>=n)T1.sel=n-1;
+  const sel=T1.sel,srcF=new Set(),srcT=new Set();
+  vis.forEach(c=>c.src(sel).forEach(j=>{if(j>=0&&j<n)(c.grp==="tgt"?srcT:srcF).add(j);}));
+  const ak=new Set(animKeys||[]);
+  let h=`<thead><tr><th>날짜 t</th><th class="g-y">y<span class="cd">원본</span></th>`;
+  vis.forEach(c=>{h+=`<th class="g-${c.grp}">${c.key}<span class="cd">${esc(c.code)}</span></th>`;});
+  h+="</tr></thead><tbody>";
+  for(let i=0;i<n;i++){
+    if(drop&&T1.dropDone&&nanRow[i])continue;
+    const gi=T1.start+i,we=dowOf(gi)>=5;
+    const cls=[nanRow[i]?"hasna":"",i===sel?"sel":"",drop&&!T1.dropDone&&nanRow[i]?"gone":""].join(" ");
+    h+=`<tr class="${cls}" data-i="${i}" tabindex="0" aria-label="${md(gi)} 행 선택"><td class="dt${we?" we":""}">${mdw(gi)}</td>`;
+    h+=`<td class="n${srcF.has(i)?" srcf":""}${srcT.has(i)?" srct":""}">${fv(yw[i])}</td>`;
+    vis.forEach(c=>{const v=c.f(i),na=Number.isNaN(v);let inner=na?"NaN":(c.grp==="cal"?String(v):fmt(v,c.dec));
+      if(ak.has(c.key)&&!RM){inner=c.grp==="cal"?`<span class="fadein">${inner}</span>`:`<span class="in" style="--dy:${c.dy*ROWH}px">${inner}</span>`;}
+      h+=`<td class="n${na?" na":""}${c.grp==="tgt"?" tg":""}${c.grp==="cal"&&v===0?" cal0":""}">${inner}</td>`;});
+    h+="</tr>";
+  }
+  $("t1Tbl").innerHTML=h+"</tbody>";
+  $("t1Stepper").innerHTML=steps.map((s,i)=>`<li class="${i===T1.step?"on":i<T1.step?"done":""}">${esc(s.lab)}</li>`).join("");
+  // 설명
+  let cap="";
+  if(st.lab==="원본")cap=`<b>원본</b>: 날짜와 관측값 y만 있습니다. 이대로는 "입력 → 정답" 쌍이 없어 지도학습 모형에 넣을 수 없습니다.`;
+  else if(st.drop)cap=`<b>dropna()</b>: NaN이 하나라도 있는 행을 지웁니다. 위쪽 <b>${top}행</b>(과거가 모자람) + 아래쪽 <b>${bot}행</b>(미래가 아직 없음) 삭제 → 학습에 쓸 행 <b>${kept}개</b> (${n}행 중).`;
+  else if(st.grp==="lag"){const k=+st.col.key.split("_")[1];cap=`<b>${st.col.key} = y.shift(${k})</b>: y 열을 <b>${k}칸 아래로</b> 밀어 붙입니다. 맨 위 ${k}행은 가져올 과거가 없어 NaN.`;}
+  else if(st.grp==="roll")cap=`<b>${st.col.key} = y.shift(1).rolling(${T1.w})</b>: 먼저 한 칸 밀고(어제까지) ${T1.w}일 창으로 ${st.lab==="이동평균"?"평균":"표준편차"}. 오늘 값 y(t)는 들어가지 않습니다. 맨 위 ${T1.w}행 NaN.`;
+  else if(st.grp==="cal")cap=`<b>달력 특성</b>: 날짜에서 바로 계산하므로 NaN이 없고, 미래 날짜에 대해서도 미리 알 수 있는 특성입니다.`;
+  else if(st.grp==="tgt"){const H=T1.mode==="one"?1:T1.h;cap=T1.mode==="one"?`<b>목표 = y(t)</b>: 특성이 모두 t−1까지라 y 자체가 1스텝 앞 목표입니다. shift(0)이므로 NaN 없음.`:
+    `<b>목표 = y.shift(−j)</b>: 미래 값을 <b>위로 당겨</b> 붙입니다. y_h${H}는 ${H-1}칸 위로 당겨져 맨 아래 ${H-1}행이 NaN (아직 오지 않은 미래).`;}
+  $("t1Cap").innerHTML=cap+(st.lab!=="원본"&&!st.drop?` <span class="sk-hint">현재 NaN 행: 위 ${top} · 아래 ${bot}</span>`:"");
+  // 선택 행 정보
+  const gi=T1.start+sel;let inf=`<h3>행 ${mdw(gi)} 해부</h3><p>${nanRow[sel]?(drop?'<b class="rp-leak">NaN이 있어 dropna로 삭제되는 행</b>':'<b class="rp-leak">NaN이 있는 행 → dropna 대상</b>'):"모든 칸이 채워진 학습 가능한 행"}</p><dl class="sk-kv">`;
+  inf+=`<dt>y(t) 원본</dt><dd>${fv(yw[sel])}</dd>`;
+  vis.forEach(c=>{if(c.grp==="cal"&&c.key!=="is_weekend")return;const v=c.f(sel);inf+=`<dt class="${c.grp==="tgt"?"rp-fc":c.grp==="lag"?"rp-train":c.grp==="roll"?"rp-cv":"rp-mo"}">${c.key}</dt><dd>${Number.isNaN(v)?'<span class="rp-leak">NaN</span>':fmt(v,c.dec)}</dd>`;});
+  inf+="</dl>";
+  const lines=vis.filter(c=>c.say).map(c=>c.say(sel));
+  const rm=vis.find(c=>c.key.startsWith("roll_mean"));
+  if(rm&&sel-T1.w>=0)lines.push(`  = (${yw.slice(sel-T1.w,sel).map(fv).join(" + ")}) / ${T1.w} = ${fmt(rm.f(sel),2)}`);
+  if(lines.length)inf+=`<div class="sk-formula">${lines.map(esc).join("\n")}</div>`;
+  inf+=`<p>표에서 <span class="rp-train">파란 테두리</span> = 이 행의 특성이 가져온 y, <span class="rp-fc">주황 테두리</span> = 이 행의 목표 y. 다른 행을 눌러 보세요.</p>`;
+  $("t1Info").innerHTML=inf;
+  PL.t1.sync();
+  if(drop&&!T1.dropDone){const tk=++T1.tok;if(RM){T1.dropDone=true;t1Render();}else setTimeout(()=>{if(tk===T1.tok&&curTab==="shift"){T1.dropDone=true;t1Render();}},750);}
+}
+function t1Go(to){
+  const steps=t1Steps(t1Cols(t1Win()));to=clamp(to,0,steps.length-1);
+  const fwd=to===T1.step+1;T1.tok++;T1.step=to;T1.dropDone=false;
+  t1Render(fwd?steps[to].add:null);
+}
+function t1Reset(){T1.step=-1;T1.dropDone=false;T1.tok++;PL.t1&&PL.t1.stop();t1Formula();t1SvgCols();t1Render();t1Leak();}
+makePlayer("t1",{base:1100,next(){const L=t1Steps(t1Cols(t1Win())).length;if(T1.step>=L-1)return false;t1Go(T1.step+1);return true;},
+  prev(){if(T1.step>0)t1Go(T1.step-1);},first(){t1Go(0);},atEnd(){return T1.step>=t1Steps(t1Cols(t1Win())).length-1;},atStart(){return T1.step<=0;}});
+$("t1Tbl").addEventListener("click",e=>{const tr=e.target.closest("tr[data-i]");if(!tr)return;T1.sel=+tr.dataset.i;t1Render();});
+$("t1Tbl").addEventListener("keydown",e=>{if(e.key!=="Enter"&&e.key!==" ")return;const tr=e.target.closest("tr[data-i]");if(!tr)return;e.preventDefault();T1.sel=+tr.dataset.i;t1Render();const q=$("t1Tbl").querySelector(`tr[data-i="${T1.sel}"]`);q&&q.focus();});
+bindRange("t1K",null,v=>{T1.K=v;t1Reset();});
+bindRange("t1W",null,v=>{T1.w=v;t1Reset();});
+$("t1Rm").onchange=e=>{T1.rm=e.target.checked;t1Reset();};
+$("t1Rs").onchange=e=>{T1.rs=e.target.checked;t1Reset();};
+$("t1Dow").onchange=e=>{T1.dow=e.target.checked;t1Reset();};
+$("t1Wk").onchange=e=>{T1.wk=e.target.checked;t1Reset();};
+segInit($("t1Mode"),v=>{T1.mode=v;$("t1HBox").hidden=v==="one";t1Reset();});
+bindRange("t1H",null,v=>{T1.h=v;t1Reset();});
+const t1Start=bindRange("t1Start",v=>DT.length?md(v):"",v=>{T1.start=v;t1Reset();});
+segInit($("t1Leak"),v=>{T1.leak=v;t1Leak();});
+
+/* 누수 비교 */
+function rollFeat(arr,i,kind,w){ // arr 전체에서 i행의 롤링 특성
+  const n=arr.length;let a,b;
+  if(kind==="ok"){a=i-w;b=i-1;}else if(kind==="plain"){a=i-w+1;b=i;}else{const off=(w-1)>>1;a=i+off-w+1;b=i+off;}
+  if(a<0||b>=n)return{v:NaN,a,b};return{v:mean(arr.slice(a,b+1)),a,b};
+}
+function fit1(xs,ys){const p=[];xs.forEach((x,i)=>{if(!Number.isNaN(x))p.push([x,ys[i]]);});const mx=mean(p.map(q=>q[0])),my=mean(p.map(q=>q[1]));
+  let sxy=0,sxx=0;p.forEach(([x,y])=>{sxy+=(x-mx)*(y-my);sxx+=(x-mx)*(x-mx);});const b=sxx?sxy/sxx:0,a=my-b*mx;
+  let sse=0,sst=0,sae=0;p.forEach(([x,y])=>{const e=y-(a+b*x);sse+=e*e;sae+=Math.abs(e);sst+=(y-my)*(y-my);});return{r2:1-sse/sst,mae:sae/p.length,n:p.length,a,b};}
+function t1Leak(){
+  const w=T1.w,yw=t1Win(),rows=12,kind=T1.leak,off=(w-1)>>1;
+  if(T1.lsel>=rows)T1.lsel=rows-1;
+  $("t1LkTitle").textContent=kind==="plain"?`잘못된 예: y.rolling(${w}).mean()`:`잘못된 예: y.rolling(${w}, center=True).mean()`;
+  $("t1OkTitle").textContent=`올바른 예: y.shift(1).rolling(${w}).mean()`;
+  $("t1LkF").innerHTML=kind==="plain"?`x(t) = (y(t−${w-1}) + … + <b class="rp-leak">y(t)</b>) / ${w}   ← 목표 y(t)가 들어감`:
+    `x(t) = (y(t${off-w+1<0?"−"+(w-1-off):""}) + … + <b class="rp-leak">y(t)${off>0?" … y(t+"+off+")":""}</b>) / ${w}   ← 목표${off>0?"와 미래":""}가 들어감`;
+  $("t1OkF").innerHTML=`x(t) = (y(t−${w}) + … + y(t−1)) / ${w}   ← t−1까지만`;
+  function tbl(kd){
+    const sel=T1.lsel,R=rollFeat(yw,sel,kd,w);
+    let h=`<thead><tr><th>날짜 t</th><th class="g-tgt">y(t) = 목표</th><th class="g-roll">x(t) 롤링 특성</th></tr></thead><tbody>`;
+    for(let i=0;i<rows;i++){
+      const r=rollFeat(yw,i,kd,w);let c="";
+      if(i>=R.a&&i<=R.b)c=(kd!=="ok"&&i>=sel)?" srcl":" srcf";
+      h+=`<tr class="${i===sel?"sel":""}" data-i="${i}" tabindex="0"><td class="dt">${mdw(T1.start+i)}</td><td class="n tg${c}">${fv(yw[i])}</td><td class="n${Number.isNaN(r.v)?" na":""}">${Number.isNaN(r.v)?"NaN":fmt(r.v,2)}</td></tr>`;
+    }
+    return h+"</tbody>";
+  }
+  $("t1LkTbl").innerHTML=tbl(kind);$("t1OkTbl").innerHTML=tbl("ok");
+  const xsW=Y.map((_,i)=>rollFeat(Y,i,kind,w).v),xsO=Y.map((_,i)=>rollFeat(Y,i,"ok",w).v);
+  const fw=fit1(xsW,Y),fo=fit1(xsO,Y);
+  const st=(f,col)=>`<div class="sk-stat" style="border-left:4px solid ${col}"><b>${fmt(f.r2,3)}</b><span>R² (전체 ${f.n}일)</span></div><div class="sk-stat"><b>${fmt(f.mae,2)}</b><span>MAE</span></div>`;
+  $("t1LkStats").innerHTML=st(fw,"var(--c-leak)");$("t1OkStats").innerHTML=st(fo,"var(--c-ok)");
+  const R=rollFeat(yw,T1.lsel,kind,w);
+  $("t1LkNote").innerHTML=`<b>행 ${mdw(T1.start+T1.lsel)}</b>: 잘못된 특성의 창 = ${R.a<0||R.b>=yw.length?"표 밖까지 필요 (NaN)":rng(R.a,R.b).map(i=>md(T1.start+i)).join(", ")} → 목표 y(t)${kind==="center"&&off>0?"와 그 뒤 "+off+"일":""}가 들어 있습니다. 이 특성 하나로 y(t)를 맞힌 R²가 <b>${fmt(fw.r2,3)}</b> vs 올바른 특성 <b>${fmt(fo.r2,3)}</b>. 차이는 실력이 아니라 정답을 미리 본 몫입니다.`;
+}
+function t1LeakClick(e){const tr=e.target.closest("tr[data-i]");if(!tr)return;if(e.type==="keydown"){if(e.key!=="Enter"&&e.key!==" ")return;e.preventDefault();}T1.lsel=+tr.dataset.i;t1Leak();}
+["t1LkTbl","t1OkTbl"].forEach(id=>{$(id).addEventListener("click",t1LeakClick);$(id).addEventListener("keydown",t1LeakClick);});
+onShow.shift=()=>{renderDataCard(true);t1Formula();t1SvgCols();t1Render();t1Leak();};
+
+/* ============================================================
+   2. 분할
+   ============================================================ */
+const T2={n:30,k:5,ts:0,gap:0,win:"exp",mts:10,f:4,seed:3};
+function tssSplit(n,k,ts,gap,mts){
+  const nf=k+1,tsz=ts||Math.floor(n/nf);
+  if(nf>n)return{err:`ValueError: Cannot have number of folds=${nf} greater than the number of samples=${n}.`};
+  if(n-gap-tsz*k<=0)return{err:`ValueError: Too many splits=${k} for number of samples=${n} with test_size=${tsz} and gap=${gap}.`};
+  const folds=[];
+  for(let s=n-k*tsz;s<n;s+=tsz){const end=s-gap;const tr=(mts&&mts<end)?rng(end-mts,end-1):rng(0,end-1);folds.push({tr,te:rng(s,Math.min(n,s+tsz)-1),gap:rng(end,s-1)});}
+  return{folds,tsz};
+}
+function kfoldShuffle(n,k,seed){
+  const idx=shuffle(rng(0,n-1),mulberry32(seed));const out=[];let p=0;
+  for(let f=0;f<k;f++){const sz=Math.floor(n/k)+(f<n%k?1:0);const te=idx.slice(p,p+sz).sort((a,b)=>a-b);p+=sz;const set=new Set(te);out.push({te,tr:rng(0,n-1).filter(i=>!set.has(i))});}
+  return out;
+}
+function cellsRow(n,role){let s="";for(let i=0;i<n;i++)s+=`<i class="${role[i]||""}" title="${i}"></i>`;return s;}
+function axisRow(n){let s=`<span></span><div class="tk">`;const st=n>40?10:5;for(let i=0;i<n;i+=st)s+=`<span style="left:${(i+.5)/n*100}%">${i}</span>`;return s+`</div><span></span>`;}
+function rangeTxt(a){if(!a.length)return"[]";let s=[],st=a[0],pv=a[0];for(let i=1;i<=a.length;i++){if(i<a.length&&a[i]===pv+1){pv=a[i];continue;}s.push(st===pv?`${st}`:`${st}–${pv}`);if(i<a.length){st=pv=a[i];}}return s.join(", ");}
+function t2Render(){
+  const n=T2.n,k=T2.k,mts=T2.win==="slide"?T2.mts:0;
+  const R=tssSplit(n,k,T2.ts,T2.gap,mts);
+  $("t2TsV").textContent=T2.ts?T2.ts:`None → ${Math.floor(n/(k+1))}`;
+  const nf=R.err?k:R.folds.length;if(T2.f>=nf)T2.f=nf-1;
+  let h="";
+  // 무작위 KFold
+  const KF=kfoldShuffle(n,k,T2.seed);let leakTot=0;
+  h+=`<h3 class="rp-leak">① 무작위 K-fold (KFold(n_splits=${k}, shuffle=True)) — 시계열에서 금지</h3>`;
+  KF.forEach((F,f)=>{const role={};const mn=F.te[0];let lk=0;F.tr.forEach(i=>{if(i>mn){role[i]="lk";lk++;}else role[i]="tr";});F.te.forEach(i=>role[i]="te");leakTot+=lk;
+    h+=`<div class="rp-gr${f===T2.f?" on":""}${f>T2.f?" dim":""}"><span class="lb">fold ${f+1}</span><div class="rp-cells" style="--n:${n}">${cellsRow(n,role)}</div><span class="ct rp-leak">미래로 학습 ${lk}칸</span></div>`;});
+  h+=`<div class="rp-axis">${axisRow(n)}</div>`;
+  // 홀드아웃
+  const nte=Math.ceil(0.2*n),ntr=n-nte;const role={};for(let i=0;i<n;i++)role[i]=i<ntr?"tr":"te";
+  h+=`<h3>② 시간 순 홀드아웃 (train_test_split(shuffle=False, test_size=0.2))</h3><div class="rp-gr"><span class="lb">1회</span><div class="rp-cells" style="--n:${n}">${cellsRow(n,role)}</div><span class="ct">train ${ntr} · test ${nte}</span></div>`;
+  // TSS
+  h+=`<h3 class="rp-ok">③ TimeSeriesSplit(n_splits=${k}, test_size=${T2.ts||"None"}, gap=${T2.gap}${mts?`, max_train_size=${mts}`:""})</h3>`;
+  let pr="";
+  if(R.err){h+=`<p class="rp-err">${esc(R.err)}</p>`;pr=esc(R.err);}
+  else{
+    R.folds.forEach((F,f)=>{const role={};F.tr.forEach(i=>role[i]="tr");F.gap.forEach(i=>role[i]="gap");F.te.forEach(i=>role[i]="te");
+      h+=`<div class="rp-gr${f===T2.f?" on":""}${f>T2.f?" dim":""}"><span class="lb">fold ${f+1}</span><div class="rp-cells" style="--n:${n}">${cellsRow(n,role)}</div><span class="ct">train ${F.tr.length} · test ${F.te.length}</span></div>`;
+      const line=`fold ${f+1}: train=[${rangeTxt(F.tr)}] (${F.tr.length}개)${F.gap.length?`  gap=[${rangeTxt(F.gap)}]`:""}  test=[${rangeTxt(F.te)}] (${F.te.length}개)`;
+      pr+=(f===T2.f?`<b>${esc(line)}</b>`:esc(line))+"\n";});
+    h+=`<div class="rp-axis">${axisRow(n)}</div>`;
+  }
+  $("t2Grids").innerHTML=h;$("t2Print").innerHTML=pr.trimEnd();
+  const tsz=T2.ts||Math.floor(n/(k+1));
+  $("t2Rule").innerHTML=R.err?esc(R.err):`test_size = ${T2.ts?T2.ts+" (지정)":`n // (n_splits+1) = ${n} // ${k+1} = ${tsz}`}<br>첫 test 시작 = n − n_splits×test_size = ${n} − ${k}×${tsz} = ${n-k*tsz}<br>train 끝 = test 시작 − gap${mts?`<br>train 길이 ≤ max_train_size = ${mts}`:""}`;
+  const F=R.err?null:R.folds[T2.f],KFf=KF[Math.min(T2.f,KF.length-1)];
+  $("t2Cap").innerHTML=`<b>fold ${T2.f+1}</b> — 무작위 K-fold는 test ${KFf.te.length}칸보다 미래인 표본 <b class="rp-leak">${KFf.tr.filter(i=>i>KFf.te[0]).length}칸</b>으로 학습합니다 (전체 fold 합계 ${leakTot}칸).`+(F?` TimeSeriesSplit은 train [${rangeTxt(F.tr)}] → test [${rangeTxt(F.te)}]: 항상 과거로 미래를 맞힙니다.`:"");
+  PL.t2.sync();
+}
+makePlayer("t2",{base:1000,next(){if(T2.f>=T2.k-1)return false;T2.f++;t2Render();return true;},prev(){if(T2.f>0){T2.f--;t2Render();}},first(){T2.f=0;t2Render();},atEnd(){return T2.f>=T2.k-1;},atStart(){return T2.f<=0;}});
+bindRange("t2N",null,v=>{T2.n=v;t2Render();});
+bindRange("t2K",null,v=>{T2.k=v;T2.f=v-1;t2Render();});
+bindRange("t2Ts",v=>v?String(v):"None",v=>{T2.ts=v;t2Render();});
+bindRange("t2Gap",null,v=>{T2.gap=v;t2Render();});
+bindRange("t2Mts",null,v=>{T2.mts=v;t2Render();});
+segInit($("t2Win"),v=>{T2.win=v;$("t2MtsBox").hidden=v!=="slide";t2Render();});
+onShow.split=()=>t2Render();
+
+/* ============================================================
+   모형 (나이브 · 계절 나이브 · 이동평균 · lag 선형회귀 · 단순 지수평활)
+   ============================================================ */
+const M={model:"lr",p:7,dow:false,m:7,alpha:0.3,auto:true};
+const MNAME={naive:"나이브",snaive:"계절 나이브(7일)",ma:"이동평균",lr:"선형회귀(lag)",ses:"단순 지수평활"};
+function mName(mc){return mc.model==="ma"?`이동평균(m=${mc.m})`:mc.model==="lr"?`선형회귀(lag ${mc.p}${mc.dow?" + 요일":""})`:mc.model==="ses"?`단순 지수평활(α ${mc.auto?"자동":mc.alpha.toFixed(2)})`:MNAME[mc.model];}
+function lrRow(buf,t,p,dw){const r=[1];for(let k=1;k<=p;k++)r.push(buf[t-k]);if(dw){const d=dowOf(t);for(let q=1;q<=6;q++)r.push(d===q?1:0);}return r;}
+function sesRun(s,T,a){let l=Y[s],sse=0;for(let t=s+1;t<=T;t++){const e=Y[t]-l;sse+=e*e;l=a*Y[t]+(1-a)*l;}return{l,sse,n:T-s};}
+function needRows(mc){return mc.model==="lr"?mc.p+(1+mc.p+(mc.dow?6:0))+3:mc.model==="ma"?mc.m+3:mc.model==="snaive"?10:4;}
+function fitM(mc,s,T){
+  const F={model:mc.model,s,T};
+  if(mc.model==="naive"){const r=[];for(let t=s+1;t<=T;t++)r.push(Y[t]-Y[t-1]);F.sigma=Math.sqrt(mean(r.map(e=>e*e)));}
+  else if(mc.model==="snaive"){const r=[];for(let t=Math.max(s+7,7);t<=T;t++)r.push(Y[t]-Y[t-7]);F.sigma=Math.sqrt(mean(r.map(e=>e*e)));}
+  else if(mc.model==="ma"){const r=[];for(let t=Math.max(s+mc.m,mc.m);t<=T;t++)r.push(Y[t]-mean(Y.slice(t-mc.m,t)));F.sigma=Math.sqrt(mean(r.map(e=>e*e)));}
+  else if(mc.model==="lr"){
+    const X=[],yy=[];for(let t=Math.max(s,0)+mc.p;t<=T;t++){X.push(lrRow(Y,t,mc.p,mc.dow));yy.push(Y[t]);}
+    F.beta=lstsq(X,yy);let sse=0;X.forEach((x,i)=>{const e=yy[i]-dot(F.beta,x);sse+=e*e;});F.nRows=X.length;
+    F.sigma=Math.sqrt(sse/Math.max(1,X.length-F.beta.length));
+  }else{
+    let a=mc.alpha;if(mc.auto){let best=Infinity;for(let q=1;q<=99;q++){const r=sesRun(s,T,q/100);if(r.sse<best-1e-12){best=r.sse;a=q/100;}}}
+    F.alpha=a;const r=sesRun(s,T,a);F.sigma=Math.sqrt(r.sse/Math.max(1,r.n));
+  }
+  return F;
+}
+function fcM(mc,F,s,T,h){
+  const f=[],sd=[];
+  if(mc.model==="naive")for(let j=1;j<=h;j++){f.push(Y[T]);sd.push(F.sigma*Math.sqrt(j));}
+  else if(mc.model==="snaive")for(let j=1;j<=h;j++){f.push(Y[T+j-7*Math.ceil(j/7)]);sd.push(F.sigma*Math.sqrt(Math.ceil(j/7)));}
+  else if(mc.model==="ma"){const v=mean(Y.slice(T-mc.m+1,T+1));for(let j=1;j<=h;j++){f.push(v);sd.push(F.sigma);}}
+  else if(mc.model==="lr"){
+    const buf=Y.slice(0,T+1);for(let j=1;j<=h;j++){const t=T+j;const v=dot(F.beta,lrRow(buf,t,mc.p,mc.dow));buf.push(v);f.push(v);}
+    const ph=F.beta.slice(1,1+mc.p),psi=[1];for(let i=1;i<h;i++){let v=0;for(let k=1;k<=mc.p&&k<=i;k++)v+=ph[k-1]*psi[i-k];psi.push(v);}
+    let acc=0;for(let j=0;j<h;j++){acc+=psi[j]*psi[j];sd.push(F.sigma*Math.sqrt(acc));}
+  }else{const l=sesRun(s,T,F.alpha).l;for(let j=1;j<=h;j++){f.push(l);sd.push(F.sigma*Math.sqrt(1+(j-1)*F.alpha*F.alpha));}}
+  return{f,sd};
+}
+function metr(pairs,scale){
+  if(!pairs.length)return{mae:NaN,rmse:NaN,mape:NaN,smape:NaN,mase:NaN,n:0};
+  let ae=0,se=0,ap=0,apn=0,sm=0;
+  pairs.forEach(([a,f])=>{const e=a-f;ae+=Math.abs(e);se+=e*e;if(Math.abs(a)>1e-9){ap+=Math.abs(e/a);apn++;}const den=Math.abs(a)+Math.abs(f);sm+=den>0?2*Math.abs(e)/den:0;});
+  const n=pairs.length,mae=ae/n;return{mae,rmse:Math.sqrt(se/n),mape:apn?100*ap/apn:NaN,smape:100*sm/n,mase:scale>0?mae/scale:NaN,n};
+}
+function naiveScale(T0){let s=0;for(let t=1;t<T0;t++)s+=Math.abs(Y[t]-Y[t-1]);return s/(T0-1);}
+
+/* ============================================================
+   3. 롤링(워크포워드) 예측
+   ============================================================ */
+const T3={T0:70,h:7,stride:1,win:"exp",L:42,re:"each",k:7,oi:0,ph:3,R:null,init:true};
+function wfRun(mc,cfg){
+  const out=[];let F=null,fits=0,lastFit=-1;
+  for(let T=cfg.T0-1,oi=0;T+cfg.h<=N-1;T+=cfg.stride,oi++){
+    const s=cfg.win==="slide"?Math.max(0,T-cfg.L+1):0;
+    const refit=F===null||cfg.re==="each"||(cfg.re==="k"&&oi%cfg.k===0);
+    if(refit){F=fitM(mc,s,T);fits++;lastFit=oi;}
+    const P=fcM(mc,F,s,T,cfg.h);
+    const act=Y.slice(T+1,T+1+cfg.h);const err=act.map((a,j)=>a-P.f[j]);
+    out.push({T,s,refit,fitOi:lastFit,F,f:P.f,sd:P.sd,act,err,mae:mean(err.map(Math.abs)),fits});
+  }
+  const pairs=[];out.forEach(o=>o.act.forEach((a,j)=>pairs.push([a,o.f[j]])));
+  return{orig:out,fits,met:metr(pairs,naiveScale(cfg.T0))};
+}
+function t3Cfg(){return{T0:T3.T0,h:T3.h,stride:T3.stride,win:T3.win,L:T3.L,re:T3.re,k:T3.k};}
+function t3Check(mc,cfg){
+  const need=needRows(mc);const len=cfg.win==="slide"?Math.min(cfg.L,cfg.T0):cfg.T0;
+  if(len<need)return`학습 구간(${len}일)이 너무 짧습니다. 이 모형은 최소 ${need}일이 필요합니다 (lag·창을 줄이거나 학습 길이를 늘리세요).`;
+  if(cfg.T0+cfg.h>N)return`초기 학습 길이 + 예측 길이가 데이터 길이(${N}일)를 넘습니다.`;
+  return"";
+}
+function t3Compute(){
+  const cfg=t3Cfg(),err=t3Check(M,cfg);
+  $("t3Err").hidden=!err;$("t3Err").textContent=err;
+  if(err){T3.R=null;return;}
+  T3.R=wfRun(M,cfg);
+  const L=T3.R.orig.length;
+  if(T3.init){T3.oi=Math.min(14,L-1);T3.ph=3;T3.init=false;}
+  if(T3.oi>=L){T3.oi=L-1;T3.ph=3;}
+}
+function t3Draw(){
+  const R=T3.R;const cv=$("t3Chart"),cv2=$("t3Err2");
+  if(!R){prep(cv,300);prep(cv2,120);$("t3Info").innerHTML="";$("t3Stats").innerHTML="";$("t3Cap").textContent="";return;}
+  const o=R.orig[T3.oi],ph=T3.ph,h=T3.h;
+  let lo=Math.min(...Y),hi=Math.max(...Y);
+  R.orig.forEach(q=>q.f.forEach(v=>{lo=Math.min(lo,v);hi=Math.max(hi,v);}));
+  o.f.forEach((v,j)=>{lo=Math.min(lo,v-1.96*o.sd[j]);hi=Math.max(hi,v+1.96*o.sd[j]);});
+  const pd=(hi-lo)*.06;
+  const W=cv.parentElement.clientWidth||700,H1=W<520?250:310,X0=W<640?Math.max(0,o.T-42):0;
+  const g=axes(cv,H1,{x0:X0,x1:N-1,ymin:lo-pd,ymax:hi+pd,ylabel:META.unit}),c=g.c,P=g.P;
+  c.save();c.beginPath();c.rect(g.L,0,g.w-g.L,g.h);c.clip();
+  // 학습 창
+  c.save();c.globalAlpha=.09;c.fillStyle=P.train;c.fillRect(g.X(o.s),g.T,g.X(o.T)-g.X(o.s),g.h-g.T-g.B);c.restore();
+  c.save();c.fillStyle=P.train;c.font=`600 11px ${P.sans}`;c.textBaseline="top";c.textAlign="left";
+  const fitTxt=o.refit?"이 원점에서 학습":"계수 유지 (재학습 안 함)";c.fillText(W<640?`학습 ${o.T-o.s+1}일${o.refit?"":" · 계수 유지"}`:`학습 창 ${o.T-o.s+1}일 · ${fitTxt}`,Math.max(g.X(o.s),g.L)+4,g.T+2);c.restore();
+  // 아직 모르는 미래
+  const fx=ph>=2?o.T+h:o.T;
+  if(fx<N-1){c.save();c.fillStyle=P.s2;c.globalAlpha=.75;c.fillRect(g.X(fx)+1,g.T,g.w-g.R-g.X(fx)-1,g.h-g.T-g.B);c.restore();
+    c.save();c.fillStyle=P.faint;c.font=`600 11px ${P.sans}`;c.textAlign="center";c.textBaseline="middle";const cx=(g.X(fx)+g.w-g.R)/2;if(g.w-g.R-g.X(fx)>70)c.fillText("아직 모르는 미래",cx,g.T+16);c.restore();}
+  HOLI.forEach(i=>{if(i<=fx){c.save();c.fillStyle=P.fc;c.font=`600 10px ${P.sans}`;c.textAlign="center";c.textBaseline="bottom";if(i===HOLI[1])c.fillText("추석",g.X(i),g.h-g.B-2);c.restore();}});
+  // 실제 (학습 이전 부분은 흐리게)
+  if(o.s>0){c.save();c.globalAlpha=.35;line(c,rng(0,o.s).map(i=>[g.X(i),g.Y(Y[i])]),P.train,1.3);c.restore();}
+  line(c,rng(o.s,o.T).map(i=>[g.X(i),g.Y(Y[i])]),P.train,1.7);
+  // 지난 원점 예측
+  c.save();c.globalAlpha=.3;for(let q=0;q<T3.oi;q++){const r=R.orig[q];line(c,[[g.X(r.T),g.Y(Y[r.T])]].concat(r.f.map((v,j)=>[g.X(r.T+1+j),g.Y(v)])),P.fc,1.1);}c.restore();
+  // 지난 원점 실제값 (이미 공개된 과거) — 학습 창 밖 미래 쪽은 원점까지 이미 표시
+  if(ph>=1){
+    const xs=[g.X(o.T)].concat(o.f.map((_,j)=>g.X(o.T+1+j)));
+    const lo95=[g.Y(Y[o.T])].concat(o.f.map((v,j)=>g.Y(v-1.96*o.sd[j]))),hi95=[g.Y(Y[o.T])].concat(o.f.map((v,j)=>g.Y(v+1.96*o.sd[j])));
+    const lo80=[g.Y(Y[o.T])].concat(o.f.map((v,j)=>g.Y(v-1.2816*o.sd[j]))),hi80=[g.Y(Y[o.T])].concat(o.f.map((v,j)=>g.Y(v+1.2816*o.sd[j])));
+    band(c,xs,lo95,hi95,P.fc,.12);band(c,xs,lo80,hi80,P.fc,.2);
+  }
+  if(ph>=2){const pts=[[g.X(o.T),g.Y(Y[o.T])]].concat(o.act.map((a,j)=>[g.X(o.T+1+j),g.Y(a)]));line(c,pts,P.muted,1.6,[5,4]);dots(c,pts.slice(1),P.muted,2.6);}
+  if(ph>=3){c.save();c.strokeStyle=P.ink;c.globalAlpha=.55;c.lineWidth=1.2;o.act.forEach((a,j)=>{const x=g.X(o.T+1+j);c.beginPath();c.moveTo(x,g.Y(a));c.lineTo(x,g.Y(o.f[j]));c.stroke();});c.restore();}
+  if(ph>=1){const pts=[[g.X(o.T),g.Y(Y[o.T])]].concat(o.f.map((v,j)=>[g.X(o.T+1+j),g.Y(v)]));line(c,pts,P.fc,2.3);dots(c,pts.slice(1),P.fc,2.6);}
+  c.restore();
+  vdash(g,g.X(o.T),P.ink,`원점 ${md(o.T)}`);
+  // 오차 막대
+  const g2=axes(cv2,W<520?110:130,{x0:X0,x1:N-1,ymin:0,ymax:Math.max(...R.orig.map(q=>q.mae))*1.12||1,ylabel:"MAE",padT:14});
+  const bw=Math.max(2,(g2.X(1)-g2.X(0))*T3.stride*.7);
+  const shown=T3.oi+(ph>=3?1:0);let cum=[],ae=0,cnt=0;
+  g2.c.save();g2.c.beginPath();g2.c.rect(g2.L,0,g2.w-g2.L,g2.h);g2.c.clip();
+  R.orig.forEach((q,k)=>{const x=g2.X(q.T+1);
+    if(k<shown){g2.c.save();g2.c.fillStyle=k===T3.oi?g2.P.ink:g2.P.fc;g2.c.globalAlpha=k===T3.oi?.9:.6;g2.c.fillRect(x-bw/2,g2.Y(q.mae),bw,g2.Y(0)-g2.Y(q.mae));g2.c.restore();
+      q.err.forEach(e=>{ae+=Math.abs(e);cnt++;});cum.push([x,g2.Y(ae/cnt)]);}
+    else{g2.c.save();g2.c.strokeStyle=g2.P.line;g2.c.strokeRect(x-bw/2+.5,g2.Y(0)-3.5,bw-1,3);g2.c.restore();}});
+  line(g2.c,cum,g2.P.ink,1.4,[4,3]);g2.c.restore();
+  // 누적 지표
+  const pairs=[];R.orig.slice(0,shown).forEach(q=>q.act.forEach((a,j)=>pairs.push([a,q.f[j]])));
+  const mt=metr(pairs,naiveScale(T3.T0));
+  const fitsSoFar=R.orig.slice(0,T3.oi+1).filter(q=>q.refit).length;
+  $("t3Stats").innerHTML=[["누적 MAE",fmt(mt.mae,2)],["RMSE",fmt(mt.rmse,2)],["MAPE",isNaN(mt.mape)?"-":fmt(mt.mape,1)+"%"],["sMAPE",isNaN(mt.smape)?"-":fmt(mt.smape,1)+"%"],["MASE",fmt(mt.mase,3)],["기록된 원점",`${shown}/${R.orig.length}`],["학습 횟수",fitsSoFar]].map(([a,b])=>`<div class="sk-stat"><b>${b}</b><span>${a}</span></div>`).join("");
+  // 단계
+  document.querySelectorAll("#t3Stepper li").forEach((li,i)=>li.className=i===ph?"on":i<ph?"done":"");
+  const caps=[`<b>① 학습</b>: ${md(o.s)} ~ ${md(o.T)} (${o.T-o.s+1}일, ${T3.win==="slide"?"고정 창":"확장 창"})${M.model==="naive"||M.model==="snaive"||M.model==="ma"?" — 이 모형은 추정할 계수가 없어 최근 값만 읽습니다.":o.refit?"으로 계수를 다시 추정합니다.":` — 재학습하지 않고 원점 #${o.fitOi+1}에서 학습한 계수를 그대로 씁니다. 입력(최근 값)만 새 관측으로 바뀝니다.`}`,
+    `<b>② ${h}스텝 예측</b>: 원점 ${md(o.T)}까지의 값만으로 ${md(o.T+1)} ~ ${md(o.T+h)}를 예측합니다. 음영은 80% · 95% 예측 구간(잔차 표준편차 기반 근사).`,
+    `<b>③ 실제값 공개</b>: 시간이 흘러 ${h}일치 실제값이 들어왔습니다 (회색 점선).`,
+    `<b>④ 오차 기록</b>: 이 원점의 MAE = <b>${fmt(o.mae,2)}</b>. 오른쪽 막대에 쌓고, 다음 원점으로 ${T3.stride}일 굴립니다.`];
+  $("t3Cap").innerHTML=`<span class="sk-hint">원점 ${T3.oi+1}/${R.orig.length}</span> · `+caps[ph];
+  // 정보 패널
+  let inf=`<h3>원점 ${T3.oi+1}: ${mdw(o.T)}</h3><dl class="sk-kv"><dt>학습 창</dt><dd>${md(o.s)} ~ ${md(o.T)} (${o.T-o.s+1}일)</dd><dt>계수</dt><dd>${o.refit?"이번에 학습":"원점 #"+(o.fitOi+1)+"에서 학습"}</dd>`;
+  const F=o.F;
+  if(M.model==="lr"){inf+=`<dt>학습 행 수</dt><dd>${F.nRows}</dd></dl><div class="sk-formula">ŷ(t) = ${fmt(F.beta[0],3)}${F.beta.slice(1,1+M.p).map((b,k)=>`\n  ${b<0?"−":"+"} ${fmt(Math.abs(b),4)}·y(t−${k+1})`).join("")}${M.dow?F.beta.slice(1+M.p).map((b,q)=>`\n  ${b<0?"−":"+"} ${fmt(Math.abs(b),3)}·[${DOWK[q+1]}]`).join(""):""}</div>`;}
+  else if(M.model==="ses")inf+=`<dt>α</dt><dd>${F.alpha.toFixed(2)}${M.auto?" (격자 탐색)":""}</dd><dt>수준 ℓ(T)</dt><dd>${fmt(sesRun(o.s,o.T,F.alpha).l,3)}</dd></dl><div class="sk-formula">ℓ(t) = α·y(t) + (1−α)·ℓ(t−1)\nŷ(T+j) = ℓ(T)  (모든 j 같음)</div>`;
+  else if(M.model==="ma")inf+=`</dl><div class="sk-formula">ŷ(T+j) = 최근 ${M.m}일 평균\n= ${fmt(o.f[0],2)}</div>`;
+  else if(M.model==="naive")inf+=`</dl><div class="sk-formula">ŷ(T+j) = y(T) = ${fv(Y[o.T])}</div>`;
+  else inf+=`</dl><div class="sk-formula">ŷ(T+j) = 같은 요일의 마지막 값 y(T+j−7·⌈j/7⌉)</div>`;
+  inf+=`<table class="sk-table rp-mini"><thead><tr><th>날짜</th><th>예측</th><th>실제</th><th>오차</th></tr></thead><tbody>`;
+  o.f.forEach((v,j)=>{inf+=`<tr class="${ph<2?"pend":""}"><td class="dt">${md(o.T+1+j)}</td><td class="n">${ph>=1?fmt(v,2):"?"}</td><td class="n">${ph>=2?fv(o.act[j]):"?"}</td><td class="n">${ph>=3?fmt(o.err[j],2):"-"}</td></tr>`;});
+  inf+="</tbody></table>";
+  $("t3Info").innerHTML=inf;
+  PL.t3.sync();
+}
+function t3Tables(){
+  if(!T3.R){$("t3ReTbl").innerHTML="";$("t3MTbl").innerHTML="";$("t3ReNote").textContent="";return;}
+  const cfg=t3Cfg();
+  const reRows=[["each","매 스텝"],["k",`매 ${T3.k}스텝`],["once","한 번만"]].map(([re,lab])=>{const R=wfRun(M,Object.assign({},cfg,{re}));return{re,lab,met:R.met,fits:R.fits};});
+  const bestRe=Math.min(...reRows.map(r=>r.met.mae));
+  $("t3ReHint").textContent=mName(M);
+  $("t3ReTbl").innerHTML=`<thead><tr><th>재학습</th><th>학습 횟수</th><th>MAE</th><th>RMSE</th><th>MASE</th></tr></thead><tbody>`+reRows.map(r=>`<tr class="${r.re===T3.re?"cur":""}"><td>${r.lab}</td><td class="n">${r.fits}</td><td class="n${Math.abs(r.met.mae-bestRe)<1e-9?" best":""}">${fmt(r.met.mae,3)}</td><td class="n">${fmt(r.met.rmse,3)}</td><td class="n">${fmt(r.met.mase,3)}</td></tr>`).join("")+"</tbody>";
+  const noParam=M.model==="naive"||M.model==="snaive"||M.model==="ma";
+  $("t3ReNote").innerHTML=noParam?`<b>${MNAME[M.model]}</b>은 추정할 계수가 없어 재학습 주기와 상관없이 결과가 같습니다. 선형회귀나 지수평활(α 자동)을 골라 비교해 보세요.`:
+    `재학습을 안 해도 입력(최근 값)은 매일 새 관측으로 갱신됩니다. 차이는 <b>계수</b>가 최근 패턴을 따라가는지입니다. 학습 횟수 ${reRows[0].fits}회 → ${reRows[2].fits}회로 줄이면 계산은 싸지고, 추세나 계절성이 바뀌면 오차가 커질 수 있습니다.`;
+  const mods=["naive","snaive","ma","lr","ses"].map(m=>{const mc=Object.assign({},M,{model:m});const e=t3Check(mc,cfg);if(e)return{m,err:e};const R=wfRun(mc,cfg);return{m,met:R.met,fits:R.fits,mc};});
+  const keys=["mae","rmse","mape","smape","mase"];const best={};keys.forEach(k=>{best[k]=Math.min(...mods.filter(x=>!x.err&&!isNaN(x.met[k])).map(x=>x.met[k]));});
+  $("t3MTbl").innerHTML=`<thead><tr><th>모형</th><th>MAE</th><th>RMSE</th><th>MAPE</th><th>sMAPE</th><th>MASE</th></tr></thead><tbody>`+mods.map(x=>x.err?`<tr><td>${MNAME[x.m]}</td><td colspan="5" class="rp-leak">학습 구간 부족</td></tr>`:
+    `<tr class="${x.m===M.model?"cur":""}"><td>${mName(x.mc)}</td>${keys.map(k=>`<td class="n${Math.abs(x.met[k]-best[k])<1e-9?" best":""}">${isNaN(x.met[k])?"-":fmt(x.met[k],k==="mase"?3:2)+(k==="mape"||k==="smape"?"%":"")}</td>`).join("")}</tr>`).join("")+"</tbody>";
+}
+function t3All(){t3Compute();t3Draw();t3Tables();}
+makePlayer("t3",{base:700,
+  next(){const R=T3.R;if(!R)return false;if(T3.ph<3)T3.ph++;else if(T3.oi<R.orig.length-1){T3.oi++;T3.ph=0;}else return false;t3Draw();return true;},
+  prev(){const R=T3.R;if(!R)return;if(T3.ph>0)T3.ph--;else if(T3.oi>0){T3.oi--;T3.ph=3;}t3Draw();},
+  first(){T3.oi=0;T3.ph=0;t3Draw();},
+  atEnd(){return !T3.R||(T3.oi>=T3.R.orig.length-1&&T3.ph>=3);},atStart(){return !T3.R||(T3.oi===0&&T3.ph===0);}});
+function modelUI(){const m=M.model;$("mPBox").hidden=m!=="lr";$("mDowBox").hidden=m!=="lr";$("mMBox").hidden=m!=="ma";$("mAutoBox").hidden=m!=="ses";$("mABox").hidden=m!=="ses"||M.auto;segSet($("t3Model"),m);}
+function mChanged(){PL.t3.stop();modelUI();t3All();}
+segInit($("t3Model"),v=>{M.model=v;mChanged();});
+bindRange("mP",null,v=>{M.p=v;mChanged();});
+$("mDow").onchange=e=>{M.dow=e.target.checked;mChanged();};
+bindRange("mM",null,v=>{M.m=v;mChanged();});
+$("mAuto").onchange=e=>{M.auto=e.target.checked;mChanged();};
+bindRange("mA",v=>v.toFixed(2),v=>{M.alpha=v;mChanged();});
+const t3T0=bindRange("t3T0",v=>v+"일",v=>{T3.T0=v;mChanged();});
+const t3H=bindRange("t3H",v=>v+"일",v=>{T3.h=v;mChanged();});
+bindRange("t3Stride",v=>v+"일",v=>{T3.stride=v;mChanged();});
+segInit($("t3Win"),v=>{T3.win=v;$("t3LBox").hidden=v!=="slide";mChanged();});
+const t3L=bindRange("t3L",v=>v+"일",v=>{T3.L=v;mChanged();});
+segInit($("t3Re"),v=>{T3.re=v;$("t3KBox").hidden=v!=="k";mChanged();});
+bindRange("t3K",null,v=>{T3.k=v;mChanged();});
+onShow.walk=()=>{modelUI();t3All();};
+
+/* ============================================================
+   4. 다중 스텝 전략
+   ============================================================ */
+const T4={p:7,H:14,dow:false,T0:70,oi:0,j:14,R:null,initO:true};
+function rowO(tau,p,dw,tgt){const r=[1];for(let k=0;k<p;k++)r.push(Y[tau-k]);if(dw){const d=dowOf(tgt);for(let q=1;q<=6;q++)r.push(d===q?1:0);}return r;}
+function t4Compute(){
+  const p=T4.p,H=T4.H,dw=T4.dow,orig=[];
+  if(T4.T0+H>N||T4.T0-p<(1+p+(dw?6:0))+H+3){T4.R=null;return;}
+  for(let T=T4.T0-1;T+H<=N-1;T++){
+    // 재귀 (1스텝 모형)
+    const X1=[],y1=[];for(let tau=p-1;tau<=T-1;tau++){X1.push(rowO(tau,p,dw,tau+1));y1.push(Y[tau+1]);}
+    const b1=lstsq(X1,y1);const buf=Y.slice(0,T+1);const rec=[],steps=[];
+    for(let j=1;j<=H;j++){const t=T+j;const x=[1];const inp=[];for(let k=1;k<=p;k++){x.push(buf[t-k]);inp.push({t:t-k,v:buf[t-k],pred:t-k>T});}
+      if(dw){const d=dowOf(t);for(let q=1;q<=6;q++)x.push(d===q?1:0);}const v=dot(b1,x);buf.push(v);rec.push(v);steps.push(inp);}
+    // 직접 · 다중 출력
+    const dir=[],mimo=[],rowsD=[];let rowsM=0;
+    for(let j=1;j<=H;j++){
+      const Xd=[],yd=[];for(let tau=p-1;tau<=T-j;tau++){Xd.push(rowO(tau,p,dw,tau+j));yd.push(Y[tau+j]);}
+      dir.push(dot(lstsq(Xd,yd),rowO(T,p,dw,T+j)));rowsD.push(Xd.length);
+      const Xm=[],ym=[];for(let tau=p-1;tau<=T-H;tau++){Xm.push(rowO(tau,p,dw,tau+j));ym.push(Y[tau+j]);}
+      mimo.push(dot(lstsq(Xm,ym),rowO(T,p,dw,T+j)));rowsM=Xm.length;
+    }
+    orig.push({T,rec,dir,mimo,steps,b1,act:Y.slice(T+1,T+1+H),rows1:X1.length,rowsD,rowsM});
+  }
+  const hz=k=>rng(1,H).map(j=>mean(orig.map(o=>Math.abs(o.act[j-1]-(k==="naive"?Y[o.T]:o[k][j-1])))));
+  T4.R={orig,curve:{rec:hz("rec"),dir:hz("dir"),mimo:hz("mimo"),naive:hz("naive")}};
+  const L=orig.length;$("t4O").max=L-1;
+  if(T4.initO){T4.oi=Math.min(L-1,Math.max(0,HOLI.length?HOLI[0]-T4.T0-3:Math.floor(L/2)));T4.initO=false;}
+  if(T4.oi>L-1)T4.oi=L-1;$("t4O").value=T4.oi;
+  if(T4.j>H)T4.j=H;
+}
+function t4Draw(){
+  const R=T4.R;const cv=$("t4Chart"),cv2=$("t4HChart");
+  if(!R){$("t4Cap").innerHTML=`<span class="rp-leak">학습 구간이 너무 짧거나 H가 깁니다. 초기 학습 길이를 늘리거나 p·H를 줄이세요.</span>`;prep(cv,260);prep(cv2,240);$("t4Chips").innerHTML="";$("t4Bars").innerHTML="";$("t4BarsX").innerHTML="";$("t4Tbl").innerHTML="";$("t4Info").innerHTML="";return;}
+  const o=R.orig[T4.oi],H=T4.H,p=T4.p,j=T4.j;
+  $("t4OV").textContent=md(o.T);
+  // 입력 창 칩
+  if(j===0){$("t4Chips").innerHTML=`<span class="sk-hint">[다음]을 누르면 ŷ(${md(o.T+1)})부터 한 스텝씩 만듭니다.</span>`;}
+  else{const inp=o.steps[j-1].slice().reverse();
+    $("t4Chips").innerHTML=inp.map(q=>`<div class="rp-chip${q.pred?" pred":""}" style="--r:${q.pred?"var(--c-fc)":"var(--c-train)"}">${q.pred?"ŷ":"y"}(${md(q.t)})<b>${fmt(q.v,META.dec?2:1)}</b></div>`).join("")+
+      `<span class="arr">→ 1스텝 모형 →</span><div class="rp-chip out">ŷ(${md(o.T+j)})<b>${fmt(o.rec[j-1],2)}</b></div><div class="rp-chip" style="--r:var(--muted)">실제<b>${fv(o.act[j-1])}</b></div>`;}
+  const nPred=j?o.steps[j-1].filter(q=>q.pred).length:0;
+  $("t4Cap").innerHTML=j===0?`원점 <b>${mdw(o.T)}</b>: 이날까지의 실제값만 압니다.`:
+    `<b>스텝 ${j}/${H}</b>: 입력 ${p}칸 중 <b class="rp-fc">${nPred}칸이 앞에서 만든 예측값</b>입니다. 재귀 |e| = ${fmt(Math.abs(o.act[j-1]-o.rec[j-1]),2)}, 직접 |e| = ${fmt(Math.abs(o.act[j-1]-o.dir[j-1]),2)}.`+(nPred>=p?` 이제 입력이 전부 예측값이라 실제 정보 없이 굴러갑니다.`:"");
+  // 경로 차트
+  const x0=Math.max(0,o.T-34),x1=o.T+H;
+  let lo=Infinity,hi=-Infinity;for(let i=x0;i<=x1;i++){lo=Math.min(lo,Y[i]);hi=Math.max(hi,Y[i]);}
+  [o.rec,o.dir,o.mimo].forEach(a=>a.forEach(v=>{lo=Math.min(lo,v);hi=Math.max(hi,v);}));const pd=(hi-lo)*.08;
+  const W=cv.parentElement.clientWidth||700;
+  const g=axes(cv,W<520?230:270,{x0,x1,ymin:lo-pd,ymax:hi+pd,ylabel:META.unit}),c=g.c,P=g.P;
+  line(c,rng(x0,o.T).map(i=>[g.X(i),g.Y(Y[i])]),P.train,1.8);
+  const fut=[[g.X(o.T),g.Y(Y[o.T])]].concat(o.act.map((a,k)=>[g.X(o.T+1+k),g.Y(a)]));line(c,fut,P.muted,1.5,[5,4]);dots(c,fut.slice(1),P.muted,2.3);
+  const path=(a,col,lw,dash,n)=>{const pts=[[g.X(o.T),g.Y(Y[o.T])]].concat(a.slice(0,n).map((v,k)=>[g.X(o.T+1+k),g.Y(v)]));line(c,pts,col,lw,dash);return pts;};
+  path(o.mimo,P.mo,1.6,[6,3],H);path(o.dir,P.cv,1.8,null,H);
+  const rp=path(o.rec,P.fc,2.4,null,j);dots(c,rp.slice(1),P.fc,3);
+  if(j>0){c.save();c.strokeStyle=P.fc;c.globalAlpha=.18;c.lineWidth=6;const x=g.X(o.T+j);c.beginPath();c.moveTo(x,g.T);c.lineTo(x,g.h-g.B);c.stroke();c.restore();}
+  vdash(g,g.X(o.T),P.ink,`원점 ${md(o.T)}`);
+  // 스텝별 오차 막대
+  const er=o.rec.map((v,k)=>Math.abs(o.act[k]-v)),ed=o.dir.map((v,k)=>Math.abs(o.act[k]-v));const mx=Math.max(...er,...ed)||1;
+  $("t4Bars").style.setProperty("--n",H);$("t4BarsX").style.setProperty("--n",H);
+  $("t4Bars").innerHTML=er.map((e,k)=>`<div title="h=${k+1}"><span class="${k<j?"r":"x"}" style="height:${(k<j?e:mx*.03)/mx*100}%"></span><span class="d" style="height:${ed[k]/mx*100}%"></span></div>`).join("");
+  $("t4BarsX").innerHTML=rng(1,H).map(k=>`<span>${k}</span>`).join("");
+  // horizon 곡선
+  const C=R.curve;const all=[...C.rec,...C.dir,...C.mimo,...C.naive];
+  const g2=axes(cv2,240,{x0:1,x1:H,ymin:0,ymax:Math.max(...all)*1.1,xlab:"num",ylabel:"MAE",padB:30});
+  const pts=a=>a.map((v,k)=>[g2.X(k+1),g2.Y(v)]);
+  line(g2.c,pts(C.naive),g2.P.muted,1.4,[3,3]);
+  line(g2.c,pts(C.mimo),g2.P.mo,1.8,[6,3]);dots(g2.c,pts(C.mimo),g2.P.mo,2.2);
+  line(g2.c,pts(C.dir),g2.P.cv,2);dots(g2.c,pts(C.dir),g2.P.cv,2.4);
+  line(g2.c,pts(C.rec),g2.P.fc,2.3);dots(g2.c,pts(C.rec),g2.P.fc,2.6);
+  g2.c.save();g2.c.fillStyle=g2.P.faint;g2.c.font=`11px ${g2.P.sans}`;g2.c.textAlign="right";g2.c.textBaseline="bottom";g2.c.fillText("예측 거리 h (일)",g2.w-g2.R,g2.h-1);
+  g2.c.fillStyle=g2.P.muted;g2.c.textAlign="right";g2.c.textBaseline="bottom";g2.c.fillText("나이브 (기준)",g2.X(H)-2,g2.Y(C.naive[H-1])-6);g2.c.restore();
+  const avg=a=>mean(a);const mid=Math.ceil(H/2)-1;
+  const nModels={rec:1,dir:H,mimo:H};
+  $("t4Tbl").innerHTML=`<thead><tr><th>전략</th><th>모형 수</th><th>학습 행 (이 원점)</th><th>h=1</th><th>h=${mid+1}</th><th>h=${H}</th><th>평균</th></tr></thead><tbody>`+
+    [["rec","재귀","rp-fc",`${o.rows1}`],["dir","직접","rp-cv",`${o.rowsD[H-1]}~${o.rowsD[0]}`],["mimo","다중 출력","rp-mo",`${o.rowsM}`],["naive","나이브 (기준)","",`-`]].map(([k,lab,cl,rows])=>{
+      const a=C[k];return`<tr><td class="${cl}"><b>${lab}</b></td><td class="n">${nModels[k]||0}</td><td class="n">${rows}</td><td class="n">${fmt(a[0],2)}</td><td class="n">${fmt(a[mid],2)}</td><td class="n">${fmt(a[H-1],2)}</td><td class="n">${fmt(avg(a),2)}</td></tr>`;}).join("")+"</tbody>";
+  $("t4Hint").textContent=`원점 ${R.orig.length}개 (${md(R.orig[0].T)} ~ ${md(R.orig[R.orig.length-1].T)}), 매 원점 재학습, 확장 창`;
+  // 정보
+  let inf=`<h3>1스텝 모형 (재귀 전략의 엔진)</h3><div class="sk-formula">ŷ(t) = ${fmt(o.b1[0],3)}${o.b1.slice(1,1+p).map((b,k)=>`\n  ${b<0?"−":"+"} ${fmt(Math.abs(b),4)}·y(t−${k+1})`).join("")}${T4.dow?"\n  + 요일 효과":""}</div>`;
+  inf+=`<p>이 원점의 오차 합계: 재귀 ${fmt(mean(er),2)} · 직접 ${fmt(mean(ed),2)} · 다중 출력 ${fmt(mean(o.mimo.map((v,k)=>Math.abs(o.act[k]-v))),2)} (MAE)</p>`;
+  inf+=`<p>입력 창에 예측값이 섞이기 시작하면(스텝 2부터) 재귀 전략의 오차가 커지는 경향이 있습니다. 반대로 직접 전략은 먼 h일수록 학습 행이 ${o.rowsD[0]} → ${o.rowsD[H-1]}개로 줄어듭니다.</p>`;
+  $("t4Info").innerHTML=inf;
+  PL.t4.sync();
+}
+makePlayer("t4",{base:800,next(){if(!T4.R||T4.j>=T4.H)return false;T4.j++;t4Draw();return true;},prev(){if(T4.j>0){T4.j--;t4Draw();}},first(){T4.j=0;t4Draw();},atEnd(){return !T4.R||T4.j>=T4.H;},atStart(){return T4.j<=0;}});
+function t4All(){t4Compute();t4Draw();}
+bindRange("t4P",null,v=>{T4.p=v;PL.t4.stop();t4All();});
+bindRange("t4H",null,v=>{T4.H=v;T4.j=v;PL.t4.stop();t4All();});
+$("t4Dow").onchange=e=>{T4.dow=e.target.checked;PL.t4.stop();t4All();};
+const t4T0=bindRange("t4T0",v=>v+"일",v=>{T4.T0=v;PL.t4.stop();t4All();});
+$("t4O").addEventListener("input",e=>{T4.oi=+e.target.value;T4.j=0;PL.t4.stop();t4Draw();});
+onShow.multi=()=>t4All();
+
+/* ============================================================
+   5. 한 번 vs 롤링
+   ============================================================ */
+const T5={model:"lr",Lt:30,upd:"input",R:null};
+function t5Compute(){
+  const mc=Object.assign({},M,{model:T5.model});const Tt=N-T5.Lt-1;
+  if(Tt+1<needRows(mc)+5){T5.R={err:"학습 구간이 너무 짧습니다."};return;}
+  const F0=fitM(mc,0,Tt);const once=fcM(mc,F0,0,Tt,T5.Lt);
+  const roll={f:[],sd:[]};let fits=1;
+  for(let t=Tt+1;t<=N-1;t++){const T=t-1;let F=F0;if(T5.upd==="refit"&&t>Tt+1){F=fitM(mc,0,T);fits++;}const r=fcM(mc,F,0,T,1);roll.f.push(r.f[0]);roll.sd.push(r.sd[0]);}
+  const act=Y.slice(Tt+1);const sc=naiveScale(Tt+1);
+  T5.R={mc,Tt,once,roll,act,fits,m1:metr(act.map((a,k)=>[a,once.f[k]]),sc),m2:metr(act.map((a,k)=>[a,roll.f[k]]),sc)};
+}
+function t5Chart(cv,fc,lab,R,lo,hi){
+  const x0=Math.max(0,R.Tt-40),W=cv.parentElement.clientWidth||600;
+  const g=axes(cv,W<480?220:250,{x0,x1:N-1,ymin:lo,ymax:hi,ylabel:META.unit}),c=g.c,P=g.P;
+  line(c,rng(x0,R.Tt).map(i=>[g.X(i),g.Y(Y[i])]),P.train,1.7);
+  const xs=[g.X(R.Tt)].concat(fc.f.map((_,k)=>g.X(R.Tt+1+k)));const y0=g.Y(Y[R.Tt]);
+  const isRoll=lab==="roll";
+  if(isRoll){ // 1스텝 구간: 각 날짜에서 따로
+    const lo95=fc.f.map((v,k)=>g.Y(v-1.96*fc.sd[k])),hi95=fc.f.map((v,k)=>g.Y(v+1.96*fc.sd[k])),lo80=fc.f.map((v,k)=>g.Y(v-1.2816*fc.sd[k])),hi80=fc.f.map((v,k)=>g.Y(v+1.2816*fc.sd[k]));
+    band(c,xs.slice(1),lo95,hi95,P.fc,.12);band(c,xs.slice(1),lo80,hi80,P.fc,.2);
+  }else{
+    band(c,xs,[y0].concat(fc.f.map((v,k)=>g.Y(v-1.96*fc.sd[k]))),[y0].concat(fc.f.map((v,k)=>g.Y(v+1.96*fc.sd[k]))),P.fc,.12);
+    band(c,xs,[y0].concat(fc.f.map((v,k)=>g.Y(v-1.2816*fc.sd[k]))),[y0].concat(fc.f.map((v,k)=>g.Y(v+1.2816*fc.sd[k]))),P.fc,.2);
+  }
+  const act=[[g.X(R.Tt),y0]].concat(R.act.map((a,k)=>[g.X(R.Tt+1+k),g.Y(a)]));line(c,act,P.muted,1.4,[5,4]);dots(c,act.slice(1),P.muted,2);
+  const fp=(isRoll?[]:[[g.X(R.Tt),y0]]).concat(fc.f.map((v,k)=>[g.X(R.Tt+1+k),g.Y(v)]));line(c,fp,P.fc,2.2);dots(c,isRoll?fp:fp.slice(1),P.fc,2.2);
+  vdash(g,g.X(R.Tt),P.ink,`학습 끝 ${md(R.Tt)}`);
+}
+function t5Draw(){
+  const R=T5.R;
+  if(!R||R.err){$("t5Note").textContent=R?R.err:"";return;}
+  $("t5L1").textContent=T5.Lt;
+  const x0=Math.max(0,R.Tt-40);let lo=Infinity,hi=-Infinity;for(let i=x0;i<N;i++){lo=Math.min(lo,Y[i]);hi=Math.max(hi,Y[i]);}
+  [[R.once,1.96],[R.roll,1.96]].forEach(([fc,z])=>fc.f.forEach((v,k)=>{lo=Math.min(lo,v-z*fc.sd[k]);hi=Math.max(hi,v+z*fc.sd[k]);}));
+  const pd=(hi-lo)*.04;
+  t5Chart($("t5C1"),R.once,"once",R,lo-pd,hi+pd);t5Chart($("t5C2"),R.roll,"roll",R,lo-pd,hi+pd);
+  const st=(m,ex)=>[["MAE",fmt(m.mae,2)],["RMSE",fmt(m.rmse,2)],["MAPE",isNaN(m.mape)?"-":fmt(m.mape,1)+"%"],["MASE",fmt(m.mase,3)]].concat(ex||[]).map(([a,b])=>`<div class="sk-stat"><b>${b}</b><span>${a}</span></div>`).join("");
+  $("t5S1").innerHTML=st(R.m1,[["학습 횟수","1"]]);$("t5S2").innerHTML=st(R.m2,[["학습 횟수",String(R.fits)]]);
+  const e1=R.act.map((a,k)=>Math.abs(a-R.once.f[k])),e2=R.act.map((a,k)=>Math.abs(a-R.roll.f[k]));
+  const cv=$("t5C3"),g=axes(cv,190,{x0:R.Tt+1,x1:N-1,ymin:0,ymax:Math.max(...e1,...e2)*1.1||1,ylabel:"|오차|"});
+  line(g.c,e1.map((v,k)=>[g.X(R.Tt+1+k),g.Y(v)]),g.P.fc,2);dots(g.c,e1.map((v,k)=>[g.X(R.Tt+1+k),g.Y(v)]),g.P.fc,2.2);
+  line(g.c,e2.map((v,k)=>[g.X(R.Tt+1+k),g.Y(v)]),g.P.cv,2);dots(g.c,e2.map((v,k)=>[g.X(R.Tt+1+k),g.Y(v)]),g.P.cv,2.2);
+  const half=Math.floor(T5.Lt/2);const a1=mean(e1.slice(0,half)),b1=mean(e1.slice(half)),a2=mean(e2.slice(0,half)),b2=mean(e2.slice(half));
+  $("t5Note").innerHTML=`<b>${mName(R.mc)}</b> · 학습 ${md(0)} ~ ${md(R.Tt)} (${R.Tt+1}일) → 평가 ${md(R.Tt+1)} ~ ${md(N-1)}. 한 번 예측 MAE <b>${fmt(R.m1.mae,2)}</b> vs 롤링 예측 MAE <b>${fmt(R.m2.mae,2)}</b>. 평가 기간 앞쪽 절반 / 뒤쪽 절반 MAE: 한 번 예측 ${fmt(a1,2)} → ${fmt(b1,2)}, 롤링 ${fmt(a2,2)} → ${fmt(b2,2)}.${T5.upd==="input"?" 롤링은 계수를 고정하고 매일 새 관측만 입력으로 넣었습니다.":" 롤링은 매일 늘어난 데이터로 계수를 다시 학습했습니다."}`;
+}
+segInit($("t5Model"),v=>{T5.model=v;t5Compute();t5Draw();});
+bindRange("t5Lt",v=>v+"일",v=>{T5.Lt=v;t5Compute();t5Draw();});
+segInit($("t5Upd"),v=>{T5.upd=v;t5Compute();t5Draw();});
+onShow.once=()=>{t5Compute();t5Draw();};
+
+/* ============================================================
+   6. 코드
+   ============================================================ */
+const T6=(function(){
+  const py=v=>Number.isInteger(v)?String(v):String(+v.toFixed(4));
+  function gen1(){
+    const L=[],K=T1.K,w=T1.w,H=T1.mode==="one"?1:T1.h,file=META.file;
+    L.push("import numpy as np","import pandas as pd","from sklearn.linear_model import LinearRegression","from sklearn.model_selection import TimeSeriesSplit, cross_val_score","");
+    L.push(`# 0. 데이터: 날짜,값 (데이터 카드의 'CSV로 보기' 내용을 ${file}로 저장)`,`df = pd.read_csv("${file}", parse_dates=["date"], index_col="date").asfreq("D")`,'y = df["y"].astype(float)',"");
+    L.push("# 1. Time Shift: 시계열 → 지도학습 표 (행 t의 특성은 t-1까지)","feat = pd.DataFrame(index=y.index)",`for k in range(1, ${K+1}):`,'    feat[f"lag_{k}"] = y.shift(k)                   # 과거 값을 k칸 아래로 민다');
+    if(T1.rm)L.push(`feat["roll_mean_${w}"] = y.shift(1).rolling(${w}).mean()   # shift(1) 먼저: y(t)가 들어가지 않음`);
+    if(T1.rs)L.push(`feat["roll_std_${w}"] = y.shift(1).rolling(${w}).std()`);
+    if(T1.rm||T1.rs)L.push(`# 잘못된 예 (누수): y.rolling(${w}).mean() 또는 y.rolling(${w}, center=True).mean()`);
+    if(T1.wk)L.push('feat["is_weekend"] = (y.index.dayofweek >= 5).astype(int)');
+    if(T1.dow)L.push('dow = pd.get_dummies(y.index.dayofweek, prefix="dow", drop_first=True, dtype=int)',"dow.index = y.index","feat = feat.join(dow)");
+    if(T1.mode==="one")L.push('targets = y.rename("y_h1").to_frame()              # 목표 = y(t): 1스텝 앞');
+    else if(T1.mode==="h")L.push(`targets = y.shift(-${H-1}).rename("y_h${H}").to_frame()   # 목표 = y(t+${H-1}): ${H}스텝 앞 (미래를 위로 당김)`);
+    else L.push(`targets = pd.DataFrame({f"y_h{j}": y.shift(-(j - 1)) for j in range(1, ${H+1})})   # 1~${H}스텝 앞 (다중 출력)`);
+    L.push("table = feat.join(targets).dropna()                 # 위쪽(lag) · 아래쪽(목표) NaN 행 삭제","X, Y = table[feat.columns], table[targets.columns]",'print(table.shape)',"print(table.head())","");
+    const mts=T2.win==="slide"?T2.mts:"None";
+    L.push("# 2. 분할: 무작위 KFold 대신 TimeSeriesSplit",`tscv = TimeSeriesSplit(n_splits=${T2.k}, test_size=${T2.ts||"None"}, gap=${T2.gap}, max_train_size=${mts})`,
+      "for i, (tr, te) in enumerate(tscv.split(X), 1):",'    print(f"fold {i}: train {tr[0]}~{tr[-1]} ({len(tr)}개)  test {te[0]}~{te[-1]} ({len(te)}개)")',
+      'scores = cross_val_score(LinearRegression(), X, Y, cv=tscv, scoring="neg_mean_absolute_error")','print("CV MAE:", (-scores).round(3), "평균", round(-scores.mean(), 3))',
+      "# 잘못된 예: KFold(n_splits=5, shuffle=True) → 미래 행으로 학습해 과거를 맞힘 (점수가 낙관적)","");
+    // 3. 워크포워드
+    const m=M.model,cfg=t3Cfg();
+    const reTxt=cfg.re==="each"?"1":cfg.re==="k"?String(cfg.k):"None";
+    L.push(`# 3. 롤링(워크포워드) 예측: ${mName(M)} · ${cfg.win==="slide"?"고정 창 "+cfg.L+"일":"확장 창"} · 재학습 ${cfg.re==="each"?"매 스텝":cfg.re==="k"?"매 "+cfg.k+"스텝":"한 번만"}`);
+    L.push(`T0, H, STRIDE, EVERY = ${cfg.T0}, ${cfg.h}, ${cfg.stride}, ${reTxt}   # EVERY = 재학습 주기 (None = 처음 한 번만)`);
+    if(cfg.win==="slide")L.push(`WINDOW = ${cfg.L}`);
+    L.push("vals = y.to_numpy(dtype=float)");
+    if(m==="lr"){
+      L.push(`P = ${M.p}`+(M.dow?"\ndows = y.index.dayofweek.to_numpy()":""),"",
+        "def row(series, t):            # 행 t의 입력: y(t-1) … y(t-P)"+(M.dow?" + 요일 더미":""),
+        "    x = [series[t - k] for k in range(1, P + 1)]");
+      if(M.dow)L.push("    x += [1.0 if dows[t] == d else 0.0 for d in range(1, 7)]");
+      L.push("    return x","","def fit(start, end):            # vals[start:end]로 학습",
+        "    ts = range(start + P, end)","    return LinearRegression().fit([row(vals, t) for t in ts], vals[start + P:end])","",
+        "def forecast(model, start, end, h):   # 재귀: 예측값을 다음 입력으로","    buf = list(vals[:end])","    for t in range(end, end + h):","        buf.append(model.predict([row(buf, t)])[0])","    return np.array(buf[end:])");
+    }else if(m==="ses"){
+      L.push("","def level_sse(a, w):            # ℓ0 = 첫 값, ℓt = a·yt + (1-a)·ℓ(t-1)","    lvl, sse = w[0], 0.0","    for v in w[1:]:","        sse += (v - lvl) ** 2","        lvl = a * v + (1 - a) * lvl","    return lvl, sse","",
+        "def fit(start, end):");
+      if(M.auto)L.push("    grid = np.arange(1, 100) / 100             # α 격자 탐색 (학습 1스텝 SSE 최소)","    return min(grid, key=lambda a: level_sse(a, vals[start:end])[1])");
+      else L.push(`    return ${py(M.alpha)}`);
+      L.push("","def forecast(alpha, start, end, h):","    return np.repeat(level_sse(alpha, vals[start:end])[0], h)");
+    }else{
+      L.push("","def fit(start, end):            # 추정할 계수 없음","    return None","","def forecast(model, start, end, h):");
+      if(m==="naive")L.push("    return np.repeat(vals[end - 1], h)          # 마지막 값 그대로");
+      else if(m==="snaive")L.push("    return np.array([vals[end - 1 + j - 7 * int(np.ceil(j / 7))] for j in range(1, h + 1)])");
+      else L.push(`    return np.repeat(vals[end - ${M.m}:end].mean(), h)   # 최근 ${M.m}일 평균`);
+    }
+    L.push("","errors, model = [], None","for i, t in enumerate(range(T0, len(vals) - H + 1, STRIDE)):   # t = 원점 다음 날 (학습: vals[:t])");
+    L.push(cfg.win==="slide"?"    start = max(0, t - WINDOW)":"    start = 0                                  # 확장 창");
+    L.push("    if model is None or (EVERY and i % EVERY == 0):","        model = fit(start, t)                   # ① 학습","    fc = forecast(model, start, t, H)           # ② H스텝 예측","    actual = vals[t:t + H]                      # ③ 실제값 공개","    errors.append(actual - fc)                  # ④ 오차 기록",
+      "E = np.array(errors)","scale = np.mean(np.abs(np.diff(vals[:T0])))   # MASE 분모: 초기 학습 구간 나이브 MAE",
+      'print("원점", len(E), "MAE", round(np.abs(E).mean(), 3), "RMSE", round(np.sqrt((E ** 2).mean()), 3), "MASE", round(np.abs(E).mean() / scale, 3))');
+    return L.join("\n");
+  }
+  function gen2(){
+    const L=[],m=T5.model,Lt=T5.Lt,file=META.file,ref=T5.upd==="refit";
+    L.push("import numpy as np","import pandas as pd");
+    if(m==="lr")L.push("from statsmodels.tsa.ar_model import AutoReg");
+    L.push("",`df = pd.read_csv("${file}", parse_dates=["date"], index_col="date").asfreq("D")`,'y = df["y"].astype(float)',`train, test = y.iloc[:-${Lt}], y.iloc[-${Lt}:]`,"");
+    if(m==="lr"){
+      const sea=M.dow?", seasonal=True, period=7":"";
+      L.push(`res = AutoReg(train, lags=${M.p}, trend="c"${sea}).fit()${M.dow?"   # seasonal=True: 요일 더미와 같은 효과":""}`,
+        "print(res.params.round(4))","",`once = res.forecast(${Lt})                          # ① 학습 끝에서 한 번에 ${Lt}일`,"",
+        "roll = []","for t in range(len(test)):                         # ② 1스텝 롤링","    roll.append(res.forecast(1).iloc[0])",
+        `    res = res.append(test.iloc[t:t + 1], refit=${ref?"True":"False"})   # ${ref?"늘어난 데이터로 계수 재추정":"계수 유지, 새 관측만 반영"}`,
+        "roll = pd.Series(roll, index=test.index)");
+    }else if(m==="ses"){
+      L.push("def ses(series, alpha):                 # ℓ0 = 첫 값, ℓt = α·yt + (1-α)·ℓ(t-1)","    lvl, sse = series.iloc[0], 0.0","    for v in series.iloc[1:]:","        sse += (v - lvl) ** 2","        lvl = alpha * v + (1 - alpha) * lvl","    return lvl, sse","");
+      if(M.auto)L.push("def best_alpha(series):                 # 격자 탐색 (statsmodels의 최적화와 약간 다를 수 있음)","    return min(np.arange(1, 100) / 100, key=lambda a: ses(series, a)[1])","","alpha = best_alpha(train)");
+      else L.push(`alpha = ${py(M.alpha)}`);
+      L.push(`once = pd.Series(ses(train, alpha)[0], index=test.index)   # ① 한 번 예측: 마지막 수준으로 ${Lt}일`,"","roll = []","for t in range(len(test)):                 # ② 1스텝 롤링","    hist = y.iloc[:len(train) + t]");
+      if(ref&&M.auto)L.push("    alpha_t = best_alpha(hist)            # 매일 재학습","    roll.append(ses(hist, alpha_t)[0])");else L.push("    roll.append(ses(hist, alpha)[0])          # α 고정, 수준만 갱신");
+      L.push("roll = pd.Series(roll, index=test.index)","",
+        "# statsmodels로 같은 계산 (α 고정)","from statsmodels.tsa.holtwinters import SimpleExpSmoothing",
+        'sm = SimpleExpSmoothing(train, initialization_method="known", initial_level=train.iloc[0]).fit(smoothing_level=alpha, optimized=False)',"print(sm.forecast(1).iloc[0], once.iloc[0])");
+    }else{
+      if(m==="naive")L.push("once = pd.Series(train.iloc[-1], index=test.index)          # ① 마지막 값 그대로","roll = y.shift(1).iloc[-"+Lt+":]                               # ② 롤링 나이브 = 어제 값 = shift(1)");
+      else if(m==="snaive")L.push(`once = pd.Series([train.iloc[len(train) - 1 + j - 7 * int(np.ceil(j / 7))] for j in range(1, ${Lt+1})], index=test.index)`,`roll = y.shift(7).iloc[-${Lt}:]                               # ② 롤링 계절 나이브 = 7일 전 값`);
+      else L.push(`once = pd.Series(train.iloc[-${M.m}:].mean(), index=test.index)   # ① 최근 ${M.m}일 평균으로 ${Lt}일`,`roll = y.shift(1).rolling(${M.m}).mean().iloc[-${Lt}:]          # ② 매일 다시 계산한 ${M.m}일 이동평균`);
+    }
+    L.push("","mae = lambda a, b: np.mean(np.abs(a - b))",'print("한 번 예측 MAE:", round(mae(test, once), 3))','print("롤링 예측 MAE:", round(mae(test, roll), 3))');
+    return L.join("\n");
+  }
+  function hl(code){
+    return code.split("\n").map(line=>{
+      const i=line.indexOf("#");let a=line,b="";
+      if(i>=0){const before=line.slice(0,i);if(((before.match(/"/g)||[]).length%2)===0){a=before;b=line.slice(i);}}
+      let h=esc(a).replace(/(&quot;[^&]*?&quot;)/g,'<span class="st">$1</span>').replace(/\b(import|from|as|for|in|def|return|if|or|and|None|True|False|lambda|print)\b/g,'<span class="kw">$1</span>');
+      h=h.replace(/(\.shift\(-?[^)]*\)|\.rolling\([^)]*\)|TimeSeriesSplit|\.append)/g,'<span class="hl">$1</span>');
+      return h+(b?`<span class="cm">${esc(b)}</span>`:"");}).join("\n");
+  }
+  function render(){$("c1Code").innerHTML=hl(gen1());$("c2Code").innerHTML=hl(gen2());}
+  function copy(txt,msg){const done=()=>{$(msg).textContent="복사했습니다.";setTimeout(()=>$(msg).textContent="",1800);};
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(done,()=>fallback(txt,done));else fallback(txt,done);}
+  function fallback(txt,done){const ta=document.createElement("textarea");ta.value=txt;ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();try{document.execCommand("copy");done();}catch(e){}ta.remove();}
+  $("c1Copy").onclick=()=>copy(gen1(),"c1Msg");$("c2Copy").onclick=()=>copy(gen2(),"c2Msg");
+  return{render};
+})();
+onShow.code=()=>T6.render();
+
+/* ============================================================
+   데이터 길이에 맞춰 슬라이더 범위 조정
+   ============================================================ */
+function clampAll(){
+  t1Start.setMax(Math.max(0,N-ROWS));if(T1.start>N-ROWS)T1.start=Math.max(0,N-ROWS);t1Start.set(T1.start);
+  t3T0.setMax(Math.max(28,N-15));if(T3.T0>N-15){T3.T0=Math.max(28,N-15);}t3T0.set(T3.T0);
+  t3L.setMax(Math.max(21,N-15));
+  t4T0.setMax(Math.max(35,N-20));if(T4.T0>N-20){T4.T0=Math.max(35,N-20);}t4T0.set(T4.T0);
+  T1.step=-1;T1.dropDone=false;T3.init=true;T4.initO=true;
+}
+
+/* ---------- 테마 · 크기 변경 시 다시 그리기 ---------- */
+function redraw(){renderDataCard(true);
+  if(curTab==="walk")t3Draw();else if(curTab==="multi")t4Draw();else if(curTab==="once")t5Draw();}
+new MutationObserver(redraw).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+if(window.matchMedia)matchMedia("(prefers-color-scheme: dark)").addEventListener("change",redraw);
+let rz=null,lastW=window.innerWidth;window.addEventListener("resize",()=>{if(window.innerWidth===lastW)return;lastW=window.innerWidth;clearTimeout(rz);rz=setTimeout(redraw,120);});
+
+/* ---------- 시작 ---------- */
+generate();clampAll();renderDataCard();
+const startTab=location.hash.slice(1);showTab(TABS.includes(startTab)?startTab:"shift");
+})();
+</script>
+</body>
+</html>
