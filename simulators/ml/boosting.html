@@ -1,0 +1,1803 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>부스팅 계열 시뮬레이터 (AdaBoost · GBM · XGBoost · LightGBM) | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20260930c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20260930c">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 파랑 = 데이터·학습 / 청록 = 검증 / 보라 = 약한 학습기(학습) / 주황 = 평가·샘플링 / 빨강 = 오류·잔차 / 초록 = 활용
+   클래스 색: 파랑(0) · 주황(1) */
+:root{ --sk-accent: var(--cat-ml);
+  --c-data:#2563EB; --c-val:#0D9488; --c-learn:#7C3AED; --c-eval:#EA580C; --c-risk:#DC2626; --c-use:#16A34A;
+  --c0:#2563EB; --c1:#EA580C; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --c-data:#6AA5FF; --c-val:#33D1BD; --c-learn:#B294FF; --c-eval:#FF914D; --c-risk:#F87171; --c-use:#4ADE80;
+  --c0:#6AA5FF; --c1:#FF914D; } }
+:root[data-theme="dark"]{
+  --c-data:#6AA5FF; --c-val:#33D1BD; --c-learn:#B294FF; --c-eval:#FF914D; --c-risk:#F87171; --c-use:#4ADE80;
+  --c0:#6AA5FF; --c1:#FF914D; }
+
+/* 알고리즘 선택 (큰 sk-seg) */
+.bo-algo{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%;border-radius:var(--radius)}
+.bo-algo button{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:13px 18px;text-align:left;font-size:18px;white-space:normal;line-height:1.25}
+.bo-algo button b{font-weight:700}
+.bo-algo button small{font-size:12.5px;font-weight:500;opacity:.8}
+.bo-algo button:not([aria-pressed="true"]):hover{background:var(--surface-2);color:var(--ink)}
+@media (max-width:640px){
+  .bo-algo{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .bo-algo button{font-size:15.5px;padding:10px 12px}
+  .bo-algo button:nth-child(3){border-left:0}
+  .bo-algo button:nth-child(n+3){border-top:1px solid var(--line-strong)}
+}
+
+.bo-dot{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.bo-ring{display:inline-block;width:11px;height:11px;border-radius:50%;border:2px solid currentColor;margin-right:5px;vertical-align:-1px}
+.bo-line{display:inline-block;width:18px;height:0;border-top:3px solid currentColor;margin-right:5px;vertical-align:3px}
+.bo-line.dash{border-top-style:dashed;border-top-width:2px}
+.t-data{color:var(--c-data)} .t-val{color:var(--c-val)} .t-learn{color:var(--c-learn)} .t-eval{color:var(--c-eval)} .t-risk{color:var(--c-risk)} .t-use{color:var(--c-use)} .t-ink{color:var(--ink)} .t-muted{color:var(--muted)} .t-c0{color:var(--c0)} .t-c1{color:var(--c1)}
+
+.bo-fig{display:flex;flex-direction:column;gap:6px;min-width:0}
+.bo-fig h3{font-size:14px;margin:0;min-height:30px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:space-between}
+.bo-fig h3 small{font-size:12px;font-weight:600;color:var(--faint)}
+.bo-fig h3 .sk-seg button{padding:3px 9px;font-size:12px}
+.bo-fig canvas{display:block;width:100%;aspect-ratio:4/3;border:1px solid var(--line);border-radius:10px;background:var(--surface);touch-action:manipulation}
+.bo-fig.sq canvas{aspect-ratio:1/1}
+.bo-fig.wide canvas{aspect-ratio:16/9}
+.bo-fig.strip canvas{aspect-ratio:16/6}
+.bo-fig canvas.click{cursor:crosshair}
+.bo-fig .sk-legend{font-size:12px;gap:4px 12px}
+
+.bo-formula{white-space:pre-wrap;overflow-wrap:anywhere}
+.bo-formula .hl{font-weight:600}
+.bo-caption{margin:0;font-size:14px;line-height:1.6}
+.bo-caption b{color:var(--ink)}
+.bo-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.bo-sec{display:flex;flex-direction:column;gap:12px;padding-top:14px;border-top:1px solid var(--line)}
+.bo-sec:first-of-type{border-top:0;padding-top:0}
+.bo-sec > h3{font-size:15.5px;margin:0}
+.bo-round{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:5px 10px;white-space:nowrap}
+.bo-kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--ink)}
+.bo-sep{width:1px;align-self:stretch;background:var(--line);min-height:26px}
+.bo-params{padding:10px 12px;border:1px dashed var(--line-strong);border-radius:10px}
+.sk-controls .sk-seg{max-width:100%;overflow-x:auto}
+.bo-params > .sk-label{width:100%;margin:0 0 -4px}
+
+.bo-table td.cur,.bo-table tr.cur td{background:color-mix(in srgb,var(--sk-accent) 11%,var(--surface))}
+.bo-table td.best{font-weight:700;color:var(--ink)}
+.bo-table td.off,.bo-table tr.off td{color:var(--faint)}
+.bo-table td.wrap,.bo-table th.wrap{white-space:normal;min-width:150px}
+.bo-table td.c{text-align:center}
+.bo-feat th:first-child,.bo-feat td:first-child{min-width:110px}
+.bo-scroll-y{max-height:330px;overflow:auto}
+
+.bo-thumbs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:900px){.bo-thumbs{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.bo-thumbs .bo-fig h3{min-height:0;font-size:13.5px}
+
+.bo-code{margin:0;font-family:var(--mono);font-size:13px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;white-space:pre;color:var(--ink);tab-size:4;max-height:560px}
+.bo-code .cm{color:var(--muted)}
+.bo-code .kw{color:var(--c-learn);font-weight:600}
+.bo-code .st{color:var(--c-val)}
+.bo-code .nu{color:var(--c-eval)}
+.sk-btn[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+@media (max-width:520px){
+  .sk-slider{min-width:0;width:100%}
+  .sk-controls{gap:10px 12px}
+  .bo-sep{display:none}
+  .bo-code{font-size:12px;padding:12px}
+  .bo-params{padding:10px}
+}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)" aria-current="page">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">부스팅 계열 시뮬레이터 (AdaBoost · GBM · XGBoost · LightGBM)</h1>
+      <p class="ds-hero__lede">같은 데이터에서 네 가지 부스팅 알고리즘을 바꿔 가며, 라운드마다 약한 학습기가 무엇을 보고 무엇을 배우는지 따라갑니다. 샘플 가중치, 잔차(음의 기울기), 2차 근사와 분할 이득(Gain), 히스토그램 분할과 리프 중심 성장을 숫자로 확인합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <div class="sk-seg bo-algo" id="algoSeg" role="group" aria-label="알고리즘 선택 (←/→ 키로 이동)">
+    <button type="button" data-v="ada" aria-pressed="true"><b>AdaBoost</b><small>틀린 점의 가중치를 키움</small></button>
+    <button type="button" data-v="gbm" aria-pressed="false"><b>Gradient Boosting</b><small>잔차(음의 기울기)에 트리</small></button>
+    <button type="button" data-v="xgb" aria-pressed="false"><b>XGBoost</b><small>2차 근사 · 규제 · Gain</small></button>
+    <button type="button" data-v="lgbm" aria-pressed="false"><b>LightGBM</b><small>히스토그램 · 리프 중심 · GOSS</small></button>
+  </div>
+
+  <!-- ================= 실험대 (공통) ================= -->
+  <section class="sk-card" aria-labelledby="labTitle">
+    <div class="sk-head"><h2 id="labTitle"></h2><span class="sk-hint">키보드 <span class="bo-kbd">→</span> 다음 라운드 · <span class="bo-kbd">←</span> 이전 · 알고리즘 버튼에서 <span class="bo-kbd">←</span><span class="bo-kbd">→</span> 전환</span></div>
+    <p class="sk-lead" id="labLead"></p>
+
+    <div class="sk-controls">
+      <div class="sk-group"><span class="sk-label">데이터</span>
+        <div class="sk-seg" id="kindSeg" role="group" aria-label="데이터 종류">
+          <button type="button" data-v="cls" aria-pressed="true">분류: 나이·혈당 → 질환</button>
+          <button type="button" data-v="reg" aria-pressed="false">회귀: 나이 → 의료비</button>
+        </div>
+      </div>
+      <div class="sk-group"><span class="sk-label" title="0 = 질환 없음, 1 = 질환 있음">그래프 클릭</span>
+        <div class="sk-seg" id="modeSeg" role="group" aria-label="그래프를 눌렀을 때 동작"></div>
+      </div>
+      <div class="sk-group">
+        <button type="button" class="sk-btn sk-btn--sm" id="btnSeed">새 데이터 뽑기</button>
+        <button type="button" class="sk-btn sk-btn--sm" id="btnResetPts">원래 데이터로</button>
+        <span class="sk-hint sk-mono" id="dataInfo"></span>
+      </div>
+      <label class="sk-check"><input type="checkbox" id="showVal">검증 데이터 보기</label>
+    </div>
+    <p class="sk-note" id="kindNote" hidden></p>
+
+    <div class="sk-controls">
+      <div class="sk-group">
+        <button type="button" class="sk-btn sk-btn--sm" id="bFirst">처음</button>
+        <button type="button" class="sk-btn sk-btn--sm" id="bPrev">이전</button>
+        <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="bNext">다음 라운드</button>
+        <button type="button" class="sk-btn sk-btn--sm" id="bPlay">재생</button>
+        <button type="button" class="sk-btn sk-btn--sm" id="bLast">끝으로</button>
+      </div>
+      <div class="sk-slider" style="min-width:150px">
+        <div class="sk-sl-head"><label for="spd">재생 속도</label><b id="spdV">1×</b></div>
+        <input type="range" id="spd" min="0" max="4" step="1" value="1">
+      </div>
+      <span class="bo-round" id="roundLbl" aria-live="polite"></span>
+    </div>
+
+    <div class="sk-controls">
+      <div class="sk-slider">
+        <div class="sk-sl-head"><label for="pN">라운드 수 (n_estimators)</label><b id="pNV"></b></div>
+        <input type="range" id="pN" min="1" max="300" step="1" value="50">
+      </div>
+      <div class="sk-slider">
+        <div class="sk-sl-head"><label for="pLr">학습률 η (learning_rate)</label><b id="pLrV"></b></div>
+        <input type="range" id="pLr" min="0.01" max="1" step="0.01" value="1">
+      </div>
+      <div class="sk-slider">
+        <div class="sk-sl-head"><label for="pDepth">약한 학습기 깊이 (max_depth)</label><b id="pDepthV"></b></div>
+        <input type="range" id="pDepth" min="1" max="6" step="1" value="1">
+      </div>
+    </div>
+
+    <div class="sk-controls bo-params" data-for="gbm" hidden>
+      <span class="sk-label">Gradient Boosting 설정</span>
+      <div class="sk-slider">
+        <div class="sk-sl-head"><label for="gSub">표본 비율 (subsample)</label><b id="gSubV"></b></div>
+        <input type="range" id="gSub" min="0.3" max="1" step="0.1" value="1">
+      </div>
+      <span class="sk-hint">1.0보다 작으면 라운드마다 학습점 일부만 무작위로 써서 트리를 만듭니다 (확률적 부스팅).</span>
+    </div>
+    <div class="sk-controls bo-params" data-for="xgb" hidden>
+      <span class="sk-label">XGBoost 설정</span>
+      <div class="sk-slider">
+        <div class="sk-sl-head"><label for="xLam">λ (reg_lambda)</label><b id="xLamV"></b></div>
+        <input type="range" id="xLam" min="0" max="10" step="0.5" value="1">
+      </div>
+      <div class="sk-slider">
+        <div class="sk-sl-head"><label for="xGam">γ (gamma)</label><b id="xGamV"></b></div>
+        <input type="range" id="xGam" min="0" max="10" step="0.1" value="0">
+      </div>
+      <div class="sk-slider">
+        <div class="sk-sl-head"><label for="xMcw">min_child_weight</label><b id="xMcwV"></b></div>
+        <input type="range" id="xMcw" min="0" max="10" step="0.5" value="1">
+      </div>
+      <div class="sk-slider">
+        <div class="sk-sl-head"><label for="xSub">subsample</label><b id="xSubV"></b></div>
+        <input type="range" id="xSub" min="0.3" max="1" step="0.1" value="1">
+      </div>
+      <div class="sk-slider">
+        <div class="sk-sl-head"><label for="xCol">colsample_bytree</label><b id="xColV"></b></div>
+        <input type="range" id="xCol" min="0.5" max="1" step="0.5" value="1">
+      </div>
+    </div>
+    <div class="sk-controls bo-params" data-for="lgbm" hidden>
+      <span class="sk-label">LightGBM 설정</span>
+      <div class="sk-slider">
+        <div class="sk-sl-head"><label for="lLeaves">num_leaves</label><b id="lLeavesV"></b></div>
+        <input type="range" id="lLeaves" min="2" max="31" step="1" value="8">
+      </div>
+      <div class="sk-slider">
+        <div class="sk-sl-head"><label for="lBins">max_bin</label><b id="lBinsV"></b></div>
+        <input type="range" id="lBins" min="2" max="64" step="1" value="16">
+      </div>
+      <div class="sk-slider">
+        <div class="sk-sl-head"><label for="lMcs">min_child_samples</label><b id="lMcsV"></b></div>
+        <input type="range" id="lMcs" min="1" max="30" step="1" value="5">
+      </div>
+      <label class="sk-check"><input type="checkbox" id="lGoss">GOSS 사용</label>
+      <div class="sk-slider">
+        <div class="sk-sl-head"><label for="lA">a (top_rate)</label><b id="lAV"></b></div>
+        <input type="range" id="lA" min="0.05" max="0.5" step="0.05" value="0.2">
+      </div>
+      <div class="sk-slider">
+        <div class="sk-sl-head"><label for="lB">b (other_rate)</label><b id="lBV"></b></div>
+        <input type="range" id="lB" min="0.05" max="0.5" step="0.05" value="0.1">
+      </div>
+    </div>
+
+    <div class="sk-grid3">
+      <div class="bo-fig" id="fig1">
+        <h3><span>① 현재 앙상블 F<sub>m</sub></span><small id="t1"></small></h3>
+        <canvas id="cv1" class="click" aria-label="현재까지 더한 앙상블의 예측: 분류는 확률 배경과 결정 경계, 회귀는 예측선과 잔차"></canvas>
+        <div class="sk-legend" id="lg1"></div>
+      </div>
+      <div class="bo-fig" id="fig2">
+        <h3><span id="t2a">② 이번 라운드 약한 학습기 h<sub>m</sub></span>
+          <span class="sk-seg" id="wSeg" role="group" aria-label="표시할 가중치" hidden><button type="button" data-v="before" aria-pressed="false">갱신 전</button><button type="button" data-v="after" aria-pressed="true">갱신 후</button></span></h3>
+        <canvas id="cv2" class="click" aria-label="이번 라운드에 만든 약한 학습기의 분할 영역과 학습에 쓴 점의 가중치 또는 기울기"></canvas>
+        <div class="sk-legend" id="lg2"></div>
+      </div>
+      <div class="bo-fig" id="fig3">
+        <h3><span>③ 학습·검증 곡선</span>
+          <span class="sk-seg" id="metSeg" role="group" aria-label="곡선 종류"><button type="button" data-v="loss" aria-pressed="true">손실</button><button type="button" data-v="acc" aria-pressed="false">정확도</button></span></h3>
+        <canvas id="cv3" aria-label="라운드별 학습·검증 손실 또는 정확도 곡선, 검증 최적 라운드 표시"></canvas>
+        <div class="sk-legend"><span class="t-data"><i class="bo-line"></i>학습</span><span class="t-val"><i class="bo-line"></i>검증</span><span class="t-eval"><i class="bo-line dash"></i>검증 최적</span></div>
+      </div>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="bo-col">
+        <div class="sk-formula bo-formula" id="fx" aria-live="polite"></div>
+      </div>
+      <div class="bo-col">
+        <div class="sk-stats" id="stats"></div>
+        <p class="sk-note bo-caption" id="cap"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= AdaBoost 핵심 ================= -->
+  <section class="sk-card bo-deep" data-for="ada" aria-labelledby="adaH">
+    <div class="sk-head"><h2 id="adaH">AdaBoost 핵심: 샘플 가중치 갱신 (SAMME, 결정 그루터기)</h2><span class="sk-hint" id="adaHint"></span></div>
+    <div class="sk-formula bo-formula" id="adaSteps"></div>
+    <div class="sk-grid2">
+      <div class="bo-fig wide">
+        <h3><span>학습기별 가중치 α<sub>k</sub></span><small>진한 막대 = 지금까지 더한 학습기</small></h3>
+        <canvas id="cvAlpha" aria-label="학습기 번호별 가중치 알파 막대 그래프"></canvas>
+      </div>
+      <div class="bo-fig wide">
+        <h3><span>가중 오류 ε → 학습기 가중치 α</span><small>α = η·½ ln((1−ε)/ε)</small></h3>
+        <canvas id="cvEps" aria-label="가중 오류 엡실론에 따른 알파 곡선과 각 학습기의 위치"></canvas>
+      </div>
+    </div>
+    <p class="sk-note" id="adaNote"></p>
+  </section>
+
+  <!-- ================= Gradient Boosting 핵심 ================= -->
+  <section class="sk-card bo-deep" data-for="gbm" aria-labelledby="gbmH" hidden>
+    <div class="sk-head"><h2 id="gbmH">Gradient Boosting 핵심: 음의 기울기에 회귀 트리 맞추기</h2></div>
+    <div class="sk-formula bo-formula">F₀ = 상수(회귀: 평균, 분류: log(p̄/(1−p̄)))
+라운드 m:  rᵢ = −∂L(yᵢ, F)/∂F |<sub>F = F<sub>m−1</sub>(xᵢ)</sub>      (음의 기울기 = 잔차)
+          hₘ = rᵢ에 맞춘 회귀 트리 (잎 값은 손실별로 다시 계산)
+          Fₘ(x) = Fₘ₋₁(x) + η · hₘ(x)</div>
+    <div class="sk-grid2">
+      <div class="bo-col">
+        <div class="sk-scroll"><table class="sk-table bo-table">
+          <thead><tr><th>손실</th><th>L(y, F)</th><th>트리가 맞출 값 −∂L/∂F</th><th>잎 값</th></tr></thead>
+          <tbody>
+            <tr><td>제곱 오차 (회귀)</td><td class="sk-mono">½(y − F)²</td><td class="sk-mono">y − F  (잔차)</td><td class="sk-mono">잎 잔차 평균</td></tr>
+            <tr><td>로그 손실 (분류)</td><td class="sk-mono">−[y ln p + (1−y) ln(1−p)]</td><td class="sk-mono">y − p,  p = σ(F)</td><td class="sk-mono">Σr / Σp(1−p)  (뉴턴 스텝)</td></tr>
+          </tbody>
+        </table></div>
+        <p class="sk-note" id="gbmNote"></p>
+      </div>
+      <div class="bo-col">
+        <h3 style="margin:0;font-size:15px" id="gbmLeafH">이번 트리의 잎 값</h3>
+        <div class="sk-scroll bo-scroll-y"><table class="sk-table bo-table" id="gbmLeaves"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= XGBoost 핵심 ================= -->
+  <section class="sk-card bo-deep" data-for="xgb" aria-labelledby="xgbH" hidden>
+    <div class="sk-head"><h2 id="xgbH">XGBoost 핵심: 2차 근사, 잎 값 w*, 분할 이득 Gain</h2></div>
+    <div class="sk-formula bo-formula">목적함수(라운드 m)   Obj ≈ Σᵢ [ gᵢ f(xᵢ) + ½ hᵢ f(xᵢ)² ] + γT + ½λ Σⱼ wⱼ²
+분류(로그 손실)      gᵢ = pᵢ − yᵢ,   hᵢ = pᵢ(1 − pᵢ)          회귀(제곱 오차)  gᵢ = F(xᵢ) − yᵢ,  hᵢ = 1
+잎 j의 최적 값       w*ⱼ = −Gⱼ / (Hⱼ + λ),    Gⱼ = Σ gᵢ,  Hⱼ = Σ hᵢ  (잎에 든 점)
+분할 이득 (논문 식)   Gain = ½ [ G<sub>L</sub>²/(H<sub>L</sub>+λ) + G<sub>R</sub>²/(H<sub>R</sub>+λ) − (G<sub>L</sub>+G<sub>R</sub>)²/(H<sub>L</sub>+H<sub>R</sub>+λ) ] − γ
+xgboost 구현         ½ 없이 [ · ] 값을 gain으로 기록하고, [ · ] &lt; gamma 인 분할은 가지치기 (이 화면도 같은 기준)</div>
+    <div class="bo-sec">
+      <h3 id="xgbNodeH">루트 노드의 분할 후보</h3>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">특성</span><div class="sk-seg" id="xFeatSeg" role="group" aria-label="분할 후보를 볼 특성"></div></div>
+        <span class="sk-hint">위의 λ · γ · min_child_weight 슬라이더를 바꾸면 표와 그래프가 바로 바뀝니다.</span>
+      </div>
+      <dl class="sk-kv" id="xgbNode" style="max-width:640px"></dl>
+      <div class="sk-grid2">
+        <div class="bo-fig wide">
+          <h3><span>분할 기준별 [ · ] (½ 없는 gain)</span></h3>
+          <canvas id="cvGain" aria-label="분할 기준값에 따른 이득 곡선, 감마 선과 min_child_weight 위반 구간"></canvas>
+          <div class="sk-legend"><span class="t-learn"><i class="bo-line"></i>[ · ] 이득</span><span class="t-risk"><i class="bo-line dash"></i>γ (이보다 낮으면 가지치기)</span><span class="t-muted"><i class="bo-dot" style="background:var(--surface-2);border:1px solid var(--line-strong)"></i>min_child_weight 미달</span><span class="t-eval"><i class="bo-ring"></i>최선</span></div>
+        </div>
+        <div class="sk-scroll"><table class="sk-table bo-table" id="xgbCand"></table></div>
+      </div>
+    </div>
+    <div class="bo-sec">
+      <h3>이번 트리의 잎 값</h3>
+      <div class="sk-scroll bo-scroll-y"><table class="sk-table bo-table" id="xgbLeaves"></table></div>
+    </div>
+    <div class="bo-sec">
+      <h3>결측값 기본 방향 (default direction)</h3>
+      <p class="sk-lead">루트 노드에서 위 특성 값의 일부를 결측으로 지운 뒤, 각 분할 기준마다 결측을 <b>왼쪽에 넣을 때</b>와 <b>오른쪽에 넣을 때</b>의 이득을 모두 계산하고 큰 쪽을 그 분할의 기본 방향으로 저장합니다. 예측할 때 결측값은 이 방향으로 내려갑니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">결측으로 만들 점</span>
+          <div class="sk-seg" id="xMissSeg" role="group" aria-label="결측 개수">
+            <button type="button" data-v="5" aria-pressed="false">5개</button>
+            <button type="button" data-v="10" aria-pressed="true">10개</button>
+            <button type="button" data-v="20" aria-pressed="false">20개</button>
+          </div>
+        </div>
+      </div>
+      <div class="sk-formula bo-formula" id="xgbMissF"></div>
+      <div class="sk-scroll"><table class="sk-table bo-table" id="xgbMiss"></table></div>
+    </div>
+  </section>
+
+  <!-- ================= LightGBM 핵심 ================= -->
+  <section class="sk-card bo-deep" data-for="lgbm" aria-labelledby="lgbH" hidden>
+    <div class="sk-head"><h2 id="lgbH">LightGBM 핵심: 히스토그램 분할 · 리프 중심 성장 · GOSS</h2></div>
+    <div class="bo-sec">
+      <h3>① 히스토그램 분할 (max_bin)</h3>
+      <p class="sk-lead">연속값을 max_bin개 이하의 구간(bin)으로 미리 묶어 두고, 노드마다 구간별 G·H 합(히스토그램)만 만들어 <b>구간 경계에서만</b> 분할을 찾습니다. 후보 수가 데이터 수가 아니라 구간 수로 줄어 큰 데이터에서 빠릅니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">특성</span><div class="sk-seg" id="lFeatSeg" role="group" aria-label="히스토그램을 볼 특성"></div></div>
+        <span class="sk-hint">max_bin 슬라이더(위 LightGBM 설정)를 움직여 보세요.</span>
+      </div>
+      <div class="sk-grid2">
+        <div class="bo-col">
+          <div class="bo-fig strip">
+            <h3><span>구간별 데이터 수</span><small id="histT"></small></h3>
+            <canvas id="cvHist" aria-label="구간으로 묶은 특성 값의 히스토그램"></canvas>
+          </div>
+          <div class="bo-fig strip">
+            <h3><span>분할 기준별 이득 [ · ]: 정확 탐색 vs 구간 경계</span></h3>
+            <canvas id="cvHistG" aria-label="모든 경계에서 계산한 이득 곡선과 구간 경계에서만 계산한 이득 점"></canvas>
+            <div class="sk-legend"><span class="t-muted"><i class="bo-line" style="border-top-width:1.5px"></i>정확 탐색 (모든 경계)</span><span class="t-learn"><i class="bo-dot" style="background:var(--c-learn);border-radius:50%"></i>히스토그램 (구간 경계)</span><span class="t-eval"><i class="bo-ring"></i>각 방식의 최선</span></div>
+          </div>
+        </div>
+        <div class="bo-col">
+          <div class="sk-stats" id="histStats"></div>
+          <div class="sk-formula bo-formula" id="histF"></div>
+        </div>
+      </div>
+    </div>
+    <div class="bo-sec">
+      <h3>② 리프 중심(leaf-wise) vs 레벨 중심(level-wise) 성장</h3>
+      <p class="sk-lead">같은 기울기(g, h)로 트리 하나를 잎 1개부터 키웁니다. <b>레벨 중심</b>(XGBoost 기본 depthwise)은 한 층을 왼쪽부터 다 나눈 뒤 다음 층으로, <b>리프 중심</b>(LightGBM)은 지금 잎 가운데 <b>Gain이 가장 큰 잎</b>만 나눕니다. 원 안의 숫자 = 나눈 순서.</p>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--sm" id="gFirst">처음</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="gPrev">이전</button>
+          <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="gNext">잎 하나 더</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="gPlay">재생</button>
+        </div>
+        <span class="bo-round" id="growLbl"></span>
+        <span class="sk-hint" id="growSrc"></span>
+      </div>
+      <div class="sk-grid3">
+        <div class="bo-fig"><h3><span class="t-val">레벨 중심 (level-wise)</span><small id="lvlT"></small></h3><canvas id="cvLvl" aria-label="레벨 중심으로 자란 트리 그림"></canvas></div>
+        <div class="bo-fig"><h3><span class="t-learn">리프 중심 (leaf-wise)</span><small id="leafT"></small></h3><canvas id="cvLeaf" aria-label="리프 중심으로 자란 트리 그림"></canvas></div>
+        <div class="bo-fig"><h3><span>잎 수에 따른 손실 감소</span></h3><canvas id="cvGrow" aria-label="잎 수에 따른 두 성장 방식의 누적 손실 감소 비교"></canvas>
+          <div class="sk-legend"><span class="t-val"><i class="bo-line"></i>레벨 중심</span><span class="t-learn"><i class="bo-line"></i>리프 중심</span></div></div>
+      </div>
+      <p class="sk-note" id="growNote"></p>
+    </div>
+    <div class="bo-sec">
+      <h3>③ GOSS (기울기 기반 단측 샘플링)</h3>
+      <div class="sk-grid2">
+        <div class="bo-fig strip">
+          <h3><span>|g| 큰 순서로 정렬한 학습점</span><small id="gossT"></small></h3>
+          <canvas id="cvGoss" aria-label="기울기 크기 순으로 정렬한 막대, 유지한 상위 a, 무작위로 뽑은 b, 제외한 점 표시"></canvas>
+          <div class="sk-legend"><span class="t-learn"><i class="bo-dot" style="background:var(--c-learn)"></i>상위 a: 모두 유지</span><span class="t-eval"><i class="bo-dot" style="background:var(--c-eval)"></i>나머지에서 b만큼 무작위 → g, h × (1−a)/b</span><span class="t-muted"><i class="bo-dot" style="background:var(--line-strong)"></i>이번 트리에서 제외</span></div>
+        </div>
+        <div class="sk-formula bo-formula" id="gossF"></div>
+      </div>
+      <p class="sk-note"><b>EFB(배타적 특성 묶음)</b>: 동시에 0이 아닌 경우가 거의 없는 희소 특성들(예: 원-핫 진단 코드)을 한 특성으로 합쳐 특성 수를 줄입니다. 특성이 2개뿐인 이 예제에서는 효과가 없어 생략합니다.</p>
+    </div>
+  </section>
+
+  <!-- ================= 비교 ================= -->
+  <section class="sk-card" id="cmp" aria-labelledby="cmpH">
+    <div class="sk-head"><h2 id="cmpH">네 알고리즘 비교: 같은 데이터 · 같은 라운드 수</h2><span class="sk-hint">각 알고리즘의 위 설정을 그대로 쓰고 라운드 수만 맞춥니다</span></div>
+    <div class="sk-controls">
+      <div class="sk-slider" style="min-width:220px">
+        <div class="sk-sl-head"><label for="cN">라운드 수</label><b id="cNV">100</b></div>
+        <input type="range" id="cN" min="5" max="300" step="5" value="100">
+      </div>
+      <button type="button" class="sk-btn sk-btn--sm" id="cRun">다시 측정</button>
+    </div>
+    <div class="bo-thumbs" id="thumbs"></div>
+    <div class="sk-scroll"><table class="sk-table bo-table" id="cmpTable"></table></div>
+    <p class="sk-note" id="cmpNote"></p>
+    <div class="sk-scroll"><table class="sk-table bo-table bo-feat">
+      <thead><tr><th>항목</th><th class="wrap">AdaBoost</th><th class="wrap">Gradient Boosting</th><th class="wrap">XGBoost</th><th class="wrap">LightGBM</th></tr></thead>
+      <tbody>
+        <tr><td>약한 학습기</td><td class="wrap">결정 그루터기(깊이 1) 분류 트리</td><td class="wrap">얕은 회귀 트리 (깊이 3 안팎)</td><td class="wrap">회귀 트리, 2차 근사 점수로 분할</td><td class="wrap">회귀 트리, 히스토그램으로 분할</td></tr>
+        <tr><td>다음 학습기에 주는 신호</td><td class="wrap"><b>샘플 가중치</b> wᵢ (틀린 점 ↑)</td><td class="wrap"><b>잔차</b> = 음의 기울기</td><td class="wrap"><b>기울기 g + 헤시안 h</b></td><td class="wrap">g + h, GOSS 가중 (1−a)/b</td></tr>
+        <tr><td>손실</td><td class="wrap">지수 손실 exp(−yF)</td><td class="wrap">미분 가능한 손실 (제곱 오차, 로그 손실 등)</td><td class="wrap">손실의 2차 테일러 근사</td><td class="wrap">2차 근사 (XGBoost와 같음)</td></tr>
+        <tr><td>규제</td><td class="wrap">learning_rate, 학습기 수</td><td class="wrap">learning_rate, max_depth, subsample</td><td class="wrap">λ(L2)·α(L1), γ, min_child_weight, 행·열 샘플링</td><td class="wrap">lambda_l1/l2, min_gain_to_split, min_child_samples, 샘플링</td></tr>
+        <tr><td>분할 탐색</td><td class="wrap">정확 (모든 경계)</td><td class="wrap">정확 (모든 경계)</td><td class="wrap">exact 또는 hist (현재 기본 hist)</td><td class="wrap">히스토그램 (max_bin)</td></tr>
+        <tr><td>트리 성장</td><td class="wrap">깊이 제한</td><td class="wrap">깊이 제한 (max_depth)</td><td class="wrap">레벨 중심 (depthwise 기본)</td><td class="wrap"><b>리프 중심</b> (num_leaves)</td></tr>
+        <tr><td>결측 처리</td><td class="wrap">미지원 (대치 필요)</td><td class="wrap">미지원 (대치 필요, HistGradientBoosting은 지원)</td><td class="wrap">분할마다 <b>기본 방향</b> 학습</td><td class="wrap">기본 방향 학습 (결측을 한쪽으로)</td></tr>
+        <tr><td>대표 하이퍼파라미터</td><td class="wrap sk-mono">n_estimators, learning_rate, estimator</td><td class="wrap sk-mono">n_estimators, learning_rate, max_depth, subsample</td><td class="wrap sk-mono">n_estimators, learning_rate, max_depth, reg_lambda, gamma, min_child_weight, subsample, colsample_bytree</td><td class="wrap sk-mono">n_estimators, learning_rate, num_leaves, max_bin, min_child_samples, top_rate, other_rate</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- ================= 코드 ================= -->
+  <section class="sk-card" aria-labelledby="codeH">
+    <div class="sk-head"><h2 id="codeH">파이썬 코드</h2><span class="sk-hint">선택한 알고리즘 · 데이터 · 현재 설정이 바로 반영됩니다</span></div>
+    <div class="sk-controls">
+      <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="copyBtn">복사</button>
+      <span class="sk-hint" id="codeHint"></span>
+    </div>
+    <pre class="bo-code" id="code" tabindex="0" aria-label="파이썬 코드"></pre>
+    <p class="sk-note" id="codeNote"></p>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20260930c"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ---------------- 공통 수학 ---------------- */
+  function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+  function gauss(R){let u=0;while(u===0)u=R();const v=R();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+  const sigmoid = z => 1/(1+Math.exp(-z));
+  const logit = p => Math.log(p/(1-p));
+  const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+  const mean = a => { let s=0; for (const v of a) s+=v; return s/a.length; };
+  function mse(y, F){ let s=0; for (let i=0;i<y.length;i++){ const d=y[i]-F[i]; s+=d*d; } return s/y.length; }
+  function logloss(y, F, k){ k = k||1; let s=0; for (let i=0;i<y.length;i++){ let p=sigmoid(k*F[i]); p=Math.min(1-1e-15,Math.max(1e-15,p)); s+= y[i]?-Math.log(p):-Math.log(1-p); } return s/y.length; }
+  function exploss(y, F){ let s=0; for (let i=0;i<y.length;i++) s+=Math.exp(-(y[i]?1:-1)*F[i]); return s/y.length; }
+  function accuracy(y, F){ let c=0; for (let i=0;i<y.length;i++) if ((F[i]>0?1:0)===y[i]) c++; return c/y.length; }
+  function argmin(a){ let b=0; for (let i=1;i<a.length;i++) if (a[i]<a[b]-1e-12) b=i; return b; }
+  function argmax(a){ let b=0; for (let i=1;i<a.length;i++) if (a[i]>a[b]+1e-12) b=i; return b; }
+  function shuffleTake(R, arr, k){ const a=arr.slice(); for (let i=0;i<k;i++){ const j=i+Math.floor(R()*(a.length-i)); const t=a[i]; a[i]=a[j]; a[j]=t; } return a.slice(0,k); }
+  const range = n => Array.from({length:n}, (_,i) => i);
+
+  /* ---------------- 데이터 (seed 고정, float32로 맞춤) ---------------- */
+  const age = u => 20 + 60*u, glu = v => 70 + 130*v;
+  function genCls(seed){
+    const R = mulberry32(seed*104729+7), X = [], y = [];
+    for (let i=0;i<200;i++){
+      const u = R(), v = R();
+      const b = 0.78 - 0.5*u + 0.13*Math.sin(3*Math.PI*u);
+      X.push([Math.fround(u), Math.fround(v)]); y.push(R() < sigmoid(20*(v - b)) ? 1 : 0);
+    }
+    return { kind:"cls", X:X.slice(0,120), y:y.slice(0,120), Xv:X.slice(120), yv:y.slice(120) };
+  }
+  function genReg(seed){
+    const R = mulberry32(seed*7919+11), X = [], y = [];
+    for (let i=0;i<100;i++){
+      const a = 20 + 60*R();
+      X.push([Math.fround(a)]); y.push(+(1 + 2.5/(1+Math.exp(-(a-55)/6)) + 0.4*Math.sin(a/5) + 0.35*gauss(R)).toFixed(3));
+    }
+    return { kind:"reg", X:X.slice(0,60), y:y.slice(0,60), Xv:X.slice(60), yv:y.slice(60) };
+  }
+
+  /* ---------------- 트리 공통 ---------------- */
+  function leafOf(t, x){ while (!t.leaf) t = x[t.f] <= t.thr ? t.left : t.right; return t; }
+  const predict = (t, x) => leafOf(t, x).value;
+  function leavesOf(t, out){ out = out || []; if (t.leaf) out.push(t); else { leavesOf(t.left, out); leavesOf(t.right, out); } return out; }
+  function depthOf(t){ return t.leaf ? 0 : 1 + Math.max(depthOf(t.left), depthOf(t.right)); }
+  function sortedBy(X, idx, f){ return idx.slice().sort((a,b) => X[a][f]-X[b][f] || a-b); }
+  const gainRaw = (GL,HL,GR,HR,lam) => GL*GL/(HL+lam) + GR*GR/(HR+lam) - (GL+GR)*(GL+GR)/(HL+HR+lam);
+
+  /* ---------------- AdaBoost (SAMME, 가중 지니 분류 트리) ---------------- */
+  function giniTree(X, y, w, idx, maxDepth, depth){
+    let w0 = 0, w1 = 0; for (const i of idx){ if (y[i]) w1 += w[i]; else w0 += w[i]; }
+    const node = { leaf:true, value: w1 > w0 ? 1 : 0, w0, w1, n:idx.length, idx, depth };
+    if (depth >= maxDepth || idx.length < 2 || w0 <= 0 || w1 <= 0) return node;
+    let best = null;
+    for (let f=0; f<X[idx[0]].length; f++){
+      const o = sortedBy(X, idx, f); let l0 = 0, l1 = 0;
+      for (let k=0; k<o.length-1; k++){
+        if (y[o[k]]) l1 += w[o[k]]; else l0 += w[o[k]];
+        if (X[o[k]][f] === X[o[k+1]][f]) continue;
+        const r0 = w0-l0, r1 = w1-l1, wl = l0+l1, wr = r0+r1;
+        if (wl <= 0 || wr <= 0) continue;
+        const s = (l0*l0 + l1*l1)/wl + (r0*r0 + r1*r1)/wr;   /* 클수록 가중 지니 불순도 합이 작음 */
+        if (!best || s > best.s + 1e-15) best = { s, f, thr:(X[o[k]][f]+X[o[k+1]][f])/2, k, o };
+      }
+    }
+    if (!best) return node;
+    return { leaf:false, f:best.f, thr:best.thr, n:idx.length, idx, depth, w0, w1,
+      left: giniTree(X, y, w, best.o.slice(0,best.k+1), maxDepth, depth+1),
+      right: giniTree(X, y, w, best.o.slice(best.k+1), maxDepth, depth+1) };
+  }
+  function trainAda(D, p){
+    const { X, y, Xv } = D, n = y.length, all = range(n);
+    let w = new Float64Array(n).fill(1/n), F = new Float64Array(n), Fv = new Float64Array(Xv.length);
+    const rounds = [{ F, Fv, w }]; let stop = null;
+    for (let m=1; m<=p.n; m++){
+      const tree = giniTree(X, y, w, all, p.depth, 0);
+      const hp = X.map(x => predict(tree, x)), wrong = hp.map((v,i) => v !== y[i]);
+      let eps = 0, sw = 0, nWrong = 0;
+      for (let i=0;i<n;i++){ sw += w[i]; if (wrong[i]){ eps += w[i]; nWrong++; } }
+      eps /= sw;
+      if (eps <= 1e-12){ stop = { m, why:"zero" }; break; }
+      if (eps >= 0.5){ stop = { m, why:"half", eps }; break; }
+      const alpha = p.lr * 0.5 * Math.log((1-eps)/eps), up = Math.exp(alpha), dn = Math.exp(-alpha);
+      const raw = new Float64Array(n); let Z = 0;
+      for (let i=0;i<n;i++){ raw[i] = w[i]*(wrong[i] ? up : dn); Z += raw[i]; }
+      const wn = raw.map(v => v/Z);
+      const Fn = F.map((v,i) => v + alpha*(hp[i] ? 1 : -1));
+      const Fvn = Fv.map((v,i) => v + alpha*(predict(tree, Xv[i]) ? 1 : -1));
+      rounds.push({ tree, wBefore:w, w:wn, wrong, hp, eps, alpha, up, dn, Z, nWrong, F:Fn, Fv:Fvn });
+      w = wn; F = Fn; Fv = Fvn;
+    }
+    return { algo:"ada", F0:0, k:2, rounds, stop, add:(rd, x) => rd.alpha*(predict(rd.tree, x) ? 1 : -1) };
+  }
+
+  /* ---------------- Gradient Boosting (잔차에 맞춘 회귀 트리) ---------------- */
+  function sseTree(X, r, idx, maxDepth, leafFn, depth){
+    const n = idx.length; let s = 0; for (const i of idx) s += r[i];
+    const leaf = () => ({ leaf:true, value:leafFn(idx), n, idx, depth, sr:s });
+    if (depth >= maxDepth || n < 2) return leaf();
+    const base = s*s/n; let best = null;
+    for (let f=0; f<X[idx[0]].length; f++){
+      const o = sortedBy(X, idx, f); let sl = 0;
+      for (let k=0; k<n-1; k++){
+        sl += r[o[k]];
+        if (X[o[k]][f] === X[o[k+1]][f]) continue;
+        const nl = k+1, nr = n-nl, sr = s-sl, g = sl*sl/nl + sr*sr/nr - base;   /* = 제곱오차 합 감소량 */
+        if (!best || g > best.g + 1e-12) best = { g, f, thr:(X[o[k]][f]+X[o[k+1]][f])/2, k, o };
+      }
+    }
+    if (!best || best.g <= 1e-12) return leaf();
+    return { leaf:false, f:best.f, thr:best.thr, gain:best.g, n, idx, depth, sr:s,
+      left: sseTree(X, r, best.o.slice(0,best.k+1), maxDepth, leafFn, depth+1),
+      right: sseTree(X, r, best.o.slice(best.k+1), maxDepth, leafFn, depth+1) };
+  }
+  function trainGbm(D, p, seed){
+    const { X, y, Xv, kind } = D, n = y.length, cls = kind === "cls", all = range(n);
+    const ybar = mean(y), F0 = cls ? logit(ybar) : ybar;
+    let F = new Float64Array(n).fill(F0), Fv = new Float64Array(Xv.length).fill(F0);
+    const rounds = [{ F, Fv }], R = mulberry32(seed*31+5);
+    for (let m=1; m<=p.n; m++){
+      const pr = cls ? Array.from(F, sigmoid) : null;
+      const r = y.map((v,i) => v - (cls ? pr[i] : F[i]));
+      let idx = all;
+      if (p.sub < 1) idx = shuffleTake(R, all, Math.max(1, Math.floor(p.sub*n))).sort((a,b) => a-b);
+      const leafFn = cls
+        ? ids => { let a=0, b=0; for (const i of ids){ a += r[i]; b += pr[i]*(1-pr[i]); } return Math.abs(b) < 1e-150 ? 0 : a/b; }
+        : ids => { let a=0; for (const i of ids) a += r[i]; return a/ids.length; };
+      const tree = sseTree(X, r, idx, p.depth, leafFn, 0);
+      const Fn = F.map((v,i) => v + p.lr*predict(tree, X[i]));
+      const Fvn = Fv.map((v,i) => v + p.lr*predict(tree, Xv[i]));
+      rounds.push({ tree, r, pr, idx, inS:new Set(idx), F:Fn, Fv:Fvn });
+      F = Fn; Fv = Fvn;
+    }
+    return { algo:"gbm", F0, ybar, k:1, rounds, add:(rd, x) => p.lr*predict(rd.tree, x) };
+  }
+
+  /* ---------------- XGBoost (정확 탐색, 2차 근사, 사후 가지치기) ---------------- */
+  function gradHess(cls, y, F){
+    const g = new Float64Array(y.length), h = new Float64Array(y.length), pr = cls ? new Float64Array(y.length) : null;
+    for (let i=0;i<y.length;i++){
+      if (cls){ const p = sigmoid(F[i]); pr[i] = p; g[i] = p - y[i]; h[i] = p*(1-p); }
+      else { g[i] = F[i] - y[i]; h[i] = 1; }
+    }
+    return { g, h, pr };
+  }
+  function xgbCands(X, g, h, idx, f, lam, mcw){
+    const o = sortedBy(X, idx, f); let G = 0, H = 0; for (const i of idx){ G += g[i]; H += h[i]; }
+    const list = []; let GL = 0, HL = 0;
+    for (let k=0; k<o.length-1; k++){
+      GL += g[o[k]]; HL += h[o[k]];
+      const a = X[o[k]][f], b = X[o[k+1]][f]; if (a === b) continue;
+      const GR = G-GL, HR = H-HL;
+      list.push({ f, thr:(a+b)/2, GL, HL, GR, HR, nl:k+1, nr:o.length-k-1, ok: HL >= mcw && HR >= mcw, gain: gainRaw(GL,HL,GR,HR,lam), k, o });
+    }
+    return { G, H, list };
+  }
+  function xgbTree(X, g, h, idx, feats, p, depth){
+    let G = 0, H = 0; for (const i of idx){ G += g[i]; H += h[i]; }
+    const leaf = { leaf:true, value:-G/(H+p.lambda), G, H, n:idx.length, idx, depth };
+    if (depth >= p.depth || idx.length < 2) return leaf;
+    let best = null;
+    for (const f of feats) for (const c of xgbCands(X, g, h, idx, f, p.lambda, p.mcw).list) if (c.ok && (!best || c.gain > best.gain)) best = c;
+    if (!best || best.gain <= 1e-6) return leaf;
+    const L = xgbTree(X, g, h, best.o.slice(0,best.k+1), feats, p, depth+1);
+    const Rt = xgbTree(X, g, h, best.o.slice(best.k+1), feats, p, depth+1);
+    if (L.leaf && Rt.leaf && best.gain < p.gamma){ leaf.pruned = { f:best.f, thr:best.thr, gain:best.gain }; return leaf; }
+    return { leaf:false, f:best.f, thr:best.thr, gain:best.gain, G, H, n:idx.length, idx, depth, left:L, right:Rt };
+  }
+  function trainXgb(D, p, seed){
+    const { X, y, Xv, kind } = D, n = y.length, cls = kind === "cls", d = X[0].length, all = range(n);
+    const ybar = mean(y), F0 = cls ? logit(ybar) : ybar;
+    let F = new Float64Array(n).fill(F0), Fv = new Float64Array(Xv.length).fill(F0);
+    const rounds = [{ F, Fv }], R = mulberry32(seed*131+17);
+    for (let m=1; m<=p.n; m++){
+      const { g, h, pr } = gradHess(cls, y, F);
+      let idx = all;
+      if (p.sub < 1){ idx = all.filter(() => R() < p.sub); if (idx.length < 2) idx = all.slice(0,2); }
+      const feats = (p.col < 1 && d > 1) ? shuffleTake(R, range(d), Math.max(1, Math.round(p.col*d))).sort() : range(d);
+      const tree = xgbTree(X, g, h, idx, feats, p, 0);
+      const Fn = F.map((v,i) => v + p.lr*predict(tree, X[i]));
+      const Fvn = Fv.map((v,i) => v + p.lr*predict(tree, Xv[i]));
+      rounds.push({ tree, g, h, pr, idx, inS:new Set(idx), feats, F:Fn, Fv:Fvn });
+      F = Fn; Fv = Fvn;
+    }
+    return { algo:"xgb", F0, ybar, k:1, rounds, add:(rd, x) => p.lr*predict(rd.tree, x) };
+  }
+  /* 결측 기본 방향: 결측 점을 왼쪽/오른쪽에 넣었을 때의 이득을 모두 계산 */
+  function xgbMissing(X, g, h, idx, f, lam, mcw, miss){
+    const nm = idx.filter(i => !miss.has(i)); let Gm = 0, Hm = 0, Gn = 0, Hn = 0;
+    for (const i of idx){ if (miss.has(i)){ Gm += g[i]; Hm += h[i]; } else { Gn += g[i]; Hn += h[i]; } }
+    const o = sortedBy(X, nm, f), list = []; let GL = 0, HL = 0;
+    for (let k=0; k<o.length-1; k++){
+      GL += g[o[k]]; HL += h[o[k]];
+      const a = X[o[k]][f], b = X[o[k+1]][f]; if (a === b) continue;
+      const GR = Gn-GL, HR = Hn-HL;
+      const okL = HL+Hm >= mcw && HR >= mcw, okR = HL >= mcw && HR+Hm >= mcw;
+      list.push({ thr:(a+b)/2, gl: gainRaw(GL+Gm, HL+Hm, GR, HR, lam), gr: gainRaw(GL, HL, GR+Gm, HR+Hm, lam), okL, okR });
+    }
+    return { Gm, Hm, nMiss: idx.length - nm.length, list };
+  }
+
+  /* ---------------- LightGBM (히스토그램, 리프 중심, GOSS) ---------------- */
+  /* 구간 경계: 고유값이 max_bin 이하이면 값마다 한 구간, 넘으면 같은 개수씩(분위수) 묶음 */
+  function makeEdges(vals, maxBin){
+    const s = vals.slice().sort((a,b) => a-b), n = s.length, dv = [], cnt = [];
+    for (const v of s){ if (dv.length && dv[dv.length-1] === v) cnt[cnt.length-1]++; else { dv.push(v); cnt.push(1); } }
+    const edges = [];
+    if (dv.length <= maxBin){ for (let j=0;j<dv.length-1;j++) edges.push((dv[j]+dv[j+1])/2); }
+    else { let acc = 0;
+      for (let j=0;j<dv.length-1;j++){ acc += cnt[j]; if (edges.length < maxBin-1 && acc >= (edges.length+1)*n/maxBin - 1e-9) edges.push((dv[j]+dv[j+1])/2); } }
+    return { edges, distinct: dv.length };
+  }
+  function binOf(x, e){ let lo = 0, hi = e.length; while (lo < hi){ const md = (lo+hi) >> 1; if (e[md] < x) lo = md+1; else hi = md; } return lo; }
+  /* 한 노드의 최선 분할 (구간 경계에서만) */
+  function lgbBest(idx, Xb, g, h, nb, p){
+    let Gt = 0, Ht = 0; for (const i of idx){ Gt += g[i]; Ht += h[i]; }
+    let best = null;
+    for (let f=0; f<nb.length; f++){
+      const B = nb[f], SG = new Float64Array(B), SH = new Float64Array(B), SC = new Int32Array(B);
+      for (const i of idx){ const b = Xb[i][f]; SG[b] += g[i]; SH[b] += h[i]; SC[b]++; }
+      let GL = 0, HL = 0, CL = 0, fb = null;
+      for (let j=0; j<B-1; j++){
+        GL += SG[j]; HL += SH[j]; CL += SC[j];
+        const CR = idx.length-CL, HR = Ht-HL;
+        if (CL < p.mcs || HL < 1e-3) continue;
+        if (CR < p.mcs || HR < 1e-3) break;
+        const gain = gainRaw(GL, HL, Gt-GL, HR, p.lambda);
+        if (gain > 0 && (!fb || gain >= fb.gain)) fb = { f, bin:j, gain };   /* 같은 이득이면 더 높은 경계 (LightGBM과 같음) */
+      }
+      if (fb && (!best || fb.gain > best.gain)) best = fb;
+    }
+    return { G:Gt, H:Ht, best };
+  }
+  /* mode = "leaf"(리프 중심) | "level"(레벨 중심), 잎이 maxLeaves개가 될 때까지 */
+  function lgbGrow(idx, Xb, g, h, nb, edges, p, mode, maxLeaves, maxDepth){
+    let order = 0;
+    const mk = (ids, depth) => { const s = lgbBest(ids, Xb, g, h, nb, p); return { leaf:true, idx:ids, n:ids.length, depth, G:s.G, H:s.H, value:-s.G/(s.H+p.lambda), cand:s.best }; };
+    const root = mk(idx, 0), leaves = [root], queue = [root], steps = [];
+    const can = nd => nd.cand && nd.cand.gain > 0 && !(maxDepth > 0 && nd.depth >= maxDepth);
+    while (leaves.length < maxLeaves){
+      let nd = null;
+      if (mode === "leaf"){ for (const l of leaves) if (can(l) && (!nd || l.cand.gain > nd.cand.gain)) nd = l; }
+      else { while (queue.length){ const q = queue.shift(); if (can(q)){ nd = q; break; } } }
+      if (!nd) break;
+      const c = nd.cand, f = c.f, L = [], Rr = [];
+      for (const i of nd.idx) (Xb[i][f] <= c.bin ? L : Rr).push(i);
+      const l = mk(L, nd.depth+1), r = mk(Rr, nd.depth+1);
+      Object.assign(nd, { leaf:false, f, thr:edges[f][c.bin], gain:c.gain, left:l, right:r, order:++order });
+      leaves[leaves.indexOf(nd)] = l; leaves.push(r);
+      if (mode !== "leaf") queue.push(l, r);
+      steps.push({ gain:c.gain, node:nd });
+    }
+    return { root, steps };
+  }
+  function gossPick(R, g, n, a, b){
+    const topK = Math.max(1, Math.floor(a*n)), othK = Math.max(1, Math.floor(b*n));
+    const ord = range(n).sort((i,j) => Math.abs(g[j])-Math.abs(g[i]) || i-j);
+    const top = ord.slice(0, topK), smp = shuffleTake(R, ord.slice(topK), Math.min(othK, n-topK));
+    return { top:new Set(top), smp:new Set(smp), mult:(n-topK)/smp.length, topK, othK:smp.length, ord };
+  }
+  function trainLgb(D, p, seed){
+    const { X, y, Xv, kind } = D, n = y.length, cls = kind === "cls", d = X[0].length, all = range(n);
+    const E = [], nb = [], distinct = [];
+    for (let f=0; f<d; f++){ const e = makeEdges(X.map(x => x[f]), p.bins); E.push(e.edges); nb.push(e.edges.length+1); distinct.push(e.distinct); }
+    const Xb = X.map(x => x.map((v,f) => binOf(v, E[f])));
+    const ybar = mean(y), F0 = cls ? logit(ybar) : ybar;
+    let F = new Float64Array(n).fill(F0), Fv = new Float64Array(Xv.length).fill(F0);
+    const rounds = [{ F, Fv }], R = mulberry32(seed*577+29);
+    for (let m=1; m<=p.n; m++){
+      const { g, h, pr } = gradHess(cls, y, F);
+      let idx = all, gw = g, hw = h, goss = null;
+      if (p.goss){
+        goss = gossPick(R, g, n, p.a, p.b);
+        idx = all.filter(i => goss.top.has(i) || goss.smp.has(i));
+        gw = g.map((v,i) => goss.smp.has(i) ? v*goss.mult : v); hw = h.map((v,i) => goss.smp.has(i) ? v*goss.mult : v);
+      }
+      const gr = lgbGrow(idx, Xb, gw, hw, nb, E, p, "leaf", p.leaves, p.depth);
+      const tree = gr.root;
+      const Fn = F.map((v,i) => v + p.lr*predict(tree, X[i]));
+      const Fvn = Fv.map((v,i) => v + p.lr*predict(tree, Xv[i]));
+      rounds.push({ tree, g, h, gw, hw, pr, idx, inS:new Set(idx), goss, F:Fn, Fv:Fvn });
+      F = Fn; Fv = Fvn;
+    }
+    return { algo:"lgbm", F0, ybar, k:1, rounds, edges:E, nb, Xb, distinct, add:(rd, x) => p.lr*predict(rd.tree, x) };
+  }
+
+  /* ---------------- 학습 묶음 ---------------- */
+  function train(algo, D, p, seed){
+    const t0 = performance.now();
+    const R = algo === "ada" ? trainAda(D, p) : algo === "gbm" ? trainGbm(D, p, seed) : algo === "xgb" ? trainXgb(D, p, seed) : trainLgb(D, p, seed);
+    R.ms = performance.now() - t0;
+    R.N = R.rounds.length - 1; R.p = p; R.kind = D.kind;
+    const cls = D.kind === "cls";
+    R.trL = []; R.vaL = []; R.trA = []; R.vaA = []; R.trLL = []; R.vaLL = [];
+    for (const rd of R.rounds){
+      if (cls){
+        if (algo === "ada"){ R.trL.push(exploss(D.y, rd.F)); R.vaL.push(exploss(D.yv, rd.Fv)); }
+        else { R.trL.push(logloss(D.y, rd.F)); R.vaL.push(logloss(D.yv, rd.Fv)); }
+        R.trLL.push(logloss(D.y, rd.F, R.k)); R.vaLL.push(logloss(D.yv, rd.Fv, R.k));
+        R.trA.push(accuracy(D.y, rd.F)); R.vaA.push(accuracy(D.yv, rd.Fv));
+      } else { R.trL.push(mse(D.y, rd.F)); R.vaL.push(mse(D.yv, rd.Fv)); }
+    }
+    R.bestL = argmin(R.vaL); R.bestA = cls ? argmax(R.vaA) : 0;
+    return R;
+  }
+
+  /* ---------------- 그리기 도구 ---------------- */
+  const $ = id => document.getElementById(id);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let C = {};
+  function readColors(){
+    const s = getComputedStyle(document.documentElement), g = n => s.getPropertyValue(n).trim();
+    C = { surface:g("--surface"), surface2:g("--surface-2"), ink:g("--ink"), text:g("--text"), muted:g("--muted"), faint:g("--faint"),
+      line:g("--line"), lineStrong:g("--line-strong"), data:g("--c-data"), val:g("--c-val"), learn:g("--c-learn"), evalc:g("--c-eval"),
+      risk:g("--c-risk"), use:g("--c-use"), c0:g("--c0"), c1:g("--c1"), mono:g("--mono")||"monospace", sans:g("--sans")||"sans-serif" };
+  }
+  function hexRgb(h){ h = (h||"#888").replace("#",""); if (h.length === 3) h = h.split("").map(c => c+c).join(""); const n = parseInt(h.slice(0,6),16); return [n>>16&255, n>>8&255, n&255]; }
+  function alpha(hex, a){ const [r,g,b] = hexRgb(hex); return `rgba(${r},${g},${b},${a})`; }
+  function mixRgb(c, base, t){ return `rgb(${Math.round(base[0]+(c[0]-base[0])*t)},${Math.round(base[1]+(c[1]-base[1])*t)},${Math.round(base[2]+(c[2]-base[2])*t)})`; }
+  function prep(cv){
+    const dpr = Math.max(1, window.devicePixelRatio||1), w = cv.clientWidth, h = cv.clientHeight;
+    if (!w || !h) return null;
+    const W = Math.round(w*dpr), H = Math.round(h*dpr);
+    if (cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; }
+    const ctx = cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
+    return { ctx, w, h };
+  }
+  function niceTicks(a, b, n){
+    const span = b-a; if (!(span > 0)) return [a];
+    const s0 = span/Math.max(1,n), mag = Math.pow(10, Math.floor(Math.log10(s0))), e = s0/mag;
+    const st = (e<1.5?1:e<3?2:e<7?5:10)*mag, t = [];
+    for (let v=Math.ceil(a/st-1e-9)*st; v<=b+1e-9; v+=st) t.push(+v.toFixed(10));
+    return t;
+  }
+  function fmtTick(v){ const a = Math.abs(v); if (a === 0) return "0"; if (a >= 100) return v.toFixed(0); if (a >= 1) return (+v.toFixed(2)).toString(); if (a >= 0.01) return (+v.toFixed(3)).toString(); return v.toExponential(0); }
+  /* 좌표축: o = {x0,x1,y0,y1,xl,yl,xt,yt,xfmt,yfmt,bare} */
+  function axes(P, o){
+    const { ctx, w, h } = P, small = w < 360;
+    const m = o.bare ? { l:4, r:4, t:4, b:4 } : { l: small?38:46, r:10, t:10, b:32 };
+    const pw = w-m.l-m.r, ph = h-m.t-m.b;
+    const sx = v => m.l + (v-o.x0)/(o.x1-o.x0)*pw;
+    const sy = v => m.t + (1-(v-o.y0)/(o.y1-o.y0))*ph;
+    if (!o.bare){
+      ctx.save(); ctx.lineWidth = 1; ctx.font = `${small?10:11}px ${C.mono}`;
+      const xt = o.xt || niceTicks(o.x0, o.x1, small?4:6), yt = o.yt || niceTicks(o.y0, o.y1, small?4:5);
+      ctx.strokeStyle = C.line; ctx.fillStyle = C.muted;
+      ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      for (const v of yt){ const y = Math.round(sy(v))+.5; ctx.beginPath(); ctx.moveTo(m.l,y); ctx.lineTo(w-m.r,y); ctx.stroke(); ctx.fillText(o.yfmt ? o.yfmt(v) : fmtTick(v), m.l-5, y); }
+      ctx.textAlign = "center"; ctx.textBaseline = "top";
+      for (const v of xt){ const x = Math.round(sx(v))+.5; ctx.beginPath(); ctx.moveTo(x,m.t); ctx.lineTo(x,h-m.b); ctx.stroke(); ctx.fillText(o.xfmt ? o.xfmt(v) : fmtTick(v), x, h-m.b+4); }
+      ctx.font = `600 ${small?10.5:11.5}px ${C.sans}`; ctx.fillStyle = C.muted;
+      if (o.xl){ ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText(o.xl, w-m.r, h-1); }
+      ctx.restore();
+    }
+    return { yl:o.yl, sx, sy, m, pw, ph, ix: px => o.x0 + (px-m.l)/pw*(o.x1-o.x0), iy: py => o.y0 + (1-(py-m.t)/ph)*(o.y1-o.y0) };
+  }
+  function frame(P, A){ P.ctx.save(); P.ctx.strokeStyle = C.lineStrong; P.ctx.lineWidth = 1; P.ctx.strokeRect(A.m.l+.5, A.m.t+.5, A.pw-1, A.ph-1); P.ctx.restore(); }
+  function ylab(P, A){ if (A.yl) label(P.ctx, A.yl, A.m.l+7, A.m.t+5, C.muted, "left", "top"); }
+  function clip(P, A){ P.ctx.save(); P.ctx.beginPath(); P.ctx.rect(A.m.l, A.m.t, A.pw, A.ph); P.ctx.clip(); }
+  function polyline(ctx, xs, ys, sx, sy){ ctx.beginPath(); for (let i=0;i<xs.length;i++){ const X = sx(xs[i]), Y = sy(ys[i]); i ? ctx.lineTo(X,Y) : ctx.moveTo(X,Y); } ctx.stroke(); }
+  function dot(ctx, x, y, r, fill, stroke, lw){ ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); if (fill){ ctx.fillStyle = fill; ctx.fill(); } if (stroke){ ctx.strokeStyle = stroke; ctx.lineWidth = lw||1; ctx.stroke(); } }
+  function label(ctx, text, x, y, color, align, base){ ctx.save(); ctx.font = `600 11px ${C.sans}`; ctx.textAlign = align||"left"; ctx.textBaseline = base||"top";
+    const tw = ctx.measureText(text).width, bx = align === "right" ? x-tw-4 : align === "center" ? x-tw/2-4 : x-4;
+    ctx.fillStyle = alpha(C.surface, .88); ctx.fillRect(bx, (base === "bottom" ? y-15 : y-1), tw+8, 16);
+    ctx.fillStyle = color; ctx.fillText(text, x, y); ctx.restore(); }
+  function vline(ctx, A, x, color, dash, lw){ ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = lw||1.2; ctx.setLineDash(dash||[]); ctx.beginPath(); ctx.moveTo(Math.round(A.sx(x))+.5, A.m.t); ctx.lineTo(Math.round(A.sx(x))+.5, A.m.t+A.ph); ctx.stroke(); ctx.restore(); }
+  function hline(ctx, A, y, color, dash, lw){ ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = lw||1.2; ctx.setLineDash(dash||[]); ctx.beginPath(); ctx.moveTo(A.m.l, Math.round(A.sy(y))+.5); ctx.lineTo(A.m.l+A.pw, Math.round(A.sy(y))+.5); ctx.stroke(); ctx.restore(); }
+
+  const SUB = "₀₁₂₃₄₅₆₇₈₉", sub = n => String(n).replace(/\d/g, d => SUB[+d]);
+  const fx = (v, d) => { const s = (Math.abs(v) < 0.5*Math.pow(10,-d) ? 0 : v).toFixed(d); return s.replace("-", "−"); };
+  const f2 = v => fx(v,2), f3 = v => fx(v,3), f4 = v => fx(v,4);
+  const par = (v, d) => v < 0 ? "(" + fx(v, d||3) + ")" : fx(v, d||3);
+  const pct = v => (v*100).toFixed(1) + "%";
+  function setSeg(el, v){ el.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === String(v)))); }
+  function onSeg(el, fn){ el.addEventListener("click", e => { const b = e.target.closest("button"); if (!b || b.disabled) return; setSeg(el, b.dataset.v); fn(b.dataset.v); }); }
+  function statHTML(items){ return items.map(([v,l,cls]) => `<div class="sk-stat"><b${cls?` class="${cls}"`:""}>${v}</b><span>${l}</span></div>`).join(""); }
+  const SPEEDS = [0.5, 1, 2, 4, 8];
+  const ALGO_NAME = { ada:"AdaBoost", gbm:"Gradient Boosting", xgb:"XGBoost", lgbm:"LightGBM" };
+  const ALGOS = ["ada","gbm","xgb","lgbm"];
+
+  /* ---------------- 상태 ---------------- */
+  const P = {
+    ada:  { n:50,  lr:1.0, depth:1 },
+    gbm:  { n:100, lr:0.1, depth:2, sub:1.0 },
+    xgb:  { n:100, lr:0.3, depth:3, lambda:1, gamma:0, mcw:1, sub:1.0, col:1.0 },
+    lgbm: { n:100, lr:0.1, depth:0, leaves:8, bins:16, mcs:5, lambda:0, goss:false, a:0.2, b:0.1 },
+  };
+  const S = { algo:"ada", kind:"cls", seed:{ cls:2, reg:3 }, m:0, sel:null, mode:"sel", showVal:false, metric:"loss", speed:1, timer:null,
+    wView:"after", anim:null, xFeat:1, xMiss:10, lFeat:1, grow:6, growTimer:null, cmpN:100, cmpDirty:true };
+  const DATA = { cls:genCls(S.seed.cls), reg:genReg(S.seed.reg) };
+  let D = DATA.cls, R = null, gridCache = null, growCache = null, adaNote = "";
+
+  /* 표시용 이름·값 */
+  const featNames = () => D.kind === "cls" ? ["나이", "혈당"] : ["나이"];
+  const dispV = (f, v) => D.kind === "cls" ? (f ? glu(v) : age(v)) : v;
+  function cond(f, thr, le){ const nm = featNames()[f]; return `${nm} ${le ? "≤" : ">"} ${dispV(f, thr).toFixed(1)}`; }
+  function leafPaths(t, cs, out){ if (t.leaf){ out.push({ t, cond: cs.length ? cs.join(" · ") : "(전체)" }); return out; }
+    leafPaths(t.left, cs.concat(cond(t.f, t.thr, true)), out); leafPaths(t.right, cs.concat(cond(t.f, t.thr, false)), out); return out; }
+  function pointText(i){ const x = D.X[i], y = D.y[i];
+    return D.kind === "cls" ? `#${i+1}: 나이 ${Math.round(age(x[0]))}세, 혈당 ${Math.round(glu(x[1]))} mg/dL, 실제 y = ${y}` : `#${i+1}: 나이 ${x[0].toFixed(1)}세, 실제 의료비 y = ${f3(y)}`; }
+
+  /* ---------------- 학습·선택 ---------------- */
+  function defaultSel(){
+    if (D.kind === "cls"){ let b = -1, bd = 1e9; D.X.forEach((x,k) => { const d = Math.hypot(x[0]-0.62, x[1]-0.55); if (D.y[k] === 1 && d < bd){ bd = d; b = k; } }); return b < 0 ? 0 : b; }
+    let b = 0; D.X.forEach((x,k) => { if (Math.abs(x[0]-60) < Math.abs(D.X[b][0]-60)) b = k; }); return b;
+  }
+  function retrain(keepM){
+    R = train(S.algo, D, P[S.algo], S.seed[D.kind]);
+    gridCache = null; growCache = null;
+    S.m = keepM ? Math.min(S.m, R.N) : 0;
+    if (S.sel == null || S.sel >= D.y.length) S.sel = defaultSel();
+    S.cmpDirty = true;
+  }
+  let pend = 0;
+  function schedule(keepM){ cancelAnimationFrame(pend); pend = requestAnimationFrame(() => { retrain(keepM !== false); renderAll(); scheduleCmp(); }); }
+
+  /* 앙상블 F를 격자 위에서 (분류: GN×GN 칸, 회귀: 나이 격자) */
+  const GN = 64, GRID = range(241).map(i => 20 + 60*i/240);
+  function gridPts(){ if (D.kind === "cls"){ const a = []; for (let r=0;r<GN;r++) for (let c=0;c<GN;c++) a.push([(c+.5)/GN, (r+.5)/GN]); return a; } return GRID.map(v => [v]); }
+  function ensGrid(m){
+    if (gridCache && gridCache.R === R && gridCache.m === m) return gridCache.G;
+    const pts = gridPts(); let G, from;
+    if (gridCache && gridCache.R === R && gridCache.m < m){ G = gridCache.G.slice(); from = gridCache.m+1; }
+    else { G = new Float64Array(pts.length).fill(R.F0); from = 1; }
+    for (let k=from; k<=m; k++){ const rd = R.rounds[k]; for (let j=0;j<pts.length;j++) G[j] += R.add(rd, pts[j]); }
+    gridCache = { R, m, G }; return G;
+  }
+  function gridFor(Rx, m, pts){ const G = new Float64Array(pts.length).fill(Rx.F0); for (let k=1;k<=m;k++){ const rd = Rx.rounds[k]; for (let j=0;j<pts.length;j++) G[j] += Rx.add(rd, pts[j]); } return G; }
+
+  /* ---------------- ① 앙상블 ---------------- */
+  function planeAxes(P0, bare){
+    return axes(P0, { x0:0, x1:1, y0:0, y1:1, bare, xt:[20,30,40,50,60,70,80].map(a => (a-20)/60), yt:[80,100,120,140,160,180,200].map(g => (g-70)/130),
+      xfmt:u => Math.round(age(u)), yfmt:v => Math.round(glu(v)), xl:"나이 (세)", yl:"공복혈당 (mg/dL)" });
+  }
+  function paintProb(P0, A, G, n, k){
+    const { ctx } = P0, c0 = hexRgb(C.c0), c1 = hexRgb(C.c1), sf = hexRgb(C.surface), cw = A.pw/n, ch = A.ph/n;
+    for (let r=0;r<n;r++) for (let c=0;c<n;c++){
+      const p = sigmoid(k*G[r*n+c]), t = Math.min(1, Math.abs(p-.5)*2)*0.42 + 0.06;
+      ctx.fillStyle = mixRgb(p >= .5 ? c1 : c0, sf, t); ctx.fillRect(A.m.l + c*cw, A.m.t + (n-1-r)*ch, cw+.6, ch+.6);
+    }
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.beginPath();
+    for (let r=0;r<n;r++) for (let c=0;c<n;c++){
+      const s = G[r*n+c] > 0;
+      if (c+1 < n && (G[r*n+c+1] > 0) !== s){ const x = A.m.l+(c+1)*cw, yT = A.m.t+(n-1-r)*ch; ctx.moveTo(x, yT); ctx.lineTo(x, yT+ch); }
+      if (r+1 < n && (G[(r+1)*n+c] > 0) !== s){ const yy = A.m.t+(n-1-r)*ch, x = A.m.l+c*cw; ctx.moveTo(x, yy); ctx.lineTo(x+cw, yy); }
+    }
+    ctx.stroke();
+  }
+  function yRangeReg(){ const all = D.y.concat(D.yv); return [Math.floor(Math.min(...all)*2)/2 - 0.25, Math.ceil(Math.max(...all)*2)/2 + 0.25]; }
+  function drawEnsemble(){
+    const cv = $("cv1"), P0 = prep(cv); if (!P0) return;
+    const { ctx } = P0, m = S.m, cur = R.rounds[m], i = S.sel;
+    if (D.kind === "cls"){
+      const A = planeAxes(P0); clip(P0, A);
+      paintProb(P0, A, ensGrid(m), GN, R.k);
+      if (S.showVal) D.Xv.forEach((x,k) => dot(ctx, A.sx(x[0]), A.sy(x[1]), 4, null, D.yv[k] ? C.c1 : C.c0, 2));
+      D.X.forEach((x,k) => dot(ctx, A.sx(x[0]), A.sy(x[1]), 3.6, D.y[k] ? C.c1 : C.c0, C.surface, 1.2));
+      if (i != null) dot(ctx, A.sx(D.X[i][0]), A.sy(D.X[i][1]), 8.5, null, C.ink, 2.2);
+      ctx.restore(); frame(P0, A); ylab(P0, A); cv._A = A;
+    } else {
+      const [y0,y1] = yRangeReg(), A = axes(P0, { x0:20, x1:80, y0, y1, xl:"나이 (세)", yl:"연간 의료비 (백만 원)" }); clip(P0, A);
+      if (S.showVal) D.Xv.forEach((x,k) => dot(ctx, A.sx(x[0]), A.sy(D.yv[k]), 3.4, null, alpha(C.val,.9), 1.5));
+      ctx.strokeStyle = alpha(C.risk, .6); ctx.lineWidth = 1.4;
+      D.X.forEach((x,k) => { ctx.beginPath(); ctx.moveTo(A.sx(x[0]), A.sy(cur.F[k])); ctx.lineTo(A.sx(x[0]), A.sy(D.y[k])); ctx.stroke(); });
+      const pts = GRID.map(v => [v]);
+      if (m){ ctx.setLineDash([5,4]); ctx.strokeStyle = C.muted; ctx.lineWidth = 1.5; polyline(ctx, GRID, gridFor(R, m-1, pts), A.sx, A.sy); ctx.setLineDash([]); }
+      ctx.strokeStyle = C.ink; ctx.lineWidth = 2.6; polyline(ctx, GRID, ensGrid(m), A.sx, A.sy);
+      D.X.forEach((x,k) => dot(ctx, A.sx(x[0]), A.sy(D.y[k]), 3.6, C.data, C.surface, 1));
+      if (i != null) dot(ctx, A.sx(D.X[i][0]), A.sy(D.y[i]), 8, null, C.ink, 2);
+      ctx.restore(); frame(P0, A); ylab(P0, A); cv._A = A;
+    }
+  }
+
+  /* ---------------- ② 이번 라운드 약한 학습기 ---------------- */
+  function treeRects(t, rc, rects, segs){
+    const [u0,u1,v0,v1] = rc;
+    if (t.leaf){ rects.push({ rc, t });
+      if (t.pruned){ const q = t.pruned; segs.push(q.f === 0 ? { x0:clamp(q.thr,u0,u1), y0:v0, x1:clamp(q.thr,u0,u1), y1:v1, pruned:true } : { x0:u0, y0:clamp(q.thr,v0,v1), x1:u1, y1:clamp(q.thr,v0,v1), pruned:true }); }
+      return; }
+    if (t.f === 0){ const x = clamp(t.thr,u0,u1); segs.push({ x0:x, y0:v0, x1:x, y1:v1 }); treeRects(t.left, [u0,x,v0,v1], rects, segs); treeRects(t.right, [x,u1,v0,v1], rects, segs); }
+    else { const y = clamp(t.thr,v0,v1); segs.push({ x0:u0, y0:y, x1:u1, y1:y }); treeRects(t.left, [u0,u1,v0,y], rects, segs); treeRects(t.right, [u0,u1,y,v1], rects, segs); }
+  }
+  /* 지금 화면의 "다음 트리가 맞출 값" (m = 0이면 F₀에서 계산) */
+  function targetsAt(m){
+    const rd = R.rounds[m], cls = D.kind === "cls";
+    if (S.algo === "ada") return null;
+    if (m && S.algo === "gbm") return { t: rd.r };
+    if (m) return { t: Array.from(rd.g, v => -v), g: rd.g, h: rd.h };
+    const F = R.rounds[0].F, gh = gradHess(cls, D.y, F);
+    return { t: Array.from(gh.g, v => -v), g: gh.g, h: gh.h };
+  }
+  function adaW(rd){
+    if (!rd) return R.rounds[0].w;
+    if (S.anim && S.anim.m === S.m){ const t = clamp((performance.now()-S.anim.t0)/650, 0, 1), e = t<.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2; return rd.wBefore.map((v,k) => v + (rd.w[k]-v)*e); }
+    return S.wView === "before" ? rd.wBefore : rd.w;
+  }
+  function drawLearner(){
+    const cv = $("cv2"), P0 = prep(cv); if (!P0) return;
+    const { ctx } = P0, m = S.m, rd = m ? R.rounds[m] : null, i = S.sel, n = D.y.length;
+    if (D.kind === "cls"){
+      const A = planeAxes(P0); clip(P0, A);
+      const c0 = hexRgb(C.c0), c1 = hexRgb(C.c1), sf = hexRgb(C.surface);
+      if (rd){
+        const rects = [], segs = []; treeRects(rd.tree, [0,1,0,1], rects, segs);
+        const vmax = Math.max(1e-9, ...rects.map(r => Math.abs(r.t.value)));
+        for (const { rc, t } of rects){
+          const v = t.value, tint = S.algo === "ada" ? 0.2 : 0.07 + 0.33*Math.abs(v)/vmax;
+          ctx.fillStyle = mixRgb((S.algo === "ada" ? v === 1 : v > 0) ? c1 : c0, sf, tint);
+          ctx.fillRect(A.sx(rc[0]), A.sy(rc[3]), A.sx(rc[1])-A.sx(rc[0]), A.sy(rc[2])-A.sy(rc[3]));
+        }
+        ctx.lineWidth = 2;
+        for (const s of segs){ ctx.strokeStyle = s.pruned ? C.risk : C.learn; ctx.setLineDash(s.pruned ? [5,4] : []); ctx.beginPath(); ctx.moveTo(A.sx(s.x0), A.sy(s.y0)); ctx.lineTo(A.sx(s.x1), A.sy(s.y1)); ctx.stroke(); }
+        ctx.setLineDash([]);
+        if (S.algo !== "ada") for (const { rc, t } of rects){
+          const cx = (A.sx(rc[0])+A.sx(rc[1]))/2, cy = (A.sy(rc[2])+A.sy(rc[3]))/2, wpx = A.sx(rc[1])-A.sx(rc[0]), hpx = A.sy(rc[2])-A.sy(rc[3]);
+          if (wpx > 44 && hpx > 20) label(ctx, (t.value >= 0 ? "+" : "") + f2(t.value), cx, cy-7, C.learn, "center", "top");
+        }
+      }
+      if (S.algo === "ada"){
+        const w = adaW(rd);
+        D.X.forEach((x,k) => { const r = clamp(1.4 + 3.4*Math.sqrt(w[k]*n), 1.4, 16);
+          dot(ctx, A.sx(x[0]), A.sy(x[1]), r, alpha(D.y[k] ? C.c1 : C.c0, .85), C.surface, 1);
+          if (rd && rd.wrong[k]) dot(ctx, A.sx(x[0]), A.sy(x[1]), r+2, null, C.risk, 2); });
+        if (i != null){ const r = clamp(1.4 + 3.4*Math.sqrt(w[i]*n), 1.4, 16); dot(ctx, A.sx(D.X[i][0]), A.sy(D.X[i][1]), r+5.5, null, C.ink, 2); }
+        if (S.anim && S.anim.m === m && rd){ if (performance.now()-S.anim.t0 < 650) requestAnimationFrame(drawLearner); else S.anim = null; }
+      } else {
+        const T = targetsAt(m), inS = rd ? rd.inS : null, gs = rd && rd.goss;
+        D.X.forEach((x,k) => {
+          const r = 1.8 + 8.5*Math.abs(T.t[k]), X0 = A.sx(x[0]), Y0 = A.sy(x[1]), col = D.y[k] ? C.c1 : C.c0;
+          if (gs){
+            if (gs.top.has(k)){ dot(ctx, X0, Y0, r, col, C.surface, 1); dot(ctx, X0, Y0, r+2, null, C.learn, 2); }
+            else if (gs.smp.has(k)){ dot(ctx, X0, Y0, r, col, C.surface, 1); dot(ctx, X0, Y0, r+2, null, C.evalc, 2); }
+            else dot(ctx, X0, Y0, r, null, alpha(col, .45), 1.2);
+          } else if (inS && !inS.has(k)) dot(ctx, X0, Y0, r, null, alpha(col, .5), 1.3);
+          else dot(ctx, X0, Y0, r, col, C.surface, 1);
+        });
+        if (i != null) dot(ctx, A.sx(D.X[i][0]), A.sy(D.X[i][1]), 1.8+8.5*Math.abs(T.t[i])+5.5, null, C.ink, 2);
+      }
+      ctx.restore(); frame(P0, A); ylab(P0, A);
+      if (S.algo === "lgbm" && R.edges){ ctx.save(); ctx.strokeStyle = alpha(C.learn, .55); ctx.lineWidth = 1;
+        for (const e of R.edges[0]){ const x = A.sx(e); ctx.beginPath(); ctx.moveTo(x, A.m.t+A.ph); ctx.lineTo(x, A.m.t+A.ph-6); ctx.stroke(); }
+        for (const e of R.edges[1]){ const y = A.sy(e); ctx.beginPath(); ctx.moveTo(A.m.l, y); ctx.lineTo(A.m.l+6, y); ctx.stroke(); } ctx.restore(); }
+      if (!rd) label(ctx, S.algo === "ada" ? "모든 점 가중치 1/n에서 시작" : "다음 트리 h₁이 맞출 값 (점 크기)", A.m.l+8, A.m.t+A.ph-24, C.learn);
+      cv._A = A;
+    } else {
+      const T = targetsAt(m), tv = T.t;
+      const hg = rd ? GRID.map(g => predict(rd.tree, [g])) : null;
+      let mx = Math.max(0.1, ...tv.map(Math.abs)); if (hg) mx = Math.max(mx, ...hg.map(Math.abs)); mx *= 1.12;
+      const yl = S.algo === "gbm" ? (m ? `잔차 r = y − F${sub(m-1)}` : "잔차 r = y − F₀") : (m ? `−g = y − F${sub(m-1)}` : "−g = y − F₀");
+      const A = axes(P0, { x0:20, x1:80, y0:-mx, y1:mx, xl:"나이 (세)", yl }); clip(P0, A);
+      hline(ctx, A, 0, C.lineStrong, [], 1.2);
+      if (rd){ ctx.strokeStyle = alpha(C.learn,.45); ctx.lineWidth = 1; ctx.setLineDash([2,3]);
+        (function walk(t){ if (t.leaf) return; vline(ctx, A, t.thr, alpha(C.learn,.5), [2,3], 1); walk(t.left); walk(t.right); })(rd.tree); ctx.setLineDash([]); }
+      const gs = rd && rd.goss, inS = rd ? rd.inS : null;
+      D.X.forEach((x,k) => { const X0 = A.sx(x[0]), Y0 = A.sy(tv[k]);
+        if (gs){ if (gs.top.has(k)){ dot(ctx, X0, Y0, 3.8, C.risk, C.surface, 1); dot(ctx, X0, Y0, 6, null, C.learn, 1.8); }
+          else if (gs.smp.has(k)){ dot(ctx, X0, Y0, 3.8, C.risk, C.surface, 1); dot(ctx, X0, Y0, 6, null, C.evalc, 1.8); }
+          else dot(ctx, X0, Y0, 3.6, null, alpha(C.risk,.45), 1.2); }
+        else if (inS && !inS.has(k)) dot(ctx, X0, Y0, 3.6, null, alpha(C.risk,.55), 1.4);
+        else dot(ctx, X0, Y0, 3.6, C.risk, C.surface, 1); });
+      if (hg){ ctx.strokeStyle = C.learn; ctx.lineWidth = 2.8; polyline(ctx, GRID, hg, A.sx, A.sy);
+        ctx.setLineDash([5,4]); ctx.lineWidth = 1.6; polyline(ctx, GRID, hg.map(v => v*R.p.lr), A.sx, A.sy); ctx.setLineDash([]); }
+      if (i != null) dot(ctx, A.sx(D.X[i][0]), A.sy(tv[i]), 8, null, C.ink, 2);
+      ctx.restore(); frame(P0, A); ylab(P0, A);
+      if (S.algo === "lgbm" && R.edges){ ctx.save(); ctx.strokeStyle = alpha(C.learn,.6); ctx.lineWidth = 1;
+        for (const e of R.edges[0]){ const x = A.sx(e); ctx.beginPath(); ctx.moveTo(x, A.m.t+A.ph); ctx.lineTo(x, A.m.t+A.ph-7); ctx.stroke(); } ctx.restore(); }
+      if (!rd) label(ctx, "다음 트리 h₁이 이 값을 맞춥니다", A.m.l+8, A.m.t+26, C.learn);
+      cv._A = A;
+    }
+  }
+  function legend2(){
+    const cls = D.kind === "cls", a = S.algo;
+    let s = "";
+    if (a === "ada") s = `<span class="t-learn"><i class="bo-line"></i>그루터기 분할</span><span class="t-muted">점 크기 = 가중치 wᵢ</span><span class="t-risk"><i class="bo-ring"></i>이번 학습기가 틀린 점</span>`;
+    else if (cls) s = `<span class="t-learn"><i class="bo-line"></i>분할 · 칸 숫자 = 잎 값</span><span class="t-muted">점 크기 = |${a === "gbm" ? "r" : "g"}| = |y − p|</span>`;
+    else s = `<span class="t-risk"><i class="bo-dot" style="background:var(--c-risk)"></i>${a === "gbm" ? "잔차 r" : "−g (= 잔차)"}</span><span class="t-learn"><i class="bo-line"></i>${a === "gbm" ? "h" : "w*"}ₘ(x)</span><span class="t-learn"><i class="bo-line dash"></i>η·${a === "gbm" ? "h" : "w*"}ₘ(x)</span>`;
+    if (a === "gbm" && R.p.sub < 1) s += `<span class="t-muted"><i class="bo-ring"></i>이번 표본에서 빠진 점</span>`;
+    if (a === "xgb"){ if (R.p.sub < 1) s += `<span class="t-muted"><i class="bo-ring"></i>subsample로 빠진 점</span>`; s += `<span class="t-risk"><i class="bo-line dash"></i>γ로 가지치기된 분할</span>`; }
+    if (a === "lgbm"){ if (R.p.goss) s += `<span class="t-learn"><i class="bo-ring"></i>GOSS 상위 a</span><span class="t-eval"><i class="bo-ring"></i>무작위 b (×(1−a)/b)</span><span class="t-muted">빈 점 = 제외</span>`; s += `<span class="t-learn">축의 눈금 = 구간 경계</span>`; }
+    $("lg2").innerHTML = s;
+    $("lg1").innerHTML = cls
+      ? `<span class="t-c0"><i class="bo-dot" style="background:var(--c0)"></i>질환 없음 (0)</span><span class="t-c1"><i class="bo-dot" style="background:var(--c1)"></i>질환 있음 (1)</span><span class="t-ink"><i class="bo-line"></i>결정 경계</span><span class="t-muted">배경 = ${a === "ada" ? "p = σ(2F)" : "p = σ(F)"}</span>${S.showVal ? `<span class="t-muted"><i class="bo-ring"></i>검증</span>` : ""}`
+      : `<span class="t-data"><i class="bo-dot" style="background:var(--c-data)"></i>학습</span>${S.showVal ? `<span class="t-val"><i class="bo-ring"></i>검증</span>` : ""}<span class="t-ink"><i class="bo-line"></i>F<sub>m</sub></span><span class="t-muted"><i class="bo-line dash"></i>F<sub>m−1</sub></span><span class="t-risk"><i class="bo-line" style="border-top-width:2px"></i>잔차</span>`;
+  }
+
+  /* ---------------- ③ 곡선 ---------------- */
+  function drawCurves(){
+    const cv = $("cv3"), P0 = prep(cv); if (!P0) return;
+    const acc = S.metric === "acc" && D.kind === "cls";
+    const tr = acc ? R.trA : R.trL, va = acc ? R.vaA : R.vaL, N = R.N, m = S.m, b = acc ? R.bestA : R.bestL;
+    const all = tr.concat(va); let y0, y1;
+    if (acc){ y0 = Math.max(0, Math.floor((Math.min(...all)-0.02)*20)/20); y1 = Math.min(1.0001, Math.ceil((Math.max(...all)+0.01)*20)/20); }
+    else { y0 = 0; y1 = Math.max(...all)*1.06 || 1; }
+    const yl = acc ? "정확도" : D.kind === "reg" ? "MSE" : S.algo === "ada" ? "지수 손실 exp(−yF)" : "로그 손실";
+    const A = axes(P0, { x0:0, x1:Math.max(1,N), y0, y1, xl:"라운드", yl, yfmt: acc ? v => Math.round(v*100)+"%" : null });
+    const { ctx } = P0, xs = range(N+1);
+    clip(P0, A);
+    ctx.lineWidth = 1.6; ctx.strokeStyle = alpha(C.data,.28); polyline(ctx, xs, tr, A.sx, A.sy);
+    ctx.strokeStyle = alpha(C.val,.28); polyline(ctx, xs, va, A.sx, A.sy);
+    ctx.lineWidth = 2.6; ctx.strokeStyle = C.data; polyline(ctx, xs.slice(0,m+1), tr.slice(0,m+1), A.sx, A.sy);
+    ctx.strokeStyle = C.val; polyline(ctx, xs.slice(0,m+1), va.slice(0,m+1), A.sx, A.sy);
+    vline(ctx, A, b, C.evalc, [5,4], 1.6);
+    vline(ctx, A, m, alpha(C.ink, .45), [], 1);
+    dot(ctx, A.sx(m), A.sy(tr[m]), 4.5, C.data, C.surface, 1.5); dot(ctx, A.sx(m), A.sy(va[m]), 4.5, C.val, C.surface, 1.5);
+    dot(ctx, A.sx(b), A.sy(va[b]), 5, C.evalc, C.surface, 1.5);
+    ctx.restore(); frame(P0, A); ylab(P0, A);
+    const lx = A.sx(b), right = lx > A.m.l + A.pw*0.6;
+    label(ctx, `검증 ${acc ? "최고" : "최저"} ${b}라운드`, right ? lx-6 : lx+6, A.m.t+24, C.evalc, right ? "right" : "left");
+  }
+
+  /* ---------------- 수식 · 설명 ---------------- */
+  function stumpRule(t){
+    if (t.leaf) return `분할 없음 → 모두 ${t.value}`;
+    if (t.left.leaf && t.right.leaf) return `${cond(t.f, t.thr, true)} → ${t.left.value},  그 외 → ${t.right.value}`;
+    return `깊이 ${depthOf(t)} 트리 (잎 ${leavesOf(t).length}개)`;
+  }
+  function mainFormula(){
+    const m = S.m, i = S.sel, y = D.y[i], cls = D.kind === "cls", a = S.algo, lr = R.p.lr, rd = m ? R.rounds[m] : null, F0 = R.F0;
+    let s = `라운드 ${m} · 선택한 점 ${pointText(i)}\n`;
+    if (a === "ada"){
+      if (!rd) return s + `시작: 모든 점의 가중치 wᵢ = 1/n = 1/${D.y.length} = ${f4(1/D.y.length)}\nF₀(x) = 0 (아직 학습기 없음) → [다음 라운드]에서 첫 그루터기 h₁을 학습합니다.`;
+      const h = rd.hp[i], wr = rd.wrong[i], Fv = rd.F[i];
+      s += `그루터기 h${sub(m)}: ${stumpRule(rd.tree)}   ⇒  h${sub(m)}(x) = ${h ? "+1" : "−1"} <span class="${wr ? "t-risk" : "t-use"} hl">(${wr ? "틀림" : "맞음"})</span>\n`;
+      s += `가중치   wᵢ ← wᵢ · e^(${wr ? "+" : "−"}α) / Z = ${f4(rd.wBefore[i])} × ${f3(wr ? rd.up : rd.dn)} / ${f3(rd.Z)} = <b class="hl">${f4(rd.w[i])}</b>\n`;
+      s += `누적 점수 F${sub(m)}(x) = Σ αₖhₖ(x) = ${f3(Fv)}  →  H(x) = sign(F) = ${Fv > 0 ? "+1 (질환)" : "−1 (질환 없음)"}\n`;
+      s += `확률(참고) p = 1 / (1 + e^(−2F)) = ${f3(sigmoid(2*Fv))}`;
+      return s;
+    }
+    if (!rd){
+      if (cls){ const p0 = sigmoid(F0);
+        s += `F₀ = log(p̄ / (1 − p̄)),  p̄ = ${D.y.reduce((u,v) => u+v, 0)}/${D.y.length} = ${f3(R.ybar)}  →  F₀ = <b class="hl">${f3(F0)}</b>\n`;
+        s += a === "gbm" ? `유사 잔차 r = y − σ(F₀) = ${y} − ${f3(p0)} = <span class="t-risk hl">${f3(y-p0)}</span>` : `g = p − y = ${f3(p0)} − ${y} = <span class="t-risk hl">${f3(p0-y)}</span>,   h = p(1−p) = ${f3(p0*(1-p0))}`;
+      } else {
+        s += `F₀ = 학습 데이터 ${D.y.length}개의 평균 = <b class="hl">${f3(F0)}</b>\n`;
+        s += a === "gbm" ? `잔차 r = y − F₀ = ${f3(y)} − ${par(F0)} = <span class="t-risk hl">${f3(y-F0)}</span>` : `g = F₀ − y = ${f3(F0-y)},   h = 1`;
+      }
+      return s + `\n→ [다음 라운드]를 누르면 첫 트리가 이 값을 맞춥니다.`;
+    }
+    const Fp = R.rounds[m-1].F[i], Fn = rd.F[i], lf = leafOf(rd.tree, D.X[i]), out = rd.inS && !rd.inS.has(i);
+    if (a === "gbm"){
+      if (cls){ const p = rd.pr[i], r = rd.r[i]; let sr = 0, sh = 0; for (const k of lf.idx){ sr += rd.r[k]; sh += rd.pr[k]*(1-rd.pr[k]); }
+        s += `현재 확률  p = σ(F${sub(m-1)}(x)) = σ(${f3(Fp)}) = ${f3(p)}\n`;
+        s += `유사 잔차  r = y − p = ${y} − ${f3(p)} = <span class="t-risk hl">${f3(r)}</span>   (= −∂L/∂F)${out ? "  · 이번 표본에서 빠진 점" : ""}\n`;
+        s += `잎 값      γ = Σr / Σp(1−p) = ${f3(sr)} / ${f3(sh)} = <span class="t-learn hl">${f3(lf.value)}</span>   (이 점이 속한 잎: ${lf.idx.length}개)\n`;
+        s += `갱신       F${sub(m)}(x) = ${f3(Fp)} + ${f2(lr)} × ${par(lf.value)} = <b class="hl">${f3(Fn)}</b>  →  p = ${f3(sigmoid(Fn))}`;
+      } else { const r = rd.r[i];
+        s += `잔차      r = y − F${sub(m-1)}(x) = ${f3(y)} − ${par(Fp)} = <span class="t-risk hl">${f3(r)}</span>${out ? "  · 이번 표본에서 빠진 점" : ""}\n`;
+        s += `새 트리   h${sub(m)}(x) = 잎 잔차 평균 = ${f3(lf.sr)} / ${lf.idx.length} = <span class="t-learn hl">${f3(lf.value)}</span>\n`;
+        s += `갱신      F${sub(m)}(x) = ${f3(Fp)} + ${f2(lr)} × ${par(lf.value)} = <b class="hl">${f3(Fn)}</b>\n남은 잔차 y − F${sub(m)}(x) = ${f3(y-Fn)}`;
+      }
+      return s;
+    }
+    const g = rd.g[i], h = rd.h[i], lam = R.p.lambda;
+    if (cls) s += `기울기  g = p − y = ${f3(rd.pr[i])} − ${y} = <span class="t-risk hl">${f3(g)}</span>,   헤시안 h = p(1−p) = ${f3(h)}\n`;
+    else s += `기울기  g = F${sub(m-1)}(x) − y = ${f3(Fp)} − ${f3(y)} = <span class="t-risk hl">${f3(g)}</span>,   헤시안 h = 1\n`;
+    if (a === "lgbm" && rd.goss){ const gs = rd.goss;
+      s += `GOSS    ${gs.top.has(i) ? "|g| 상위 a → 그대로 유지" : gs.smp.has(i) ? `무작위 표본 → g, h × (1−a)/b = ×${f2(gs.mult)}` : "이번 트리에서 제외 (잎 값 계산에 안 들어감)"}\n`; }
+    else if (out) s += `subsample로 이번 트리에서 빠진 점 (잎 값 계산에 안 들어감)\n`;
+    s += `이 점의 잎: G = Σg = ${f3(lf.G)},  H = Σh = ${f3(lf.H)}  (점 ${lf.idx.length}개),  λ = ${fx(lam,1)}\n`;
+    s += `잎 값   w* = −G / (H + λ) = ${f3(-lf.G)} / ${f3(lf.H + lam)} = <span class="t-learn hl">${f3(lf.value)}</span>\n`;
+    s += `갱신    F${sub(m)}(x) = ${f3(Fp)} + ${f2(lr)} × ${par(lf.value)} = <b class="hl">${f3(Fn)}</b>${cls ? `  →  p = ${f3(sigmoid(Fn))}` : ""}`;
+    return s;
+  }
+  const TITLES = {
+    ada:"AdaBoost: 틀린 점의 가중치를 키워 다음 그루터기가 그 점을 보게 하기",
+    gbm:"Gradient Boosting: 잔차(음의 기울기)에 회귀 트리를 이어 맞추기",
+    xgb:"XGBoost: 기울기 g와 헤시안 h로 잎 값과 분할 이득 계산하기",
+    lgbm:"LightGBM: 구간(히스토그램)으로 묶고 Gain 큰 잎부터 키우기" };
+  const LEADS = {
+    ada:"매 라운드 가중치 wᵢ를 반영한 결정 그루터기 하나를 학습하고, 가중 오류 ε로 학습기 가중치 α를 정한 뒤 틀린 점은 e^α배, 맞은 점은 e^−α배로 바꿔 정규화합니다. 최종 예측은 H(x) = sign(Σ αₘhₘ(x)).",
+    gbm:"F₀(상수)에서 출발해, 매 라운드 손실의 음의 기울기(회귀: 잔차 y − F, 분류: y − p)에 얕은 회귀 트리를 맞추고 F ← F + η·h로 조금씩 더합니다.",
+    xgb:"손실을 2차까지 근사해 점마다 g(1차 미분), h(2차 미분)를 계산합니다. 잎 값은 w* = −G/(H+λ), 분할은 G·H로 계산한 Gain이 가장 큰 곳을 고르고 γ보다 작으면 잘라냅니다.",
+    lgbm:"XGBoost와 같은 g·h·Gain을 쓰되, 특성 값을 max_bin개 구간으로 묶어 구간 경계에서만 분할을 찾고, 트리는 Gain이 가장 큰 잎부터 num_leaves개까지 키웁니다. GOSS로 기울기 작은 점은 일부만 씁니다." };
+  function caption(){
+    const m = S.m, a = S.algo, cls = D.kind === "cls", rd = m ? R.rounds[m] : null, b = R.bestL;
+    let s = "";
+    if (a === "ada"){
+      if (!rd) s = `처음에는 모든 점이 같은 가중치입니다. [다음 라운드]를 누르면 그루터기가 학습되고 <b>틀린 점(빨간 테두리)이 커지는</b> 애니메이션이 나옵니다.`;
+      else s = `${m}번째 그루터기는 가중 오류 ε = ${f3(rd.eps)}, α = ${f3(rd.alpha)}. 틀린 ${rd.nWrong}개 점의 가중치가 ×${f3(rd.up/rd.Z)}로 커지고 맞은 점은 ×${f3(rd.dn/rd.Z)}로 줄어, 다음 그루터기는 <b>지금 틀린 점을 더 신경 씁니다</b>.`;
+      if (R.stop) s += R.stop.why === "zero" ? ` ${R.stop.m}라운드 그루터기가 가중 오류 0으로 모두 맞혀 학습을 멈췄습니다.` : ` ${R.stop.m}라운드에서 ε ≥ 0.5(무작위보다 못함)가 되어 학습을 멈췄습니다.`;
+    } else if (!rd) s = `출발점 F₀ = ${f3(R.F0)} ${cls ? "(로그 오즈)" : "(평균)"}에서 모든 점의 ${a === "gbm" ? "잔차" : "기울기"}를 계산했습니다. 오른쪽 그림의 큰 점일수록 다음 트리가 크게 고치려는 점입니다.`;
+    else {
+      s = m < b ? `트리를 더할수록 학습·검증 손실이 함께 내려갑니다. 검증 손실은 <b>${b}라운드</b>에서 가장 낮습니다.` :
+          m === b ? `<b>검증 손실이 가장 낮은 라운드</b>입니다 (조기 종료 지점).` :
+          R.vaL[R.N] > R.vaL[b]*1.02 ? `검증 최저(${b}라운드)를 지나 검증 손실이 <b>다시 오릅니다</b> → 과적합. 실무에서는 조기 종료(early stopping)로 멈춥니다.` : `검증 최저(${b}라운드) 이후에도 검증 손실이 거의 그대로입니다.`;
+      if (a === "xgb"){ const pr = []; (function w(t){ if (t.leaf){ if (t.pruned) pr.push(t.pruned); return; } w(t.left); w(t.right); })(rd.tree);
+        if (pr.length) s += ` 이번 트리에서 γ = ${fx(R.p.gamma,1)} 때문에 분할 ${pr.length}개가 잘렸습니다(빨간 점선).`;
+        if (rd.feats.length < D.X[0].length) s += ` colsample_bytree로 이번 트리는 <b>${featNames()[rd.feats[0]]}</b>만 썼습니다.`; }
+      if (a === "lgbm") s += ` 이번 트리: 잎 ${leavesOf(rd.tree).length}개, 깊이 ${depthOf(rd.tree)}.` + (rd.goss ? ` GOSS로 ${rd.idx.length}개 점만 사용.` : "");
+      if (a === "gbm" && R.p.sub < 1) s += ` subsample ${fx(R.p.sub,1)}: 이번 트리는 ${rd.idx.length}개 점(속이 찬 점)만 봤습니다.`;
+    }
+    return s;
+  }
+  function renderStats(){
+    const m = S.m, cls = D.kind === "cls", ln = !cls ? "MSE" : S.algo === "ada" ? "지수 손실" : "로그 손실";
+    const it = [[`${m} / ${R.N}`, "라운드 m"], [f4(R.trL[m]), `학습 ${ln}`, "t-data"], [f4(R.vaL[m]), `검증 ${ln}`, "t-val"]];
+    if (cls) it.push([pct(R.trA[m]), "학습 정확도", "t-data"], [pct(R.vaA[m]), "검증 정확도", "t-val"]);
+    it.push([`${R.bestL}`, "검증 손실 최저 라운드", "t-eval"]);
+    $("stats").innerHTML = statHTML(it);
+  }
+
+  /* ---------------- AdaBoost 화면 ---------------- */
+  function renderAda(){
+    const m = S.m, rd = m ? R.rounds[m] : R.rounds[1], n = D.y.length, lr = R.p.lr;
+    $("adaHint").textContent = m ? `라운드 ${m}의 숫자` : (rd ? "라운드 0: 1라운드 숫자를 미리 보여 줍니다" : "");
+    if (!rd){ $("adaSteps").innerHTML = "학습기가 없습니다."; }
+    else {
+      const k = m || 1, wt = rd.eps*rd.up/rd.Z;
+      let pz = 1; for (let j=1;j<=k;j++) pz *= R.rounds[j].Z;
+      $("adaSteps").innerHTML =
+`① 가중 오류      ε${sub(k)} = Σ<sub>틀린 i</sub> wᵢ = <span class="t-risk hl">${f4(rd.eps)}</span>   (틀린 점 ${rd.nWrong}개 / ${n}개)
+② 학습기 가중치   α${sub(k)} = η · ½ ln((1−ε)/ε) = ${f2(lr)} × ½ ln(${f4(1-rd.eps)} / ${f4(rd.eps)}) = <span class="t-learn hl">${f4(rd.alpha)}</span>
+③ 가중치 갱신     틀린 점 w ← w · e^α = w × ${f4(rd.up)}      맞은 점 w ← w · e^−α = w × ${f4(rd.dn)}
+④ 정규화          Z${sub(k)} = ε·e^α + (1−ε)·e^−α = ${f4(rd.eps)}×${f4(rd.up)} + ${f4(1-rd.eps)}×${f4(rd.dn)} = ${f4(rd.Z)}   → w ← w / Z
+                  틀린 점 가중치 합: ${f4(rd.eps)} → <b class="hl">${f4(wt)}</b>${Math.abs(lr-1) < 1e-9 ? "   (η = 1이면 언제나 0.5: 방금 학습기는 새 가중치에서 동전 던지기 수준)" : ""}
+⑤ 최종 분류기     H(x) = sign( Σ<sub>k=1..${k}</sub> αₖ hₖ(x) ),   hₖ(x) ∈ {−1, +1}
+지수 손실         L = (1/n) Σ exp(−yᵢ F(xᵢ)) = Z₁·Z₂·…·Z${sub(k)} = <b class="hl">${f4(pz)}</b>   (AdaBoost = 지수 손실을 한 단계씩 줄이는 방법)`;
+    }
+    $("adaNote").innerHTML = `scikit-learn의 <b>SAMME</b>는 α를 ln((1−ε)/ε)·η로 두 배 크게 쓰고 <b>틀린 점만</b> e^α배 합니다. 정규화하면 가중치와 예측이 이 화면과 똑같습니다(estimator_weights_ = 2α, estimator_errors_ = ε). 회귀용 AdaBoost.R2(AdaBoostRegressor)는 이 시뮬레이터에서 생략합니다.${adaNote}`;
+    drawAlpha(); drawEps();
+  }
+  function drawAlpha(){
+    const cv = $("cvAlpha"), P0 = prep(cv); if (!P0) return;
+    const N = R.N, al = R.rounds.slice(1).map(r => r.alpha), mx = Math.max(0.1, ...al)*1.1;
+    const A = axes(P0, { x0:0.5, x1:Math.max(1,N)+0.5, y0:0, y1:mx, xl:"학습기 번호 k", yl:"αₖ", xt: niceTicks(1, Math.max(1,N), 6).filter(v => v >= 1 && Number.isInteger(v)) });
+    const { ctx } = P0, bw = Math.max(1, A.pw/Math.max(1,N)*0.72);
+    clip(P0, A);
+    al.forEach((v,k) => { const x = A.sx(k+1); ctx.fillStyle = k+1 <= S.m ? C.learn : alpha(C.learn, .22); ctx.fillRect(x-bw/2, A.sy(v), bw, A.sy(0)-A.sy(v)); });
+    if (S.m){ const v = al[S.m-1], x = A.sx(S.m); ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.strokeRect(x-bw/2-1, A.sy(v)-1, bw+2, A.sy(0)-A.sy(v)+2); }
+    ctx.restore(); frame(P0, A); ylab(P0, A);
+    if (S.m) label(ctx, `α${sub(S.m)} = ${f3(al[S.m-1])}`, A.m.l+A.pw-6, A.m.t+6, C.learn, "right");
+  }
+  function drawEps(){
+    const cv = $("cvEps"), P0 = prep(cv); if (!P0) return;
+    const lr = R.p.lr, f = e => lr*0.5*Math.log((1-e)/e), ys = [f(0.03), f(0.6)];
+    const A = axes(P0, { x0:0, x1:0.6, y0:Math.min(...ys), y1:Math.max(...ys), xl:"가중 오류 ε", yl:"α" });
+    const { ctx } = P0; clip(P0, A);
+    hline(ctx, A, 0, C.lineStrong, [], 1.2); vline(ctx, A, 0.5, C.risk, [4,4], 1.4);
+    const xs = range(200).map(k => 0.03 + 0.57*k/199); ctx.strokeStyle = C.ink; ctx.lineWidth = 2; polyline(ctx, xs, xs.map(f), A.sx, A.sy);
+    R.rounds.slice(1).forEach((r,k) => dot(ctx, A.sx(r.eps), A.sy(r.alpha), k+1 === S.m ? 6 : 3, k+1 === S.m ? C.learn : alpha(C.learn, k+1 <= S.m ? .55 : .2), k+1 === S.m ? C.surface : null, 1.5));
+    ctx.restore(); frame(P0, A); ylab(P0, A);
+    label(ctx, "ε = 0.5 → α = 0", A.sx(0.5)-4, A.m.t+6, C.risk, "right");
+  }
+
+  /* ---------------- GBM 화면 ---------------- */
+  function renderGbm(){
+    const m = S.m, cls = D.kind === "cls", rd = m ? R.rounds[m] : null, lr = R.p.lr;
+    $("gbmNote").innerHTML = `분류에서 잎 값을 잔차 평균이 아니라 <b>Σr / Σp(1−p)</b>로 두는 것은 로그 손실을 2차 근사해 한 번에 최솟값으로 가는 뉴턴 스텝입니다(scikit-learn 방식, XGBoost의 −G/H와 같은 식). ` +
+      (R.p.sub < 1 ? `지금 subsample = ${fx(R.p.sub,1)}: 라운드마다 학습점의 ${Math.round(R.p.sub*100)}%만 무작위로 써서 트리를 만들어 분산을 줄입니다(확률적 부스팅).` : `subsample을 1보다 작게 하면 라운드마다 일부 점만 써서 트리를 만듭니다(확률적 부스팅).`);
+    $("gbmLeafH").textContent = m ? `라운드 ${m} 트리의 잎 값` : "이번 트리의 잎 값";
+    if (!rd){ $("gbmLeaves").innerHTML = `<tbody><tr><td class="t-muted">[다음 라운드]를 누르면 첫 트리의 잎이 여기에 나옵니다.</td></tr></tbody>`; return; }
+    const rows = leafPaths(rd.tree, [], []), sel = leafOf(rd.tree, D.X[S.sel]);
+    $("gbmLeaves").innerHTML = `<thead><tr><th>잎 (조건)</th><th>점 수</th><th>Σr</th>${cls ? "<th>Σp(1−p)</th>" : ""}<th>잎 값${cls ? " γ" : " h"}</th><th>η × 잎 값</th></tr></thead><tbody>` +
+      rows.map(({ t, cond: c }) => { let sh = 0; if (cls) for (const k of t.idx) sh += rd.pr[k]*(1-rd.pr[k]);
+        return `<tr class="${t === sel ? "cur" : ""}"><td class="wrap">${c}</td><td class="n">${t.idx.length}</td><td class="n">${f3(t.sr)}</td>${cls ? `<td class="n">${f3(sh)}</td>` : ""}<td class="n best">${f3(t.value)}</td><td class="n">${f3(lr*t.value)}</td></tr>`; }).join("") + `</tbody>`;
+  }
+
+  /* ---------------- XGBoost 화면 ---------------- */
+  function featSeg(el, cur){ const nm = featNames(); el.innerHTML = nm.map((t,f) => `<button type="button" data-v="${f}" aria-pressed="${f === cur}">${t}</button>`).join(""); }
+  function xgbRootData(){ const k = Math.max(1, S.m), rd = R.rounds[k]; return rd ? { k, rd } : null; }
+  function renderXgb(){
+    const q = xgbRootData(), p = R.p; if (!q) return;
+    const { k, rd } = q, d = D.X[0].length; if (S.xFeat >= d) S.xFeat = 0;
+    featSeg($("xFeatSeg"), S.xFeat);
+    const f = S.xFeat, cs = xgbCands(D.X, rd.g, rd.h, rd.idx, f, p.lambda, p.mcw), G = cs.G, H = cs.H;
+    $("xgbNodeH").textContent = `라운드 ${k} 트리 · 루트 노드의 분할 후보` + (S.m ? "" : " (라운드 0이라 1라운드를 미리 보여 줌)");
+    const root = rd.tree, used = rd.feats.includes(f);
+    $("xgbNode").innerHTML = `<dt>노드의 점 수 (subsample 후)</dt><dd>${rd.idx.length}</dd><dt>G = Σg</dt><dd>${f4(G)}</dd><dt>H = Σh (cover)</dt><dd>${f4(H)}</dd>` +
+      `<dt>나누지 않을 때 잎 값 w* = −G/(H+λ)</dt><dd>${f4(-G/(H+p.lambda))}</dd><dt>실제 루트</dt><dd>${root.leaf ? (root.pruned ? `가지치기됨 (${cond(root.pruned.f, root.pruned.thr, true)}, [·] = ${f3(root.pruned.gain)} &lt; γ)` : "분할 없음") : `${cond(root.f, root.thr, true)}  ([·] = ${f3(root.gain)})`}</dd>` +
+      (used ? "" : `<dt>colsample_bytree</dt><dd>이번 트리는 이 특성을 쓰지 않음</dd>`);
+    const okList = cs.list.filter(c => c.ok), best = okList.reduce((b,c) => !b || c.gain > b.gain ? c : b, null);
+    const top = cs.list.slice().sort((a,b) => (b.ok - a.ok) || b.gain - a.gain).slice(0, 8);
+    const verdict = c => !c.ok ? `<span class="t-muted">min_child_weight 미달</span>` : c === best ? (c.gain - p.gamma < 0 ? `<span class="t-risk">최선이지만 γ 미달</span>` : `<b>최선</b>`) : c.gain - p.gamma < 0 ? `<span class="t-risk">γ 미달</span>` : "후보";
+    $("xgbCand").innerHTML = `<thead><tr><th>분할 기준</th><th>G<sub>L</sub></th><th>H<sub>L</sub></th><th>G<sub>R</sub></th><th>H<sub>R</sub></th><th>[ · ]</th><th>[ · ] − γ</th><th>판정</th></tr></thead><tbody>` +
+      top.map(c => `<tr class="${c === best ? "cur" : ""}${c.ok ? "" : " off"}"><td>${cond(f, c.thr, true)}</td><td class="n">${f3(c.GL)}</td><td class="n">${f3(c.HL)}</td><td class="n">${f3(c.GR)}</td><td class="n">${f3(c.HR)}</td><td class="n${c === best ? " best" : ""}">${f3(c.gain)}</td><td class="n">${f3(c.gain - p.gamma)}</td><td>${verdict(c)}</td></tr>`).join("") +
+      `</tbody><tfoot><tr><td colspan="8" class="t-muted" style="white-space:normal">후보 ${cs.list.length}개 중 [ · ]가 큰 8개 · λ = ${fx(p.lambda,1)}, γ = ${fx(p.gamma,1)}, min_child_weight = ${fx(p.mcw,1)}</td></tr></tfoot>`;
+    drawGain(cs, f, best);
+    /* 잎 값 */
+    const rows = leafPaths(rd.tree, [], []), sel = leafOf(rd.tree, D.X[S.sel]);
+    $("xgbLeaves").innerHTML = `<thead><tr><th>잎 (조건)</th><th>점 수</th><th>G = Σg</th><th>H = Σh</th><th>w* = −G/(H+λ)</th><th>η·w*</th></tr></thead><tbody>` +
+      rows.map(({ t, cond: c }) => `<tr class="${t === sel ? "cur" : ""}"><td class="wrap">${c}${t.pruned ? ` <span class="t-risk">(가지치기)</span>` : ""}</td><td class="n">${t.n}</td><td class="n">${f3(t.G)}</td><td class="n">${f3(t.H)}</td><td class="n best">${f3(t.value)}</td><td class="n">${f3(p.lr*t.value)}</td></tr>`).join("") + `</tbody>`;
+    /* 결측 기본 방향 */
+    const Rm = mulberry32(S.seed[D.kind]*13 + S.xMiss*7 + k), miss = new Set(shuffleTake(Rm, rd.idx, Math.min(S.xMiss, rd.idx.length-4)));
+    const mr = xgbMissing(D.X, rd.g, rd.h, rd.idx, f, p.lambda, p.mcw, miss);
+    const sc = c => Math.max(c.okL ? c.gl : -Infinity, c.okR ? c.gr : -Infinity);
+    const valid = mr.list.filter(c => isFinite(sc(c))).sort((a,b) => sc(b) - sc(a)), bm = valid[0];
+    $("xgbMissF").innerHTML = `결측 ${mr.nMiss}개 (${featNames()[f]} 값을 지움):  G<sub>결측</sub> = ${f3(mr.Gm)},  H<sub>결측</sub> = ${f3(mr.Hm)}\n` +
+      `결측 → 왼쪽:  [ (G<sub>L</sub>+G<sub>결측</sub>)²/(H<sub>L</sub>+H<sub>결측</sub>+λ) + G<sub>R</sub>²/(H<sub>R</sub>+λ) − G²/(H+λ) ]\n결측 → 오른쪽: [ G<sub>L</sub>²/(H<sub>L</sub>+λ) + (G<sub>R</sub>+G<sub>결측</sub>)²/(H<sub>R</sub>+H<sub>결측</sub>+λ) − G²/(H+λ) ]` +
+      (bm ? `\n<b>최선: ${cond(f, bm.thr, true)}, 결측은 ${bm.gl >= bm.gr && bm.okL ? "왼쪽" : "오른쪽"}으로</b>  ([ · ] = ${f3(sc(bm))}) → 예측할 때 이 특성이 비어 있으면 이 방향으로 보냅니다.` : "");
+    $("xgbMiss").innerHTML = `<thead><tr><th>분할 기준 (결측 아닌 값)</th><th>결측 → 왼쪽 [ · ]</th><th>결측 → 오른쪽 [ · ]</th><th>기본 방향</th></tr></thead><tbody>` +
+      valid.slice(0,6).map(c => { const L = c.okL ? c.gl : -Infinity, Rr = c.okR ? c.gr : -Infinity, dir = L >= Rr ? "왼쪽" : "오른쪽";
+        return `<tr class="${c === bm ? "cur" : ""}"><td>${cond(f, c.thr, true)}</td><td class="n${L >= Rr ? " best" : ""}">${c.okL ? f3(c.gl) : "미달"}</td><td class="n${Rr > L ? " best" : ""}">${c.okR ? f3(c.gr) : "미달"}</td><td>${dir}</td></tr>`; }).join("") + `</tbody>`;
+  }
+  function drawGain(cs, f, best){
+    const cv = $("cvGain"), P0 = prep(cv); if (!P0) return;
+    const p = R.p, L = cs.list, cls = D.kind === "cls";
+    const xr = cls ? (f ? [70,200] : [20,80]) : [20,80];
+    const gmax = Math.max(p.gamma*1.15, 0.1, ...L.map(c => c.gain))*1.08;
+    const A = axes(P0, { x0:xr[0], x1:xr[1], y0:0, y1:gmax, xl:featNames()[f] + (cls && f ? " (mg/dL)" : " (세)"), yl:"[ · ]" });
+    const { ctx } = P0; clip(P0, A);
+    for (const c of L) if (!c.ok){ const x = A.sx(dispV(f, c.thr)); ctx.fillStyle = alpha(C.lineStrong, .55); ctx.fillRect(x-1.5, A.m.t, 3, A.ph); }
+    if (p.gamma > 0){ ctx.fillStyle = alpha(C.risk, .07); ctx.fillRect(A.m.l, A.sy(p.gamma), A.pw, A.sy(0)-A.sy(p.gamma)); hline(ctx, A, p.gamma, C.risk, [6,4], 1.6); }
+    ctx.strokeStyle = C.learn; ctx.lineWidth = 2; polyline(ctx, L.map(c => dispV(f, c.thr)), L.map(c => c.gain), A.sx, A.sy);
+    L.forEach(c => dot(ctx, A.sx(dispV(f, c.thr)), A.sy(c.gain), 2, c.ok ? C.learn : C.faint));
+    if (best) dot(ctx, A.sx(dispV(f, best.thr)), A.sy(best.gain), 7, null, C.evalc, 2.4);
+    ctx.restore(); frame(P0, A); ylab(P0, A);
+    if (p.gamma > 0) label(ctx, `γ = ${fx(p.gamma,1)}`, A.m.l+A.pw-6, A.sy(p.gamma)-4, C.risk, "right", "bottom");
+  }
+
+  /* ---------------- LightGBM 화면 ---------------- */
+  function renderLgb(){
+    const d = D.X[0].length; if (S.lFeat >= d) S.lFeat = 0;
+    featSeg($("lFeatSeg"), S.lFeat);
+    drawHist(); renderGrow(); renderGoss();
+  }
+  function histData(){
+    const k = Math.max(1, S.m), rd = R.rounds[k], f = S.lFeat, p = R.p, all = range(D.y.length);
+    const e = R.edges[f], nb = R.nb[f];
+    /* 정확 탐색 (모든 경계) vs 히스토그램 (구간 경계) : 같은 g·h, 같은 최소 데이터 수 */
+    const ex = xgbCands(D.X, rd.g, rd.h, all, f, p.lambda, 0).list.map(c => ({ ...c, ok: c.nl >= p.mcs && c.nr >= p.mcs && c.HL >= 1e-3 && c.HR >= 1e-3 }));
+    const SG = new Float64Array(nb), SH = new Float64Array(nb), SC = new Int32Array(nb), S0 = new Int32Array(nb);
+    for (const i of all){ const b = R.Xb[i][f]; SG[b] += rd.g[i]; SH[b] += rd.h[i]; SC[b]++; if (D.kind === "cls" && !D.y[i]) S0[b]++; }
+    let G = 0, H = 0; for (const i of all){ G += rd.g[i]; H += rd.h[i]; }
+    const hs = []; let GL = 0, HL = 0, CL = 0;
+    for (let j=0;j<nb-1;j++){ GL += SG[j]; HL += SH[j]; CL += SC[j]; const CR = all.length-CL;
+      hs.push({ thr:e[j], gain: gainRaw(GL, HL, G-GL, H-HL, p.lambda), ok: CL >= p.mcs && CR >= p.mcs && HL >= 1e-3 && H-HL >= 1e-3 }); }
+    const bx = ex.filter(c => c.ok).reduce((b,c) => !b || c.gain > b.gain ? c : b, null);
+    const bh = hs.filter(c => c.ok).reduce((b,c) => !b || c.gain >= b.gain ? c : b, null);
+    return { k, f, e, nb, SC, S0, ex, hs, bx, bh, distinct: R.distinct[f] };
+  }
+  function drawHist(){
+    const H0 = histData(), { f, e, nb, SC, S0, ex, hs, bx, bh } = H0, cls = D.kind === "cls";
+    const xr = cls ? (f ? [70,200] : [20,80]) : [20,80], lo = xr[0], hi = xr[1];
+    const edgesD = e.map(v => dispV(f, v)), xl = featNames()[f] + (cls && f ? " (mg/dL)" : " (세)");
+    $("histT").textContent = `max_bin = ${R.p.bins} → 구간 ${nb}개`;
+    let P0 = prep($("cvHist"));
+    if (P0){
+      const cmax = Math.max(1, ...SC)*1.1, A = axes(P0, { x0:lo, x1:hi, y0:0, y1:cmax, xl, yl:"데이터 수" }), { ctx } = P0; clip(P0, A);
+      for (let j=0;j<nb;j++){
+        const a = j ? edgesD[j-1] : lo, b = j < nb-1 ? edgesD[j] : hi, x0 = A.sx(a), x1 = A.sx(b);
+        if (j % 2) { ctx.fillStyle = alpha(C.lineStrong, .18); ctx.fillRect(x0, A.m.t, x1-x0, A.ph); }
+        const w = Math.max(1, x1-x0-1.5);
+        if (cls){ const h0 = S0[j], h1 = SC[j]-S0[j];
+          ctx.fillStyle = alpha(C.c0, .8); ctx.fillRect(x0+.75, A.sy(h0), w, A.sy(0)-A.sy(h0));
+          ctx.fillStyle = alpha(C.c1, .8); ctx.fillRect(x0+.75, A.sy(h0+h1), w, A.sy(h0)-A.sy(h0+h1)); }
+        else { ctx.fillStyle = alpha(C.data, .75); ctx.fillRect(x0+.75, A.sy(SC[j]), w, A.sy(0)-A.sy(SC[j])); }
+      }
+      ctx.strokeStyle = C.learn; ctx.lineWidth = 1; for (const x of edgesD){ const X = Math.round(A.sx(x))+.5; ctx.beginPath(); ctx.moveTo(X, A.m.t); ctx.lineTo(X, A.m.t+A.ph); ctx.stroke(); }
+      ctx.restore(); frame(P0, A); ylab(P0, A);
+    }
+    P0 = prep($("cvHistG"));
+    if (P0){
+      const gm = Math.max(0.1, ...ex.map(c => c.gain), ...hs.map(c => c.gain))*1.1, A = axes(P0, { x0:lo, x1:hi, y0:0, y1:gm, xl, yl:"[ · ]" }), { ctx } = P0; clip(P0, A);
+      ctx.strokeStyle = alpha(C.muted, .8); ctx.lineWidth = 1.5; polyline(ctx, ex.map(c => dispV(f, c.thr)), ex.map(c => c.ok ? c.gain : 0), A.sx, A.sy);
+      hs.forEach(c => dot(ctx, A.sx(dispV(f, c.thr)), A.sy(c.ok ? c.gain : 0), 3.6, c.ok ? C.learn : C.faint, C.surface, 1));
+      if (bx) dot(ctx, A.sx(dispV(f, bx.thr)), A.sy(bx.gain), 7, null, C.muted, 2.2);
+      if (bh) dot(ctx, A.sx(dispV(f, bh.thr)), A.sy(bh.gain), 8, null, C.evalc, 2.4);
+      ctx.restore(); frame(P0, A); ylab(P0, A);
+    }
+    $("histStats").innerHTML = statHTML([
+      [`${H0.distinct}`, "고유값 수"], [`${ex.length}`, "정확 탐색 후보", "t-muted"], [`${hs.length}`, "히스토그램 후보", "t-learn"],
+      [bx ? f3(bx.gain) : "−", "정확 탐색 최고 [ · ]"], [bh ? f3(bh.gain) : "−", "히스토그램 최고 [ · ]", "t-learn"] ]);
+    const n = D.y.length, nm = featNames()[f];
+    $("histF").innerHTML = `라운드 ${H0.k} 기울기, 학습점 ${n}개, min_child_samples = ${R.p.mcs}\n` +
+      `정확 탐색: 노드마다 값을 정렬해 n = ${n}개를 훑고 경계 ${ex.length}개 평가\n히스토그램: 구간별 G·H 합을 만든 뒤 구간 ${nb}개만 훑고 경계 ${hs.length}개 평가\n` +
+      (bx ? `정확 최선   ${cond(f, bx.thr, true)}   [ · ] = ${f3(bx.gain)}\n` : "") + (bh ? `구간 최선   ${cond(f, bh.thr, true)}   [ · ] = ${f3(bh.gain)}` + (bx ? `   (정확 대비 ${(bh.gain/bx.gain*100).toFixed(1)}%)` : "") : "") +
+      `\n→ 데이터가 수백만 행이어도 ${nm} 하나에서 살펴볼 경계는 max_bin − 1개뿐 (기본 255)` +
+      `\n<span class="t-muted">* 실제 LightGBM은 히스토그램에 개수 대신 h 합만 저장해 min_child_samples 판단용 개수를 h로 추정합니다(회귀는 같고, 분류는 경계 사례에서 조금 다를 수 있음).</span>`;
+  }
+  function growData(){
+    if (growCache && growCache.R === R && growCache.k === Math.max(1, S.m)) return growCache;
+    const k = Math.max(1, S.m), rd = R.rounds[k], p = R.p, all = range(D.y.length);
+    const K = p.leaves, lvl = lgbGrow(all, R.Xb, rd.g, rd.h, R.nb, R.edges, p, "level", K, 0), lf = lgbGrow(all, R.Xb, rd.g, rd.h, R.nb, R.edges, p, "leaf", K, 0);
+    const cum = st => { const a = [0]; for (const s of st) a.push(a[a.length-1] + s.gain/2); return a; };
+    growCache = { R, k, K, lvl, lf, cL:cum(lvl.steps), cF:cum(lf.steps) };
+    return growCache;
+  }
+  function renderGrow(){
+    const g = growData(), maxS = Math.max(g.lvl.steps.length, g.lf.steps.length);
+    S.grow = clamp(S.grow, 0, maxS);
+    const s = S.grow, sl = Math.min(s, g.lvl.steps.length), sf = Math.min(s, g.lf.steps.length);
+    $("growLbl").textContent = `잎 ${s+1}개 / 최대 ${g.K}`;
+    $("growSrc").textContent = `라운드 ${g.k}의 g·h, 전체 학습점, 같은 max_bin·min_child_samples (깊이 제한 없음)`;
+    const dL = depthAt(g.lvl.root, sl), dF = depthAt(g.lf.root, sf);
+    $("lvlT").textContent = `깊이 ${dL} · 손실 감소 ${f3(g.cL[sl])}`; $("leafT").textContent = `깊이 ${dF} · 손실 감소 ${f3(g.cF[sf])}`;
+    drawTree($("cvLvl"), g.lvl.root, sl, C.val); drawTree($("cvLeaf"), g.lf.root, sf, C.learn); drawGrowChart(g, s);
+    const diff = g.cF[sf] - g.cL[sl];
+    $("growNote").innerHTML = `같은 잎 ${s+1}개에서 손실 감소(2차 근사, ½ΣGain): 레벨 중심 <b class="t-val">${f3(g.cL[sl])}</b> · 리프 중심 <b class="t-learn">${f3(g.cF[sf])}</b>` +
+      (s ? (diff > 1e-9 ? ` → 리프 중심이 ${f3(diff)} 더 줄였습니다. 대신 한쪽으로 깊어져(깊이 ${dF}) 데이터가 적으면 과적합하기 쉬워 num_leaves·min_child_samples·max_depth로 막습니다.` : ` → 아직 같은 분할을 골랐습니다. 잎을 더 늘려 보세요.`) : "") +
+      ` ${g.lvl.steps.length < g.K-1 || g.lf.steps.length < g.K-1 ? "(min_child_samples 때문에 더 나눌 잎이 없으면 일찍 멈춥니다.)" : ""}`;
+    $("gPrev").disabled = $("gFirst").disabled = s === 0; $("gNext").disabled = s >= maxS;
+  }
+  function depthAt(nd, s){ if (!(nd.order && nd.order <= s)) return 0; return 1 + Math.max(depthAt(nd.left, s), depthAt(nd.right, s)); }
+  function drawTree(cv, root, s, col){
+    const P0 = prep(cv); if (!P0) return;
+    const { ctx, w, h } = P0, pos = new Map(); let leafN = 0;
+    (function lay(nd, d){ const int = nd.order && nd.order <= s;
+      if (!int){ pos.set(nd, { x:leafN++, d, leaf:true }); return; }
+      lay(nd.left, d+1); lay(nd.right, d+1); pos.set(nd, { x:(pos.get(nd.left).x + pos.get(nd.right).x)/2, d, leaf:false }); })(root, 0);
+    const maxD = Math.max(...[...pos.values()].map(v => v.d)), pad = 16, top = 18;
+    const dy = Math.min(64, (h-top-44)/Math.max(2, maxD)), X = v => pad + (v.x+0.5)/leafN*(w-2*pad), Y = v => top + v.d*dy;
+    ctx.strokeStyle = C.lineStrong; ctx.lineWidth = 1.3;
+    for (const [nd, v] of pos) if (!v.leaf){ for (const c of [nd.left, nd.right]){ const u = pos.get(c); ctx.beginPath(); ctx.moveTo(X(v), Y(v)); ctx.lineTo(X(u), Y(u)); ctx.stroke(); } }
+    const rr = clamp((w-2*pad)/Math.max(1,leafN)*0.32, 4, 10);
+    for (const [nd, v] of pos){
+      if (v.leaf){ ctx.fillStyle = alpha(nd.value >= 0 ? C.c1 : C.c0, .55); ctx.strokeStyle = C.lineStrong; ctx.lineWidth = 1;
+        ctx.fillRect(X(v)-rr*.75, Y(v)-rr*.75, rr*1.5, rr*1.5); ctx.strokeRect(X(v)-rr*.75, Y(v)-rr*.75, rr*1.5, rr*1.5); }
+      else { dot(ctx, X(v), Y(v), rr+1.5, col, nd.order === s ? C.ink : C.surface, nd.order === s ? 2.4 : 1.2);
+        if (rr >= 6){ ctx.fillStyle = C.surface; ctx.font = `700 ${rr >= 8 ? 11 : 9}px ${C.mono}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(nd.order), X(v), Y(v)+.5); } }
+    }
+    if (s > 0){ const last = [...pos.keys()].find(nd => nd.order === s); if (last) label(ctx, `${s}번째: ${cond(last.f, last.thr, true)}`, 8, h-20, C.muted, "left", "top"); }
+    else label(ctx, "잎 1개 (루트)", 8, h-20, C.muted, "left", "top");
+  }
+  function drawGrowChart(g, s){
+    const cv = $("cvGrow"), P0 = prep(cv); if (!P0) return;
+    const K = g.K, ym = Math.max(0.01, ...g.cL, ...g.cF)*1.08;
+    const A = axes(P0, { x0:1, x1:K, y0:0, y1:ym, xl:"잎 수", yl:"손실 감소 ½ΣGain" }), { ctx } = P0; clip(P0, A);
+    ctx.lineWidth = 2.4; ctx.strokeStyle = C.val; polyline(ctx, g.cL.map((_,j) => j+1), g.cL, A.sx, A.sy);
+    ctx.strokeStyle = C.learn; polyline(ctx, g.cF.map((_,j) => j+1), g.cF, A.sx, A.sy);
+    vline(ctx, A, s+1, alpha(C.ink,.45), [], 1);
+    const sl = Math.min(s, g.cL.length-1), sf = Math.min(s, g.cF.length-1);
+    dot(ctx, A.sx(sl+1), A.sy(g.cL[sl]), 4.5, C.val, C.surface, 1.5); dot(ctx, A.sx(sf+1), A.sy(g.cF[sf]), 4.5, C.learn, C.surface, 1.5);
+    ctx.restore(); frame(P0, A); ylab(P0, A);
+  }
+  function renderGoss(){
+    const p = R.p, n = D.y.length, k = Math.max(1, S.m), rd = R.rounds[k];
+    const topK = Math.max(1, Math.floor(p.a*n)), othK = Math.max(1, Math.floor(p.b*n)), mult = (n-topK)/Math.min(othK, n-topK);
+    $("gossT").textContent = p.goss ? `라운드 ${k}` : "GOSS 꺼짐: 켜면 표시";
+    $("gossF").innerHTML = `학습점 n = ${n},  a = ${fx(p.a,2)},  b = ${fx(p.b,2)}\n` +
+      `① |g| 큰 순서로 정렬 → 상위 a·n = ${topK}개는 모두 유지\n② 나머지 ${n-topK}개에서 b·n = ${Math.min(othK, n-topK)}개를 무작위로 뽑음\n` +
+      `③ 뽑은 점의 g, h에 (1−a)/b = ${f2((1-p.a)/p.b)} 곱하기 (실제 계산: (n − ${topK})/${Math.min(othK, n-topK)} = ${f2(mult)})\n` +
+      `   → 작은 기울기 ${Math.min(othK, n-topK)}개가 뽑히지 않은 ${n-topK}개 전체의 G·H 합을 대신함\n` +
+      `이번 트리에 쓰는 점: ${topK + Math.min(othK, n-topK)}개 / ${n}개 (${pct((topK + Math.min(othK, n-topK))/n)})\n` +
+      `<span class="t-muted">* LightGBM 구현은 |g·h|로 정렬하고, 처음 1/learning_rate 라운드는 GOSS 없이 전체를 씁니다. 이 화면은 1라운드부터 적용합니다.</span>`;
+    const cv = $("cvGoss"), P0 = prep(cv); if (!P0) return;
+    const ord = range(n).sort((i,j) => Math.abs(rd.g[j])-Math.abs(rd.g[i]) || i-j), gm = Math.max(1e-9, ...ord.map(i => Math.abs(rd.g[i])))*1.08;
+    const A = axes(P0, { x0:0, x1:n, y0:0, y1:gm, xl:"|g| 큰 순서", yl:"|g|" }), { ctx } = P0, bw = A.pw/n; clip(P0, A);
+    ord.forEach((i,r) => { const gs = rd.goss, v = Math.abs(rd.g[i]);
+      ctx.fillStyle = !gs ? alpha(C.muted,.55) : gs.top.has(i) ? C.learn : gs.smp.has(i) ? C.evalc : alpha(C.lineStrong,.9);
+      const hh = A.sy(0)-A.sy(v), y = A.sy(v); ctx.fillRect(A.m.l + r*bw + .3, y, Math.max(.8, bw-.6), hh);
+      if (gs && gs.smp.has(i)){ ctx.fillStyle = alpha(C.evalc,.18); ctx.fillRect(A.m.l + r*bw + .3, A.m.t, Math.max(.8, bw-.6), A.ph); } });
+    if (rd.goss) vline(ctx, A, rd.goss.topK, C.learn, [4,3], 1.4);
+    ctx.restore(); frame(P0, A); ylab(P0, A);
+  }
+
+  /* ---------------- 비교 ---------------- */
+  let cmpRes = null, cmpTimer = 0;
+  function scheduleCmp(){ S.cmpDirty = true; clearTimeout(cmpTimer); cmpTimer = setTimeout(runCmp, 300); }
+  function runCmp(){
+    const cls = D.kind === "cls", res = {};
+    for (const a of ALGOS){
+      if (a === "ada" && !cls){ res[a] = null; continue; }
+      const p = Object.assign({}, P[a], { n:S.cmpN }); let best = null;
+      for (let t=0;t<3;t++){ const Rx = train(a, D, p, S.seed[D.kind]); if (!best || Rx.ms < best.ms) best = Rx; }
+      res[a] = best;
+    }
+    cmpRes = { res, cls, n:S.cmpN, D }; S.cmpDirty = false; renderCmp();
+  }
+  function settingText(a){ const p = P[a];
+    if (a === "ada") return `η ${f2(p.lr)}, 깊이 ${p.depth}`;
+    if (a === "gbm") return `η ${f2(p.lr)}, 깊이 ${p.depth}, subsample ${fx(p.sub,1)}`;
+    if (a === "xgb") return `η ${f2(p.lr)}, 깊이 ${p.depth}, λ ${fx(p.lambda,1)}, γ ${fx(p.gamma,1)}, mcw ${fx(p.mcw,1)}`;
+    return `η ${f2(p.lr)}, 잎 ${p.leaves}, max_bin ${p.bins}, mcs ${p.mcs}${p.goss ? ", GOSS" : ""}`; }
+  function renderCmp(){
+    if (!cmpRes){ return; }
+    const { res, cls } = cmpRes;
+    $("thumbs").innerHTML = ALGOS.map(a => `<div class="bo-fig${cls ? " sq" : ""}"><h3><span>${ALGO_NAME[a]}</span><small id="thS-${a}"></small></h3><canvas id="th-${a}" aria-label="${ALGO_NAME[a]} 결정 경계 썸네일"></canvas></div>`).join("");
+    ALGOS.forEach(a => ro.observe($("th-" + a)));
+    drawThumbs();
+    const rows = ALGOS.map(a => { const Rx = res[a];
+      if (!Rx) return `<tr class="off"><td>${ALGO_NAME[a]}</td><td class="wrap" colspan="5">회귀는 생략 (AdaBoost.R2 = AdaBoostRegressor)</td></tr>`;
+      const N = Rx.N;
+      return cls ? `<tr class="${a === S.algo ? "cur" : ""}"><td><b>${ALGO_NAME[a]}</b></td><td class="wrap sk-mono" style="font-size:12.5px">${settingText(a)}${N < cmpRes.n ? ` · ${N}라운드에서 멈춤` : ""}</td><td class="n">${pct(Rx.trA[N])}</td><td class="n" data-k="va">${pct(Rx.vaA[N])}</td><td class="n" data-k="ll">${f4(Rx.vaLL[N])}</td><td class="n">${Rx.ms.toFixed(1)} ms</td></tr>`
+                 : `<tr class="${a === S.algo ? "cur" : ""}"><td><b>${ALGO_NAME[a]}</b></td><td class="wrap sk-mono" style="font-size:12.5px">${settingText(a)}</td><td class="n">${f4(Rx.trL[N])}</td><td class="n" data-k="va">${f4(Rx.vaL[N])}</td><td class="n">${f4(Math.min(...Rx.vaL))} (${Rx.bestL})</td><td class="n">${Rx.ms.toFixed(1)} ms</td></tr>`; });
+    $("cmpTable").innerHTML = (cls ? `<thead><tr><th>알고리즘</th><th>현재 설정</th><th>학습 정확도</th><th>검증 정확도</th><th>검증 로그 손실</th><th>학습 시간</th></tr></thead>`
+                                   : `<thead><tr><th>알고리즘</th><th>현재 설정</th><th>학습 MSE</th><th>검증 MSE</th><th>검증 MSE 최저 (라운드)</th><th>학습 시간</th></tr></thead>`) + `<tbody>${rows.join("")}</tbody>`;
+    const vals = ALGOS.filter(a => res[a]).map(a => [a, cls ? res[a].vaA[res[a].N] : -res[a].vaL[res[a].N]]);
+    const bv = Math.max(...vals.map(v => v[1]));
+    $("cmpTable").querySelectorAll("tbody tr").forEach((tr, j) => { const a = ALGOS[j]; if (res[a] && Math.abs((cls ? res[a].vaA[res[a].N] : -res[a].vaL[res[a].N]) - bv) < 1e-12){ const td = tr.querySelector('[data-k="va"]'); if (td) td.classList.add("best"); } });
+    $("cmpNote").innerHTML = `${cmpRes.n}라운드, 학습 ${D.y.length}개 · 검증 ${D.yv.length}개. ` + (cls ? `AdaBoost의 로그 손실은 p = σ(2F)로 계산했습니다. ` : "") +
+      `학습 시간은 이 브라우저에서 이 페이지의 순수 JS 구현으로 3번 재서 가장 짧은 값입니다. 데이터가 작아 라이브러리 속도와는 다르며, LightGBM이 실제로 빠른 이유는 큰 데이터에서의 <b>히스토그램·GOSS·EFB</b>입니다. 정확도 차이는 데이터와 설정에 따라 바뀝니다(새 데이터 뽑기로 확인).`;
+  }
+  function drawThumbs(){
+    if (!cmpRes) return;
+    const { res, cls } = cmpRes, Dx = cmpRes.D;
+    for (const a of ALGOS){
+      const cv = $("th-" + a); if (!cv) continue; const P0 = prep(cv); if (!P0) continue;
+      const Rx = res[a], { ctx } = P0;
+      if (!Rx){ const A = axes(P0, { x0:0, x1:1, y0:0, y1:1, bare:true }); frame(P0, A); label(ctx, "회귀는 생략", P0.w/2, P0.h/2-8, C.muted, "center"); $("thS-" + a).textContent = ""; continue; }
+      $("thS-" + a).textContent = cls ? `검증 ${pct(Rx.vaA[Rx.N])}` : `검증 MSE ${f3(Rx.vaL[Rx.N])}`;
+      if (cls){
+        const n = 44, pts = []; for (let r=0;r<n;r++) for (let c=0;c<n;c++) pts.push([(c+.5)/n, (r+.5)/n]);
+        const A = axes(P0, { x0:0, x1:1, y0:0, y1:1, bare:true }); clip(P0, A); paintProb(P0, A, gridFor(Rx, Rx.N, pts), n, Rx.k);
+        Dx.X.forEach((x,k) => dot(ctx, A.sx(x[0]), A.sy(x[1]), 2.2, Dx.y[k] ? C.c1 : C.c0, C.surface, .8));
+        ctx.restore(); frame(P0, A);
+      } else {
+        const all = Dx.y.concat(Dx.yv), A = axes(P0, { x0:20, x1:80, y0:Math.min(...all)-0.3, y1:Math.max(...all)+0.3, bare:true }); clip(P0, A);
+        Dx.X.forEach((x,k) => dot(ctx, A.sx(x[0]), A.sy(Dx.y[k]), 2.4, C.data, C.surface, .8));
+        ctx.strokeStyle = C.learn; ctx.lineWidth = 2.2; polyline(ctx, GRID, gridFor(Rx, Rx.N, GRID.map(v => [v])), A.sx, A.sy);
+        ctx.restore(); frame(P0, A);
+      }
+    }
+  }
+
+  /* ---------------- 코드 ---------------- */
+  const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  function hilite(code){
+    return code.split("\n").map(line => {
+      let q = false, h = -1; for (let j=0;j<line.length;j++){ if (line[j] === '"') q = !q; else if (line[j] === "#" && !q){ h = j; break; } }
+      let a = h >= 0 ? line.slice(0,h) : line; const c = h >= 0 ? line.slice(h) : "";
+      a = esc(a).replace(/("[^"]*")/g, '<span class="st">$1</span>')
+        .replace(/\b(import|from|as|for|in|print|def|return|if|else|True|False|None)\b/g, '<span class="kw">$1</span>')
+        .replace(/(^|[^\w.])(-?\d+\.?\d*(?:e-?\d+)?)(?![\w])/g, '$1<span class="nu">$2</span>');
+      return a + (c ? `<span class="cm">${esc(c)}</span>` : "");
+    }).join("\n");
+  }
+  const num = v => String(+(+v).toFixed(2));
+  function codeText(){
+    const a = S.algo, cls = D.kind === "cls", p = P[a];
+    const head = cls ? `import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, log_loss
+` : `import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
+`;
+    const data = cls ? `
+# 예시 데이터: 나이, 공복혈당 → 질환 여부(0/1)  (화면과 같은 규칙, 난수만 다름)
+rng = np.random.default_rng(2)
+u, v = rng.uniform(0, 1, 200), rng.uniform(0, 1, 200)
+boundary = 0.78 - 0.5 * u + 0.13 * np.sin(3 * np.pi * u)
+y = (rng.uniform(0, 1, 200) < 1 / (1 + np.exp(-20 * (v - boundary)))).astype(int)
+X = np.column_stack([20 + 60 * u, 70 + 130 * v])      # 나이(세), 공복혈당(mg/dL)
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.4, random_state=42, stratify=y)
+` : `
+# 예시 데이터: 나이 → 연간 의료비(백만 원)  (화면과 같은 규칙, 난수만 다름)
+rng = np.random.default_rng(3)
+age = rng.uniform(20, 80, 100)
+cost = 1 + 2.5 / (1 + np.exp(-(age - 55) / 6)) + 0.4 * np.sin(age / 5) + rng.normal(0, 0.35, 100)
+X, y = age.reshape(-1, 1), cost
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.4, random_state=42)
+`;
+    const evalCls = `print("검증 정확도:", accuracy_score(y_val, model.predict(X_val)))
+print("검증 로그 손실:", log_loss(y_val, model.predict_proba(X_val)))`;
+    const evalReg = `print("검증 MSE:", mean_squared_error(y_val, model.predict(X_val)))`;
+    if (a === "ada") return head + `from sklearn.ensemble import AdaBoostClassifier
+from sklearn.tree import DecisionTreeClassifier
+` + data + `
+model = AdaBoostClassifier(
+    estimator=DecisionTreeClassifier(max_depth=${p.depth}),   # 약한 학습기: ${p.depth === 1 ? "결정 그루터기" : "얕은 트리"}
+    n_estimators=${p.n},
+    learning_rate=${num(p.lr)},        # η: α에 곱하는 축소 계수
+    random_state=42,
+)                             # scikit-learn 1.6+ 는 SAMME 방식만 사용
+model.fit(X_train, y_train)
+
+# estimator_errors_ = ε,  estimator_weights_ = η·ln((1-ε)/ε) = 화면의 α × 2
+print("가중 오류 ε:", model.estimator_errors_[:5].round(4))
+print("학습기 가중치(SAMME):", model.estimator_weights_[:5].round(4))
+print("검증 정확도:", accuracy_score(y_val, model.predict(X_val)))
+
+# 라운드별 검증 정확도
+val_acc = [accuracy_score(y_val, pr) for pr in model.staged_predict(X_val)]
+print("검증 정확도 최고:", max(val_acc), "/ 라운드", int(np.argmax(val_acc)) + 1)
+`;
+    if (a === "gbm"){ const M = cls ? "GradientBoostingClassifier" : "GradientBoostingRegressor";
+      return head + `from sklearn.ensemble import ${M}
+` + data + `
+model = ${M}(
+    loss="${cls ? "log_loss" : "squared_error"}",${cls ? "         # 유사 잔차 y - p, 잎 값 = 뉴턴 스텝 Σr/Σp(1-p)" : "    # 음의 기울기 = 잔차 y - F"}
+    n_estimators=${p.n},
+    learning_rate=${num(p.lr)},        # η
+    max_depth=${p.depth},
+    subsample=${fx(p.sub,1)},${p.sub < 1 ? "            # < 1.0 이면 확률적 부스팅" : "            # 1.0 = 매 라운드 학습 데이터 전체"}
+    random_state=42,
+)
+model.fit(X_train, y_train)
+${cls ? evalCls : evalReg}
+
+# 라운드별 검증 손실 → 조기 종료 지점
+${cls ? `val_loss = [log_loss(y_val, pr) for pr in model.staged_predict_proba(X_val)]` : `val_loss = [mean_squared_error(y_val, pr) for pr in model.staged_predict(X_val)]`}
+print("검증 손실 최저 라운드:", int(np.argmin(val_loss)) + 1)
+`; }
+    if (a === "xgb"){ const M = cls ? "XGBClassifier" : "XGBRegressor";
+      return head + `from xgboost import ${M}            # pip install xgboost
+` + data + `
+model = ${M}(${cls ? "" : `
+    objective="reg:squarederror",   # g = F - y, h = 1`}
+    n_estimators=${p.n},
+    learning_rate=${num(p.lr)},
+    max_depth=${p.depth},
+    reg_lambda=${num(p.lambda)},          # λ: 잎 값 w* = -G/(H+λ)를 0 쪽으로 줄임
+    gamma=${num(p.gamma)},               # γ: 분할 이득 [·]이 이보다 작으면 가지치기
+    min_child_weight=${num(p.mcw)},    # 자식 노드 H 합(cover)의 최소값
+    subsample=${num(p.sub)},           # 트리마다 쓰는 행 비율
+    colsample_bytree=${num(p.col)},    # 트리마다 쓰는 특성 비율
+    tree_method="exact",      # 이 화면과 같은 정확 탐색 (기본값은 "hist")
+    eval_metric="${cls ? "logloss" : "rmse"}",
+    random_state=42,
+)
+model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
+${cls ? evalCls : evalReg}
+print("검증 ${cls ? "로그 손실" : "RMSE"}(라운드별):", model.evals_result()["validation_0"]["${cls ? "logloss" : "rmse"}"][-3:])
+
+# 첫 트리: 분할 기준, gain(= [·], ½ 없음), cover(= H 합), 잎 값(= η·w*)
+print(model.get_booster().get_dump(with_stats=True)[0])
+# 결측값은 np.nan 그대로 넣으면 분할마다 기본 방향(missing=)을 학습
+`; }
+    const M = cls ? "LGBMClassifier" : "LGBMRegressor";
+    return head + `from lightgbm import ${M}          # pip install lightgbm
+` + data + `
+model = ${M}(
+    n_estimators=${p.n},
+    learning_rate=${num(p.lr)},
+    num_leaves=${p.leaves},             # 리프 중심 성장: 트리 하나의 잎 수 상한
+    max_depth=${p.depth > 0 ? p.depth : -1},            # -1 = 깊이 제한 없음
+    max_bin=${p.bins},               # 히스토그램 구간 수 (기본 255)
+    min_child_samples=${p.mcs},      # 잎 하나의 최소 데이터 수 (기본 20)
+    reg_lambda=0.0,${p.goss ? `
+    data_sample_strategy="goss",   # GOSS: 기울기 큰 점은 유지, 작은 점은 일부만
+    top_rate=${num(p.a)},             # a
+    other_rate=${num(p.b)},           # b` : ""}
+    random_state=42,
+    verbose=-1,
+)
+model.fit(X_train, y_train, eval_set=[(X_val, y_val)])
+${cls ? evalCls : evalReg}
+print("첫 트리 잎 수:", model.booster_.dump_model()["tree_info"][0]["num_leaves"])
+`;
+  }
+  function renderCode(){
+    const t = codeText(); $("code").textContent = ""; $("code").innerHTML = hilite(t); $("code")._t = t;
+    const a = S.algo;
+    $("codeHint").textContent = `${ALGO_NAME[a]} · ${D.kind === "cls" ? "분류" : "회귀"}`;
+    $("codeNote").innerHTML = a === "ada" ? `scikit-learn 기본값은 n_estimators=50, learning_rate=1.0, 그루터기(max_depth=1)입니다. 잡음이 많은 데이터에서는 틀린 점(잡음)에 가중치가 몰려 과적합하기 쉬우니 learning_rate를 낮춰 보세요.`
+      : a === "gbm" ? `scikit-learn 기본값은 n_estimators=100, learning_rate=0.1, max_depth=3입니다. 데이터가 크면 히스토그램 방식의 <b>HistGradientBoosting${D.kind === "cls" ? "Classifier" : "Regressor"}</b>(결측 지원, 조기 종료 내장)가 훨씬 빠릅니다.`
+      : a === "xgb" ? `xgboost 기본값은 n_estimators=100(2.0+), learning_rate=0.3, max_depth=6, reg_lambda=1, gamma=0, min_child_weight=1, tree_method="hist"입니다. 시작값 base_score는 학습 데이터에서 자동으로 정합니다(분류: 평균 확률, 회귀: 평균).`
+      : `LightGBM 기본값은 num_leaves=31, max_depth=-1, max_bin=255, min_child_samples=20, learning_rate=0.1입니다. 작은 데이터에서는 min_child_samples와 num_leaves를 줄여야 트리가 자랍니다.`;
+  }
+  $("copyBtn").onclick = async () => {
+    const t = $("code")._t || "";
+    try { await navigator.clipboard.writeText(t); $("copyBtn").textContent = "복사됨"; }
+    catch (e) { const r = document.createRange(); r.selectNodeContents($("code")); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); $("copyBtn").textContent = "선택됨 (Ctrl+C)"; }
+    setTimeout(() => $("copyBtn").textContent = "복사", 1500);
+  };
+
+  /* ---------------- 전체 그리기 ---------------- */
+  function syncControls(){
+    const a = S.algo, p = P[a];
+    setSeg($("algoSeg"), a); setSeg($("kindSeg"), D.kind);
+    $("kindSeg").querySelector('[data-v="reg"]').disabled = a === "ada";
+    $("pN").value = p.n; $("pNV").textContent = p.n;
+    $("pLr").value = p.lr; $("pLrV").textContent = f2(p.lr);
+    $("pDepth").min = a === "lgbm" ? 0 : 1; $("pDepth").value = p.depth; $("pDepthV").textContent = a === "lgbm" && p.depth === 0 ? "제한 없음 (−1)" : p.depth;
+    document.querySelectorAll(".bo-params").forEach(el => el.hidden = el.dataset.for !== a);
+    document.querySelectorAll(".bo-deep").forEach(el => el.hidden = el.dataset.for !== a);
+    const g = P.gbm, x = P.xgb, l = P.lgbm;
+    $("gSub").value = g.sub; $("gSubV").textContent = fx(g.sub,1);
+    $("xLam").value = x.lambda; $("xLamV").textContent = fx(x.lambda,1); $("xGam").value = x.gamma; $("xGamV").textContent = fx(x.gamma,1);
+    $("xMcw").value = x.mcw; $("xMcwV").textContent = fx(x.mcw,1); $("xSub").value = x.sub; $("xSubV").textContent = fx(x.sub,1);
+    $("xCol").value = x.col; $("xColV").textContent = fx(x.col,1); $("xCol").disabled = D.kind === "reg";
+    $("lLeaves").value = l.leaves; $("lLeavesV").textContent = l.leaves; $("lBins").value = l.bins; $("lBinsV").textContent = l.bins;
+    $("lMcs").value = l.mcs; $("lMcsV").textContent = l.mcs; $("lGoss").checked = l.goss;
+    $("lA").value = l.a; $("lAV").textContent = f2(l.a); $("lB").value = l.b; $("lBV").textContent = f2(l.b); $("lA").disabled = $("lB").disabled = !l.goss;
+    $("modeSeg").innerHTML = (D.kind === "cls" ? [["sel","점 선택"],["add0","0 추가"],["add1","1 추가"],["del","삭제"]] : [["sel","점 선택"],["add","점 추가"],["del","삭제"]])
+      .map(([v,t]) => `<button type="button" data-v="${v}" aria-pressed="${v === S.mode}">${t}</button>`).join("");
+    if (!$("modeSeg").querySelector('[aria-pressed="true"]')){ S.mode = "sel"; setSeg($("modeSeg"), "sel"); }
+    $("metSeg").hidden = D.kind !== "cls"; $("wSeg").hidden = a !== "ada";
+    ["fig1","fig2"].forEach(id => $(id).classList.toggle("sq", D.kind === "cls"));
+    $("labTitle").textContent = TITLES[a]; $("labLead").textContent = LEADS[a];
+    $("t2a").innerHTML = a === "ada" ? "② 이번 라운드 그루터기 h<sub>m</sub>와 가중치" : D.kind === "cls" ? `② 이번 라운드 트리 h<sub>m</sub> (잎 값)` : `② 이번 라운드: ${a === "gbm" ? "잔차" : "−g"}와 새 트리`;
+    const base = D.kind === "cls" ? genCls(S.seed.cls) : genReg(S.seed.reg), dn = D.y.length - base.y.length;
+    $("dataInfo").textContent = `seed ${S.seed[D.kind]} · 학습 ${D.y.length}개 · 검증 ${D.yv.length}개${dn ? ` (변경 ${dn > 0 ? "+" : ""}${dn})` : ""}`;
+  }
+  function renderMain(){
+    $("roundLbl").textContent = `라운드 ${S.m} / ${R.N}` + (R.N < P[S.algo].n ? ` (${R.N}에서 멈춤)` : "");
+    $("t1").textContent = `m = ${S.m}`;
+    drawEnsemble(); drawLearner(); drawCurves(); legend2();
+    $("fx").innerHTML = mainFormula(); $("cap").innerHTML = caption(); renderStats();
+    $("bFirst").disabled = $("bPrev").disabled = S.m === 0; $("bNext").disabled = $("bLast").disabled = S.m >= R.N;
+  }
+  function renderDeep(){ if (S.algo === "ada") renderAda(); else if (S.algo === "gbm") renderGbm(); else if (S.algo === "xgb") renderXgb(); else renderLgb(); }
+  function renderAll(){ syncControls(); renderMain(); renderDeep(); renderCode(); }
+  function redraw(){ readColors(); renderMain(); renderDeep(); drawThumbs(); }
+
+  /* ---------------- 라운드 이동 ---------------- */
+  function step(d){
+    const m0 = S.m; S.m = clamp(S.m + d, 0, R.N);
+    S.anim = (S.algo === "ada" && d === 1 && S.m === m0+1 && !reduce && S.wView === "after" && (!S.timer || S.speed <= 1)) ? { m:S.m, t0:performance.now() } : null;
+    renderMain(); renderDeep();
+  }
+  function stop(){ if (S.timer){ clearInterval(S.timer); S.timer = null; } $("bPlay").textContent = "재생"; }
+  function play(){
+    if (S.timer){ stop(); return; }
+    if (S.m >= R.N) S.m = 0;
+    $("bPlay").textContent = "멈춤";
+    const inc = R.N > 100 ? Math.ceil(R.N/100) : 1, base = S.algo === "ada" ? 900 : 520;
+    S.timer = setInterval(() => { if (S.m >= R.N){ stop(); return; } step(inc); }, (reduce ? 1000 : base)/SPEEDS[S.speed]);
+  }
+  $("bFirst").onclick = () => { stop(); S.m = 0; renderMain(); renderDeep(); };
+  $("bPrev").onclick = () => { stop(); step(-1); };
+  $("bNext").onclick = () => { stop(); step(1); };
+  $("bLast").onclick = () => { stop(); S.m = R.N; renderMain(); renderDeep(); };
+  $("bPlay").onclick = play;
+  $("spd").oninput = e => { S.speed = +e.target.value; $("spdV").textContent = SPEEDS[S.speed] + "×"; if (S.timer){ stop(); play(); } };
+
+  /* ---------------- 조작 연결 ---------------- */
+  function setAlgo(a, focus){
+    if (!ALGOS.includes(a)) return;
+    stop(); stopGrow(); S.algo = a; S.anim = null;
+    adaNote = "";
+    if (a === "ada" && D.kind === "reg"){ D = DATA.cls; adaNote = " (AdaBoost는 분류로 바꿔 보여 줍니다.)"; S.sel = null; }
+    $("kindNote").hidden = !(a === "ada"); $("kindNote").innerHTML = `AdaBoost는 분류(나이·혈당 → 질환)로 봅니다. 회귀용 <b>AdaBoost.R2</b>(scikit-learn AdaBoostRegressor)는 이 시뮬레이터에서 생략합니다.`;
+    history.replaceState(null, "", "#" + a);
+    retrain(true); renderAll(); scheduleCmp();
+    if (focus) $("algoSeg").querySelector(`[data-v="${a}"]`).focus();
+  }
+  onSeg($("algoSeg"), v => setAlgo(v));
+  $("algoSeg").addEventListener("keydown", e => {
+    const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return;
+    e.preventDefault(); setAlgo(ALGOS[(ALGOS.indexOf(S.algo) + d + ALGOS.length) % ALGOS.length], true);
+  });
+  onSeg($("kindSeg"), v => { if (v === D.kind) return; stop(); D = DATA[v]; S.sel = null; S.mode = "sel"; retrain(true); renderAll(); scheduleCmp(); });
+  onSeg($("modeSeg"), v => { S.mode = v; });
+  onSeg($("metSeg"), v => { S.metric = v; drawCurves(); });
+  onSeg($("wSeg"), v => { S.wView = v; S.anim = null; drawLearner(); });
+  $("showVal").onchange = e => { S.showVal = e.target.checked; drawEnsemble(); legend2(); };
+  $("btnSeed").onclick = () => { stop(); S.seed[D.kind]++; DATA[D.kind] = D.kind === "cls" ? genCls(S.seed.cls) : genReg(S.seed.reg); D = DATA[D.kind]; S.sel = null; retrain(false); renderAll(); scheduleCmp(); };
+  $("btnResetPts").onclick = () => { stop(); DATA[D.kind] = D.kind === "cls" ? genCls(S.seed.cls) : genReg(S.seed.reg); D = DATA[D.kind]; S.sel = null; retrain(true); renderAll(); scheduleCmp(); };
+  function bindRange(id, fn){ $(id).addEventListener("input", e => { stop(); fn(+e.target.value); syncControls(); schedule(true); }); }
+  bindRange("pN", v => { P[S.algo].n = v; });
+  bindRange("pLr", v => { P[S.algo].lr = v; });
+  bindRange("pDepth", v => { P[S.algo].depth = v; });
+  bindRange("gSub", v => { P.gbm.sub = v; });
+  bindRange("xLam", v => { P.xgb.lambda = v; }); bindRange("xGam", v => { P.xgb.gamma = v; }); bindRange("xMcw", v => { P.xgb.mcw = v; });
+  bindRange("xSub", v => { P.xgb.sub = v; }); bindRange("xCol", v => { P.xgb.col = v; });
+  bindRange("lLeaves", v => { P.lgbm.leaves = v; }); bindRange("lBins", v => { P.lgbm.bins = v; }); bindRange("lMcs", v => { P.lgbm.mcs = v; });
+  bindRange("lA", v => { P.lgbm.a = v; }); bindRange("lB", v => { P.lgbm.b = v; });
+  $("lGoss").onchange = e => { stop(); P.lgbm.goss = e.target.checked; syncControls(); schedule(true); };
+  onSeg($("xFeatSeg"), v => { S.xFeat = +v; renderXgb(); });
+  onSeg($("xMissSeg"), v => { S.xMiss = +v; renderXgb(); });
+  onSeg($("lFeatSeg"), v => { S.lFeat = +v; drawHist(); });
+
+  /* 그래프 클릭: 점 선택 · 추가 · 삭제 */
+  function nearest(cv, ev, useTarget){
+    const A = cv._A, rc = cv.getBoundingClientRect(), px = ev.clientX - rc.left, py = ev.clientY - rc.top;
+    let b = -1, bd = 1e9;
+    D.X.forEach((x,k) => { const yy = D.kind === "cls" ? x[1] : useTarget ? useTarget[k] : D.y[k];
+      const d = Math.hypot(A.sx(x[0]) - px, A.sy(yy) - py); if (d < bd){ bd = d; b = k; } });
+    return { b, bd, px, py, A };
+  }
+  function onPlot(cv, ev){
+    if (!cv._A) return;
+    const T = (cv.id === "cv2" && D.kind === "reg") ? targetsAt(S.m).t : null;
+    const q = nearest(cv, ev, T), A = q.A;
+    if (S.mode === "sel" || (cv.id === "cv2" && D.kind === "reg")){ if (q.b >= 0){ S.sel = q.b; renderMain(); renderDeep(); } return; }
+    if (S.mode === "del"){
+      if (q.b < 0 || q.bd > 14 || D.y.length <= 10) return;
+      D.X.splice(q.b, 1); D.y.splice(q.b, 1); if (S.sel === q.b) S.sel = null; else if (S.sel > q.b) S.sel--;
+    } else {
+      const u = A.ix(q.px), v = A.iy(q.py);
+      if (D.kind === "cls"){ if (u < 0 || u > 1 || v < 0 || v > 1) return; D.X.push([Math.fround(u), Math.fround(v)]); D.y.push(S.mode === "add1" ? 1 : 0); }
+      else { if (u < 20 || u > 80) return; D.X.push([Math.fround(u)]); D.y.push(+v.toFixed(3)); }
+      S.sel = D.y.length - 1;
+    }
+    stop(); retrain(true); renderAll(); scheduleCmp();
+  }
+  $("cv1").addEventListener("click", e => onPlot($("cv1"), e));
+  $("cv2").addEventListener("click", e => onPlot($("cv2"), e));
+
+  /* 성장 비교 단계 */
+  function stopGrow(){ if (S.growTimer){ clearInterval(S.growTimer); S.growTimer = null; } $("gPlay").textContent = "재생"; }
+  $("gFirst").onclick = () => { stopGrow(); S.grow = 0; renderGrow(); };
+  $("gPrev").onclick = () => { stopGrow(); S.grow--; renderGrow(); };
+  $("gNext").onclick = () => { stopGrow(); S.grow++; renderGrow(); };
+  $("gPlay").onclick = () => {
+    if (S.growTimer){ stopGrow(); return; }
+    const g = growData(), mx = Math.max(g.lvl.steps.length, g.lf.steps.length); if (S.grow >= mx) S.grow = 0;
+    $("gPlay").textContent = "멈춤"; renderGrow();
+    S.growTimer = setInterval(() => { if (S.grow >= mx){ stopGrow(); return; } S.grow++; renderGrow(); }, reduce ? 1400 : 900);
+  };
+
+  /* 비교 */
+  $("cN").oninput = e => { S.cmpN = +e.target.value; $("cNV").textContent = S.cmpN; scheduleCmp(); };
+  $("cRun").onclick = () => runCmp();
+
+  /* 키보드: → / ← 로 라운드 이동 (입력칸·버튼 묶음·코드 안에서는 제외) */
+  document.addEventListener("keydown", e => {
+    if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    const t = e.target; if (t && t.closest && t.closest("input,select,textarea,.sk-seg,pre,[role=tab]")) return;
+    stop(); step(e.key === "ArrowRight" ? 1 : -1); e.preventDefault();
+  });
+
+  /* 테마·크기 변화 → 다시 그리기 */
+  new MutationObserver(redraw).observe(document.documentElement, { attributes:true, attributeFilter:["data-theme"] });
+  try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", redraw); } catch (e) {}
+  let rz = 0;
+  const ro = new ResizeObserver(() => { cancelAnimationFrame(rz); rz = requestAnimationFrame(redraw); });
+  document.querySelectorAll("canvas").forEach(c => ro.observe(c));
+
+  /* ---------------- 시작 ---------------- */
+  readColors();
+  const h0 = location.hash.slice(1);
+  if (ALGOS.includes(h0)) S.algo = h0;
+  if (S.algo === "ada"){ $("kindNote").hidden = false; $("kindNote").innerHTML = `AdaBoost는 분류(나이·혈당 → 질환)로 봅니다. 회귀용 <b>AdaBoost.R2</b>(scikit-learn AdaBoostRegressor)는 이 시뮬레이터에서 생략합니다.`; }
+  retrain(false); renderAll(); scheduleCmp();
+  window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (ALGOS.includes(h) && h !== S.algo) setAlgo(h); });
+})();
+</script>
+</body>
+</html>

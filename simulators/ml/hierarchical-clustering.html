@@ -1,0 +1,1466 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>계층형 군집분석 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20260930c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20260930c">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 군집 색 10가지(--k1~--k10) · 갱신된 행 청록 · 역전·이상 빨강 · 최적 초록 */
+:root{ --sk-accent: var(--cat-ml);
+  --k1:#2563EB; --k2:#EA580C; --k3:#0D9488; --k4:#7C3AED; --k5:#16A34A; --k6:#DB2777; --k7:#B45309; --k8:#0284C7; --k9:#65A30D; --k10:#8B5E34;
+  --va:#0D9488; --bad:#DC2626; --ok:#16A34A; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --k1:#6AA5FF; --k2:#FF914D; --k3:#33D1BD; --k4:#B294FF; --k5:#4ADE80; --k6:#F472B6; --k7:#F5B041; --k8:#38BDF8; --k9:#A3E635; --k10:#D2A97E;
+  --va:#33D1BD; --bad:#F87171; --ok:#4ADE80; } }
+:root[data-theme="dark"]{
+  --k1:#6AA5FF; --k2:#FF914D; --k3:#33D1BD; --k4:#B294FF; --k5:#4ADE80; --k6:#F472B6; --k7:#F5B041; --k8:#38BDF8; --k9:#A3E635; --k10:#D2A97E;
+  --va:#33D1BD; --bad:#F87171; --ok:#4ADE80; }
+
+/* 알고리즘 선택 (큰 세그먼트, 6칸 격자) */
+.hc-algo.sk-seg{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:1px;background:var(--line-strong);border:1.5px solid var(--line-strong);border-radius:12px;width:100%}
+.hc-algo.sk-seg button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:10px 14px;border:0;text-align:left;white-space:normal;min-width:0;background:var(--surface)}
+.hc-algo.sk-seg button + button{border-left:0}
+.hc-algo.sk-seg button b{font-size:16.5px;font-weight:700;color:inherit;line-height:1.3}
+.hc-algo.sk-seg button small{font-size:12px;font-weight:600;opacity:.82;line-height:1.35}
+.hc-algo.sk-seg button[aria-pressed="true"]{background:var(--ink);color:var(--on-ink)}
+.hc-algo.sk-seg button:focus-visible{outline-offset:-4px}
+.hc-algonote{margin:0;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;font-size:14px;color:var(--muted)}
+.hc-algonote code{font-family:var(--mono);font-size:13px;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:1px 7px}
+.hc-pane{display:flex;flex-direction:column;gap:16px}
+
+/* 레이아웃 */
+.hc-two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:18px;align-items:start}
+@media (max-width:900px){.hc-two{grid-template-columns:minmax(0,1fr)}}
+.hc-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.hc-cv{width:100%;aspect-ratio:4/3;display:block;border:1px solid var(--line);border-radius:10px;touch-action:manipulation}
+.hc-cv.edit{cursor:crosshair} .hc-cv.pick{cursor:pointer}
+.hc-sub{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:13px;color:var(--muted)}
+.hc-sub .sk-slider{min-width:150px}
+.hc-prog{font-family:var(--mono);font-size:13.5px;color:var(--ink);font-weight:600}
+.hc-kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--ink)}
+.hc-chip{appearance:none;font:inherit;font-size:12.5px;font-weight:600;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px 11px;cursor:pointer}
+.hc-chip:hover{color:var(--ink);border-color:var(--line-strong)}
+.hc-chip:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.hc-chip b{color:var(--ink);font-weight:700}
+
+/* 범례 */
+.hc-sw{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.hc-sw.ln{height:3px;border-radius:2px;vertical-align:3px;width:16px}
+.hc-sw.dash{height:0;border-top:2.5px dashed currentColor;background:none!important;width:16px;vertical-align:3px;border-radius:0}
+.hc-sw.ring{background:none!important;border:2px solid currentColor}
+.hc-sw.halo{border-radius:4px;opacity:.55}
+.t-bad{color:var(--bad)} .t-ok{color:var(--ok)} .t-va{color:var(--va)} .t-acc{color:var(--sk-accent)} .t-muted{color:var(--muted)}
+
+/* 덴드로그램 · 차트 (SVG) */
+.hc-dgwrap{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:4px 2px}
+.hc-dg svg,.hc-chart svg{display:block;width:100%;height:auto}
+.hc-dg.drag svg{cursor:ns-resize;touch-action:none}
+.hc-svg .gl{stroke:var(--line);stroke-width:1}
+.hc-svg .fr{fill:none;stroke:var(--line-strong);stroke-width:1}
+.hc-svg .ax{fill:var(--muted);font-size:11px;font-family:var(--mono)}
+.hc-svg .axl{fill:var(--muted);font-size:12px;font-family:var(--sans);font-weight:600}
+.hc-svg .lf{fill:var(--muted);font-size:10.5px;font-family:var(--mono)}
+.hc-svg .lb{font-size:11.5px;font-family:var(--sans);font-weight:700;paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round}
+.hc-svg .lbm{font-size:11px;font-family:var(--mono);font-weight:600;paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round}
+.hc-svg .hit{cursor:pointer}
+.hc-svg .hit:hover{opacity:.8}
+.hc-chart{min-width:0}
+
+/* 거리 행렬 */
+.hc-mats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+.hc-mats.one{grid-template-columns:minmax(0,1fr)}
+@media (max-width:1080px){.hc-mats{grid-template-columns:minmax(0,1fr)}}
+.hc-matbox{display:flex;flex-direction:column;gap:6px;min-width:0}
+.hc-matbox h3{font-size:14px}
+.hc-mat{border-collapse:separate;border-spacing:2px;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12.5px}
+.hc-mat th{font-size:11.5px;font-weight:700;color:var(--muted);padding:2px 5px;white-space:nowrap;text-align:center;font-family:var(--mono)}
+.hc-mat th.r{text-align:right}
+.hc-mat td{min-width:44px;height:28px;padding:0 5px;text-align:center;background:var(--surface-2);color:var(--ink);border-radius:5px;border:1.5px solid transparent;white-space:nowrap}
+.hc-mat td.dg{color:var(--faint);background:transparent}
+.hc-mat td.tint,.hc-mat th.tint{background:color-mix(in srgb,var(--sk-accent) 12%,var(--surface))}
+.hc-mat td.pair{background:var(--sk-accent);color:var(--on-ink);font-weight:700}
+.hc-mat td.new,.hc-mat th.new{background:color-mix(in srgb,var(--va) 18%,var(--surface))}
+.hc-mat td.next{border-color:var(--ink);border-style:dashed}
+.hc-mat td.avg{background:color-mix(in srgb,var(--k4) 12%,var(--surface))}
+.hc-mat td.avg.best{background:var(--va);color:var(--on-ink);font-weight:700}
+.hc-upd{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:4px 18px;font-family:var(--mono);font-size:12.5px;color:var(--text);margin:0;padding:0;list-style:none}
+.hc-upd li{overflow-wrap:anywhere}
+.hc-upd b{color:var(--va)}
+
+/* 병합 기록 표 */
+.hc-z{max-height:340px;overflow:auto}
+.hc-z tr.on td{background:color-mix(in srgb,var(--sk-accent) 12%,var(--surface))}
+.hc-z tr.future td{color:var(--faint)}
+.hc-z tbody tr{cursor:pointer}
+.hc-z tbody tr:hover td{background:var(--surface-2)}
+.hc-z tr.inv td.h{color:var(--bad);font-weight:700}
+
+/* 비교 격자 */
+.hc-cmpgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:1080px){.hc-cmpgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:620px){.hc-cmpgrid{grid-template-columns:minmax(0,1fr)}}
+.hc-cmpcard{border:1.5px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:7px;min-width:0;background:var(--surface)}
+.hc-cmpcard.on{border-color:var(--sk-accent);box-shadow:0 0 0 1px var(--sk-accent)}
+.hc-cmphd{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.hc-cmphd b{font-size:15px}
+.hc-cmphd button{font-size:12px}
+.hc-cmpst{font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:2px}
+.hc-cmpst .sk-mono{color:var(--ink)}
+.hc-cmpst .flag{font-weight:700}
+.hc-cmp-cv{width:100%;aspect-ratio:4/3;display:block;border:1px solid var(--line);border-radius:8px}
+.hc-cmpnote{margin:0;padding-left:18px;font-size:14px;display:flex;flex-direction:column;gap:4px}
+.hc-tbl td{white-space:normal;min-width:120px;vertical-align:top}
+.hc-tbl td:first-child{font-weight:700;min-width:96px}
+.hc-tbl tr.on td{background:color-mix(in srgb,var(--sk-accent) 9%,var(--surface))}
+
+/* DIANA 표 */
+.hc-dtab{max-height:360px;overflow:auto}
+.hc-dtab tr.best td{background:color-mix(in srgb,var(--sk-accent) 13%,var(--surface));font-weight:700}
+.hc-dtab tr.neg td{color:var(--muted)}
+.hc-dtab td.pos{color:var(--va);font-weight:700}
+
+/* 스케일 3단 */
+.hc-sclcard{border:1.5px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:7px;min-width:0;background:var(--surface)}
+.hc-sclcard.on{border-color:var(--sk-accent);box-shadow:0 0 0 1px var(--sk-accent)}
+.hc-sclcard h3{display:flex;justify-content:space-between;gap:8px;align-items:baseline;font-size:15px;margin:0}
+.hc-share{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--surface-2)}
+.hc-share span{display:block;height:100%}
+.hc-code{margin:0;white-space:pre;max-height:760px;overflow:auto;font-size:12.5px;line-height:1.6}
+.sk-note.hc-warn{border-left-color:var(--bad);background:color-mix(in srgb,var(--bad) 7%,var(--surface))}
+.hc-formula b{color:var(--sk-accent)}
+.nrm{font-family:var(--sans);font-weight:700}
+.hc-formula .v{color:var(--va);font-weight:600}
+
+@media (max-width:900px){ .hc-algo.sk-seg{grid-template-columns:repeat(3,minmax(0,1fr))} }
+@media (max-width:520px){
+  .hc-algo.sk-seg{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hc-algo.sk-seg button{padding:8px 10px} .hc-algo.sk-seg button b{font-size:15px}
+  .sk-slider{min-width:0;width:100%} .hc-sub .sk-slider{min-width:0;width:100%}
+  .hc-upd{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion: reduce){ .hc-mat td{transition:none} }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)" aria-current="page">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">계층형 군집분석 시뮬레이터</h1>
+      <p class="ds-hero__lede">정답 라벨 없이 가까운 것끼리 묶는 비지도 학습입니다. 가장 가까운 두 군집을 하나씩 합쳐 나무(덴드로그램)를 만들고, 원하는 높이에서 잘라 군집을 정합니다. 두 군집 사이 거리를 어떻게 재느냐(단일·완전·평균·중심·Ward)에 따라 결과가 달라지고, 거꾸로 전체를 쪼개 내려가는 분할적 방법(DIANA)도 함께 비교합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <div class="sk-seg hc-algo" id="algoSeg" role="group" aria-label="알고리즘 선택">
+    <button type="button" data-a="single" aria-pressed="true"><b>단일 연결</b><small>Single · 가장 가까운 쌍</small></button>
+    <button type="button" data-a="complete" aria-pressed="false"><b>완전 연결</b><small>Complete · 가장 먼 쌍</small></button>
+    <button type="button" data-a="average" aria-pressed="false"><b>평균 연결</b><small>Average · 모든 쌍의 평균</small></button>
+    <button type="button" data-a="centroid" aria-pressed="false"><b>중심 연결</b><small>Centroid · 두 중심 사이</small></button>
+    <button type="button" data-a="ward" aria-pressed="false"><b>Ward</b><small>합칠 때 SSE 증가량</small></button>
+    <button type="button" data-a="diana" aria-pressed="false"><b>분할적 DIANA</b><small>위에서 아래로 쪼개기</small></button>
+  </div>
+  <p class="hc-algonote" id="algoNote"></p>
+
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button type="button" class="sk-tab" role="tab" id="tab-merge" aria-controls="pane-merge" aria-selected="true"><span class="sk-num">1</span><span id="tabMergeTxt">병합 과정</span></button>
+    <button type="button" class="sk-tab" role="tab" id="tab-cut" aria-controls="pane-cut" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>덴드로그램 자르기</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-compare" aria-controls="pane-compare" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>연결법 비교</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-diana" aria-controls="pane-diana" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>DIANA 분할</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-scale" aria-controls="pane-scale" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>거리와 스케일</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>코드</button>
+  </nav>
+
+  <!-- ================= 1. 병합 과정 ================= -->
+  <section class="hc-pane" id="pane-merge" role="tabpanel" aria-labelledby="tab-merge">
+    <div class="sk-card">
+      <div class="sk-head"><h2 id="mTitle">가장 가까운 두 군집을 하나씩 합치기</h2><span class="sk-hint">키보드 <span class="hc-kbd">→</span> 다음 · <span class="hc-kbd">←</span> 이전</span></div>
+      <p class="sk-lead" id="mLead"></p>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--sm" id="mFirst">처음</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="mPrev">이전</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="mNext">다음 병합</button>
+          <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="mPlay">재생</button>
+          <span class="hc-prog" id="mProg">병합 0 / 0</span>
+        </div>
+        <div class="sk-slider" style="min-width:140px"><div class="sk-sl-head"><label for="mSpeed">속도</label><b id="mSpeedV">1×</b></div><input type="range" id="mSpeed" min="0" max="3" step="1" value="1"></div>
+        <button type="button" class="hc-chip" data-goto="scale"></button>
+      </div>
+      <div class="hc-two">
+        <div class="hc-col">
+          <canvas class="hc-cv edit" id="mCv" aria-label="공복혈당과 BMI 산점도. 같은 색은 지금까지 합쳐진 군집이고, 이번에 합쳐진 두 군집과 그 거리를 정하는 점 쌍이 선으로 표시됩니다. 빈 곳을 누르면 점 추가, 점을 누르면 삭제"></canvas>
+          <div class="sk-legend" id="mLegend"></div>
+          <div class="hc-databar" data-set="main"></div>
+        </div>
+        <div class="hc-col">
+          <div class="sk-scroll hc-dgwrap"><div class="hc-dg" id="mDg" role="img" aria-label="덴드로그램. 병합이 진행될수록 위로 자랍니다"></div></div>
+          <div class="sk-stats" id="mStats"></div>
+          <div class="sk-formula hc-formula" id="mFormula"></div>
+        </div>
+      </div>
+      <p class="sk-note" id="mNote"></p>
+    </div>
+    <div class="sk-card" id="mMatCard">
+      <div class="sk-head"><h2 id="mMatTitle">거리 행렬이 줄어드는 과정</h2><span class="sk-hint" id="mMatHint"></span></div>
+      <div class="sk-formula hc-formula" id="mLW"></div>
+      <div id="mMats"></div>
+      <ul class="hc-upd" id="mUpd"></ul>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2 id="mZTitle">병합 기록 (scipy linkage 결과 Z와 같은 형식)</h2><span class="sk-hint">행을 누르면 그 단계로 이동</span></div>
+      <p class="sk-lead" id="mZLead"></p>
+      <div class="sk-scroll hc-z"><table class="sk-table" id="mZ"></table></div>
+    </div>
+  </section>
+
+  <!-- ================= 2. 덴드로그램 자르기 ================= -->
+  <section class="hc-pane" id="pane-cut" role="tabpanel" aria-labelledby="tab-cut" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>덴드로그램을 가로로 잘라 군집 정하기</h2><span class="sk-hint">덴드로그램 위를 끌어 자르는 높이를 바꿀 수 있습니다</span></div>
+      <p class="sk-lead">자르는 선 아래에서 이미 합쳐진 가지는 하나의 군집이 됩니다. 높이 t로 자르면 scipy의 <code>fcluster(Z, t, criterion="distance")</code>, 군집 수 k로 자르면 <code>criterion="maxclust"</code>와 같습니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">자르는 기준</span>
+          <div class="sk-seg" id="cMode" role="group" aria-label="자르는 기준">
+            <button type="button" data-v="k" aria-pressed="true">군집 수 k</button>
+            <button type="button" data-v="h" aria-pressed="false">높이 t</button>
+          </div>
+        </div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="cK">군집 수 k</label><b id="cKV">3</b></div><input type="range" id="cK" min="2" max="9" step="1" value="3"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="cT">높이 t</label><b id="cTV">1</b></div><input type="range" id="cT" min="0" max="1" step="0.001" value="0.5"></div>
+        <button type="button" class="hc-chip" data-goto="scale"></button>
+      </div>
+      <div class="hc-two">
+        <div class="hc-col">
+          <canvas class="hc-cv pick" id="cCv" aria-label="자른 결과로 색칠한 산점도. 점을 누르면 그 점의 실루엣 계산을 보여 줍니다"></canvas>
+          <div class="sk-legend" id="cLegend"></div>
+          <div class="hc-databar" data-set="main"></div>
+        </div>
+        <div class="hc-col">
+          <div class="sk-scroll hc-dgwrap"><div class="hc-dg drag" id="cDg" role="img" aria-label="덴드로그램과 자르는 선. 위아래로 끌어 높이를 바꿉니다"></div></div>
+          <div class="sk-stats" id="cStats"></div>
+          <div class="sk-formula hc-formula" id="cSil"></div>
+        </div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>적절한 k 고르기</h2><span class="sk-hint">그래프의 막대·점을 누르면 그 k로 자릅니다</span></div>
+      <div class="sk-grid3">
+        <div class="hc-col"><h3>병합 높이 (엘보)</h3><div class="hc-chart" id="cElbow"></div></div>
+        <div class="hc-col"><h3>k별 평균 실루엣</h3><div class="hc-chart" id="cSilK"></div></div>
+        <div class="hc-col"><h3 id="cSilPlotT">점별 실루엣</h3><div class="hc-chart" id="cSilPlot"></div></div>
+      </div>
+      <p class="sk-note" id="cNote"></p>
+    </div>
+  </section>
+
+  <!-- ================= 3. 연결법 비교 ================= -->
+  <section class="hc-pane" id="pane-compare" role="tabpanel" aria-labelledby="tab-compare" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>같은 데이터, 같은 k, 여섯 가지 방법</h2><button type="button" class="hc-chip" data-goto="scale"></button></div>
+      <p class="sk-lead">데이터 모양을 바꿔 가며 어떤 방법이 어떤 모양에 강한지 봅니다. 각 칸 아래는 그 방법의 덴드로그램과 자르는 선입니다. SSE는 군집 안 제곱오차 합(작을수록 촘촘), 실루엣은 −1~1(클수록 잘 분리)입니다.</p>
+      <div class="sk-controls">
+        <div class="hc-databar" data-set="cmp"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="pK">군집 수 k</label><b id="pKV">2</b></div><input type="range" id="pK" min="2" max="8" step="1" value="2"></div>
+      </div>
+      <div class="hc-cmpgrid" id="pGrid"></div>
+      <ul class="hc-cmpnote" id="pNote"></ul>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>연결법 한눈에 비교</h2><span class="sk-hint">강조된 행 = 위에서 고른 방법</span></div>
+      <div class="sk-scroll"><table class="sk-table hc-tbl" id="pTable"></table></div>
+    </div>
+  </section>
+
+  <!-- ================= 4. DIANA ================= -->
+  <section class="hc-pane" id="pane-diana" role="tabpanel" aria-labelledby="tab-diana" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>DIANA: 전체 하나에서 시작해 '분파'를 떼어 내기</h2><span class="sk-hint">키보드 <span class="hc-kbd">→</span> 다음 · <span class="hc-kbd">←</span> 이전</span></div>
+      <p class="sk-lead">분할적(Divisive) 방법은 병합의 반대 방향입니다. ① 지름(가장 먼 두 점 거리)이 가장 큰 군집을 고르고 ② 다른 점들과 평균 거리가 가장 큰 점을 떼어 '분파(splinter)'를 시작한 뒤 ③ 남은 쪽보다 분파 쪽에 더 가까운 점(D &gt; 0)을 하나씩 옮깁니다. 옮길 점이 없으면 한 번의 분할이 끝납니다. 데이터는 1번 화면과 같습니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--sm" id="dFirst">처음</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="dPrev">이전</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="dNext">다음</button>
+          <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="dPlay">재생</button>
+          <span class="hc-prog" id="dProg"></span>
+        </div>
+        <div class="sk-slider" style="min-width:140px"><div class="sk-sl-head"><label for="dSpeed">속도</label><b id="dSpeedV">1×</b></div><input type="range" id="dSpeed" min="0" max="3" step="1" value="1"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="dSplit">몇 번째 분할로 이동</label><b id="dSplitV">1</b></div><input type="range" id="dSplit" min="1" max="9" step="1" value="1"></div>
+        <button type="button" class="hc-chip" data-goto="scale"></button>
+      </div>
+      <div class="hc-two">
+        <div class="hc-col">
+          <canvas class="hc-cv" id="dCv" aria-label="DIANA 분할 과정. 나누는 군집의 남은 쪽과 분파 쪽을 다른 색으로, 다음에 옮길 점을 고리로 표시합니다"></canvas>
+          <div class="sk-legend" id="dLegend"></div>
+        </div>
+        <div class="hc-col">
+          <div class="sk-scroll hc-dgwrap"><div class="hc-dg" id="dDg" role="img" aria-label="위에서 아래로 자라는 DIANA 덴드로그램"></div></div>
+          <div class="sk-stats" id="dStats"></div>
+          <div class="sk-formula hc-formula" id="dFormula"></div>
+        </div>
+      </div>
+      <p class="sk-note" id="dNote"></p>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2 id="dTabTitle">점별 계산</h2><span class="sk-hint" id="dTabHint"></span></div>
+      <div class="sk-scroll hc-dtab"><table class="sk-table" id="dTab"></table></div>
+    </div>
+  </section>
+
+  <!-- ================= 5. 거리와 스케일 ================= -->
+  <section class="hc-pane" id="pane-scale" role="tabpanel" aria-labelledby="tab-scale" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>거리 정의와 스케일링이 결과를 바꾼다</h2><span class="sk-hint">여기서 고른 거리·스케일링이 모든 화면에 적용됩니다</span></div>
+      <p class="sk-lead">공복혈당은 60~200, BMI는 15~40처럼 단위와 범위가 다릅니다. 스케일링 없이 거리를 재면 범위가 넓은 공복혈당이 거리를 거의 다 차지해 BMI 차이가 무시됩니다. 같은 데이터·같은 방법·같은 k로 세 가지 스케일링을 나란히 봅니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">거리</span>
+          <div class="sk-seg" id="sMetric" role="group" aria-label="거리 정의">
+            <button type="button" data-v="euclid" aria-pressed="true">유클리드</button>
+            <button type="button" data-v="manhattan" aria-pressed="false">맨해튼</button>
+            <button type="button" data-v="cosine" aria-pressed="false">코사인</button>
+          </div>
+        </div>
+        <div class="sk-group"><span class="sk-label">스케일링</span>
+          <div class="sk-seg" id="sScale" role="group" aria-label="스케일링">
+            <button type="button" data-v="none" aria-pressed="false">없음</button>
+            <button type="button" data-v="std" aria-pressed="true">표준화</button>
+            <button type="button" data-v="minmax" aria-pressed="false">Min-Max</button>
+          </div>
+        </div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="sK">군집 수 k</label><b id="sKV">2</b></div><input type="range" id="sK" min="2" max="8" step="1" value="2"></div>
+      </div>
+      <p class="sk-note hc-warn" id="sWarn" hidden></p>
+      <div class="hc-databar" data-set="scl"></div>
+      <div class="sk-grid3" id="sGrid"></div>
+      <p class="sk-note" id="sNote"></p>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>두 점 사이 세 가지 거리</h2><span class="sk-hint" id="sPairHint"></span></div>
+        <div class="sk-formula hc-formula" id="sDist"></div>
+        <p class="sk-lead">Ward와 중심 연결은 '중심'과 '제곱오차'를 쓰므로 유클리드 거리에서만 정의됩니다(scipy는 다른 거리를 넣으면 오류). 코사인은 원점에서 본 <b>방향</b>만 비교하므로 표준화한 뒤(평균이 원점) 쓰는 것이 일반적입니다.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>계산량: 점이 많아지면?</h2></div>
+        <p class="sk-note"><b>메모리 O(n²) · 시간 O(n³)</b> (단순 구현 기준. scipy는 단일·완전·평균·Ward에 O(n²) 시간 알고리즘을 쓰지만 n×n 거리 행렬은 피할 수 없음)</p>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="xN">데이터 수 n</label><b id="xNV">1,000</b></div><input type="range" id="xN" min="0" max="7" step="1" value="2"></div>
+        <div class="sk-stats" id="xStats"></div>
+        <p class="sk-lead" id="xNote"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 6. 코드 ================= -->
+  <section class="hc-pane" id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>현재 설정을 그대로 옮긴 파이썬 코드</h2>
+        <div class="sk-group"><label class="sk-check"><input type="checkbox" id="codeData" checked>현재 데이터 포함</label><button type="button" class="sk-btn sk-btn--sm" id="codeCopy">복사</button></div>
+      </div>
+      <p class="sk-lead" id="codeLead"></p>
+      <pre class="sk-formula hc-code" id="codePre"></pre>
+    </div>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20260930c"></script>
+<script>
+(function () {
+"use strict";
+const $ = id => document.getElementById(id);
+const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ================================================================== 공통 도구 */
+function css(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function colors(){
+  const C={};
+  [["surface","--surface"],["surface2","--surface-2"],["ink","--ink"],["text","--text"],["muted","--muted"],["faint","--faint"],
+   ["line","--line"],["lineStrong","--line-strong"],["accent","--cat-ml"],["va","--va"],["bad","--bad"],["ok","--ok"]].forEach(([k,v])=>C[k]=css(v));
+  C.k=[]; for(let i=1;i<=10;i++) C.k.push(css("--k"+i));
+  C.mono=css("--mono"); C.sans=css("--sans");
+  return C;
+}
+const PAL = i => i<0 ? "var(--muted)" : `var(--k${(i%10)+1})`;
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function gauss(r){ let u=0; while(!u) u=r(); const v=r(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+function fx(v,d){ if(!Number.isFinite(v)) return "–"; let s=v.toFixed(d); if(/^-0\.?0*$/.test(s)) s=s.slice(1); return s.replace("-","−"); }
+const f2=v=>fx(v,2), f3=v=>fx(v,3), sq=v=>v<0?`(${f3(v)})²`:`${f3(v)}²`;
+function fd(v){ const a=Math.abs(v); return fx(v, a>=100?1 : a>=10?2 : 3); }
+function fm(v){ const a=Math.abs(v); return fx(v, a>=100?0 : a>=10?1 : 2); }
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const comma=v=>Math.round(v).toLocaleString("en-US");
+function niceTicks(lo,hi,n){
+  const span=hi-lo; if(span<=0) return [lo];
+  const s0=span/n, mag=Math.pow(10,Math.floor(Math.log10(s0))), e=s0/mag;
+  const step=(e<1.5?1:e<3?2:e<7?5:10)*mag, out=[];
+  for(let v=Math.ceil(lo/step-1e-9)*step; v<=hi+1e-9; v+=step) out.push(+v.toFixed(10));
+  return out;
+}
+const tickTxt=v=>String(+v.toFixed(3));
+function fitCanvas(cv){
+  const dpr=window.devicePixelRatio||1, w=Math.max(40,cv.clientWidth), h=Math.max(40,cv.clientHeight||w*0.75);
+  cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr);
+  const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); return {ctx,w,h,dpr};
+}
+const P = i => "P"+(i+1);
+function cl(mem){
+  if(mem.length===1) return P(mem[0]);
+  const s=mem.slice().sort((a,b)=>a-b).map(i=>i+1);
+  return "{"+(s.length<=4 ? s.join(",") : s.slice(0,3).join(",")+",…")+"}";
+}
+const clFull = mem => "{"+mem.slice().sort((a,b)=>a-b).map(i=>i+1).join(",")+"}";
+
+/* ================================================================== 데이터 */
+const XR=[60,200], YR=[15,40];
+const FEAT=["공복혈당","BMI"], UNIT=["mg/dL","kg/m²"];
+const PRESETS=[["blobs3","뭉친 3덩어리"],["bands","길쭉한 띠"],["sizes","크기가 다른 덩어리"],["outlier","이상값 포함"],["rings","동심원"],["strata","BMI만 다른 두 무리"]];
+const PKEYS=PRESETS.map(p=>p[0]);
+function toRaw(u,v){
+  return [Math.round((XR[0]+(XR[1]-XR[0])*clamp(u,0.02,0.98))*10)/10, Math.round((YR[0]+(YR[1]-YR[0])*clamp(v,0.03,0.97))*100)/100];
+}
+function genPreset(preset,n,seed){
+  const r=mulberry32(seed*7919+PKEYS.indexOf(preset)*104729+17), g=()=>gauss(r), out=[];
+  if(preset==="blobs3"){
+    const C=[[0.24,0.30],[0.50,0.78],[0.80,0.32]];
+    for(let i=0;i<n;i++){ const c=C[i%3]; out.push(toRaw(c[0]+g()*0.05,c[1]+g()*0.055)); }
+  } else if(preset==="bands"){
+    const m=Math.ceil(n/2), L=Math.hypot(0.84,0.78), ox=0.78/L, oy=-0.84/L;
+    for(let i=0;i<n;i++){ const b=i%2?1:-1, j=Math.floor(i/2), t=(j+0.2+r()*0.6)/m, e=0.075*b+g()*0.012;
+      out.push(toRaw(0.08+0.84*t+ox*e,0.11+0.78*t+oy*e)); }
+  } else if(preset==="strata"){
+    const m=Math.ceil(n/2);
+    for(let i=0;i<n;i++){ const b=i%2, j=Math.floor(i/2), u=0.04+0.92*((j+0.15+r()*0.7)/m);
+      out.push(toRaw(u,(b?0.71:0.31)+(u-0.5)*0.10+g()*0.028)); }
+  } else if(preset==="sizes"){
+    const nb=Math.round(n*0.6);
+    for(let i=0;i<n;i++){
+      if(i<nb) out.push(toRaw(0.33+g()*0.12,0.47+g()*0.13));
+      else if((i-nb)%2===0) out.push(toRaw(0.82+g()*0.03,0.82+g()*0.035));
+      else out.push(toRaw(0.84+g()*0.03,0.17+g()*0.035));
+    }
+  } else if(preset==="outlier"){
+    const O=[[0.95,0.08],[0.06,0.93],[0.96,0.95]], m=n-3, C=[[0.30,0.34],[0.62,0.62]];
+    for(let i=0;i<m;i++){ const c=C[i%2]; out.push(toRaw(c[0]+g()*0.06,c[1]+g()*0.065)); }
+    O.forEach(o=>out.push(toRaw(o[0]+g()*0.01,o[1]+g()*0.01)));
+  } else { /* rings */
+    const ni=Math.max(3,Math.round(n*0.3)), no=n-ni;
+    for(let i=0;i<ni;i++){ const a=r()*2*Math.PI, rr=0.07*Math.sqrt(r()); out.push(toRaw(0.5+rr*Math.cos(a),0.5+rr*Math.sin(a))); }
+    for(let i=0;i<no;i++){ const a=(i+0.3*r())/no*2*Math.PI, rr=0.37+g()*0.012; out.push(toRaw(0.5+rr*Math.cos(a),0.5+rr*Math.sin(a))); }
+  }
+  return out;
+}
+
+/* ================================================================== 상태 */
+const ALGOS=["single","complete","average","centroid","ward","diana"];
+const AL={
+  single:{name:"단일 연결",en:"Single",py:"single",def:"d(A,B) = min d(a,b)",desc:"두 군집에서 가장 가까운 점 쌍의 거리"},
+  complete:{name:"완전 연결",en:"Complete",py:"complete",def:"d(A,B) = max d(a,b)",desc:"두 군집에서 가장 먼 점 쌍의 거리"},
+  average:{name:"평균 연결",en:"Average",py:"average",def:"d(A,B) = (1/|A||B|) Σ d(a,b)",desc:"모든 점 쌍 거리의 평균 (UPGMA)"},
+  centroid:{name:"중심 연결",en:"Centroid",py:"centroid",def:"d(A,B) = <span class=nrm>‖</span>c<sub>A</sub> − c<sub>B</sub><span class=nrm>‖</span>",desc:"두 군집 중심(평균점) 사이 거리 (UPGMC)"},
+  ward:{name:"Ward",en:"Ward",py:"ward",def:"ΔSSE = |A||B|/(|A|+|B|) · <span class=nrm>‖</span>c<sub>A</sub> − c<sub>B</sub><span class=nrm>‖</span>²",desc:"합쳤을 때 군집 안 제곱오차합(SSE)이 가장 적게 늘어나는 쌍"},
+  diana:{name:"분할적 DIANA",en:"DIANA",py:"diana",def:"지름 = max d(a,b) 인 군집부터 분할",desc:"전체에서 시작해 평균 거리가 가장 큰 점부터 떼어 내는 분할"}
+};
+const MET={euclid:{name:"유클리드",sp:"euclidean",sk:"euclidean"},manhattan:{name:"맨해튼",sp:"cityblock",sk:"manhattan"},cosine:{name:"코사인",sp:"cosine",sk:"cosine"}};
+const SCL={none:{name:"스케일링 없음",short:"없음"},std:{name:"표준화",short:"표준화"},minmax:{name:"Min-Max",short:"Min-Max"}};
+const TABS=["merge","cut","compare","diana","scale","code"];
+const DEF={main:{preset:"blobs3",n:10,seed:1},cmp:{preset:"bands",n:36,seed:1},scl:{preset:"strata",n:30,seed:3}};
+const S={algo:"single",tab:"merge",metric:"euclid",scale:"std",data:{},
+  m:{step:3}, cut:{mode:"k",k:3,t:0,sel:null}, cmpK:2, sclK:2, dv:{pos:0}, xN:2, codeData:true};
+function loadData(set){ const d=S.data[set]; d.pts=genPreset(d.preset,d.n,d.seed); d.edited=false; d.ver=(d.ver||0)+1; }
+Object.keys(DEF).forEach(k=>{ S.data[k]=Object.assign({},DEF[k]); loadData(k); });
+
+/* ================================================================== 계산 */
+function scaleX(pts,mode){
+  const n=pts.length, out=pts.map(p=>[p[0],p[1]]);
+  if(mode==="none") return out;
+  for(let d=0;d<2;d++){
+    const v=pts.map(p=>p[d]);
+    if(mode==="std"){
+      const m=v.reduce((a,x)=>a+x,0)/n; let s=Math.sqrt(v.reduce((a,x)=>a+(x-m)*(x-m),0)/n); if(!(s>0)) s=1;
+      v.forEach((x,i)=>out[i][d]=(x-m)/s);
+    } else {
+      const lo=Math.min(...v), hi=Math.max(...v), r=(hi-lo)||1; v.forEach((x,i)=>out[i][d]=(x-lo)/r);
+    }
+  }
+  return out;
+}
+function dist(a,b,metric){
+  if(metric==="manhattan") return Math.abs(a[0]-b[0])+Math.abs(a[1]-b[1]);
+  if(metric==="cosine"){ const na=Math.sqrt(a[0]*a[0]+a[1]*a[1]), nb=Math.sqrt(b[0]*b[0]+b[1]*b[1]); if(!na||!nb) return 0;
+    return Math.max(0,1-(a[0]*b[0]+a[1]*b[1])/(na*nb)); }
+  return Math.sqrt((a[0]-b[0])*(a[0]-b[0])+(a[1]-b[1])*(a[1]-b[1]));
+}
+function distMat(X,metric){ const n=X.length, D=[]; for(let i=0;i<n;i++){ D.push(new Float64Array(n)); }
+  for(let i=0;i<n;i++) for(let j=i+1;j<n;j++){ const v=dist(X[i],X[j],metric); D[i][j]=v; D[j][i]=v; } return D; }
+const effMetric=(algo,metric)=>(algo==="ward"||algo==="centroid")?"euclid":metric;
+const meanPt=(X,mem)=>{ let a=0,b=0; mem.forEach(i=>{a+=X[i][0];b+=X[i][1];}); return [a/mem.length,b/mem.length]; };
+
+/* 병합적: 거리 행렬을 Lance–Williams 식으로 갱신 */
+function runAgglo(X,D,method){
+  const n=X.length, M=D.map(r=>Array.from(r)), alive=new Array(n).fill(true), id=[...Array(n).keys()],
+        size=new Array(n).fill(1), mem=[...Array(n).keys()].map(i=>[i]), merges=[], snaps=[], keep=n<=12;
+  const snap=()=>{ const slots=[]; for(let i=0;i<n;i++) if(alive[i]) slots.push(i);
+    snaps.push({slots, mem:slots.map(i=>mem[i].slice()), M:slots.map(i=>slots.map(j=>M[i][j]))}); return slots; };
+  for(let s=0;s<n-1;s++){
+    let slots;
+    if(keep) slots=snap(); else { slots=[]; for(let i=0;i<n;i++) if(alive[i]) slots.push(i); }
+    let bi=-1,bj=-1,bv=Infinity;
+    for(let x=0;x<slots.length;x++){ const i=slots[x]; for(let y=x+1;y<slots.length;y++){ const j=slots[y]; if(M[i][j]<bv){ bv=M[i][j]; bi=i; bj=j; } } }
+    const nA=size[bi], nB=size[bj], upd=[];
+    for(const k of slots){ if(k===bi||k===bj) continue;
+      const nk=size[k], dA=M[k][bi], dB=M[k][bj]; let v;
+      if(method==="single") v=Math.min(dA,dB);
+      else if(method==="complete") v=Math.max(dA,dB);
+      else if(method==="average") v=(nA*dA+nB*dB)/(nA+nB);
+      else if(method==="centroid") v=Math.sqrt(Math.max(0,(nA*dA*dA+nB*dB*dB)/(nA+nB)-nA*nB*bv*bv/((nA+nB)*(nA+nB))));
+      else v=Math.sqrt(Math.max(0,((nk+nA)*dA*dA+(nk+nB)*dB*dB-nk*bv*bv)/(nk+nA+nB)));
+      upd.push({k,nk,dA,dB,v,kMem:mem[k].slice()});
+    }
+    upd.forEach(u=>{ M[bi][u.k]=u.v; M[u.k][bi]=u.v; });
+    const memA=mem[bi].slice(), memB=mem[bj].slice();
+    merges.push({idA:id[bi],idB:id[bj],h:bv,size:nA+nB,memA,memB,nA,nB,slotA:bi,slotB:bj,upd});
+    alive[bj]=false; size[bi]=nA+nB; mem[bi]=memA.concat(memB); id[bi]=n+s;
+  }
+  if(keep) snap();
+  const Z=merges.map(m=>({a:Math.min(m.idA,m.idB),b:Math.max(m.idA,m.idB),h:m.h,size:m.size}));
+  return {n,Z,merges,snaps};
+}
+
+/* 분할적: DIANA (Kaufman & Rousseeuw) */
+function runDiana(X,D){
+  const n=X.length; let clusters=[[...Array(n).keys()]]; const splits=[];
+  const diamOf=c=>{ let d=-1,p=c[0],q=c[0]; for(let i=0;i<c.length;i++) for(let j=i+1;j<c.length;j++) if(D[c[i]][c[j]]>d){ d=D[c[i]][c[j]]; p=c[i]; q=c[j]; } return {d,p,q}; };
+  for(;;){
+    let best=-1,bd=null;
+    clusters.forEach((c,ci)=>{ if(c.length<2) return; const r=diamOf(c); if(!bd||r.d>bd.d){ bd=r; best=ci; } });
+    if(best<0) break;
+    const c=clusters[best], old=c.slice(), moves=[];
+    let jm=0, bavg=-Infinity;
+    old.forEach((i,t)=>{ let s=0; for(const j of old) if(j!==i) s+=D[i][j]; s/=old.length-1; if(s>bavg){ bavg=s; jm=t; } });
+    const spl=[old[jm]]; moves.push(old[jm]); old.splice(jm,1);
+    while(old.length>1){
+      let b2=-1, bdv=-Infinity;
+      old.forEach((i,t)=>{ let a=0; for(const j of old) if(j!==i) a+=D[i][j]; a/=old.length-1;
+        let b=0; for(const h of spl) b+=D[i][h]; b/=spl.length; if(a-b>bdv){ bdv=a-b; b2=t; } });
+      if(bdv<=0) break;
+      spl.push(old[b2]); moves.push(old[b2]); old.splice(b2,1);
+    }
+    clusters.splice(best,1); clusters.push(old,spl);
+    splits.push({parent:c.slice(),old:old.slice(),spl:spl.slice(),h:bd.d,pair:[bd.p,bd.q],moves});
+  }
+  const key=c=>c.slice().sort((a,b)=>a-b).join(",");
+  const node=new Map();
+  splits.forEach((sp,t)=>node.set(key(sp.parent),n+(n-2-t)));
+  const Z=new Array(n-1);
+  splits.forEach((sp,t)=>{ const ia=sp.old.length===1?sp.old[0]:node.get(key(sp.old)), ib=sp.spl.length===1?sp.spl[0]:node.get(key(sp.spl));
+    sp.oldId=ia; sp.splId=ib; Z[n-2-t]={a:Math.min(ia,ib),b:Math.max(ia,ib),h:sp.h,size:sp.parent.length}; });
+  return {n,Z,splits};
+}
+
+/* 나무 구조: 잎 순서(scipy dendrogram과 같은 왼쪽=작은 번호), 부분나무 최대 높이(MD) */
+function mkTree(R){
+  const n=R.n, Z=R.Z, md=new Array(n-1), lv=new Array(2*n-1);
+  for(let i=0;i<n;i++) lv[i]=[i];
+  for(let m=0;m<n-1;m++){ const z=Z[m];
+    md[m]=Math.max(z.h, z.a>=n?md[z.a-n]:-Infinity, z.b>=n?md[z.b-n]:-Infinity);
+    lv[n+m]=lv[z.a].concat(lv[z.b]); }
+  const order=lv[2*n-2].slice(), pos=new Array(n); order.forEach((l,i)=>pos[l]=i);
+  const inv=[]; for(let m=0;m<n-1;m++){ const z=Z[m], ch=Math.max(z.a>=n?Z[z.a-n].h:-Infinity, z.b>=n?Z[z.b-n].h:-Infinity); if(z.h<ch-1e-12) inv.push(m); }
+  return {n,Z,md,lv,order,pos,inv,top:Math.max(...md)};
+}
+function cutT(T,t){
+  const n=T.n, par=[...Array(n).keys()], f=x=>{ while(par[x]!==x){ par[x]=par[par[x]]; x=par[x]; } return x; };
+  for(let m=0;m<n-1;m++) if(T.md[m]<=t){ const z=T.Z[m]; par[f(T.lv[z.a][0])]=f(T.lv[z.b][0]); }
+  const lab=new Array(n), map=new Map(); let k=0;
+  for(const i of T.order){ const r=f(i); if(!map.has(r)) map.set(r,k++); lab[i]=map.get(r); }
+  return {lab,k,t};
+}
+function cutK(T,k){
+  const c=[0,...[...new Set(T.md)].sort((a,b)=>a-b)];
+  for(const t of c){ const r=cutT(T,t); if(r.k<=k) return r; }
+  return cutT(T,T.top);
+}
+function silhouette(D,lab,k){
+  const n=lab.length, sz=new Array(k).fill(0); lab.forEach(l=>sz[l]++);
+  const s=new Array(n).fill(0), A=new Array(n).fill(0), B=new Array(n).fill(0);
+  for(let i=0;i<n;i++){
+    if(sz[lab[i]]===1){ s[i]=0; continue; }
+    const sum=new Array(k).fill(0); for(let j=0;j<n;j++) if(j!==i) sum[lab[j]]+=D[i][j];
+    const a=sum[lab[i]]/(sz[lab[i]]-1); let b=Infinity;
+    for(let c=0;c<k;c++) if(c!==lab[i]&&sz[c]>0) b=Math.min(b,sum[c]/sz[c]);
+    A[i]=a; B[i]=b; const mx=Math.max(a,b); s[i]=mx>0?(b-a)/mx:0;
+  }
+  return {s,a:A,b:B,mean:s.reduce((x,y)=>x+y,0)/n};
+}
+function sseOf(X,lab,k){ let t=0; for(let c=0;c<k;c++){ const mem=[]; lab.forEach((l,i)=>{ if(l===c) mem.push(i); }); if(!mem.length) continue;
+  const m=meanPt(X,mem); mem.forEach(i=>{ t+=(X[i][0]-m[0])**2+(X[i][1]-m[1])**2; }); } return t; }
+function kmeans(X,k,seed){
+  const n=X.length; let best=null;
+  for(let rep=0;rep<10;rep++){
+    const r=mulberry32(seed*97+rep*7+3), C=[X[Math.floor(r()*n)].slice()];
+    while(C.length<k){ const d2=X.map(p=>Math.min(...C.map(c=>(p[0]-c[0])**2+(p[1]-c[1])**2))); const tot=d2.reduce((a,b)=>a+b,0); let u=r()*tot, j=0; while(j<n-1&&u>d2[j]){ u-=d2[j]; j++; } C.push(X[j].slice()); }
+    let lab=new Array(n).fill(0);
+    for(let it=0;it<100;it++){
+      let ch=false;
+      X.forEach((p,i)=>{ let bj=0,bd=Infinity; C.forEach((c,j)=>{ const d=(p[0]-c[0])**2+(p[1]-c[1])**2; if(d<bd){bd=d;bj=j;} }); if(lab[i]!==bj){ lab[i]=bj; ch=true; } });
+      for(let j=0;j<k;j++){ const mem=[]; lab.forEach((l,i)=>{ if(l===j) mem.push(i); }); if(mem.length) C[j]=meanPt(X,mem); }
+      if(!ch&&it>0) break;
+    }
+    const e=sseOf(X,lab,k); if(!best||e<best.e) best={lab,e};
+  }
+  return best.lab;
+}
+function ari(a,b){
+  const n=a.length, c2=x=>x*(x-1)/2, tab=new Map(), ra=new Map(), rb=new Map();
+  for(let i=0;i<n;i++){ const key=a[i]+"|"+b[i]; tab.set(key,(tab.get(key)||0)+1); ra.set(a[i],(ra.get(a[i])||0)+1); rb.set(b[i],(rb.get(b[i])||0)+1); }
+  let sij=0; tab.forEach(v=>sij+=c2(v)); let sa=0; ra.forEach(v=>sa+=c2(v)); let sb=0; rb.forEach(v=>sb+=c2(v));
+  const exp=sa*sb/c2(n), mx=(sa+sb)/2; return mx===exp?1:(sij-exp)/(mx-exp);
+}
+
+const cache=new Map();
+function result(set,algo,scaleMode,metricOpt){
+  const d=S.data[set], sc=scaleMode||S.scale, me=effMetric(algo,metricOpt||S.metric);
+  const key=[set,d.ver,algo,sc,me].join("|"); if(cache.has(key)) return cache.get(key);
+  const X=scaleX(d.pts,sc), D=distMat(X,me);
+  const R=algo==="diana"?runDiana(X,D):runAgglo(X,D,algo);
+  R.X=X; R.D=D; R.metric=me; R.scale=sc; R.algo=algo; R.pts=d.pts; R.T=mkTree(R);
+  cache.set(key,R); if(cache.size>160) cache.delete(cache.keys().next().value);
+  return R;
+}
+
+/* 단계별 군집 색 (합쳐질 때 큰 쪽 색을 물려받음, 한 점짜리는 무채색) */
+function leastUsed(use){ let b=0; for(let i=1;i<use.length;i++) if(use[i]<use[b]) b=i; return b; }
+function aggloColors(R,s){
+  const n=R.n, col=new Map(), owner=[...Array(n).keys()], use=new Array(10).fill(0);
+  for(let m=0;m<s;m++){ const z=R.merges[m], A=z.idA, B=z.idB, ca=col.get(A), cb=col.get(B); let c;
+    if(ca==null&&cb==null){ c=leastUsed(use); use[c]++; }
+    else if(ca==null) c=cb; else if(cb==null) c=ca;
+    else { const kA=z.nA>=z.nB; c=kA?ca:cb; use[kA?cb:ca]--; }
+    col.delete(A); col.delete(B); col.set(n+m,c);
+    z.memA.concat(z.memB).forEach(p=>owner[p]=n+m);
+  }
+  return owner.map(o=>col.has(o)?col.get(o):-1);
+}
+function dianaColors(R,s){
+  const n=R.n, use=new Array(10).fill(0), ci=new Array(n).fill(0); use[0]=1;
+  const cols=new Map(); const key=c=>c.slice().sort((a,b)=>a-b).join(",");
+  cols.set(key(R.splits.length?R.splits[0].parent:[...Array(n).keys()]),0);
+  for(let t=0;t<s;t++){ const sp=R.splits[t], k=key(sp.parent), c=cols.get(k); cols.delete(k);
+    if(sp.old.length>=2) cols.set(key(sp.old),c); else use[c]--;
+    if(sp.spl.length>=2){ const c2=leastUsed(use); use[c2]++; cols.set(key(sp.spl),c2); } }
+  ci.fill(-1); cols.forEach((c,k)=>k.split(",").forEach(i=>ci[+i]=c));
+  return ci;
+}
+
+/* ================================================================== 그리기: 산점도 (캔버스) */
+let OFF=null;
+function hullPts(p){
+  if(p.length<3) return p.slice();
+  const a=p.slice().sort((u,v)=>u[0]-v[0]||u[1]-v[1]), cr=(o,x,y)=>(x[0]-o[0])*(y[1]-o[1])-(x[1]-o[1])*(y[0]-o[0]);
+  const lo=[],up=[]; for(const q of a){ while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],q)<=0) lo.pop(); lo.push(q); }
+  for(let i=a.length-1;i>=0;i--){ const q=a[i]; while(up.length>=2&&cr(up[up.length-2],up[up.length-1],q)<=0) up.pop(); up.push(q); }
+  up.pop(); lo.pop(); return lo.concat(up);
+}
+function drawHalo(ctx,cv,dpr,ptsPx,color,alpha,rad){
+  if(!OFF) OFF=document.createElement("canvas");
+  OFF.width=cv.width; OFF.height=cv.height; const o=OFF.getContext("2d"); o.setTransform(dpr,0,0,dpr,0,0);
+  const h=hullPts(ptsPx); o.fillStyle=color; o.strokeStyle=color; o.lineJoin="round"; o.lineCap="round"; o.lineWidth=rad*2;
+  o.beginPath(); h.forEach((q,i)=>i?o.lineTo(q[0],q[1]):o.moveTo(q[0],q[1])); if(h.length>2) o.closePath();
+  if(h.length===1){ o.arc(h[0][0],h[0][1],rad,0,2*Math.PI); o.fill(); } else { o.stroke(); if(h.length>2) o.fill(); }
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha=alpha; ctx.drawImage(OFF,0,0); ctx.restore();
+}
+function scatter(cv,pts,o){
+  const {ctx,w,h,dpr}=fitCanvas(cv), C=colors(), mini=!!o.mini;
+  const pad={l:mini?32:(w<420?44:52), r:mini?8:14, t:mini?8:12, b:mini?22:(w<420?36:40)};
+  const pw=w-pad.l-pad.r, ph=h-pad.t-pad.b;
+  const px=x=>pad.l+(x-XR[0])/(XR[1]-XR[0])*pw, py=y=>pad.t+(1-(y-YR[0])/(YR[1]-YR[0]))*ph;
+  ctx.fillStyle=C.surface; ctx.fillRect(0,0,w,h);
+  ctx.lineWidth=1; ctx.strokeStyle=C.line; ctx.fillStyle=C.muted; ctx.font=`${mini?10:11}px ${C.mono}`;
+  const xt=niceTicks(XR[0],XR[1],mini?3:(w<420?4:7)), yt=niceTicks(YR[0],YR[1],mini?3:5);
+  ctx.textAlign="center"; ctx.textBaseline="top";
+  xt.forEach(v=>{ const X=px(v); ctx.beginPath(); ctx.moveTo(X,pad.t); ctx.lineTo(X,pad.t+ph); ctx.stroke(); ctx.fillText(tickTxt(v),X,pad.t+ph+4); });
+  ctx.textAlign="right"; ctx.textBaseline="middle";
+  yt.forEach(v=>{ const Y=py(v); ctx.beginPath(); ctx.moveTo(pad.l,Y); ctx.lineTo(pad.l+pw,Y); ctx.stroke(); ctx.fillText(tickTxt(v),pad.l-5,Y); });
+  ctx.strokeStyle=C.lineStrong; ctx.strokeRect(pad.l,pad.t,pw,ph);
+  if(!mini){ ctx.fillStyle=C.muted; ctx.font=`600 12px ${C.sans}`; ctx.textAlign="center"; ctx.textBaseline="bottom";
+    ctx.fillText(`${FEAT[0]} (${UNIT[0]})`,pad.l+pw/2,h-2);
+    ctx.save(); ctx.translate(13,pad.t+ph/2); ctx.rotate(-Math.PI/2); ctx.textBaseline="middle"; ctx.fillText(`${FEAT[1]} (${UNIT[1]})`,0,0); ctx.restore(); }
+  const R0=mini?3.4:(pts.length>28?4.6:5.6);
+  const P2=pts.map(p=>[px(p[0]),py(p[1])]);
+  (o.hulls||[]).forEach(hl=>{ if(!hl.idx.length) return; drawHalo(ctx,cv,dpr,hl.idx.map(i=>P2[i]),hl.c<0?C.muted:C.k[hl.c%10],hl.alpha||0.17,hl.rad||(mini?8:13)); });
+  const pxy=q=>[px(q[0]),py(q[1])];
+  (o.lines||[]).forEach(L=>{ const a=pxy(L.a), b=pxy(L.b); ctx.save(); ctx.globalAlpha=L.alpha==null?1:L.alpha; ctx.strokeStyle=L.color||C.ink; ctx.lineWidth=L.w||2;
+    ctx.setLineDash(L.dash?[6,4]:[]); ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); ctx.restore(); });
+  pts.forEach((p,i)=>{ const [X,Y]=P2[i], c=o.ci?o.ci[i]:-1;
+    ctx.save(); if(o.dim&&o.dim[i]) ctx.globalAlpha=0.25;
+    ctx.beginPath(); ctx.arc(X,Y,R0,0,2*Math.PI); ctx.fillStyle=c<0?C.muted:C.k[c%10]; ctx.fill(); ctx.lineWidth=1.4; ctx.strokeStyle=C.surface; ctx.stroke();
+    ctx.restore();
+    if(o.ring&&o.ring[i]){ ctx.beginPath(); ctx.arc(X,Y,R0+3,0,2*Math.PI); ctx.strokeStyle=o.ringColor||C.bad; ctx.lineWidth=2; ctx.stroke(); }
+    if(o.sel===i){ ctx.beginPath(); ctx.arc(X,Y,R0+6,0,2*Math.PI); ctx.strokeStyle=C.ink; ctx.lineWidth=2.2; ctx.stroke(); }
+  });
+  (o.marks||[]).forEach(m=>{ const [X,Y]=pxy(m.p), s=mini?5:7; ctx.strokeStyle=C.surface; ctx.lineWidth=5;
+    const path=()=>{ ctx.beginPath(); if(m.type==="d"){ ctx.moveTo(X,Y-s); ctx.lineTo(X+s,Y); ctx.lineTo(X,Y+s); ctx.lineTo(X-s,Y); ctx.closePath(); } else { ctx.moveTo(X-s,Y-s); ctx.lineTo(X+s,Y+s); ctx.moveTo(X+s,Y-s); ctx.lineTo(X-s,Y+s); } };
+    path(); ctx.stroke(); ctx.strokeStyle=m.color||C.ink; ctx.lineWidth=m.type==="d"?2:2.6; path(); if(m.type==="d"){ ctx.fillStyle=m.color||C.ink; ctx.fill(); } ctx.stroke(); });
+  if(o.labels){ ctx.font=`500 ${pts.length>24?9.5:10.5}px ${C.mono}`; ctx.textAlign="left"; ctx.textBaseline="bottom";
+    pts.forEach((p,i)=>{ if(o.labels!==true&&!o.labels[i]) return; const [X,Y]=P2[i]; ctx.lineWidth=3; ctx.strokeStyle=C.surface; ctx.strokeText(i+1,X+R0,Y-R0+1); ctx.fillStyle=C.text; ctx.fillText(i+1,X+R0,Y-R0+1); }); }
+  (o.tags||[]).forEach(L=>{ const a=pxy(L.a), b=pxy(L.b||L.a), X=(a[0]+b[0])/2, Y=(a[1]+b[1])/2;
+    ctx.font=`600 11.5px ${C.mono}`; const tw=ctx.measureText(L.text).width; let bx=clamp(X-tw/2-5,pad.l+2,pad.l+pw-tw-12), by=clamp(Y-22,pad.t+2,pad.t+ph-20);
+    ctx.fillStyle=C.surface; ctx.globalAlpha=0.92; ctx.fillRect(bx,by,tw+10,18); ctx.globalAlpha=1; ctx.strokeStyle=L.color||C.ink; ctx.lineWidth=1; ctx.strokeRect(bx+.5,by+.5,tw+9,17);
+    ctx.fillStyle=L.color||C.ink; ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.fillText(L.text,bx+5,by+9.5); });
+  cv._view={pad,pw,ph,px,py,ix:X=>XR[0]+(X-pad.l)/pw*(XR[1]-XR[0]),iy:Y=>YR[0]+(1-(Y-pad.t)/ph)*(YR[1]-YR[0]),P2};
+}
+function hitPoint(cv,e){
+  const V=cv._view; if(!V) return {i:-1};
+  const r=cv.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+  let bi=-1,bd=11; V.P2.forEach((q,i)=>{ const d=Math.hypot(q[0]-mx,q[1]-my); if(d<bd){ bd=d; bi=i; } });
+  const inside=mx>=V.pad.l&&mx<=V.pad.l+V.pw&&my>=V.pad.t&&my<=V.pad.t+V.ph;
+  return {i:bi,inside,x:V.ix(mx),y:V.iy(my)};
+}
+
+/* ================================================================== 그리기: 덴드로그램 (SVG) */
+function dendro(el,T,o){
+  const n=T.n, mini=!!o.mini, cw=Math.round(el.clientWidth||620);
+  const W=o.w||(mini?320:Math.max(300,cw,n>18?n*13+70:0)), H=o.h||(mini?118:(cw<520?290:330));
+  const labels=!mini&&o.labels!==false;
+  const pad={l:mini?6:50,r:mini?6:14,t:mini?8:16,b:mini?8:(labels?24:12)};
+  const pw=W-pad.l-pad.r, ph=H-pad.t-pad.b;
+  const yMax=(T.top>0?T.top:1)*1.07;
+  const X=p=>pad.l+(p+0.5)/n*pw, Y=h=>pad.t+(1-h/yMax)*ph, base=Y(0);
+  const vis=o.visible||(()=>true), div=!!o.divisive;
+  let g="";
+  if(!mini){
+    niceTicks(0,yMax,5).forEach(v=>{ const y=Y(v); g+=`<line class="gl" x1="${pad.l}" x2="${pad.l+pw}" y1="${y}" y2="${y}"/><text class="ax" x="${pad.l-6}" y="${y+4}" text-anchor="end">${tickTxt(v)}</text>`; });
+    g+=`<text class="axl" x="${pad.l-6}" y="${pad.t-4}" text-anchor="end" style="font-size:11px">높이</text>`;
+  }
+  const xs=new Array(2*n-1), ys=new Array(2*n-1), boxes=[];
+  for(let i=0;i<n;i++){ xs[i]=X(T.pos[i]); ys[i]=base; }
+  for(let m=0;m<n-1;m++){ const z=T.Z[m]; xs[n+m]=(xs[z.a]+xs[z.b])/2; ys[n+m]=Y(z.h); }
+  if(div){
+    const place=id=>{ if(id<n) return; const m=id-n;
+      if(vis(m)){ const z=T.Z[m]; place(z.a); place(z.b); xs[id]=(xs[z.a]+xs[z.b])/2; ys[id]=Y(z.h); }
+      else { const L=T.lv[id].map(i=>T.pos[i]); const lo=Math.min(...L), hi=Math.max(...L); xs[id]=X((lo+hi)/2); ys[id]=base-9; boxes.push({id,lo,hi,pend:m===o.pending}); } };
+    place(2*n-2);
+  }
+  const sw=mini?1.5:2, links=[];
+  for(let m=0;m<n-1;m++){ if(!vis(m)) continue;
+    const z=T.Z[m], col=o.linkColor?o.linkColor(m):null, hl=o.hl===m;
+    const ya=z.a<n?base:ys[z.a], yb=z.b<n?base:ys[z.b];
+    const st=hl?"var(--sk-accent)":(col||"var(--muted)");
+    links.push(`<path d="M${xs[z.a]} ${ya}V${ys[n+m]}H${xs[z.b]}V${yb}" fill="none" style="stroke:${st}" stroke-width="${hl?sw+1.8:sw}" stroke-linejoin="round"/>`);
+  }
+  if(div){ /* 아직 나뉘지 않은 군집: 바닥의 띠 */
+    const gap=pw/n;
+    boxes.forEach(b=>{ const c=o.boxColor?o.boxColor(b.id):"var(--muted)", x0=X(b.lo)-gap*0.42, x1=X(b.hi)+gap*0.42;
+      g+=`<rect x="${x0}" y="${base-9}" width="${Math.max(2,x1-x0)}" height="13" rx="4" style="fill:${c};opacity:.28"/><rect x="${x0}" y="${base-9}" width="${Math.max(2,x1-x0)}" height="13" rx="4" fill="none" style="stroke:${c}" stroke-width="1.4"/>`;
+      if(b.pend){ const yh=Y(T.Z[b.id-n].h), xc=xs[b.id];
+        g+=`<path d="M${xc} ${base-9}V${yh}M${x0} ${yh}H${x1}" fill="none" style="stroke:var(--sk-accent)" stroke-width="2" stroke-dasharray="5 4"/>`;
+        if(!mini) g+=`<text class="lb" x="${clamp(xc,pad.l+60,pad.l+pw-60)}" y="${yh-7}" text-anchor="middle" style="fill:var(--sk-accent)">${o.pendTxt||"나누는 중"} · 지름 ${fd(T.Z[b.id-n].h)}</text>`; } });
+    /* 나뉜 노드에서 아직 안 나뉜 자식까지 세로선은 위 링크에서 ys(=base-9)로 그려짐 */
+  }
+  g+=links.join("");
+  if(o.levelH!=null){ const y=Y(o.levelH); g+=`<line x1="${pad.l}" x2="${pad.l+pw}" y1="${y}" y2="${y}" style="stroke:var(--sk-accent)" stroke-width="1" stroke-dasharray="2 4"/>`; }
+  /* 역전 표시 */
+  if(o.showInv!==false) T.inv.forEach(m=>{ if(!vis(m)) return; g+=`<circle cx="${xs[n+m]}" cy="${ys[n+m]}" r="${mini?3.5:6}" fill="none" style="stroke:var(--bad)" stroke-width="2"/>`;
+    if(!mini) g+=`<text class="lb" x="${xs[n+m]+8}" y="${ys[n+m]+14}" style="fill:var(--bad)">역전</text>`; });
+  /* 잎 */
+  const lfs=n>30?8.5:n>20?9.5:10.5;
+  for(let i=0;i<n;i++){ const c=o.leafColor?o.leafColor(i):-1, x=xs[i];
+    g+=`<circle cx="${x}" cy="${base}" r="${mini?2:3.2}" style="fill:${PAL(c)}"/>`;
+    if(labels) g+=`<text class="lf" x="${x}" y="${base+15}" text-anchor="middle" style="font-size:${lfs}px">${i+1}</text>`; }
+  /* 자르는 선 */
+  if(o.cut!=null){ const y=Y(o.cut);
+    g+=`<line x1="${pad.l}" x2="${pad.l+pw}" y1="${y}" y2="${y}" style="stroke:var(--ink)" stroke-width="${mini?1.4:2}" stroke-dasharray="7 4"/>`;
+    if(!mini) g+=`<text class="lbm" x="${pad.l+6}" y="${y-6}" style="fill:var(--ink)">t = ${fd(o.cut)}${o.cutTxt||""}</text>`; }
+  if(o.note&&!mini) g+=`<text class="lb" x="${pad.l+8}" y="${pad.t+12}" style="fill:var(--muted)">${o.note}</text>`;
+  const minW=(!mini&&W>cw)?`style="min-width:${W}px"`:"";
+  el.innerHTML=`<svg class="hc-svg" viewBox="0 0 ${W} ${H}" ${minW} aria-hidden="true">${g}</svg>`;
+  el._map={pad,ph,yMax,H,W};
+}
+
+/* ================================================================== UI: 공통 */
+function setChip(){ document.querySelectorAll(".hc-chip[data-goto]").forEach(b=>{
+  const al=b.closest("#pane-diana")?"diana":b.closest("#pane-compare")?"single":S.algo, me=effMetric(al,S.metric), forced=me!==S.metric;
+  b.innerHTML=`거리 <b>${MET[me].name}</b>${forced?" (고정)":""} · <b>${SCL[S.scale].name}</b> 변경`; }); }
+const ALGO_NOTE={
+  single:"두 군집에서 가장 가까운 두 점의 거리. 띠처럼 이어진 모양을 잘 따라가지만, 잡음 몇 개가 다리를 놓으면 덩어리가 줄줄이 이어집니다(사슬 효과).",
+  complete:"두 군집에서 가장 먼 두 점의 거리. 지름이 작은, 둥글고 크기가 비슷한 군집을 만듭니다.",
+  average:"두 군집 사이 모든 점 쌍 거리의 평균. 단일과 완전의 중간 성격입니다.",
+  centroid:"두 군집 중심(평균점) 사이 거리. 합친 뒤 높이가 이전보다 낮아지는 '역전'이 생길 수 있습니다.",
+  ward:"합쳤을 때 군집 안 제곱오차합(SSE)이 가장 적게 늘어나는 쌍을 합칩니다. K-means처럼 분산이 작은 둥근 군집을 만듭니다.",
+  diana:"병합과 반대로 전체 하나에서 시작해, 지름이 가장 큰 군집을 둘로 쪼개는 일을 반복합니다."
+};
+function renderAlgoNote(){
+  $("algoNote").innerHTML=`<code>${AL[S.algo].def}</code><span>${ALGO_NOTE[S.algo]}</span>`;
+  $("tabMergeTxt").textContent=S.algo==="diana"?"분할 과정":"병합 과정";
+}
+function legendClusters(){ return `<span><i class="hc-sw" style="background:var(--muted)"></i>아직 혼자인 점</span><span><i class="hc-sw" style="background:var(--k1)"></i><i class="hc-sw" style="background:var(--k2)"></i><i class="hc-sw" style="background:var(--k3)"></i>합쳐진 군집</span>`; }
+
+/* ---------- 데이터 막대 (프리셋 · 점 개수 · seed) ---------- */
+let dbUid=0;
+function buildDatabars(){
+  document.querySelectorAll(".hc-databar").forEach(el=>{
+    const set=el.dataset.set, u="db"+(dbUid++);
+    el.classList.add("hc-sub");
+    el.innerHTML=`<label class="sk-label" for="${u}p">데이터</label><select class="sk-select" id="${u}p" data-k="preset">${PRESETS.map(p=>`<option value="${p[0]}">${p[1]}</option>`).join("")}</select>
+      <div class="sk-slider"><div class="sk-sl-head"><label for="${u}n">점 개수</label><b data-k="nv"></b></div><input type="range" id="${u}n" data-k="n" min="8" max="40" step="1"></div>
+      <button type="button" class="sk-btn sk-btn--sm" data-k="new">다른 데이터</button>
+      <button type="button" class="sk-btn sk-btn--sm" data-k="reset">처음 데이터</button>
+      <span class="sk-mono" data-k="seed"></span>`;
+    const q=k=>el.querySelector(`[data-k="${k}"]`);
+    q("preset").addEventListener("change",e=>{ const d=S.data[set]; d.preset=e.target.value; loadData(set); dataChanged(set); });
+    q("n").addEventListener("input",e=>{ const d=S.data[set]; d.n=+e.target.value; loadData(set); dataChanged(set); });
+    q("new").addEventListener("click",()=>{ S.data[set].seed++; loadData(set); dataChanged(set); });
+    q("reset").addEventListener("click",()=>{ Object.assign(S.data[set],DEF[set]); loadData(set); dataChanged(set); });
+  });
+}
+function syncDatabars(){
+  document.querySelectorAll(".hc-databar").forEach(el=>{ const d=S.data[el.dataset.set], q=k=>el.querySelector(`[data-k="${k}"]`);
+    q("preset").value=d.preset; q("n").value=clamp(d.pts.length,8,40); q("nv").textContent=d.pts.length;
+    q("seed").textContent=`seed ${d.seed}${d.edited?" · 수정됨":""}`; });
+}
+function dataChanged(set){ stopPlay(); if(set==="main"){ S.cut.sel=null; } syncDatabars(); render(); }
+
+/* ================================================================== 1. 병합 과정 */
+function pairDef(R,z){
+  const D=R.D, A=z.memA, B=z.memB; let best=null;
+  if(R.algo==="single"||R.algo==="complete"){ const mn=R.algo==="single";
+    A.forEach(a=>B.forEach(b=>{ const v=D[a][b]; if(!best||(mn?v<best.v:v>best.v)) best={a,b,v}; })); }
+  return best;
+}
+function renderMerge(){
+  const R=result("main",S.algo), n=R.n, T=R.T, div=S.algo==="diana", steps=n-1;
+  S.m.step=clamp(S.m.step,0,steps); const s=S.m.step, pts=R.pts;
+  $("mProg").textContent=`${div?"분할":"병합"} ${s} / ${steps}`;
+  $("mNext").textContent=div?"다음 분할":"다음 병합";
+  $("mFirst").disabled=$("mPrev").disabled=s===0; $("mNext").disabled=s===steps;
+  const lblLab=n<=24;
+  if(!div){
+    $("mTitle").textContent="가장 가까운 두 군집을 하나씩 합치기";
+    $("mLead").innerHTML=`처음에는 점 ${n}개가 각각 하나의 군집입니다. 매 단계 <b>군집 사이 거리가 가장 작은 두 군집</b>을 합치고, 그 거리를 덴드로그램의 높이로 기록합니다. ${n-1}번 합치면 하나가 됩니다. 지금 방법(${AL[S.algo].name})의 군집 사이 거리: ${AL[S.algo].desc}.`;
+    const ci=aggloColors(R,s), last=s>0?R.merges[s-1]:null, next=s<steps?R.merges[s]:null;
+    const o={ci,labels:lblLab,hulls:[],lines:[],marks:[],tags:[]};
+    let formula="", note="";
+    const nameA=z=>`A = ${cl(z.memA)}`, nameB=z=>`B = ${cl(z.memB)}`;
+    if(last){
+      const c=ci[last.memA[0]];
+      o.hulls.push({idx:last.memA,c,alpha:0.2},{idx:last.memB,c,alpha:0.2});
+      const raw=i=>pts[i];
+      const cA=meanPt(pts,last.memA), cB=meanPt(pts,last.memB), xA=meanPt(R.X,last.memA), xB=meanPt(R.X,last.memB);
+      const pd=pairDef(R,last), hd=fd(last.h);
+      if(S.algo==="single"||S.algo==="complete"){
+        o.lines.push({a:raw(pd.a),b:raw(pd.b),w:2.6}); o.tags.push({a:raw(pd.a),b:raw(pd.b),text:`d = ${hd}`});
+        o.labels=lblLab?true:Object.fromEntries([[pd.a,1],[pd.b,1]]);
+        formula=`<div>${nameA(last)} · ${nameB(last)}</div><div>d(A, B) = ${S.algo==="single"?"min":"max"}<sub>a∈A, b∈B</sub> d(a, b) = d(${P(pd.a)}, ${P(pd.b)}) = <b>${hd}</b></div><div class="t-muted">${S.algo==="single"?"가장 가까운":"가장 먼"} 점 쌍 하나가 두 군집 사이 거리를 정합니다 (선으로 표시).</div>`;
+      } else if(S.algo==="average"){
+        let sum=0; const many=last.nA*last.nB;
+        last.memA.forEach(a=>last.memB.forEach(b=>{ sum+=R.D[a][b]; if(many<=260) o.lines.push({a:raw(a),b:raw(b),w:1.2,alpha:many>40?0.25:0.45}); }));
+        o.marks.push({p:cA,color:"var(--ink)"},{p:cB,color:"var(--ink)"}); o.tags.push({a:cA,b:cB,text:`평균 ${hd}`});
+        formula=`<div>${nameA(last)} · ${nameB(last)}</div><div>d(A, B) = (1 / (|A|·|B|)) Σ d(a, b) = ${fd(sum)} / (${last.nA}×${last.nB}) = <b>${hd}</b></div><div class="t-muted">두 군집 사이 모든 점 쌍 ${many}개(가는 선)의 평균입니다.</div>`;
+      } else if(S.algo==="centroid"){
+        o.marks.push({p:cA,color:"var(--ink)"},{p:cB,color:"var(--ink)"}); o.lines.push({a:cA,b:cB,w:2.6}); o.tags.push({a:cA,b:cB,text:`d = ${hd}`});
+        const dx=xA[0]-xB[0], dy=xA[1]-xB[1];
+        formula=`<div>${nameA(last)} · ${nameB(last)}</div><div>c<sub>A</sub> = (${f3(xA[0])}, ${f3(xA[1])}), c<sub>B</sub> = (${f3(xB[0])}, ${f3(xB[1])}) <span class="t-muted">(${SCL[R.scale].name} 좌표)</span></div><div>d(A, B) = <span class=nrm>‖</span>c<sub>A</sub> − c<sub>B</sub><span class=nrm>‖</span> = √(${sq(dx)} + ${sq(dy)}) = <b>${hd}</b></div>`;
+      } else {
+        const cM=meanPt(pts,last.memA.concat(last.memB));
+        last.memA.concat(last.memB).forEach(i=>o.lines.push({a:raw(i),b:cM,w:1,alpha:0.4}));
+        o.marks.push({p:cA,color:"var(--ink)"},{p:cB,color:"var(--ink)"},{p:cM,type:"d",color:"var(--sk-accent)"}); o.lines.push({a:cA,b:cB,w:2.4});
+        const d2=(xA[0]-xB[0])**2+(xA[1]-xB[1])**2, dS=last.nA*last.nB/(last.nA+last.nB)*d2;
+        o.tags.push({a:cA,b:cB,text:`ΔSSE ${fd(dS)}`});
+        formula=`<div>${nameA(last)} · ${nameB(last)}</div><div>ΔSSE = |A||B|/(|A|+|B|) · <span class=nrm>‖</span>c<sub>A</sub> − c<sub>B</sub><span class=nrm>‖</span>² = ${last.nA}·${last.nB}/${last.nA+last.nB} × ${fd(d2)} = <b>${fd(dS)}</b></div><div>scipy 높이 = √(2·ΔSSE) = √(2 × ${fd(dS)}) = <b>${hd}</b></div>`;
+      }
+      const prev=s>1?R.merges[s-2].h:null;
+      if(S.algo==="centroid"&&prev!=null&&last.h<prev-1e-12) note=`<b class="t-bad">역전(inversion)</b>: 이번 병합 높이 ${hd}가 바로 앞 병합 ${fd(prev)}보다 낮습니다. 두 군집을 합치면 중심이 옮겨 가서 다른 군집과 더 가까워질 수 있기 때문입니다. 덴드로그램에서 가지가 아래로 꺾입니다.`;
+      else if(S.algo==="ward") note=`Ward는 높이로 √(2·ΔSSE)를 씁니다(scipy·sklearn 공통). 합친 뒤 전체 SSE = ${fd(R.merges.slice(0,s).reduce((a,z)=>a+z.h*z.h/2,0))}. 마름모 = 합친 군집의 새 중심.`;
+      else if(S.algo==="single") note=`단일 연결은 두 군집의 가장 가까운 점 하나씩만 보면 되므로, 띠처럼 이어진 점들이 줄줄이 합쳐집니다.`;
+      else if(S.algo==="complete") note=`완전 연결은 가장 먼 쌍을 보므로, 한 점이라도 멀면 합치기를 미룹니다 → 지름이 작은 군집.`;
+      else if(S.algo==="average") note=`평균 연결은 모든 쌍을 보므로 한두 점에 덜 흔들립니다.`;
+      else note=`× = 각 군집의 중심. 중심 사이 거리가 가장 짧은 두 군집을 합칩니다.`;
+    } else if(next){
+      o.lines.push({a:pts[next.memA[0]],b:pts[next.memB[0]],w:2,dash:true}); o.tags.push({a:pts[next.memA[0]],b:pts[next.memB[0]],text:"다음 병합"});
+      formula=`<div>단계 0: 군집 ${n}개 (점 하나가 군집 하나)</div><div>가장 가까운 두 점 ${P(next.memA[0])}, ${P(next.memB[0])} (d = <b>${fd(next.h)}</b>)이 먼저 합쳐집니다.</div><div class="t-muted">첫 병합은 어떤 연결법이든 같습니다. 차이는 군집이 생긴 뒤부터 나타납니다.</div>`;
+      note=`[다음 병합]을 누르거나 <span class="hc-kbd">→</span> 키로 한 단계씩 진행합니다. 빈 곳을 누르면 점이 추가되고, 점을 누르면 삭제됩니다.`;
+    }
+    scatter($("mCv"),pts,o);
+    dendro($("mDg"),T,{visible:m=>m<s,hl:s-1,linkColor:m=>PAL(ci[T.lv[n+m][0]]),leafColor:i=>ci[i],levelH:last?last.h:null});
+    $("mLegend").innerHTML=legendClusters()+`<span><i class="hc-sw ln" style="background:var(--ink)"></i>${S.algo==="single"?"가장 가까운 쌍":S.algo==="complete"?"가장 먼 쌍":S.algo==="average"?"모든 쌍":S.algo==="centroid"?"중심 사이 (×)":"중심 사이 · 새 중심(◆)"}</span>`;
+    const sse=S.algo==="ward"?R.merges.slice(0,s).reduce((a,z)=>a+z.h*z.h/2,0):null;
+    $("mStats").innerHTML=`<div class="sk-stat"><b>${s}</b><span>병합 횟수</span></div><div class="sk-stat"><b>${n-s}</b><span>남은 군집 수</span></div><div class="sk-stat"><b>${last?fd(last.h):"–"}</b><span>이번 병합 높이</span></div>`+(sse!=null?`<div class="sk-stat"><b>${fd(sse)}</b><span>누적 SSE</span></div>`:"")+(T.inv.length?`<div class="sk-stat"><b class="t-bad">${T.inv.length}</b><span>역전 횟수(전체)</span></div>`:"");
+    $("mFormula").innerHTML=formula; $("mNote").innerHTML=note;
+    renderMatAgglo(R,s);
+    renderZ(R,s);
+  } else renderMergeDiana(R,s);
+}
+const LW={
+  single:"d(k, A∪B) = min{ d(k,A), d(k,B) }   ← Lance–Williams: α<sub>A</sub>=α<sub>B</sub>=½, β=0, γ=−½",
+  complete:"d(k, A∪B) = max{ d(k,A), d(k,B) }   ← Lance–Williams: α<sub>A</sub>=α<sub>B</sub>=½, β=0, γ=+½",
+  average:"d(k, A∪B) = ( |A|·d(k,A) + |B|·d(k,B) ) / ( |A|+|B| )",
+  centroid:"d²(k, A∪B) = |A|/(|A|+|B|)·d²(k,A) + |B|/(|A|+|B|)·d²(k,B) − |A||B|/(|A|+|B|)²·d²(A,B)",
+  ward:"d²(k, A∪B) = [ (|k|+|A|)·d²(k,A) + (|k|+|B|)·d²(k,B) − |k|·d²(A,B) ] / ( |k|+|A|+|B| )"
+};
+function matHTML(sn,o){
+  const L=sn.mem.map(cl), idx=new Map(sn.slots.map((s,i)=>[s,i]));
+  const pa=o.pair?[idx.get(o.pair[0]),idx.get(o.pair[1])]:null, nx=o.next?[idx.get(o.next[0]),idx.get(o.next[1])]:null, nw=o.newSlot!=null?idx.get(o.newSlot):-1;
+  const tintRows=pa?new Set(pa):new Set();
+  let h=`<table class="hc-mat"><thead><tr><th></th>${L.map((l,j)=>`<th class="${tintRows.has(j)?"tint":""}${j===nw?" new":""}" title="${clFull(sn.mem[j])}">${l}</th>`).join("")}</tr></thead><tbody>`;
+  sn.M.forEach((row,i)=>{ h+=`<tr><th class="r${tintRows.has(i)?" tint":""}${i===nw?" new":""}" title="${clFull(sn.mem[i])}">${L[i]}</th>`;
+    row.forEach((v,j)=>{ let c=""; if(i===j){ h+=`<td class="dg">·</td>`; return; }
+      if(pa&&((i===pa[0]&&j===pa[1])||(i===pa[1]&&j===pa[0]))) c="pair";
+      else if(i===nw||j===nw) c="new";
+      else if(tintRows.has(i)||tintRows.has(j)) c="tint";
+      if(nx&&((i===nx[0]&&j===nx[1])||(i===nx[1]&&j===nx[0]))) c+=" next";
+      h+=`<td class="${c}">${fm(v)}</td>`; });
+    h+="</tr>"; });
+  return h+"</tbody></table>";
+}
+function renderMatAgglo(R,s){
+  const n=R.n; $("mMatTitle").textContent="거리 행렬이 줄어드는 과정";
+  $("mLW").innerHTML=`<div>갱신 식 (${AL[S.algo].name}): ${LW[S.algo]}</div>`+(S.algo==="ward"?`<div class="t-muted">여기서 d는 scipy 높이 √(2·ΔSSE). 처음 행렬은 점 사이 유클리드 거리.</div>`:S.algo==="centroid"?`<div class="t-muted">d는 두 중심 사이 유클리드 거리. 제곱한 값으로 갱신한 뒤 제곱근.</div>`:"");
+  if(n>10){
+    $("mMatHint").textContent="";
+    $("mMats").innerHTML=`<p class="sk-note">점이 10개 이하일 때 거리 행렬 표를 보여 줍니다 (지금 ${n}개). <button type="button" class="sk-btn sk-btn--sm" id="mTo10">점 10개로 줄이기</button></p>`;
+    $("mTo10").onclick=()=>{ const d=S.data.main; d.n=10; loadData("main"); dataChanged("main"); };
+    $("mUpd").innerHTML=""; return;
+  }
+  $("mMatHint").textContent=`${MET[R.metric].name} 거리 · ${SCL[R.scale].name}`;
+  const legend=`<div class="sk-legend"><span><i class="hc-sw halo" style="background:var(--sk-accent);opacity:1;border-radius:3px"></i>이번에 합친 쌍(최솟값)</span><span><i class="hc-sw halo" style="background:color-mix(in srgb,var(--va) 35%,var(--surface));opacity:1;border-radius:3px"></i>새로 계산된 행</span><span><i class="hc-sw ring" style="color:var(--ink);border-style:dashed;border-radius:3px"></i>다음 병합(새 최솟값)</span></div>`;
+  if(s===0){
+    const z=R.merges[0];
+    $("mMats").className="hc-mats one";
+    $("mMats").innerHTML=`<div class="hc-matbox"><h3>처음 거리 행렬 (점 ${n}개)</h3><div class="sk-scroll">${matHTML(R.snaps[0],{next:[z.slotA,z.slotB]})}</div>${legend}</div>`;
+    $("mUpd").innerHTML=`<li>가장 작은 값 ${fm(z.h)} = d(${P(z.memA[0])}, ${P(z.memB[0])}) → 첫 병합</li>`;
+    return;
+  }
+  const z=R.merges[s-1], nz=s<n-1?R.merges[s]:null;
+  $("mMats").className="hc-mats";
+  $("mMats").innerHTML=`<div class="hc-matbox"><h3>병합 전 (군집 ${n-s+1}개)</h3><div class="sk-scroll">${matHTML(R.snaps[s-1],{pair:[z.slotA,z.slotB]})}</div></div>
+    <div class="hc-matbox"><h3>병합 후 (군집 ${n-s}개)</h3><div class="sk-scroll">${matHTML(R.snaps[s],{newSlot:z.slotA,next:nz?[nz.slotA,nz.slotB]:null})}</div></div><div style="grid-column:1/-1">${legend}</div>`;
+  const AB=cl(z.memA.concat(z.memB));
+  $("mUpd").innerHTML=z.upd.map(u=>{ const k=cl(u.kMem);
+    let ex;
+    if(S.algo==="single") ex=`min(${fm(u.dA)}, ${fm(u.dB)})`;
+    else if(S.algo==="complete") ex=`max(${fm(u.dA)}, ${fm(u.dB)})`;
+    else if(S.algo==="average") ex=`(${z.nA}×${fm(u.dA)} + ${z.nB}×${fm(u.dB)}) / ${z.nA+z.nB}`;
+    else if(S.algo==="centroid") ex=`√(${z.nA}/${z.nA+z.nB}·${fm(u.dA)}² + ${z.nB}/${z.nA+z.nB}·${fm(u.dB)}² − ${z.nA*z.nB}/${(z.nA+z.nB)**2}·${fm(z.h)}²)`;
+    else ex=`√((${u.nk+z.nA}·${fm(u.dA)}² + ${u.nk+z.nB}·${fm(u.dB)}² − ${u.nk}·${fm(z.h)}²) / ${u.nk+z.nA+z.nB})`;
+    return `<li>d(${k}, ${AB}) = ${ex} = <b>${fm(u.v)}</b></li>`; }).join("")||`<li>모두 하나로 합쳐졌습니다.</li>`;
+}
+function renderZ(R,s){
+  const n=R.n;
+  $("mZTitle").textContent="병합 기록 (scipy linkage 결과 Z와 같은 형식)";
+  $("mZLead").innerHTML=`Z의 한 행 = [군집 a, 군집 b, 높이, 크기]. 번호는 scipy 규칙(점 0~${n-1}, 새 군집 ${n}, ${n+1}, …)이며 그림의 P번호는 1부터 셉니다.`;
+  let h=`<thead><tr><th>단계</th><th>Z[i,0] a</th><th>Z[i,1] b</th><th>Z[i,2] 높이</th><th>Z[i,3] 크기</th><th>합친 두 군집</th></tr></thead><tbody>`;
+  R.merges.forEach((z,i)=>{ const inv=R.T.inv.includes(i);
+    h+=`<tr data-s="${i+1}" class="${i===s-1?"on":""}${i>=s?" future":""}${inv?" inv":""}"><td class="n">${i+1}</td><td class="n">${Math.min(z.idA,z.idB)}</td><td class="n">${Math.max(z.idA,z.idB)}</td><td class="n h">${f3(z.h)}${inv?" (역전)":""}</td><td class="n">${z.size}</td><td>${cl(z.memA)} + ${cl(z.memB)}</td></tr>`; });
+  $("mZ").innerHTML=h+"</tbody>";
+}
+function renderMergeDiana(R,s){
+  const n=R.n, T=R.T, pts=R.pts, steps=n-1;
+  $("mTitle").textContent="전체를 위에서부터 하나씩 쪼개기 (DIANA)";
+  $("mLead").innerHTML=`처음에는 점 ${n}개 전체가 하나의 군집입니다. 매 단계 <b>지름(가장 먼 두 점 사이 거리)이 가장 큰 군집</b>을 둘로 쪼개고, 그 지름을 덴드로그램의 높이로 씁니다. 덴드로그램이 위에서 아래로 자랍니다. 한 번의 분할 안에서 점이 옮겨 가는 과정은 4번 화면에서 자세히 봅니다.`;
+  const ci=dianaColors(R,s), last=s>0?R.splits[s-1]:null, next=s<steps?R.splits[s]:null;
+  const o={ci,labels:n<=24,hulls:[],lines:[],marks:[],tags:[]};
+  let formula="",note="";
+  if(last){
+    const cO=last.old.length>=2?ci[last.old[0]]:-1, cS=last.spl.length>=2?ci[last.spl[0]]:-1;
+    o.hulls.push({idx:last.old,c:cO,alpha:0.2},{idx:last.spl,c:cS,alpha:0.2});
+    o.lines.push({a:pts[last.pair[0]],b:pts[last.pair[1]],w:2,dash:true}); o.tags.push({a:pts[last.pair[0]],b:pts[last.pair[1]],text:`지름 ${fd(last.h)}`});
+    o.ring=[]; o.ring[last.moves[0]]=true; o.ringColor="var(--sk-accent)";
+    formula=`<div>나눈 군집 ${cl(last.parent)} (${last.parent.length}개) · 지름 = d(${P(last.pair[0])}, ${P(last.pair[1])}) = <b>${fd(last.h)}</b> = 높이</div><div>분파 시작 = 평균 거리가 가장 큰 ${P(last.moves[0])} → 옮긴 점 ${last.moves.length}개</div><div>결과: 남은 쪽 ${cl(last.old)} | 분파 ${cl(last.spl)}</div>`;
+    note=`고리 = 분파를 시작한 점(다른 점들과 평균 거리가 가장 큼). 다음에는 남아 있는 군집 중 지름이 가장 큰 것을 쪼갭니다${next?` → ${cl(next.parent)} (지름 ${fd(next.h)})`:""}.`;
+  } else if(next){
+    o.lines.push({a:pts[next.pair[0]],b:pts[next.pair[1]],w:2,dash:true}); o.tags.push({a:pts[next.pair[0]],b:pts[next.pair[1]],text:`지름 ${fd(next.h)}`});
+    formula=`<div>단계 0: 전체가 하나의 군집 (점 ${n}개)</div><div>지름 = d(${P(next.pair[0])}, ${P(next.pair[1])}) = <b>${fd(next.h)}</b> → 덴드로그램 맨 위 높이</div>`;
+    note=`[다음 분할]을 누르면 전체가 둘로 쪼개집니다.`;
+  }
+  scatter($("mCv"),pts,o);
+  const hlM=s>0?n-1-s:null;
+  dendro($("mDg"),T,{divisive:true,visible:m=>m>=n-1-s,hl:hlM,pending:s<steps?n-2-s:null,pendTxt:"다음에 나눌 군집",linkColor:()=>"var(--ink)",leafColor:i=>ci[i],boxColor:id=>PAL(ci[T.lv[id][0]]),levelH:last?last.h:null});
+  $("mLegend").innerHTML=`<span><i class="hc-sw" style="background:var(--k1)"></i><i class="hc-sw" style="background:var(--k2)"></i>현재 군집</span><span><i class="hc-sw" style="background:var(--muted)"></i>혼자 떨어진 점</span><span><i class="hc-sw dash" style="color:var(--ink)"></i>지름</span><span><i class="hc-sw ring" style="color:var(--sk-accent)"></i>분파 시작점</span>`;
+  $("mStats").innerHTML=`<div class="sk-stat"><b>${s}</b><span>분할 횟수</span></div><div class="sk-stat"><b>${s+1}</b><span>현재 군집 수</span></div><div class="sk-stat"><b>${last?fd(last.h):"–"}</b><span>이번 분할 높이(지름)</span></div>`;
+  $("mFormula").innerHTML=formula; $("mNote").innerHTML=note;
+  /* 행렬 */
+  $("mMatTitle").textContent="나누는 군집의 거리 행렬";
+  $("mLW").innerHTML=`<div>지름 = max<sub>a,b∈C</sub> d(a, b) · 분파 시작점 = argmax<sub>i</sub> (1/(|C|−1)) Σ<sub>j∈C</sub> d(i, j)</div>`;
+  const sp=last||next;
+  if(n>10||!sp){
+    $("mMatHint").textContent="";
+    $("mMats").className="";
+    $("mMats").innerHTML=n>10?`<p class="sk-note">점이 10개 이하일 때 거리 행렬 표를 보여 줍니다 (지금 ${n}개). <button type="button" class="sk-btn sk-btn--sm" id="mTo10">점 10개로 줄이기</button></p>`:"";
+    if($("mTo10")) $("mTo10").onclick=()=>{ const d=S.data.main; d.n=10; loadData("main"); dataChanged("main"); };
+    $("mUpd").innerHTML="";
+  } else {
+    $("mMatHint").textContent=`${MET[R.metric].name} 거리 · ${SCL[R.scale].name}`;
+    const c=sp.parent.slice().sort((a,b)=>a-b), D=R.D, avg=c.map(i=>c.reduce((a,j)=>a+(j===i?0:D[i][j]),0)/(c.length-1));
+    const ini=sp.moves[0];
+    let h=`<table class="hc-mat"><thead><tr><th></th>${c.map(i=>`<th>${P(i)}</th>`).join("")}<th>평균</th></tr></thead><tbody>`;
+    c.forEach((i,a)=>{ h+=`<tr><th class="r${i===ini?" new":""}">${P(i)}</th>`;
+      c.forEach(j=>{ if(i===j){ h+=`<td class="dg">·</td>`; return; } const pr=(i===sp.pair[0]&&j===sp.pair[1])||(i===sp.pair[1]&&j===sp.pair[0]);
+        h+=`<td class="${pr?"pair":i===ini?"new":""}">${fm(D[i][j])}</td>`; });
+      h+=`<td class="avg${i===ini?" best":""}">${fm(avg[a])}</td></tr>`; });
+    $("mMats").className="hc-mats one";
+    $("mMats").innerHTML=`<div class="hc-matbox"><h3>${last?"방금 나눈":"다음에 나눌"} 군집 ${cl(sp.parent)}</h3><div class="sk-scroll">${h}</tbody></table></div><div class="sk-legend"><span><i class="hc-sw halo" style="background:var(--sk-accent);opacity:1;border-radius:3px"></i>지름(가장 먼 쌍)</span><span><i class="hc-sw halo" style="background:var(--va);opacity:1;border-radius:3px"></i>평균 거리 최대 = 분파 시작</span></div></div>`;
+    $("mUpd").innerHTML=`<li>지름 ${fm(sp.h)} = d(${P(sp.pair[0])}, ${P(sp.pair[1])})</li><li>분파 시작 ${P(ini)} (평균 ${fm(avg[c.indexOf(ini)])}) → 이후 옮긴 점: ${sp.moves.slice(1).map(P).join(", ")||"없음"}</li>`;
+  }
+  /* 분할 기록 */
+  $("mZTitle").textContent="분할 기록 (위에서부터)";
+  $("mZLead").innerHTML=`DIANA는 scipy·sklearn에 없어 직접 구현합니다(6번 화면 코드). 분할 기록을 거꾸로 뒤집으면 scipy의 Z 형식이 되어 <code>dendrogram</code>·<code>fcluster</code>에 그대로 쓸 수 있습니다.`;
+  let z=`<thead><tr><th>분할</th><th>나눈 군집</th><th>지름(높이)</th><th>남은 쪽</th><th>분파</th><th>Z 행</th></tr></thead><tbody>`;
+  R.splits.forEach((sp,t)=>{ z+=`<tr data-s="${t+1}" class="${t===s-1?"on":""}${t>=s?" future":""}"><td class="n">${t+1}</td><td title="${clFull(sp.parent)}">${cl(sp.parent)} (${sp.parent.length})</td><td class="n">${f3(sp.h)}</td><td title="${clFull(sp.old)}">${cl(sp.old)}</td><td title="${clFull(sp.spl)}">${cl(sp.spl)}</td><td class="n">${n-2-t}</td></tr>`; });
+  $("mZ").innerHTML=z+"</tbody>";
+}
+
+/* ================================================================== 2. 자르기 */
+function currentCut(R){
+  const T=R.T, n=R.n, K=Math.min(10,n-1), mds=[...new Set(T.md)].sort((a,b)=>a-b);
+  let r, line;
+  if(S.cut.mode==="k"){ S.cut.k=clamp(S.cut.k,2,K); r=cutK(T,S.cut.k); const up=mds.find(v=>v>r.t); line=up!=null?(r.t+up)/2:r.t; }
+  else { S.cut.t=clamp(S.cut.t,0,T.top*1.06); r=cutT(T,S.cut.t); line=S.cut.t; }
+  return {r,line,K,mds};
+}
+function renderCut(){
+  const R=result("main",S.algo), T=R.T, n=R.n, {r,line,K}=currentCut(R), k=r.k;
+  const mx=T.top*1.06;
+  $("cK").max=K; $("cK").value=S.cut.mode==="k"?S.cut.k:clamp(k,2,K); $("cKV").textContent=S.cut.mode==="k"?S.cut.k:k;
+  $("cT").max=mx; $("cT").step=mx/500; $("cT").value=line; $("cTV").textContent=fd(line);
+  document.querySelectorAll("#cMode button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===S.cut.mode));
+  const sil=(k>=2&&k<=n-1)?silhouette(R.D,r.lab,k):null;
+  let sel=S.cut.sel; if(sel!=null&&sel>=n) sel=null;
+  if(sel==null&&sil){ let b=0; sil.s.forEach((v,i)=>{ if(v<sil.s[b]) b=i; }); sel=b; }
+  scatter($("cCv"),R.pts,{ci:r.lab,labels:n<=24,ring:sil?sil.s.map(v=>v<0):null,sel,hulls:[...Array(k).keys()].map(c=>({idx:r.lab.map((l,i)=>l===c?i:-1).filter(i=>i>=0),c,alpha:0.12}))});
+  $("cLegend").innerHTML=[...Array(Math.min(k,10)).keys()].map(c=>`<span><i class="hc-sw" style="background:${PAL(c)}"></i>군집 ${c+1}</span>`).join("")+(k>10?`<span>… (${k}개)</span>`:"")+`<span class="t-bad"><i class="hc-sw ring"></i>실루엣 &lt; 0</span>`;
+  dendro($("cDg"),T,{cut:line,cutTxt:S.cut.mode==="k"?`  (k = ${k})`:"",linkColor:m=>T.md[m]<=r.t?PAL(r.lab[T.lv[n+m][0]]):null,leafColor:i=>r.lab[i]});
+  const sizes=[...Array(k).keys()].map(c=>r.lab.filter(l=>l===c).length);
+  $("cStats").innerHTML=`<div class="sk-stat"><b>${k}</b><span>군집 수 k</span></div><div class="sk-stat"><b>${fd(line)}</b><span>자른 높이 t</span></div><div class="sk-stat"><b>${sil?f3(sil.mean):"–"}</b><span>평균 실루엣</span></div><div class="sk-stat"><b style="font-size:15px">${k<=8?sizes.join(" · "):sizes.slice(0,8).join("·")+"…"}</b><span>군집 크기</span></div>`;
+  if(sil&&sel!=null){ const a=sil.a[sel], b=sil.b[sel], sv=sil.s[sel], own=sizes[r.lab[sel]];
+    $("cSil").innerHTML=own===1?`<div>${P(sel)}: 혼자인 군집 → s = 0 (정의)</div>`:
+      `<div>${P(sel)} (군집 ${r.lab[sel]+1}) — 점을 누르면 바뀝니다</div><div>a = 같은 군집 다른 점까지 평균 거리 = ${fd(a)}</div><div>b = 가장 가까운 다른 군집까지 평균 거리 = ${fd(b)}</div><div>s = (b − a) / max(a, b) = (${fd(b)} − ${fd(a)}) / ${fd(Math.max(a,b))} = <b>${f3(sv)}</b>${sv<0?' <span class="t-bad">→ 다른 군집에 더 가까움</span>':""}</div>`;
+  } else $("cSil").innerHTML=`<div>군집이 2개 이상, ${n-1}개 이하일 때 실루엣을 계산합니다.</div>`;
+  /* 엘보 */
+  const hs=T.md.slice().sort((a,b)=>a-b), H=kk=>hs[n-1-kk];
+  let ks=2,bj=-Infinity; for(let kk=2;kk<=K;kk++){ const j=H(kk-1)-H(kk); if(j>bj){ bj=j; ks=kk; } }
+  $("cElbow").innerHTML=elbowSVG(H,K,ks,k);
+  /* k별 실루엣 */
+  const sk=[]; for(let kk=2;kk<=K;kk++){ const rr=cutK(T,kk); sk.push({k:kk,real:rr.k,v:(rr.k>=2&&rr.k<=n-1)?silhouette(R.D,rr.lab,rr.k).mean:NaN}); }
+  let bestK=sk.reduce((a,b)=>(b.v>a.v?b:a),sk[0]);
+  $("cSilK").innerHTML=silKSVG(sk,bestK.k,k);
+  $("cSilPlotT").textContent=`점별 실루엣 (k = ${k})`;
+  $("cSilPlot").innerHTML=sil?silPlotSVG(sil,r.lab,k,sel):`<p class="sk-lead">k가 2 이상일 때 표시됩니다.</p>`;
+  $("cNote").innerHTML=`<b>엘보</b>: 군집 ${ks}개 → ${ks-1}개로 합치려면 높이가 ${fd(H(ks))} → ${fd(H(ks-1))}로 크게 뜁니다(점프 ${fd(bj)}). 그 사이에서 자르면 k = ${ks}. <b>실루엣</b>: k = ${bestK.k}일 때 평균 ${f3(bestK.v)}로 가장 큽니다. 두 기준이 다르면 데이터 모양과 목적(예: 환자 그룹을 몇 개로 관리할지)을 함께 보고 정합니다.`+(T.inv.length?` <span class="t-bad">중심 연결의 역전이 있어 높이가 단조롭지 않습니다(자르는 높이는 부분나무의 최대 높이 기준).</span>`:"");
+  bindDrag();
+  document.querySelectorAll("#cElbow .hit,#cSilK .hit").forEach(el=>el.addEventListener("click",()=>{ S.cut.mode="k"; S.cut.k=+el.dataset.k; renderCut(); renderCode(); }));
+  document.querySelectorAll("#cSilPlot .hit").forEach(el=>el.addEventListener("click",()=>{ S.cut.sel=+el.dataset.i; renderCut(); }));
+}
+function chartFrame(W,H,pad,xt,yt,X,Y,xl,yl){
+  let g=""; yt.forEach(v=>{ const y=Y(v); g+=`<line class="gl" x1="${pad.l}" x2="${W-pad.r}" y1="${y}" y2="${y}"/><text class="ax" x="${pad.l-5}" y="${y+4}" text-anchor="end">${tickTxt(v)}</text>`; });
+  xt.forEach(v=>{ g+=`<text class="ax" x="${X(v)}" y="${H-pad.b+15}" text-anchor="middle">${v}</text>`; });
+  g+=`<rect class="fr" x="${pad.l}" y="${pad.t}" width="${W-pad.l-pad.r}" height="${H-pad.t-pad.b}"/>`;
+  g+=`<text class="axl" x="${pad.l+(W-pad.l-pad.r)/2}" y="${H-3}" text-anchor="middle">${xl}</text><text class="axl" x="${pad.l}" y="${pad.t-6}">${yl}</text>`;
+  return g;
+}
+function elbowSVG(H,K,ks,kc){
+  const W=360,Hh=240,pad={l:46,r:12,t:22,b:36}, mx=H(1)*1.08||1;
+  const X=k=>pad.l+(k-0.5)/K*(W-pad.l-pad.r), Y=v=>pad.t+(1-v/mx)*(Hh-pad.t-pad.b);
+  let g=chartFrame(W,Hh,pad,[...Array(K).keys()].map(i=>i+1),niceTicks(0,mx,4),X,Y,"군집 수 k","k개가 될 때 병합 높이");
+  g+=`<path d="M${[...Array(K).keys()].map(i=>`${X(i+1)} ${Y(H(i+1))}`).join("L")}" fill="none" style="stroke:var(--muted)" stroke-width="2"/>`;
+  g+=`<line x1="${X(ks)}" y1="${Y(H(ks))}" x2="${X(ks-1)}" y2="${Y(H(ks-1))}" style="stroke:var(--sk-accent)" stroke-width="4" stroke-linecap="round"/>`;
+  g+=`<text class="lb" x="${X(ks)+8}" y="${(Y(H(ks))+Y(H(ks-1)))/2}" style="fill:var(--sk-accent)">점프 최대 → k = ${ks}</text>`;
+  for(let k=1;k<=K;k++){ const on=k===kc; g+=`<circle class="${k>=2?"hit":""}" data-k="${k}" cx="${X(k)}" cy="${Y(H(k))}" r="${on?7:5}" style="fill:${on?"var(--ink)":"var(--surface)"};stroke:var(--ink)" stroke-width="2"><title>k = ${k}: 높이 ${fd(H(k))}</title></circle>`; }
+  return `<svg class="hc-svg" viewBox="0 0 ${W} ${Hh}" role="img" aria-label="군집 수별 병합 높이 그래프">${g}</svg>`;
+}
+function silKSVG(sk,bk,kc){
+  const W=360,Hh=240,pad={l:46,r:12,t:22,b:36}, vals=sk.map(d=>d.v).filter(Number.isFinite), lo=Math.min(0,...vals), hi=Math.max(0.1,...vals)*1.12;
+  const n=sk.length, bw=(W-pad.l-pad.r)/n, X=k=>pad.l+(k-2+0.5)*bw, Y=v=>pad.t+(1-(v-lo)/(hi-lo))*(Hh-pad.t-pad.b);
+  let g=chartFrame(W,Hh,pad,sk.map(d=>d.k),niceTicks(lo,hi,4),X,Y,"군집 수 k","평균 실루엣");
+  g+=`<line x1="${pad.l}" x2="${W-pad.r}" y1="${Y(0)}" y2="${Y(0)}" style="stroke:var(--line-strong)"/>`;
+  sk.forEach(d=>{ if(!Number.isFinite(d.v)) return; const y0=Y(0), y1=Y(d.v), on=d.k===kc, best=d.k===bk;
+    g+=`<rect class="hit" data-k="${d.k}" x="${X(d.k)-bw*0.34}" y="${Math.min(y0,y1)}" width="${bw*0.68}" height="${Math.max(1,Math.abs(y1-y0))}" rx="3" style="fill:${best?"var(--ok)":"var(--k1)"};opacity:${on?1:0.55};stroke:${on?"var(--ink)":"none"}" stroke-width="2"><title>k = ${d.k}: ${f3(d.v)}</title></rect>`;
+    if(n<=10) g+=`<text class="lbm" x="${X(d.k)}" y="${y1-5}" text-anchor="middle" style="fill:var(--ink);font-size:10px">${f2(d.v)}</text>`; });
+  return `<svg class="hc-svg" viewBox="0 0 ${W} ${Hh}" role="img" aria-label="k별 평균 실루엣 막대그래프">${g}</svg>`;
+}
+function silPlotSVG(sil,lab,k,sel){
+  const n=lab.length, W=360, gap=6, row=Math.max(5,Math.min(12,Math.floor(300/n))), Hh=row*n+gap*(k-1)+56, pad={l:46,r:12,t:22,b:34};
+  const lo=Math.min(-0.1,...sil.s), hi=1, X=v=>pad.l+(v-lo)/(hi-lo)*(W-pad.l-pad.r);
+  let g=chartFrame(W,Hh,pad,[],[],X,()=>0,"실루엣 s","");
+  niceTicks(lo,hi,5).forEach(v=>{ g+=`<line class="gl" x1="${X(v)}" x2="${X(v)}" y1="${pad.t}" y2="${Hh-pad.b}"/><text class="ax" x="${X(v)}" y="${Hh-pad.b+14}" text-anchor="middle">${tickTxt(v)}</text>`; });
+  let y=pad.t;
+  for(let c=0;c<k;c++){ const mem=lab.map((l,i)=>l===c?i:-1).filter(i=>i>=0).sort((a,b)=>sil.s[b]-sil.s[a]); const y0=y;
+    mem.forEach(i=>{ const v=sil.s[i], x0=X(0), x1=X(v);
+      g+=`<rect class="hit" data-i="${i}" x="${Math.min(x0,x1)}" y="${y}" width="${Math.max(1,Math.abs(x1-x0))}" height="${row-1}" style="fill:${v<0?"var(--bad)":PAL(c)};stroke:${i===sel?"var(--ink)":"none"}" stroke-width="1.5"><title>${P(i)}: ${f3(v)}</title></rect>`; y+=row; });
+    g+=`<text class="lb" x="${pad.l-6}" y="${(y0+y)/2+4}" text-anchor="end" style="fill:${PAL(c)}">C${c+1}</text>`; y+=gap; }
+  g+=`<line x1="${X(0)}" x2="${X(0)}" y1="${pad.t}" y2="${Hh-pad.b}" style="stroke:var(--ink)"/>`;
+  g+=`<line x1="${X(sil.mean)}" x2="${X(sil.mean)}" y1="${pad.t-4}" y2="${Hh-pad.b}" style="stroke:var(--sk-accent)" stroke-width="2" stroke-dasharray="5 3"/><text class="lbm" x="${X(sil.mean)}" y="${pad.t-7}" text-anchor="middle" style="fill:var(--sk-accent)">평균 ${f3(sil.mean)}</text>`;
+  return `<svg class="hc-svg" viewBox="0 0 ${W} ${Hh}" role="img" aria-label="점별 실루엣 그래프">${g}</svg>`;
+}
+let dragOn=false;
+function bindDrag(){
+  const el=$("cDg"), svg=el.querySelector("svg"); if(!svg) return;
+  const toT=e=>{ const m=el._map, rc=svg.getBoundingClientRect(), y=(e.clientY-rc.top)*(m.H/rc.height); return clamp((1-(y-m.pad.t)/m.ph)*m.yMax,0,m.yMax); };
+  svg.addEventListener("pointerdown",e=>{ dragOn=true; try{ svg.setPointerCapture(e.pointerId); }catch(_){} S.cut.mode="h"; S.cut.t=toT(e); renderCut(); renderCode(); e.preventDefault(); });
+}
+document.addEventListener("pointermove",e=>{ if(!dragOn) return; const el=$("cDg"), svg=el.querySelector("svg"); if(!svg) return;
+  const m=el._map, rc=svg.getBoundingClientRect(), y=(e.clientY-rc.top)*(m.H/rc.height); S.cut.t=clamp((1-(y-m.pad.t)/m.ph)*m.yMax,0,m.yMax);
+  cancelAnimationFrame(dragRaf); dragRaf=requestAnimationFrame(()=>{ renderCut(); }); });
+let dragRaf=0;
+document.addEventListener("pointerup",()=>{ if(dragOn){ dragOn=false; renderCode(); } });
+
+/* ================================================================== 3. 비교 */
+function buildCompare(){
+  $("pGrid").innerHTML=ALGOS.map(a=>`<div class="hc-cmpcard" data-a="${a}"><div class="hc-cmphd"><b>${AL[a].name}</b><button type="button" class="sk-btn sk-btn--sm" data-pick="${a}">이 방법 보기</button></div>
+    <canvas class="hc-cmp-cv" aria-label="${AL[a].name} 결과 산점도"></canvas><div class="hc-dgwrap hc-dg" data-dg="${a}"></div><div class="hc-cmpst"></div></div>`).join("");
+  $("pGrid").querySelectorAll("[data-pick]").forEach(b=>b.addEventListener("click",()=>{ setAlgo(b.dataset.pick); }));
+  const rows=[
+    ["single","가장 가까운 두 점","길쭉한 띠·고리처럼 이어진 모양","사슬 효과: 잡음 점이 다리를 놓으면 덩어리가 줄줄이 이어짐. 이상값은 끝까지 혼자 남음","없음","linkage(method='single') · AgglomerativeClustering(linkage='single')"],
+    ["complete","가장 먼 두 점","둥글고 지름이 비슷한 덩어리","큰 덩어리를 쪼개기 쉬움. 이상값 하나가 거리를 키움","없음","method='complete' · linkage='complete'"],
+    ["average","모든 점 쌍의 평균 (UPGMA)","단일과 완전의 중간","극단적 모양에는 어중간","없음","method='average' · linkage='average'"],
+    ["centroid","두 중심 사이 거리 (UPGMC)","크기가 다른 덩어리도 비교적 무난","합친 뒤 높이가 낮아지는 역전 → 덴드로그램 해석이 어려움. 유클리드 전용","있음","scipy만: method='centroid' (sklearn 없음)"],
+    ["ward","합칠 때 늘어나는 SSE","분산이 작고 크기가 비슷한 둥근 덩어리 (K-means와 비슷)","길쭉한 띠·크기가 크게 다른 군집에 약함. 유클리드 전용","없음","method='ward' · linkage='ward' (sklearn 기본값)"],
+    ["diana","(분할) 지름이 큰 군집부터 평균 거리가 큰 점을 떼어 냄","큰 구조를 먼저 나눔","한 번 나뉘면 되돌릴 수 없음, 라이브러리 지원 적음","없음","R cluster::diana · 파이썬은 직접 구현"]];
+  $("pTable").innerHTML=`<thead><tr><th>방법</th><th>두 군집 사이 거리</th><th>잘 찾는 모양</th><th>약점</th><th>역전</th><th>코드</th></tr></thead><tbody>`+rows.map(r=>`<tr data-a="${r[0]}"><td>${AL[r[0]].name}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td><td><code>${r[5]}</code></td></tr>`).join("")+"</tbody>";
+}
+function renderCompare(){
+  const d=S.data.cmp, n=d.pts.length, Kmax=Math.min(8,n-1); S.cmpK=clamp(S.cmpK,2,Kmax);
+  $("pK").max=Kmax; $("pK").value=S.cmpK; $("pKV").textContent=S.cmpK;
+  const notes=[], silAll={}; let wardLab=null, Xe=null;
+  ALGOS.forEach(a=>{
+    const R=result("cmp",a), T=R.T, r=cutK(T,S.cmpK), k=r.k, card=$("pGrid").querySelector(`[data-a="${a}"]`);
+    card.classList.toggle("on",a===S.algo);
+    scatter(card.querySelector("canvas"),R.pts,{ci:r.lab,mini:true});
+    const mds=[...new Set(T.md)].sort((x,y)=>x-y), up=mds.find(v=>v>r.t), line=up!=null?(r.t+up)/2:r.t;
+    dendro(card.querySelector("[data-dg]"),T,{mini:true,divisive:false,cut:line,linkColor:m=>T.md[m]<=r.t?PAL(r.lab[T.lv[n+m][0]]):null,leafColor:i=>r.lab[i]});
+    const sil=(k>=2&&k<=n-1)?silhouette(R.D,r.lab,k).mean:NaN, Xs=scaleX(R.pts,S.scale), sse=sseOf(Xs,r.lab,k);
+    const sizes=[...Array(k).keys()].map(c=>r.lab.filter(l=>l===c).length).sort((x,y)=>y-x), share=sizes[0]/n;
+    let flag="";
+    if(a==="single"&&share>=0.7&&k>=2){ flag=`<span class="flag t-bad">사슬 효과: 한 군집이 ${Math.round(share*100)}%</span>`; notes.push(`<b>단일 연결</b>: 가장 큰 군집이 전체의 ${Math.round(share*100)}%를 차지합니다. 가까운 점을 따라 줄줄이 이어 붙는 사슬 효과입니다${sizes.slice(1).every(v=>v<=2)?" (나머지는 이상값처럼 혼자 남은 점)":""}.`); }
+    else if(a==="single") notes.push(`<b>단일 연결</b>: 크기 ${sizes.join("·")}. 가까운 점을 따라 이어 붙이므로 띠·고리처럼 이어진 모양에 강하고, 잡음 점이 다리를 놓으면 덩어리끼리 이어집니다('이상값 포함'에서 확인).`);
+    if(a==="centroid"){ if(T.inv.length){ flag=`<span class="flag t-bad">역전 ${T.inv.length}회</span>`; notes.push(`<b>중심 연결</b>: 덴드로그램에 역전이 ${T.inv.length}번 있습니다(빨간 원). 합친 군집의 중심이 이동해 다음 병합 높이가 더 낮아진 경우입니다.`); } else flag=`<span class="flag">역전 없음 (이 데이터)</span>`; }
+    if(a==="ward"){ wardLab=r.lab; Xe=Xs; }
+    silAll[a]=sil;
+    card.querySelector(".hc-cmpst").innerHTML=`<span>실루엣 <span class="sk-mono">${Number.isFinite(sil)?f3(sil):"–"}</span> · SSE <span class="sk-mono">${fd(sse)}</span></span><span>크기 <span class="sk-mono">${sizes.length<=6?sizes.join("·"):sizes.slice(0,6).join("·")+"…"}</span></span>${flag?flag:""}<span data-km></span>`;
+  });
+  if(wardLab){ const km=kmeans(Xe,S.cmpK,S.data.cmp.seed), v=ari(wardLab,km);
+    $("pGrid").querySelector('[data-a="ward"] [data-km]').innerHTML=`K-means와 일치도(ARI) <span class="sk-mono">${f2(v)}</span>`;
+    notes.push(`<b>Ward</b>: 같은 k의 K-means 결과와 일치도(ARI, 1 = 완전히 같음) ${f2(v)}. 둘 다 군집 안 제곱오차를 줄이는 방향이라 ${v>=0.9?"결과가 거의 같습니다":"대체로 비슷하게 나누지만, 경계 근처 점은 다르게 배정되기도 합니다"}.`); }
+  const sv=ALGOS.map(a=>silAll[a]).filter(Number.isFinite);
+  if(Number.isFinite(silAll.single)&&silAll.single<=Math.min(...sv)+1e-12&&S.cmpK>=2) notes.push(`<b>주의</b>: 실루엣은 둥글고 떨어진 군집에 높은 점수를 줍니다. 띠·고리처럼 이어진 모양을 따라간 단일 연결은 눈으로는 자연스러워도 실루엣이 가장 낮게(${f3(silAll.single)}) 나올 수 있습니다. 지표 하나만 보지 말고 그림을 함께 봅니다.`);
+  notes.push(`<b>완전·평균 연결</b>: 둥근 덩어리를 선호해, 띠나 고리 모양은 가로질러 자르기 쉽습니다. 데이터를 '뭉친 3덩어리'로 바꾸면 여섯 방법이 거의 같아집니다.`);
+  $("pNote").innerHTML=notes.map(t=>`<li>${t}</li>`).join("");
+  $("pTable").querySelectorAll("tbody tr").forEach(tr=>tr.classList.toggle("on",tr.dataset.a===S.algo));
+}
+
+/* ================================================================== 4. DIANA 상세 */
+function dvScreens(R){ const L=[]; R.splits.forEach((sp,t)=>{ for(let k=0;k<=sp.moves.length;k++) L.push({t,k}); }); return L; }
+function renderDiana(){
+  const R=result("main","diana"), n=R.n, T=R.T, pts=R.pts, D=R.D, L=dvScreens(R);
+  S.dv.pos=clamp(S.dv.pos,0,L.length-1); const {t,k}=L[S.dv.pos], sp=R.splits[t];
+  const spl=sp.moves.slice(0,k), splSet=new Set(spl), old=sp.parent.filter(i=>!splSet.has(i)), inP=new Set(sp.parent);
+  const done=k===sp.moves.length;
+  $("dProg").textContent=`분할 ${t+1}/${n-1} · 단계 ${k}/${sp.moves.length}`;
+  $("dFirst").disabled=$("dPrev").disabled=S.dv.pos===0; $("dNext").disabled=S.dv.pos===L.length-1;
+  $("dSplit").max=n-1; $("dSplit").value=t+1; $("dSplitV").textContent=t+1;
+  /* 행 계산 */
+  let rows;
+  if(k===0) rows=sp.parent.map(i=>({i,a:sp.parent.reduce((s,j)=>s+(j===i?0:D[i][j]),0)/(sp.parent.length-1)}));
+  else if(old.length>1) rows=old.map(i=>{ const a=old.reduce((s,j)=>s+(j===i?0:D[i][j]),0)/(old.length-1), b=spl.reduce((s,h)=>s+D[i][h],0)/spl.length; return {i,a,b,d:a-b}; });
+  else rows=[];
+  const key=k===0?"a":"d"; let best=null; rows.forEach(r=>{ if(!best||r[key]>best[key]) best=r; });
+  const nextMove=!done?sp.moves[k]:null;
+  /* 산점도 */
+  const ci=new Array(n).fill(-1), dim=new Array(n).fill(false);
+  pts.forEach((p,i)=>{ if(!inP.has(i)) dim[i]=true; else ci[i]=splSet.has(i)?1:0; });
+  const o={ci,dim,labels:n<=24,hulls:[],lines:[],marks:[],tags:[],ring:[],ringColor:"var(--sk-accent)"};
+  if(old.length) o.hulls.push({idx:old,c:0,alpha:0.15}); if(spl.length) o.hulls.push({idx:spl,c:1,alpha:0.18});
+  if(k===0){ o.lines.push({a:pts[sp.pair[0]],b:pts[sp.pair[1]],w:2,dash:true}); o.tags.push({a:pts[sp.pair[0]],b:pts[sp.pair[1]],text:`지름 ${fd(sp.h)}`}); }
+  if(nextMove!=null){ o.ring[nextMove]=true; if(spl.length){ const c=meanPt(pts,spl); o.lines.push({a:pts[nextMove],b:c,w:2,dash:true,color:"var(--sk-accent)"}); o.marks.push({p:c,color:"var(--k2)"}); } }
+  scatter($("dCv"),pts,o);
+  $("dLegend").innerHTML=`<span><i class="hc-sw" style="background:var(--k1)"></i>남은 쪽</span><span><i class="hc-sw" style="background:var(--k2)"></i>분파 (splinter)</span><span><i class="hc-sw ring" style="color:var(--sk-accent)"></i>다음에 옮길 점</span><span><i class="hc-sw" style="background:var(--muted);opacity:.35"></i>이번 분할과 무관</span>`;
+  /* 덴드로그램: t번째 분할 전까지 + 끝났으면 t 포함 */
+  const sDone=done?t+1:t, ciD=dianaColors(R,sDone);
+  dendro($("dDg"),T,{divisive:true,visible:m=>m>=n-1-sDone,hl:done?n-2-t:null,pending:done?null:n-2-t,linkColor:()=>"var(--ink)",leafColor:i=>ciD[i],boxColor:id=>PAL(ciD[T.lv[id][0]])});
+  $("dStats").innerHTML=`<div class="sk-stat"><b>${sp.parent.length}</b><span>나누는 군집 크기</span></div><div class="sk-stat"><b>${fd(sp.h)}</b><span>지름 = 높이</span></div><div class="sk-stat"><b>${old.length} | ${spl.length}</b><span>남은 쪽 | 분파</span></div>`;
+  let f;
+  if(k===0) f=`<div>나눌 군집: 지름이 가장 큰 ${cl(sp.parent)} → 지름 d(${P(sp.pair[0])}, ${P(sp.pair[1])}) = <b>${fd(sp.h)}</b></div><div>a(i) = (1/(|C|−1)) Σ<sub>j∈C</sub> d(i, j)  → 최대: ${P(best.i)}, a = <b>${fd(best.a)}</b></div><div class="t-muted">가장 '겉도는' 점을 떼어 분파를 시작합니다.</div>`;
+  else if(rows.length){ f=`<div>D(i) = (남은 쪽 평균 거리) − (분파 평균 거리) = a(i) − b(i)</div><div>최대: ${P(best.i)}: ${fd(best.a)} − ${fd(best.b)} = <b>${fd(best.d)}</b> ${best.d>0?'<span class="t-va">&gt; 0 → 분파로 옮김</span>':'≤ 0 → <b>멈춤</b>'}</div>`; }
+  else f=`<div>남은 쪽에 점이 하나뿐이라 더 옮길 수 없습니다 → 분할 끝.</div>`;
+  if(done) f+=`<div>분할 ${t+1} 결과: 남은 쪽 ${cl(old)} | 분파 ${cl(spl)} · 높이 ${fd(sp.h)}</div>`;
+  $("dFormula").innerHTML=f;
+  $("dNote").innerHTML=done?(t<n-2?`이번 분할이 끝났습니다. 다음은 남은 군집 중 지름이 가장 큰 ${cl(R.splits[t+1].parent)}(지름 ${fd(R.splits[t+1].h)})를 쪼갭니다. 지름은 쪼갤수록 작아지므로 덴드로그램에 역전이 생기지 않습니다.`:`모든 점이 혼자가 될 때까지 ${n-1}번 쪼갰습니다. 2번 화면에서 이 덴드로그램을 잘라 볼 수 있습니다(위에서 DIANA 선택).`)
+    :(k===0?`처음 단계: 군집 안 평균 거리가 가장 큰 점 ${P(sp.moves[0])}가 분파의 첫 점이 됩니다.`:`D가 양수 = 분파 쪽 점들과 평균적으로 더 가깝다는 뜻. D가 가장 큰 점 하나를 옮기고, 다시 계산합니다.`);
+  /* 표 */
+  $("dTabTitle").textContent=k===0?`군집 ${cl(sp.parent)} 안의 평균 거리 a(i)`:`남은 점들의 D(i) = a(i) − b(i)`;
+  $("dTabHint").textContent=`${MET[R.metric].name} 거리 · ${SCL[R.scale].name}`;
+  const sorted=rows.slice().sort((x,y)=>y[key]-x[key]);
+  if(k===0) $("dTab").innerHTML=`<thead><tr><th>점</th><th>군집 안 평균 거리 a(i)</th><th>판정</th></tr></thead><tbody>`+sorted.map(r=>`<tr class="${r===best?"best":""}"><td>${P(r.i)}</td><td class="n">${f3(r.a)}</td><td>${r===best?"최대 → 분파 시작":""}</td></tr>`).join("")+"</tbody>";
+  else if(rows.length) $("dTab").innerHTML=`<thead><tr><th>점</th><th>남은 쪽 평균 a(i)</th><th>분파 평균 b(i)</th><th>D(i) = a − b</th><th>판정</th></tr></thead><tbody>`+sorted.map(r=>`<tr class="${r===best&&r.d>0?"best":""}${r.d<=0?" neg":""}"><td>${P(r.i)}</td><td class="n">${f3(r.a)}</td><td class="n">${f3(r.b)}</td><td class="n${r.d>0?" pos":""}">${f3(r.d)}</td><td>${r===best&&r.d>0?"최대 → 분파로 이동":r.d>0?"분파 쪽이 더 가까움":"남은 쪽에 더 가까움"}</td></tr>`).join("")+"</tbody>";
+  else $("dTab").innerHTML=`<tbody><tr><td>남은 쪽이 한 점 (${cl(old)}) → 계산할 점이 없습니다.</td></tr></tbody>`;
+}
+
+/* ================================================================== 5. 거리와 스케일 */
+const XN=[100,500,1000,5000,10000,50000,100000,1000000];
+function bytes(b){ const u=["B","KB","MB","GB","TB"]; let i=0; while(b>=1024&&i<u.length-1){ b/=1024; i++; } return (b>=100?Math.round(b):+b.toFixed(1))+" "+u[i]; }
+function buildScale(){
+  $("sGrid").innerHTML=["none","std","minmax"].map(sc=>`<div class="hc-sclcard" data-sc="${sc}"><h3><span>${SCL[sc].name}</span><button type="button" class="sk-btn sk-btn--sm" data-use="${sc}">이 설정 쓰기</button></h3><canvas class="hc-cmp-cv" aria-label="${SCL[sc].name} 결과 산점도"></canvas><div class="hc-cmpst"></div></div>`).join("");
+  $("sGrid").querySelectorAll("[data-use]").forEach(b=>b.addEventListener("click",()=>{ S.scale=b.dataset.use; syncGlobal(); render(); }));
+}
+function renderScale(){
+  const d=S.data.scl, n=d.pts.length, Kmax=Math.min(8,n-1); S.sclK=clamp(S.sclK,2,Kmax);
+  $("sK").max=Kmax; $("sK").value=S.sclK; $("sKV").textContent=S.sclK;
+  const me=effMetric(S.algo,S.metric);
+  const cosZero=me==="cosine"&&S.scale==="minmax";
+  $("sWarn").hidden=me===S.metric&&!cosZero;
+  if(cosZero) $("sWarn").innerHTML=`Min-Max 뒤에는 두 변수 모두 최솟값인 점이 (0, 0)에 놓일 수 있습니다. 이 점은 방향이 없어 코사인 거리가 정의되지 않으므로(이 화면은 0으로 처리, scipy는 오류) 코사인은 <b>표준화</b>와 함께 쓰는 것이 안전합니다.`;
+  else if(me!==S.metric) $("sWarn").innerHTML=`<b>${AL[S.algo].name}</b>는 유클리드 거리에서만 정의되므로 ${MET[S.metric].name} 대신 유클리드로 계산합니다. 다른 방법(단일·완전·평균·DIANA)을 고르면 ${MET[S.metric].name} 거리가 적용됩니다.`;
+  const labs={};
+  ["none","std","minmax"].forEach(sc=>{
+    const R=result("scl",S.algo,sc), r=cutK(R.T,S.sclK), k=r.k, card=$("sGrid").querySelector(`[data-sc="${sc}"]`);
+    card.classList.toggle("on",sc===S.scale); labs[sc]=r.lab;
+    scatter(card.querySelector("canvas"),R.pts,{ci:r.lab,mini:true});
+    const vx=variance(R.X.map(p=>p[0])), vy=variance(R.X.map(p=>p[1])), sh=vx/(vx+vy||1);
+    const sizes=[...Array(k).keys()].map(c=>r.lab.filter(l=>l===c).length).sort((a,b)=>b-a);
+    const sil=(k>=2&&k<=n-1)?silhouette(R.D,r.lab,k).mean:NaN;
+    card.querySelector(".hc-cmpst").innerHTML=`<span>축 분산 비중 · ${FEAT[0]} <span class="sk-mono">${Math.round(sh*100)}%</span> · ${FEAT[1]} <span class="sk-mono">${Math.round((1-sh)*100)}%</span></span><div class="hc-share"><span style="width:${sh*100}%;background:var(--k1)"></span><span style="width:${(1-sh)*100}%;background:var(--k2)"></span></div><span>크기 <span class="sk-mono">${sizes.join("·")}</span> · 실루엣 <span class="sk-mono">${Number.isFinite(sil)?f3(sil):"–"}</span></span>`;
+  });
+  const a1=ari(labs.none,labs.std);
+  $("sNote").innerHTML=`스케일링 없음과 표준화의 결과 일치도(ARI) = <b>${f2(a1)}</b> (1 = 같음). 스케일링 없이는 공복혈당이 거리의 대부분을 차지해 ${FEAT[1]} 방향의 차이가 거의 무시됩니다. 표준화는 두 변수의 표준편차를, Min-Max는 범위를 1로 맞춥니다. 실루엣은 각자 다른 좌표에서 잰 값이라 칸끼리 직접 비교하지 않습니다.`;
+  /* 두 점 거리 */
+  const X=scaleX(d.pts,S.scale), a=X[0], b=X[1], pa=d.pts[0], pb=d.pts[1], dx=a[0]-b[0], dy=a[1]-b[1];
+  const dot=a[0]*b[0]+a[1]*b[1], na=Math.hypot(a[0],a[1]), nb=Math.hypot(b[0],b[1]);
+  $("sPairHint").textContent=`P1·P2 · ${SCL[S.scale].name} 좌표`;
+  const on=k=>me===k?' style="outline:2px solid var(--sk-accent);outline-offset:2px;border-radius:4px"':"";
+  $("sDist").innerHTML=`<div>P1 = (${pa[0]}, ${pa[1]}) → (${f3(a[0])}, ${f3(a[1])})</div><div>P2 = (${pb[0]}, ${pb[1]}) → (${f3(b[0])}, ${f3(b[1])})</div>
+    <div${on("euclid")}>유클리드 = √(Δx² + Δy²) = √(${sq(dx)} + ${sq(dy)}) = <b>${f3(dist(a,b,"euclid"))}</b></div>
+    <div${on("manhattan")}>맨해튼 = |Δx| + |Δy| = ${f3(Math.abs(dx))} + ${f3(Math.abs(dy))} = <b>${f3(dist(a,b,"manhattan"))}</b></div>
+    <div${on("cosine")}>코사인 = 1 − (a·b)/(<span class=nrm>‖</span>a<span class=nrm>‖</span><span class=nrm>‖</span>b<span class=nrm>‖</span>) = 1 − ${f3(dot)}/(${f3(na)}×${f3(nb)}) = <b>${f3(dist(a,b,"cosine"))}</b></div>`;
+  /* 계산량 */
+  const N=XN[S.xN]; $("xN").value=S.xN; $("xNV").textContent=comma(N);
+  const pairs=N*(N-1)/2;
+  $("xStats").innerHTML=`<div class="sk-stat"><b>${comma(pairs)}</b><span>거리 쌍 n(n−1)/2</span></div><div class="sk-stat"><b>${bytes(pairs*8)}</b><span>거리 행렬 메모리 (float64)</span></div><div class="sk-stat"><b>${N>=1e5?(N**3).toExponential(1).replace("e+"," × 10^"):comma(N**3)}</b><span>단순 구현 연산 ~n³</span></div>`;
+  $("xNote").innerHTML=N<=10000?`n = ${comma(N)}: 노트북에서도 충분히 계산됩니다. 덴드로그램은 수백 개를 넘으면 잎이 너무 많아 <code>truncate_mode="lastp"</code>로 위쪽만 그립니다.`:`n = ${comma(N)}: 거리 행렬만 ${bytes(pairs*8)}입니다. 이런 규모에서는 <b>비계층형 군집</b>(K-means · MiniBatchKMeans · DBSCAN · BIRCH)을 쓰거나, 표본을 뽑아 계층형으로 구조를 본 뒤 전체에 적용합니다.`;
+}
+function variance(v){ const m=v.reduce((a,x)=>a+x,0)/v.length; return v.reduce((a,x)=>a+(x-m)*(x-m),0)/v.length; }
+
+/* ================================================================== 6. 코드 */
+function renderCode(){
+  const d=S.data.main, R=result("main",S.algo), n=R.n, me=effMetric(S.algo,S.metric), sp=MET[me].sp, sk=MET[me].sk;
+  const {r,line}=currentCut(R), k=r.k, isK=S.cut.mode==="k", tTxt=+line.toFixed(4);
+  const L=[];
+  L.push("import numpy as np","import matplotlib.pyplot as plt","from scipy.cluster.hierarchy import linkage, dendrogram, fcluster");
+  if(S.algo==="diana") L.push("from scipy.spatial.distance import pdist, squareform");
+  if(S.scale==="std") L.push("from sklearn.preprocessing import StandardScaler"); else if(S.scale==="minmax") L.push("from sklearn.preprocessing import MinMaxScaler");
+  if(S.algo!=="centroid"&&S.algo!=="diana") L.push("from sklearn.cluster import AgglomerativeClustering");
+  L.push("from sklearn.metrics import silhouette_score","");
+  L.push(`# 특성: ${FEAT[0]}(${UNIT[0]}), ${FEAT[1]}(${UNIT[1]}) — 환자 ${n}명`);
+  if(S.codeData){ L.push("X = np.array(["); for(let i=0;i<n;i+=4) L.push("    "+d.pts.slice(i,i+4).map(p=>`[${p[0]}, ${p[1]}]`).join(", ")+","); L.push("])"); }
+  else L.push(`X = df[["${FEAT[0]}", "${FEAT[1]}"]].to_numpy()`);
+  L.push("");
+  if(S.scale==="std") L.push("# 1) 표준화: 단위가 다른 두 변수의 표준편차를 1로","X_s = StandardScaler().fit_transform(X)");
+  else if(S.scale==="minmax") L.push("# 1) Min-Max: 두 변수의 범위를 0~1로","X_s = MinMaxScaler().fit_transform(X)");
+  else L.push("# 1) 스케일링 없음 (범위가 넓은 변수가 거리를 지배함)","X_s = X.astype(float)");
+  L.push("");
+  if(S.algo==="diana"){
+    L.push("# 2) DIANA (분할적) — scipy·sklearn에 없어 직접 구현",
+"def diana(D):",
+"    n = len(D)",
+"    clusters, splits = [list(range(n))], []",
+"    while any(len(c) > 1 for c in clusters):",
+"        # 지름(가장 먼 두 점 거리)이 가장 큰 군집을 고름",
+"        c = max((c for c in clusters if len(c) > 1), key=lambda c: D[np.ix_(c, c)].max())",
+"        old = list(c)",
+"        avg = D[np.ix_(old, old)].sum(1) / (len(old) - 1)",
+"        splinter = [old.pop(int(np.argmax(avg)))]          # 평균 거리 최대인 점 → 분파 시작",
+"        while len(old) > 1:",
+"            gain = D[np.ix_(old, old)].sum(1) / (len(old) - 1) - D[np.ix_(old, splinter)].mean(1)",
+"            j = int(np.argmax(gain))",
+"            if gain[j] <= 0:                                   # 분파 쪽이 더 가까운 점이 없으면 멈춤",
+"                break",
+"            splinter.append(old.pop(j))",
+"        clusters.remove(c)",
+"        clusters += [old, splinter]",
+"        splits.append((D[np.ix_(c, c)].max(), old, splinter))",
+"    return splits","",
+"def splits_to_linkage(splits, n):",
+"    \"\"\"분할 기록을 거꾸로 뒤집어 scipy linkage 형식 Z로\"\"\"",
+"    node, Z = {}, np.zeros((n - 1, 4))",
+"    for t, (h, old, spl) in enumerate(splits):",
+"        node[tuple(sorted(old + spl))] = n + (n - 2 - t)",
+"    for t, (h, old, spl) in enumerate(splits):",
+"        ids = [g[0] if len(g) == 1 else node[tuple(sorted(g))] for g in (old, spl)]",
+"        Z[n - 2 - t] = [min(ids), max(ids), h, len(old) + len(spl)]",
+"    return Z","",
+`D = squareform(pdist(X_s, metric="${sp}"))`,
+"Z = splits_to_linkage(diana(D), len(X))");
+  } else {
+    L.push(`# 2) 계층형 군집: Z = n-1개 병합 기록 [군집 a, 군집 b, 높이, 크기]`,`Z = linkage(X_s, method="${AL[S.algo].py}", metric="${sp}")`);
+  }
+  L.push("print(np.round(Z, 4))","");
+  L.push("# 3) 덴드로그램과 자르는 선",`t = ${tTxt}`,"plt.figure(figsize=(8, 4))",`dendrogram(Z, labels=[f"P{i+1}" for i in range(len(X))], color_threshold=t)`,`plt.axhline(t, ls="--", c="gray")`,`plt.ylabel("높이")`,"plt.show()","");
+  L.push("# 4) 덴드로그램 자르기");
+  if(isK) L.push(`labels = fcluster(Z, t=${k}, criterion="maxclust")        # 군집 수 k로`,`# labels = fcluster(Z, t=t, criterion="distance")  # 높이 t로`);
+  else L.push(`labels = fcluster(Z, t=t, criterion="distance")        # 높이 t로 → 군집 ${k}개`,`# labels = fcluster(Z, t=${k}, criterion="maxclust")  # 군집 수 k로`);
+  L.push("print(labels)");
+  L.push(`if 1 < labels.max() < len(X):`,`    print("실루엣:", silhouette_score(X_s, labels, metric="${sk}"))`);
+  if(S.algo==="centroid") L.push("","# scikit-learn AgglomerativeClustering은 centroid 연결을 지원하지 않습니다","# (linkage = 'ward' | 'complete' | 'average' | 'single')");
+  else if(S.algo!=="diana"){
+    L.push("","# 5) scikit-learn (같은 결과)");
+    const met=S.algo==="ward"?"":`, metric="${sk}"`;
+    if(isK) L.push(`model = AgglomerativeClustering(n_clusters=${k}, linkage="${AL[S.algo].py}"${met})`);
+    else L.push(`model = AgglomerativeClustering(n_clusters=None, distance_threshold=t, linkage="${AL[S.algo].py}"${met})`);
+    L.push("labels_sk = model.fit_predict(X_s)","print(labels_sk)");
+  }
+  $("codePre").textContent=L.join("\n");
+  $("codeLead").innerHTML=`지금 설정: <b>${AL[S.algo].name}</b> · ${MET[me].name} 거리 · ${SCL[S.scale].name} · ${isK?`군집 수 k = ${k}`:`높이 t = ${tTxt} (군집 ${k}개)`} · 1번 화면 데이터 ${n}개. 화면의 병합 높이와 실루엣은 이 코드의 결과와 같습니다.`;
+}
+
+/* ================================================================== 탭 · 알고리즘 · 해시 */
+const RENDER={merge:renderMerge,cut:renderCut,compare:renderCompare,diana:renderDiana,scale:renderScale,code:renderCode};
+function render(){ setChip(); renderAlgoNote(); RENDER[S.tab](); if(S.tab!=="code") renderCode(); }
+function writeHash(){ history.replaceState(null,"","#"+S.algo+(S.tab==="merge"?"":"-"+S.tab)); }
+function syncAlgo(){ document.querySelectorAll("#algoSeg button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.a===S.algo)); }
+function setAlgo(a,write){ stopPlay(); S.algo=a; syncAlgo(); if(write!==false) writeHash(); render(); }
+function showTab(t,write){
+  stopPlay(); S.tab=t;
+  TABS.forEach(x=>{ const b=$("tab-"+x), on=x===t; b.setAttribute("aria-selected",on); b.tabIndex=on?0:-1; $("pane-"+x).hidden=!on; });
+  if(write!==false) writeHash(); render();
+}
+const tabBtns=TABS.map(t=>$("tab-"+t));
+tabBtns.forEach((b,i)=>{ b.addEventListener("click",()=>showTab(TABS[i]));
+  b.addEventListener("keydown",e=>{ const d=e.key==="ArrowRight"?1:e.key==="ArrowLeft"?-1:0; if(!d) return; const j=(i+d+TABS.length)%TABS.length; showTab(TABS[j]); tabBtns[j].focus(); e.preventDefault(); }); });
+const algoBtns=[...document.querySelectorAll("#algoSeg button")];
+algoBtns.forEach((b,i)=>{ b.addEventListener("click",()=>setAlgo(b.dataset.a));
+  b.addEventListener("keydown",e=>{ const d=e.key==="ArrowRight"?1:e.key==="ArrowLeft"?-1:0; if(!d) return; const n=algoBtns[(i+d+algoBtns.length)%algoBtns.length]; setAlgo(n.dataset.a); n.focus(); e.preventDefault(); }); });
+function readHash(){
+  const [a,t]=location.hash.slice(1).split("-");
+  S.algo=ALGOS.includes(a)?a:"single"; S.tab=TABS.includes(t)?t:"merge"; syncAlgo(); showTab(S.tab,false);
+}
+window.addEventListener("hashchange",readHash);
+document.addEventListener("click",e=>{ const g=e.target.closest&&e.target.closest("[data-goto]"); if(g){ showTab(g.dataset.goto); $("tab-"+g.dataset.goto).focus(); } });
+
+/* ================================================================== 조작 연결 */
+function seg(el,cb){ el.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b)); cb(b.dataset.v); })); }
+function slider(id,cb,fmt){ const el=$(id), out=$(id+"V"); el.addEventListener("input",()=>{ const v=+el.value; if(out) out.textContent=fmt?fmt(v):v; cb(v); }); }
+function syncGlobal(){
+  document.querySelectorAll("#sMetric button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===S.metric));
+  document.querySelectorAll("#sScale button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===S.scale));
+}
+/* 재생 */
+let timer=null; const SPEEDS=[0.5,1,2,3];
+function stopPlay(){ if(timer){ clearInterval(timer); timer=null; } $("mPlay").textContent="재생"; $("dPlay").textContent="재생"; }
+function play(kind){
+  if(timer){ stopPlay(); return; }
+  const isM=kind==="m";
+  const total=()=>isM?result("main",S.algo).n-1:dvScreens(result("main","diana")).length-1;
+  const get=()=>isM?S.m.step:S.dv.pos, set=v=>{ if(isM) S.m.step=v; else S.dv.pos=v; }, rend=isM?renderMerge:renderDiana;
+  if(get()>=total()) set(0);
+  rend(); $(kind+"Play").textContent="멈춤";
+  const sp=SPEEDS[+$(kind+"Speed").value]*(reduceMotion?0.5:1);
+  timer=setInterval(()=>{ if(get()>=total()){ stopPlay(); return; } set(get()+1); rend(); if(get()>=total()) stopPlay(); },1200/sp);
+}
+$("mFirst").onclick=()=>{ stopPlay(); S.m.step=0; renderMerge(); };
+$("mPrev").onclick=()=>{ stopPlay(); S.m.step=Math.max(0,S.m.step-1); renderMerge(); };
+$("mNext").onclick=()=>{ stopPlay(); S.m.step=S.m.step+1; renderMerge(); };
+$("mPlay").onclick=()=>play("m");
+slider("mSpeed",()=>{},v=>SPEEDS[v]+"×");
+$("mZ").addEventListener("click",e=>{ const tr=e.target.closest("tr[data-s]"); if(!tr) return; stopPlay(); S.m.step=+tr.dataset.s; renderMerge(); });
+$("mCv").addEventListener("click",e=>{
+  const h=hitPoint($("mCv"),e), d=S.data.main;
+  if(h.i>=0){ if(d.pts.length<=6) return; d.pts.splice(h.i,1); }
+  else { if(!h.inside||d.pts.length>=40) return; d.pts.push([Math.round(clamp(h.x,XR[0],XR[1])*10)/10,Math.round(clamp(h.y,YR[0],YR[1])*100)/100]); }
+  d.edited=true; d.ver++; dataChanged("main");
+});
+/* 자르기 */
+seg($("cMode"),v=>{ const R=result("main",S.algo), c=currentCut(R); if(v==="h"){ S.cut.t=c.line; } else { S.cut.k=clamp(c.r.k,2,c.K); } S.cut.mode=v; renderCut(); renderCode(); });
+slider("cK",v=>{ S.cut.mode="k"; S.cut.k=v; renderCut(); renderCode(); });
+slider("cT",v=>{ S.cut.mode="h"; S.cut.t=v; renderCut(); renderCode(); },v=>fd(v));
+$("cCv").addEventListener("click",e=>{ const h=hitPoint($("cCv"),e); if(h.i>=0){ S.cut.sel=h.i; renderCut(); } });
+/* 비교 */
+slider("pK",v=>{ S.cmpK=v; renderCompare(); });
+/* DIANA */
+$("dFirst").onclick=()=>{ stopPlay(); S.dv.pos=0; renderDiana(); };
+$("dPrev").onclick=()=>{ stopPlay(); S.dv.pos=Math.max(0,S.dv.pos-1); renderDiana(); };
+$("dNext").onclick=()=>{ stopPlay(); S.dv.pos++; renderDiana(); };
+$("dPlay").onclick=()=>play("d");
+slider("dSpeed",()=>{},v=>SPEEDS[v]+"×");
+slider("dSplit",v=>{ stopPlay(); const L=dvScreens(result("main","diana")); S.dv.pos=Math.max(0,L.findIndex(s=>s.t===v-1)); renderDiana(); });
+/* 거리·스케일 */
+seg($("sMetric"),v=>{ S.metric=v; render(); });
+seg($("sScale"),v=>{ S.scale=v; render(); });
+slider("sK",v=>{ S.sclK=v; renderScale(); });
+slider("xN",v=>{ S.xN=v; renderScale(); },v=>comma(XN[v]));
+/* 코드 */
+$("codeData").addEventListener("change",e=>{ S.codeData=e.target.checked; renderCode(); });
+$("codeCopy").onclick=()=>{
+  const txt=$("codePre").textContent, btn=$("codeCopy");
+  const done=()=>{ btn.textContent="복사됨"; setTimeout(()=>btn.textContent="복사",1400); };
+  const fallback=()=>{ const ta=document.createElement("textarea"); ta.value=txt; ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta); ta.select(); try{ document.execCommand("copy"); }catch(_){} ta.remove(); done(); };
+  if(navigator.clipboard&&window.isSecureContext) navigator.clipboard.writeText(txt).then(done,fallback); else fallback();
+};
+/* 키보드: 1번·4번 화면에서 → 다음, ← 이전 */
+document.addEventListener("keydown",e=>{
+  if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft") return;
+  if(S.tab!=="merge"&&S.tab!=="diana") return;
+  if(e.target.closest&&e.target.closest("input,select,textarea,.sk-tabs,.sk-seg")) return;
+  if(e.altKey||e.ctrlKey||e.metaKey) return;
+  const pre=S.tab==="merge"?"m":"d"; $(pre+(e.key==="ArrowRight"?"Next":"Prev")).click(); e.preventDefault();
+});
+
+/* 테마 · 크기 변화 → 다시 그리기 */
+let raf=0; const later=()=>{ cancelAnimationFrame(raf); raf=requestAnimationFrame(()=>RENDER[S.tab]()); };
+new MutationObserver(later).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+try{ matchMedia("(prefers-color-scheme: dark)").addEventListener("change",later); }catch(_){}
+let lastW=window.innerWidth; window.addEventListener("resize",()=>{ if(window.innerWidth!==lastW){ lastW=window.innerWidth; later(); } });
+
+buildDatabars(); buildCompare(); buildScale(); syncDatabars(); syncGlobal();
+readHash();
+})();
+</script>
+</body>
+</html>

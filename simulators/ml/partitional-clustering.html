@@ -1,0 +1,1247 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>비계층형 군집분석 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20260930c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20260930c">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 군집 색 k0~k9 · 데이터/밀도 파랑 · 튜닝 보라 · 평가 주황 · 한계 빨강 · 활용 초록 */
+:root{ --sk-accent: var(--cat-ml);
+  --k0:#2563EB; --k1:#EA580C; --k2:#0E8F84; --k3:#7C3AED; --k4:#16A34A; --k5:#DB2777; --k6:#A16207; --k7:#7C4A21; --k8:#0369A1; --k9:#DC2626;
+  --kde:#2563EB; --tune:#7C3AED; --eval:#EA580C; --leak:#DC2626; --use:#15803D; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --k0:#6AA5FF; --k1:#FF914D; --k2:#2DD4BF; --k3:#B294FF; --k4:#4ADE80; --k5:#F472B6; --k6:#FACC15; --k7:#D6A270; --k8:#38BDF8; --k9:#F87171;
+  --kde:#6AA5FF; --tune:#B294FF; --eval:#FF914D; --leak:#F87171; --use:#4ADE80; } }
+:root[data-theme="dark"]{
+  --k0:#6AA5FF; --k1:#FF914D; --k2:#2DD4BF; --k3:#B294FF; --k4:#4ADE80; --k5:#F472B6; --k6:#FACC15; --k7:#D6A270; --k8:#38BDF8; --k9:#F87171;
+  --kde:#6AA5FF; --tune:#B294FF; --eval:#FF914D; --leak:#F87171; --use:#4ADE80; }
+
+/* ---- 알고리즘 선택 (큰 세그먼트) ---- */
+.pc-algos{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:1px;background:var(--line-strong);border:1px solid var(--line-strong);border-radius:12px;overflow:hidden}
+.pc-algos button{appearance:none;border:0;font:inherit;background:var(--surface);color:var(--muted);padding:11px 14px;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:2px;min-width:0}
+.pc-algos button b{font-size:16px;color:var(--ink);line-height:1.3}
+.pc-algos button span{font-size:12.5px;line-height:1.35}
+.pc-algos button:hover{background:var(--surface-2)}
+.pc-algos button[aria-pressed="true"]{background:var(--ink);color:var(--on-ink)}
+.pc-algos button[aria-pressed="true"] b{color:var(--on-ink)}
+.pc-algos button:focus-visible{outline:2px solid var(--focus);outline-offset:-3px}
+@media (max-width:1080px){.pc-algos{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:520px){.pc-algos button{padding:9px 10px}.pc-algos button b{font-size:14px}.pc-algos button span{font-size:11.5px}}
+
+.pc-wrap{flex-wrap:wrap}
+.sk-seg.pc-wrap{display:inline-flex;flex-wrap:wrap}
+.pc-cap{margin:0;font-size:14.5px;line-height:1.6;min-height:3.2em}
+.pc-cap b{color:var(--ink)}
+.pc-kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--ink)}
+.pc-sub{font-size:12.5px;font-weight:700;color:var(--faint);letter-spacing:.02em;margin:0}
+.pc-pre{white-space:pre-wrap}
+.pc-prog{font-size:12.5px;color:var(--faint);font-family:var(--mono)}
+.pc-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.pc-ring{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;border:2px solid var(--muted)}
+.pc-x{display:inline-block;margin-right:5px;font-weight:700;color:var(--faint)}
+.pc-dia{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px;transform:rotate(45deg);border:2px solid var(--ink);background:var(--surface-2)}
+.pc-num{width:84px}
+.sk-stepper li{cursor:default}
+
+/* ---- 실행 화면 배치 ---- */
+.pc-stage{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:1080px){.pc-stage{grid-template-columns:minmax(0,1fr)}}
+.pc-side{display:flex;flex-direction:column;gap:16px;min-width:0}
+.pc-fw{width:100%;max-width:620px;margin:0 auto;display:flex;flex-direction:column;gap:6px}
+.pc-field{width:100%;aspect-ratio:1/1;display:block;border-radius:10px;border:1px solid var(--line);cursor:crosshair;touch-action:manipulation;background:var(--surface)}
+.pc-field[data-mode="probe"]{cursor:pointer}
+.pc-axis{font-size:12px;color:var(--muted);text-align:center}
+.pc-params{display:flex;flex-direction:column;gap:12px}
+.pc-params > div[hidden]{display:none}
+.pc-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:640px){.pc-two{grid-template-columns:minmax(0,1fr)}}
+.pc-mini{display:flex;flex-direction:column;gap:5px;min-width:0}
+.pc-mini canvas{width:100%;max-width:400px;margin:0 auto;aspect-ratio:1/1;display:block;border-radius:8px;border:1px solid var(--line);background:var(--surface)}
+.pc-mini h3{font-size:14px}
+.pc-mini .pc-prog{white-space:normal}
+
+/* ---- 표 ---- */
+.pc-tbl td,.pc-tbl th{padding:4px 9px}
+.pc-tbl tr.on td{background:color-mix(in srgb,var(--sk-accent) 13%,var(--surface));font-weight:700;color:var(--ink)}
+.pc-tbl tr.neg td.d{color:var(--use);font-weight:700}
+.pc-tbl tr.pos td.d{color:var(--leak)}
+.pc-cmp td{white-space:normal;vertical-align:top;min-width:8.5em;font-size:13px}
+.pc-cmp td:first-child{font-weight:700;color:var(--ink);min-width:7.5em}
+.pc-cmp th{white-space:nowrap}
+.pc-good{color:var(--use);font-weight:700}
+.pc-bad{color:var(--leak);font-weight:700}
+
+/* ---- 룰렛 (K-means++) ---- */
+.pc-roul{width:100%;display:block}
+
+/* ---- 차트 ---- */
+.pc-chart{width:100%;min-width:0;position:relative}
+.pc-chart svg{display:block;width:100%;height:auto}
+.pc-chart .gl{stroke:var(--line);stroke-width:1}
+.pc-chart .gl0{stroke:var(--line-strong);stroke-width:1}
+.pc-chart .ax{fill:var(--muted);font-size:11px;font-family:var(--mono)}
+.pc-chart .axl{fill:var(--muted);font-size:11.5px;font-family:var(--sans);font-weight:600}
+.pc-chart .sr{fill:none;stroke-width:2.4;stroke-linejoin:round;stroke-linecap:round}
+.pc-chart .mk{stroke:var(--ink);stroke-width:1.2;stroke-dasharray:3 3;opacity:.7}
+.pc-chart .mkt{fill:var(--ink);font-size:11px;font-family:var(--sans);font-weight:700;paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round}
+.pc-chart .lbl{font-size:11px;font-family:var(--sans);font-weight:700;paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round}
+.pc-chart.click svg{cursor:crosshair}
+.pc-chart rect.bar{cursor:pointer}
+
+/* ---- 비교 ---- */
+.pc-thumbs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+@media (max-width:1080px){.pc-thumbs{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:520px){.pc-thumbs{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}}
+.pc-th{display:flex;flex-direction:column;gap:3px;min-width:0}
+.pc-th canvas{width:100%;aspect-ratio:1/1;display:block;border-radius:7px;border:1px solid var(--line);background:var(--surface)}
+.pc-th b{font-size:13px;color:var(--ink)}
+.pc-th span{font-size:11.5px;color:var(--muted);font-family:var(--mono)}
+.pc-mx{display:grid;grid-template-columns:92px repeat(6,minmax(84px,1fr));gap:6px;min-width:640px;align-items:center}
+.pc-mx .h{font-size:12px;font-weight:700;color:var(--muted);text-align:center}
+.pc-mx .r{font-size:12px;font-weight:700;color:var(--ink)}
+.pc-mx .c{display:flex;flex-direction:column;gap:2px}
+.pc-mx canvas{width:100%;aspect-ratio:1/1;display:block;border-radius:6px;border:1px solid var(--line);background:var(--surface)}
+.pc-mx span{font-size:10.5px;color:var(--muted);font-family:var(--mono);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---- 코드 ---- */
+.pc-code{position:relative}
+.pc-code pre{margin:0;font-family:var(--mono);font-size:12.5px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow:auto;color:var(--ink);max-height:680px}
+.pc-code pre .cm{color:var(--muted)}
+.pc-code pre .kw{color:var(--tune);font-weight:600}
+.pc-code pre .st{color:var(--use)}
+.pc-code .sk-btn{position:absolute;top:8px;right:8px}
+
+@media (max-width:520px){
+  .sk-slider{min-width:0;width:100%}
+  .pc-hide-sm{display:none}
+}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)" aria-current="page">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">비계층형 군집분석 시뮬레이터</h1>
+      <p class="ds-hero__lede">정답 라벨 없이 점들의 거리와 밀도만으로 묶음을 찾는 비지도 학습입니다. K-means, K-means++ 초기화, K-medoids(PAM), DBSCAN, Mean Shift, GMM(EM)의 반복 과정을 한 단계씩 따라가고, 같은 데이터에서 결과와 군집 수 고르는 법을 비교합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <div class="pc-algos" id="algoSeg" role="group" aria-label="알고리즘 선택">
+    <button type="button" data-v="kmeans" aria-pressed="true"><b>K-means</b><span>평균 중심 · 할당과 갱신 반복</span></button>
+    <button type="button" data-v="kpp" aria-pressed="false"><b>K-means++ 초기화</b><span>D(x)² 비례로 중심 뽑기</span></button>
+    <button type="button" data-v="pam" aria-pressed="false"><b>K-medoids (PAM)</b><span>실제 점이 중심 · 교환</span></button>
+    <button type="button" data-v="dbscan" aria-pressed="false"><b>DBSCAN</b><span>밀도 연결 · 잡음 분리</span></button>
+    <button type="button" data-v="meanshift" aria-pressed="false"><b>Mean Shift</b><span>밀도 봉우리 오르기</span></button>
+    <button type="button" data-v="gmm" aria-pressed="false"><b>GMM (EM)</b><span>가우스 혼합 · 소프트 군집</span></button>
+  </div>
+
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button type="button" class="sk-tab" role="tab" id="tab-run" aria-controls="pane-run" aria-selected="true"><span class="sk-num">1</span>단계별 실행</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-pick" aria-controls="pane-pick" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>군집 수 고르기</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-compare" aria-controls="pane-compare" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>알고리즘 비교</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>코드</button>
+  </nav>
+
+  <!-- ================= 1. 단계별 실행 ================= -->
+  <section id="pane-run" role="tabpanel" aria-labelledby="tab-run">
+    <div class="sk-wrap" style="padding:0;gap:16px">
+    <div class="sk-card">
+      <div class="sk-head"><h2>데이터</h2><span class="sk-hint" id="dInfo"></span></div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">모양</span>
+          <div class="sk-seg pc-wrap" id="dPreset" role="group" aria-label="데이터 모양">
+            <button type="button" data-v="blobs" aria-pressed="true">둥근 3덩어리</button><button type="button" data-v="varied" aria-pressed="false">크기·밀도가 다른 덩어리</button><button type="button" data-v="aniso" aria-pressed="false">길쭉한 타원</button><button type="button" data-v="moons" aria-pressed="false">달 모양 2개</button><button type="button" data-v="circles" aria-pressed="false">동심원</button><button type="button" data-v="outlier" aria-pressed="false">이상값 포함</button></div></div>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-slider" style="min-width:170px"><div class="sk-sl-head"><label for="dN">점 수</label><b id="dNv">150</b></div><input type="range" id="dN" min="60" max="300" step="10" value="150"></div>
+        <div class="sk-group"><label class="sk-label" for="dSeed">데이터 seed</label><input class="sk-input pc-num" type="number" id="dSeed" min="0" max="9999" value="1">
+          <button type="button" class="sk-btn sk-btn--sm" id="dNew">다른 데이터</button></div>
+        <div class="sk-group"><span class="sk-label">캔버스 클릭</span>
+          <div class="sk-seg pc-wrap" id="dClick" role="group" aria-label="캔버스 클릭 동작">
+            <button type="button" data-v="probe" aria-pressed="true">점 살펴보기</button><button type="button" data-v="add" aria-pressed="false">점 추가</button><button type="button" data-v="del" aria-pressed="false">점 지우기</button><button type="button" data-v="center" aria-pressed="false" id="dClickCenter" hidden>초기 중심 놓기</button></div></div>
+      </div>
+    </div>
+
+    <div class="pc-stage">
+      <div class="sk-card">
+        <div class="sk-head"><h2 id="runTitle">K-means</h2><span class="pc-prog" id="runProg"></span></div>
+        <div class="sk-controls">
+          <div class="sk-group">
+            <button type="button" class="sk-btn sk-btn--sm" id="pFirst">처음</button>
+            <button type="button" class="sk-btn sk-btn--sm" id="pPrev">이전</button>
+            <button type="button" class="sk-btn sk-btn--sm" id="pNext">다음 단계</button>
+            <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="pPlay">재생</button>
+            <button type="button" class="sk-btn sk-btn--sm" id="pLast">끝</button>
+          </div>
+          <div class="sk-slider" style="min-width:140px"><div class="sk-sl-head"><label for="pSpeed">속도</label><b id="pSpeedV">1×</b></div><input type="range" id="pSpeed" min="0.5" max="4" step="0.5" value="1"></div>
+        </div>
+        <ol class="sk-stepper" id="runPhases" aria-label="진행 단계"></ol>
+        <div class="pc-fw">
+          <canvas class="pc-field" id="cvMain" data-mode="probe" aria-label="2차원 산점도. 군집 결과와 알고리즘의 현재 단계를 보여 줍니다. 클릭 동작은 위의 캔버스 클릭 설정을 따릅니다."></canvas>
+          <div class="pc-axis">가로: 혈당 (표준화 z) · 세로: BMI (표준화 z)</div>
+        </div>
+        <div class="sk-legend" id="runLegend"></div>
+        <p class="pc-cap" id="runCap" aria-live="polite"></p>
+      </div>
+
+      <div class="pc-side">
+        <div class="sk-card">
+          <div class="sk-head"><h2>설정</h2><span class="sk-hint" id="parHint"></span></div>
+          <div class="pc-params">
+            <div class="sk-controls" data-for="kmeans kpp pam gmm">
+              <div class="sk-slider" style="min-width:170px"><div class="sk-sl-head"><label for="aK" id="aKl">군집 수 k</label><b id="aKv">3</b></div><input type="range" id="aK" min="2" max="10" step="1" value="3"></div>
+              <div class="sk-group" data-for="kmeans kpp gmm"><label class="sk-label" for="aSeed">초기화 seed</label><input class="sk-input pc-num" type="number" id="aSeed" min="0" max="9999" value="0">
+                <button type="button" class="sk-btn sk-btn--sm" id="aSeedNext">다음 seed</button></div>
+            </div>
+            <div class="sk-controls" data-for="kmeans">
+              <div class="sk-group"><span class="sk-label">초기 중심</span>
+                <div class="sk-seg pc-wrap" id="aInit" role="group" aria-label="초기 중심 정하는 방법">
+                  <button type="button" data-v="random" aria-pressed="true">무작위 (점 k개)</button><button type="button" data-v="manual" aria-pressed="false">직접 클릭</button><button type="button" data-v="bad" aria-pressed="false">한쪽에 몰린 초기화</button></div></div>
+              <button type="button" class="sk-btn sk-btn--sm" id="aLocal">국소 최적 사례 불러오기</button>
+              <button type="button" class="sk-btn sk-btn--sm" id="aManualClear" hidden>중심 다시 놓기</button>
+            </div>
+            <div class="sk-controls" data-for="kmeans kpp">
+              <label class="sk-check"><input type="checkbox" id="aVor" checked>보로노이 영역 배경</label>
+              <label class="sk-check"><input type="checkbox" id="aTrail" checked>중심 이동 궤적</label>
+            </div>
+            <div class="sk-controls" data-for="pam">
+              <label class="sk-check"><input type="checkbox" id="aPamKm" checked>K-means 평균 중심 겹쳐 보기</label>
+            </div>
+            <div class="sk-controls" data-for="dbscan">
+              <div class="sk-slider" style="min-width:180px"><div class="sk-sl-head"><label for="aEps">eps (반경)</label><b id="aEpsV">0.35</b></div><input type="range" id="aEps" min="0.05" max="1.5" step="0.01" value="0.35"></div>
+              <div class="sk-slider" style="min-width:160px"><div class="sk-sl-head"><label for="aMin">min_samples</label><b id="aMinV">5</b></div><input type="range" id="aMin" min="2" max="20" step="1" value="5"></div>
+              <label class="sk-check"><input type="checkbox" id="aDbAll">모든 핵심점의 eps 원</label>
+            </div>
+            <div class="sk-controls" data-for="meanshift">
+              <div class="sk-slider" style="min-width:190px"><div class="sk-sl-head"><label for="aBw">bandwidth (창 반경 h)</label><b id="aBwV">1.00</b></div><input type="range" id="aBw" min="0.2" max="3" step="0.05" value="1"></div>
+              <button type="button" class="sk-btn sk-btn--sm" id="aBwEst">estimate_bandwidth로 정하기</button>
+              <div class="sk-group"><span class="sk-label">궤적</span>
+                <div class="sk-seg" id="aMsView" role="group" aria-label="이동 궤적 보기">
+                  <button type="button" data-v="all" aria-pressed="true">모든 점</button><button type="button" data-v="one" aria-pressed="false">선택한 점만</button></div></div>
+              <label class="sk-check"><input type="checkbox" id="aKde" checked>밀도(KDE) 등고선</label>
+            </div>
+            <div class="sk-controls" data-for="gmm">
+              <div class="sk-group"><span class="sk-label">공분산 유형</span>
+                <div class="sk-seg" id="aCov" role="group" aria-label="공분산 유형">
+                  <button type="button" data-v="full" aria-pressed="true">full</button><button type="button" data-v="diag" aria-pressed="false">diag</button><button type="button" data-v="spherical" aria-pressed="false">spherical</button></div></div>
+              <div class="sk-group"><span class="sk-label">초기값</span>
+                <div class="sk-seg" id="aGInit" role="group" aria-label="GMM 초기값">
+                  <button type="button" data-v="kmeans" aria-pressed="true">K-means 결과</button><button type="button" data-v="random" aria-pressed="false">무작위 소속</button></div></div>
+            </div>
+            <div class="sk-controls" data-for="gmm">
+              <div class="sk-group"><span class="sk-label">점 표시</span>
+                <div class="sk-seg" id="aGView" role="group" aria-label="소속 확률 표시">
+                  <button type="button" data-v="mix" aria-pressed="true">색 혼합</button><button type="button" data-v="pie" aria-pressed="false">파이 차트</button><button type="button" data-v="hard" aria-pressed="false">최대 확률(하드)</button></div></div>
+              <label class="sk-check"><input type="checkbox" id="aG2" checked>2σ 타원</label>
+              <label class="sk-check"><input type="checkbox" id="aGBg">배경: 소속 확률</label>
+              <button type="button" class="sk-btn sk-btn--sm" id="aGBest">초기값 5번 중 로그우도 최대 seed</button>
+            </div>
+          </div>
+        </div>
+        <div class="sk-card">
+          <div class="sk-stats" id="runStats"></div>
+          <div class="sk-formula pc-pre" id="runFormula"></div>
+          <div class="sk-head"><h3 id="probeTitle">선택한 점의 계산</h3><span class="sk-hint">캔버스에서 점을 눌러 바꿉니다</span></div>
+          <div id="runProbe"></div>
+        </div>
+        <div class="sk-card">
+          <div class="sk-head"><h3 id="curveTitle">WCSS</h3><span class="sk-hint" id="curveHint"></span></div>
+          <div class="pc-chart" id="runCurve" role="img" aria-label="반복에 따른 목적함수 곡선"></div>
+          <p class="sk-note" id="curveNote" hidden></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- K-means: n_init -->
+    <div class="sk-card" data-x="kmeans">
+      <div class="sk-head"><h2>n_init: 초기값을 여러 번 바꿔 실행하고 WCSS가 가장 작은 결과 고르기</h2><span class="pc-prog" id="xNiProg"></span></div>
+      <p class="sk-lead">K-means는 시작점에 따라 다른 <b>국소 최적</b>에 멈출 수 있습니다. scikit-learn의 <code>n_init</code>은 무작위 초기화를 여러 번 반복해 WCSS(관성, inertia)가 가장 작은 결과를 남깁니다. 막대를 누르면 그 실행을 위에서 단계별로 봅니다.</p>
+      <div class="sk-controls">
+        <div class="sk-slider" style="min-width:200px"><div class="sk-sl-head"><label for="xNi">n_init (실행 횟수)</label><b id="xNiV">10</b></div><input type="range" id="xNi" min="1" max="30" step="1" value="10"></div>
+        <button type="button" class="sk-btn sk-btn--sm" id="xNiBest">최선 실행을 위에서 보기</button>
+      </div>
+      <div class="pc-chart" id="xNiChart" role="img" aria-label="실행별 최종 WCSS 막대 그래프"></div>
+      <div class="sk-stats" id="xNiStats"></div>
+      <p class="sk-note" id="xNiNote"></p>
+    </div>
+
+    <!-- K-means++: 분포 비교 -->
+    <div class="sk-card" data-x="kpp">
+      <div class="sk-head"><h2>무작위 초기화 vs K-means++: seed 50개로 최종 WCSS 비교</h2><span class="pc-prog" id="xPpProg"></span></div>
+      <p class="sk-lead">같은 데이터·같은 k에서 seed만 0~49로 바꿔 각각 <b>n_init=1</b>로 한 번씩 실행했습니다. 점 하나가 실행 하나의 최종 WCSS입니다. 왼쪽(작을수록)이 좋습니다.</p>
+      <div class="pc-chart" id="xPpChart" role="img" aria-label="무작위 초기화와 K-means++ 초기화의 최종 WCSS 분포"></div>
+      <div class="sk-scroll"><table class="sk-table pc-tbl" id="xPpTable"></table></div>
+      <p class="sk-note" id="xPpNote"></p>
+    </div>
+
+    <!-- PAM: 교환 표 + K-means 비교 -->
+    <div class="sk-card" data-x="pam">
+      <div class="sk-head"><h2 id="xSwTitle">교환(SWAP) 비용 표</h2><span class="sk-hint">ΔTD &lt; 0 이면 교환하면 총 거리가 줄어듭니다</span></div>
+      <div class="sk-scroll"><table class="sk-table pc-tbl" id="xSwTable"></table></div>
+      <p class="sk-note" id="xSwNote"></p>
+    </div>
+    <div class="sk-card" data-x="pam">
+      <div class="sk-head"><h2>이상값에 강한 이유: 같은 데이터에서 K-means vs K-medoids</h2><button type="button" class="sk-btn sk-btn--sm" id="xPkLoad">이상값 포함 데이터 불러오기</button></div>
+      <div class="pc-two">
+        <div class="pc-mini"><h3>K-means (평균 중심, k-means++ · n_init=10)</h3><canvas id="cvPkA" aria-label="K-means 결과"></canvas><span class="pc-prog" id="xPkA"></span></div>
+        <div class="pc-mini"><h3>K-medoids PAM (실제 점 중심)</h3><canvas id="cvPkB" aria-label="K-medoids 결과"></canvas><span class="pc-prog" id="xPkB"></span></div>
+      </div>
+      <p class="sk-note" id="xPkNote"></p>
+    </div>
+
+    <!-- DBSCAN: K-means 비교 -->
+    <div class="sk-card" data-x="dbscan">
+      <div class="sk-head"><h2>모양이 둥글지 않을 때: K-means 실패 vs DBSCAN 성공</h2>
+        <div class="sk-group"><button type="button" class="sk-btn sk-btn--sm" id="xDbMoons">달 모양 2개 불러오기</button><button type="button" class="sk-btn sk-btn--sm" id="xDbCircles">동심원 불러오기</button></div></div>
+      <div class="pc-two">
+        <div class="pc-mini"><h3 id="xDkAt">K-means</h3><canvas id="cvDkA" aria-label="K-means 결과"></canvas><span class="pc-prog" id="xDkA"></span></div>
+        <div class="pc-mini"><h3 id="xDkBt">DBSCAN</h3><canvas id="cvDkB" aria-label="DBSCAN 결과"></canvas><span class="pc-prog" id="xDkB"></span></div>
+      </div>
+      <p class="sk-note" id="xDkNote"></p>
+    </div>
+
+    <!-- Mean Shift: 봉우리 표 -->
+    <div class="sk-card" data-x="meanshift">
+      <div class="sk-head"><h2>도착한 봉우리와 bandwidth 자동 추정</h2></div>
+      <div class="pc-two">
+        <div style="min-width:0"><div class="sk-scroll"><table class="sk-table pc-tbl" id="xMsTable"></table></div></div>
+        <div style="display:flex;flex-direction:column;gap:10px;min-width:0"><div class="sk-formula pc-pre" id="xMsEst"></div><p class="sk-note" id="xMsNote"></p></div>
+      </div>
+    </div>
+
+    <!-- GMM: 소프트 vs 하드, BIC -->
+    <div class="sk-card" data-x="gmm">
+      <div class="sk-head"><h2>소프트 군집(GMM) vs 하드 군집(K-means)</h2><button type="button" class="sk-btn sk-btn--sm" id="xGsLoad">길쭉한 타원 데이터 불러오기</button></div>
+      <div class="pc-two">
+        <div class="pc-mini"><h3>K-means (하드: 점마다 군집 하나)</h3><canvas id="cvGsA" aria-label="K-means 하드 군집"></canvas><span class="pc-prog" id="xGsA"></span></div>
+        <div class="pc-mini"><h3>GMM (소프트: 소속 확률, 타원 = 1σ·2σ)</h3><canvas id="cvGsB" aria-label="GMM 소프트 군집"></canvas><span class="pc-prog" id="xGsB"></span></div>
+      </div>
+      <p class="sk-note" id="xGsNote"></p>
+    </div>
+    <div class="sk-card" data-x="gmm">
+      <div class="sk-head"><h2>성분 수 k 고르기: BIC / AIC (작을수록 좋음)</h2><span class="pc-prog" id="xBicProg"></span></div>
+      <div class="sk-legend"><span><i style="background:var(--tune)"></i>BIC = −2·log L + p·ln n</span><span><i style="background:var(--eval)"></i>AIC = −2·log L + 2p</span></div>
+      <div class="pc-chart" id="xBicChart" role="img" aria-label="성분 수에 따른 BIC와 AIC"></div>
+      <p class="sk-note" id="xBicNote"></p>
+    </div>
+    </div>
+  </section>
+
+  <!-- ================= 2. 군집 수 고르기 ================= -->
+  <section id="pane-pick" role="tabpanel" aria-labelledby="tab-pick" hidden>
+    <div class="sk-wrap" style="padding:0;gap:16px">
+    <div class="sk-card">
+      <div class="sk-head"><h2 id="kTitle">군집 수 k 고르기</h2><span class="pc-prog" id="kProg"></span></div>
+      <p class="sk-lead" id="kLead"></p>
+      <div class="sk-controls">
+        <div class="sk-slider" style="min-width:220px" id="kSelWrap"><div class="sk-sl-head"><label for="kSel">실루엣 도표로 볼 k</label><b id="kSelV">3</b></div><input type="range" id="kSel" min="2" max="10" step="1" value="3"></div>
+        <button type="button" class="sk-btn sk-btn--sm" id="kApply">이 k를 1번 탭에 적용</button>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>엘보 방법: WCSS (K-means)</h2><span class="sk-hint">꺾이는 곳(팔꿈치) 근처의 k</span></div>
+        <div class="pc-chart" id="kElbow" role="img" aria-label="k에 따른 WCSS 엘보 그래프"></div>
+        <p class="sk-note" id="kElbowNote"></p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2 id="kSilTitle">실루엣 평균</h2><span class="sk-hint">클수록 좋음 (−1 ~ 1)</span></div>
+        <div class="pc-chart" id="kSil" role="img" aria-label="실루엣 평균 그래프"></div>
+        <p class="sk-note" id="kSilNote"></p>
+      </div>
+    </div>
+    <div class="sk-card" id="kBicCard">
+      <div class="sk-head"><h2>GMM: BIC / AIC</h2><span class="sk-hint">작을수록 좋음 · 모수 개수 p만큼 벌점</span></div>
+      <div class="sk-legend"><span><i style="background:var(--tune)"></i>BIC</span><span><i style="background:var(--eval)"></i>AIC</span></div>
+      <div class="pc-chart" id="kBic" role="img" aria-label="성분 수에 따른 BIC와 AIC"></div>
+      <p class="sk-note" id="kBicNote"></p>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2 id="kDiaTitle">점별 실루엣 도표</h2><span class="sk-hint">막대 하나 = 점 하나 · 점선 = 평균</span></div>
+        <div class="pc-chart" id="kDia" role="img" aria-label="군집별 점 실루엣 값 막대 도표"></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>실루엣 계수 계산</h2><span class="sk-hint">1번 탭에서 고른 점</span></div>
+        <div class="sk-formula pc-pre" id="kSilF"></div>
+        <div class="pc-two">
+          <div class="pc-mini"><canvas id="cvKSil" aria-label="실루엣 계산에 쓰인 군집 결과"></canvas></div>
+          <p class="sk-note" style="align-self:start">실루엣이 <b>1에 가까우면</b> 자기 군집과 가깝고 이웃 군집과 멉니다. <b>0 근처</b>는 경계에 있고, <b>음수</b>는 다른 군집에 더 가깝다는 뜻입니다. 정답 라벨 없이 계산하는 <b>내부 평가 지표</b>입니다.</p>
+        </div>
+      </div>
+    </div>
+    </div>
+  </section>
+
+  <!-- ================= 3. 알고리즘 비교 ================= -->
+  <section id="pane-compare" role="tabpanel" aria-labelledby="tab-compare" hidden>
+    <div class="sk-wrap" style="padding:0;gap:16px">
+    <div class="sk-card">
+      <div class="sk-head"><h2>같은 데이터, 6가지 알고리즘</h2><span class="sk-hint">각 알고리즘의 1번 탭 설정 그대로 · 숫자 = 군집 수 · 실루엣</span></div>
+      <div class="pc-thumbs" id="cmpThumbs"></div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>한눈에 비교</h2></div>
+      <div class="sk-scroll"><table class="sk-table pc-cmp" id="cmpTable"></table></div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>데이터 모양 6가지 × 알고리즘 6가지</h2><span class="pc-prog" id="cmpProg"></span></div>
+      <p class="sk-lead">각 모양의 기본값(k, eps, min_samples, bandwidth)으로 실행했습니다. GMM은 초기값 5번 중 로그우도 최대 결과입니다. 회색 × 는 DBSCAN의 잡음(−1)입니다. 어떤 모양에서 어떤 가정이 깨지는지 보세요.</p>
+      <div class="sk-scroll"><div class="pc-mx" id="cmpMatrix"></div></div>
+    </div>
+    </div>
+  </section>
+
+  <!-- ================= 4. 코드 ================= -->
+  <section id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>scikit-learn 코드</h2><span class="sk-hint">1번 탭의 설정이 그대로 들어갑니다</span></div>
+      <div class="sk-controls">
+        <label class="sk-check"><input type="checkbox" id="cAll">6가지 알고리즘 모두</label>
+        <label class="sk-check"><input type="checkbox" id="cData" checked>현재 점 데이터 포함</label>
+        <label class="sk-check"><input type="checkbox" id="cScale" checked>StandardScaler 적용</label>
+        <label class="sk-check"><input type="checkbox" id="cPlot">산점도 그리기 (matplotlib)</label>
+        <label class="sk-check"><input type="checkbox" id="cPam">K-medoids 직접 구현 함수</label>
+      </div>
+      <div class="pc-code"><pre id="cCode"></pre><button type="button" class="sk-btn sk-btn--sm" id="cCopy">복사</button></div>
+      <p class="sk-note" id="cNote"></p>
+    </div>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20260930c"></script>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const RM=!!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches);
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function gauss(r){let u=0;while(!u)u=r();const v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function fmt(v,d=2){if(v==null||!isFinite(v))return "–";let s=(+v).toFixed(d);if(/^-0\.?0*$/.test(s))s=s.slice(1);return s.replace("-","−");}
+const pct=(v,d=0)=>isFinite(v)?fmt(v*100,d)+"%":"–";
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+function hexRgb(h){h=(h||"#888").trim();if(h.startsWith("rgb")){const m=h.match(/[\d.]+/g)||[0,0,0];return[+m[0],+m[1],+m[2]];}h=h.replace("#","");if(h.length===3)h=h.split("").map(c=>c+c).join("");const n=parseInt(h,16);return[(n>>16)&255,(n>>8)&255,n&255];}
+const rgba=(c,a)=>`rgba(${c[0]|0},${c[1]|0},${c[2]|0},${a})`;
+const rgb=c=>`rgb(${c[0]|0},${c[1]|0},${c[2]|0})`;
+function fitCanvas(cv){const dpr=window.devicePixelRatio||1;const w=Math.max(40,cv.clientWidth),h=Math.max(40,cv.clientHeight||w);cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);const ctx=cv.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);return{ctx,w,h};}
+function segInit(el,fn){el.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b?"true":"false"));fn(b.dataset.v);}));}
+function segSet(el,v){el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x.dataset.v===String(v)?"true":"false"));}
+function niceTicks(a,b,n){if(!isFinite(a)||!isFinite(b)||!(b-a>1e-9*Math.max(1,Math.abs(a),Math.abs(b))))return[a];const raw=(b-a)/n,mag=Math.pow(10,Math.floor(Math.log10(raw))),st=[1,2,2.5,5,10].map(k=>k*mag).find(k=>k>=raw)||raw;const out=[];const v0=Math.ceil(a/st-1e-9);for(let i=0;i<60;i++){const v=(v0+i)*st;if(v>b+st*1e-6)break;out.push(Math.round(v*1e6)/1e6);}return out;}
+function Job(){let tok=0;return{
+  run(genFn,onDone){const my=++tok;const it=genFn();const step=()=>{if(my!==tok)return;const t0=performance.now();let r;do{r=it.next();}while(!r.done&&performance.now()-t0<14);if(my!==tok)return;if(r.done){onDone&&onDone(r.value);}else setTimeout(step,0);};setTimeout(step,0);},
+  cancel(){tok++;}
+};}
+const sum=a=>{let s=0;for(let i=0;i<a.length;i++)s+=a[i];return s;};
+
+/* ================= 데이터 (seed 고정 생성, 단위 = 표준화 z) ================= */
+const WB=3.2;
+function blobs(r,spec,n){const tw=spec.reduce((s,a)=>s+a[3],0),out=[];
+  spec.forEach((c,j)=>{const m=j===spec.length-1?n-out.length:Math.round(n*c[3]/tw);for(let i=0;i<m;i++)out.push([c[0]+c[2]*gauss(r),c[1]+c[2]*gauss(r)]);});return out;}
+const PRE={
+  blobs:{name:"둥근 3덩어리",n:150,k:3,eps:0.4,minS:5,bw:1.2,gen:(r,n)=>blobs(r,[[-1.6,-1.1,.45,1],[1.5,-1.3,.45,1],[0,1.55,.45,1]],n)},
+  varied:{name:"크기·밀도가 다른 덩어리",n:170,k:3,eps:0.45,minS:5,bw:1.0,gen:(r,n)=>blobs(r,[[-1.2,0.45,.85,.52],[1.75,1.7,.22,.24],[1.6,-1.7,.3,.24]],n)},
+  aniso:{name:"길쭉한 타원",n:180,k:3,eps:0.45,minS:5,bw:1.0,gen:(r,n)=>{const th=35*Math.PI/180,d=[Math.cos(th),Math.sin(th)],p=[-Math.sin(th),Math.cos(th)],out=[];
+    for(let i=0;i<n;i++){const j=i%3-1,a=.87*gauss(r),b=.13*gauss(r);out.push([j*1.3*p[0]+a*d[0]+b*p[0],j*1.3*p[1]+a*d[1]+b*p[1]]);}return out;}},
+  moons:{name:"달 모양 2개",n:200,k:2,eps:0.4,minS:5,bw:1.2,gen:(r,n)=>{const out=[];for(let i=0;i<n;i++){const t=Math.PI*r();let x,y;if(i%2===0){x=Math.cos(t);y=Math.sin(t);}else{x=1-Math.cos(t);y=.5-Math.sin(t);}
+    out.push([(x-.5+.075*gauss(r))*1.6,(y-.25+.075*gauss(r))*1.6]);}return out;}},
+  circles:{name:"동심원",n:200,k:2,eps:0.55,minS:5,bw:1.2,gen:(r,n)=>{const out=[];for(let i=0;i<n;i++){const t=2*Math.PI*r(),R=i%2?1.0:2.2;out.push([R*Math.cos(t)+.09*gauss(r),R*Math.sin(t)+.09*gauss(r)]);}return out;}},
+  outlier:{name:"이상값 포함",n:150,k:3,eps:0.45,minS:5,bw:1.0,gen:(r,n)=>{const m=Math.max(6,Math.round(n*.06));const out=blobs(r,[[-1.6,-1.25,.4,1],[1.45,-1.4,.4,1],[-0.35,0.75,.4,1]],n-m);
+    for(let i=0;i<m;i++)out.push([2.35+.55*gauss(r),2.35+.55*gauss(r)]);return out;}}
+};
+const PKEYS=Object.keys(PRE);
+function makeData(key,seed,n){const r=mulberry32(9001+seed*7919+PKEYS.indexOf(key)*131);return PRE[key].gen(r,n).map(p=>[clamp(Math.round(p[0]*1000)/1000,-3.1,3.1),clamp(Math.round(p[1]*1000)/1000,-3.1,3.1)]);}
+
+/* ================= 기본 계산 ================= */
+function sq(a,b){const dx=a[0]-b[0],dy=a[1]-b[1];return dx*dx+dy*dy;}
+function distMat(X){const n=X.length,D=new Float64Array(n*n);for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){const d=Math.sqrt(sq(X[i],X[j]));D[i*n+j]=d;D[j*n+i]=d;}return D;}
+const rngFor=(seed,salt)=>mulberry32(1000003+seed*7919+salt*104729);
+
+/* ---- K-means (Lloyd) ---- */
+function assignC(X,C){const n=X.length,K=C.length,L=new Int32Array(n),dd=new Float64Array(n);let w=0;
+  for(let i=0;i<n;i++){let b=0,bd=Infinity;for(let k=0;k<K;k++){const d=sq(X[i],C[k]);if(d<bd){bd=d;b=k;}}L[i]=b;dd[i]=bd;w+=bd;}return{L,dd,w};}
+function updC(X,L,C,dd){const K=C.length,n=X.length,sx=new Float64Array(K),sy=new Float64Array(K),cn=new Float64Array(K);
+  for(let i=0;i<n;i++){const l=L[i];sx[l]+=X[i][0];sy[l]+=X[i][1];cn[l]++;}
+  const empty=[];for(let k=0;k<K;k++)if(!cn[k])empty.push(k);
+  if(empty.length){const ord=Array.from({length:n},(_,i)=>i).sort((a,b)=>dd[b]-dd[a]);
+    empty.forEach((k,j)=>{const i=ord[j],o=L[i];sx[o]-=X[i][0];sy[o]-=X[i][1];cn[o]--;sx[k]=X[i][0];sy[k]=X[i][1];cn[k]=1;});}
+  return C.map((c,k)=>cn[k]?[sx[k]/cn[k],sy[k]/cn[k]]:c.slice());}
+function lloyd(X,C0,keep,maxIter){maxIter=maxIter||300;let C=C0.map(c=>c.slice()),prev=null,it=0;const steps=[];let conv=false;
+  for(it=0;it<maxIter;it++){
+    const a=assignC(X,C);let ch=X.length;if(prev){ch=0;for(let i=0;i<a.L.length;i++)if(a.L[i]!==prev[i])ch++;}
+    if(prev&&ch===0){conv=true;if(keep)steps.push({C,L:a.L,w:a.w,ch,conv:true});break;}
+    const Cn=updC(X,a.L,C,a.dd);
+    if(keep){let w2=0;for(let i=0;i<X.length;i++)w2+=sq(X[i],Cn[a.L[i]]);steps.push({C,L:a.L,w:a.w,ch,Cn,w2});}
+    C=Cn;prev=a.L;}
+  const a=assignC(X,C);return{C,L:a.L,wcss:a.w,nAssign:it+1,steps,conv};}
+function initRandom(X,k,rng){const n=X.length,idx=Array.from({length:n},(_,i)=>i);for(let j=0;j<k;j++){const r=j+Math.floor(rng()*(n-j));const t=idx[j];idx[j]=idx[r];idx[r]=t;}return{C:idx.slice(0,k).map(i=>X[i].slice()),idx:idx.slice(0,k)};}
+function initPP(X,k,rng){const n=X.length,first=Math.floor(rng()*n),idx=[first],steps=[{chosen:first}],D2=new Float64Array(n);
+  for(let i=0;i<n;i++)D2[i]=sq(X[i],X[first]);
+  for(let j=1;j<k;j++){const tot=sum(D2),u=rng()*tot;let pick=-1;
+    if(tot>0){let c=0;for(let i=0;i<n;i++){c+=D2[i];if(c>=u&&D2[i]>0){pick=i;break;}}if(pick<0)for(let i=n-1;i>=0;i--)if(D2[i]>0){pick=i;break;}}
+    if(pick<0)for(let i=0;i<n;i++)if(!idx.includes(i)){pick=i;break;}
+    steps.push({D2:D2.slice(),tot,u,chosen:pick,prev:idx.slice()});idx.push(pick);
+    for(let i=0;i<n;i++)D2[i]=Math.min(D2[i],sq(X[i],X[pick]));}
+  return{C:idx.map(i=>X[i].slice()),idx,steps};}
+function initBad(X,k,rng){const n=X.length,a=Math.floor(rng()*n);const ord=Array.from({length:n},(_,i)=>i).sort((p,q)=>sq(X[p],X[a])-sq(X[q],X[a]));const idx=[];
+  for(const i of ord){if(idx.every(j=>sq(X[j],X[i])>1e-12))idx.push(i);if(idx.length===k)break;}return{C:idx.map(i=>X[i].slice()),idx,anchor:a};}
+function kmBest(X,k,nInit,mode,seed0){let best=null;for(let r=0;r<nInit;r++){const rng=rngFor(seed0+r,mode==="pp"?2:1);const init=mode==="pp"?initPP(X,k,rng):initRandom(X,k,rng);const res=lloyd(X,init.C);if(!best||res.wcss<best.wcss-1e-12)best=res;}return best;}
+
+/* ---- K-medoids (PAM: BUILD + SWAP) ---- */
+function pam(X,D,k,keep){const n=X.length,M=[],inM=new Uint8Array(n),dn=new Float64Array(n).fill(Infinity),fr=[];
+  for(let t=0;t<k;t++){let best=-1,bv=t?-Infinity:Infinity;const td0=t?sum(dn):0,cands=keep?[]:null;
+    for(let c=0;c<n;c++){if(inM[c])continue;let v=0;
+      if(!t){for(let i=0;i<n;i++)v+=D[i*n+c];if(v<bv){bv=v;best=c;}if(keep)cands.push([c,v]);}
+      else{for(let i=0;i<n;i++){const g=dn[i]-D[i*n+c];if(g>0)v+=g;}if(v>bv){bv=v;best=c;}if(keep)cands.push([c,td0-v]);}}
+    M.push(best);inM[best]=1;for(let i=0;i<n;i++)dn[i]=Math.min(dn[i],D[i*n+best]);
+    if(keep){cands.sort((a,b)=>a[1]-b[1]);fr.push({ph:0,type:"build",t,M:M.slice(),td:sum(dn),td0,cands:cands.slice(0,6),added:best});}}
+  let it=0;
+  while(it<300){const nI=new Int32Array(n),d1=new Float64Array(n),d2=new Float64Array(n);
+    for(let i=0;i<n;i++){let a=Infinity,b=Infinity,ai=-1;for(let m=0;m<k;m++){const d=D[i*n+M[m]];if(d<a){b=a;a=d;ai=m;}else if(d<b)b=d;}nI[i]=ai;d1[i]=a;d2[i]=b;}
+    const td=sum(d1);let bd=Infinity,bm=-1,bo=-1;const all=keep?[]:null;
+    for(let m=0;m<k;m++)for(let o=0;o<n;o++){if(inM[o])continue;let dl=0;
+      for(let i=0;i<n;i++){const dio=D[i*n+o];if(nI[i]===m)dl+=Math.min(dio,d2[i])-d1[i];else if(dio<d1[i])dl+=dio-d1[i];}
+      if(keep)all.push([m,o,dl]);if(dl<bd){bd=dl;bm=m;bo=o;}}
+    const top=keep?all.sort((a,b)=>a[2]-b[2]).slice(0,8):null;
+    if(bd<-1e-9){const out=M[bm];if(keep)fr.push({ph:1,type:"eval",s:it+1,M:M.slice(),td,top,sw:[bm,out,bo,bd],nPairs:k*(n-k)});
+      inM[out]=0;M[bm]=bo;inM[bo]=1;it++;if(keep)fr.push({ph:1,type:"swap",s:it,M:M.slice(),td:td+bd,sw:[bm,out,bo,bd]});}
+    else{if(keep)fr.push({ph:2,type:"done",s:it,M:M.slice(),td,top,best:bd,nPairs:k*(n-k)});break;}}
+  const L=new Int32Array(n);let td=0;for(let i=0;i<n;i++){let a=Infinity,ai=0;for(let m=0;m<k;m++){const d=D[i*n+M[m]];if(d<a){a=d;ai=m;}}L[i]=ai;td+=a;}
+  return{M,L,td,fr,swaps:it,C:M.map(i=>X[i].slice())};}
+
+/* ---- DBSCAN ---- */
+function dbscan(X,D,eps,minS){const n=X.length,nb=[],core=new Uint8Array(n);
+  for(let i=0;i<n;i++){const a=[];for(let j=0;j<n;j++)if(D[i*n+j]<=eps)a.push(j);nb.push(a);core[i]=a.length>=minS?1:0;}
+  const L=new Int32Array(n).fill(-1),when=new Int32Array(n).fill(-1),ev=[];let c=0;
+  for(let i=0;i<n;i++){if(L[i]!==-1||!core[i])continue;L[i]=c;when[i]=ev.length;const q=[i];let h=0;
+    while(h<q.length){const p=q[h++];const added=[];for(const j of nb[p])if(L[j]===-1){L[j]=c;added.push(j);if(core[j])q.push(j);}
+      added.forEach(j=>when[j]=ev.length);ev.push({p,c,added,qlen:q.length-h,first:p===i});}
+    c++;}
+  const type=new Int8Array(n);for(let i=0;i<n;i++)type[i]=core[i]?2:(L[i]>=0?1:0);
+  return{nb,core,L,when,ev,nC:c,type};}
+function kDist(D,n,k){const out=new Float64Array(n);const row=new Float64Array(n);for(let i=0;i<n;i++){for(let j=0;j<n;j++)row[j]=D[i*n+j];row.sort();out[i]=row[Math.min(n-1,k-1)];}return out;}
+
+/* ---- Mean Shift (평평한 커널, scikit-learn MeanShift와 같은 절차) ---- */
+function meanShift(X,bw,maxIter){maxIter=maxIter||300;const n=X.length,b2=bw*bw,thr=1e-3*bw,paths=[],ends=[],cnts=[],its=[];
+  for(let s=0;s<n;s++){let m=X[s].slice();const path=[m];let it=0,cnt=0;
+    while(true){let sx=0,sy=0,c=0;for(let i=0;i<n;i++){if(sq(X[i],m)<=b2){sx+=X[i][0];sy+=X[i][1];c++;}}
+      if(!c)break;cnt=c;const old=m;m=[sx/c,sy/c];path.push(m);
+      if(Math.sqrt(sq(m,old))<=thr||it===maxIter)break;it++;}
+    paths.push(path);ends.push(m);cnts.push(cnt);its.push(it);}
+  const dict=new Map();for(let s=0;s<n;s++){if(!cnts[s])continue;dict.set(ends[s][0]+","+ends[s][1],{p:ends[s],c:cnts[s]});}
+  const sorted=[...dict.values()].sort((a,b)=>b.c-a.c||b.p[0]-a.p[0]||b.p[1]-a.p[1]);
+  const uniq=sorted.map(()=>true);
+  for(let i=0;i<sorted.length;i++){if(!uniq[i])continue;for(let j=0;j<sorted.length;j++){if(j!==i&&sq(sorted[i].p,sorted[j].p)<=b2)uniq[j]=false;}uniq[i]=true;}
+  const cents=sorted.filter((_,i)=>uniq[i]);const C=cents.map(c=>c.p);
+  const L=new Int32Array(n);for(let i=0;i<n;i++){let b=0,bd=Infinity;for(let k=0;k<C.length;k++){const d=sq(X[i],C[k]);if(d<bd){bd=d;b=k;}}L[i]=b;}
+  return{paths,ends,cnts,its,maxIt:Math.max(...its),nUnique:sorted.length,C,cint:cents.map(c=>c.c),L};}
+function estimateBW(D,n,q){const nn=Math.max(1,Math.floor(n*q));const row=new Float64Array(n);let s=0;const per=[];
+  for(let i=0;i<n;i++){for(let j=0;j<n;j++)row[j]=D[i*n+j];row.sort();per.push(row[nn-1]);s+=row[nn-1];}return{bw:s/n,nn,per};}
+
+/* ---- GMM (EM) ---- */
+const REG=1e-6,LOG2PI=Math.log(2*Math.PI);
+function gParams(X,R,k,cov){const n=X.length,nk=new Float64Array(k),mu=[],S=[];
+  for(let j=0;j<k;j++){let s=0,sx=0,sy=0;for(let i=0;i<n;i++){const g=R[i*k+j];s+=g;sx+=g*X[i][0];sy+=g*X[i][1];}
+    s+=10*2.220446049250313e-16;nk[j]=s;mu.push([sx/s,sy/s]);}
+  for(let j=0;j<k;j++){let a=0,b=0,c=0;const m=mu[j];for(let i=0;i<n;i++){const g=R[i*k+j],dx=X[i][0]-m[0],dy=X[i][1]-m[1];a+=g*dx*dx;b+=g*dx*dy;c+=g*dy*dy;}
+    a=a/nk[j]+REG;c=c/nk[j]+REG;b=b/nk[j];
+    if(cov==="diag")b=0;else if(cov==="spherical"){const v=(a+c)/2;a=v;c=v;b=0;}
+    S.push([a,b,c]);}
+  const tot=sum(nk);return{w:Array.from(nk,v=>v/tot),mu,S,nk:Array.from(nk)};}
+function logN(x,m,S){const det=S[0]*S[2]-S[1]*S[1],dx=x[0]-m[0],dy=x[1]-m[1];const q=(dx*(S[2]*dx-S[1]*dy)+dy*(S[0]*dy-S[1]*dx))/det;return -LOG2PI-.5*Math.log(det)-.5*q;}
+function gE(X,P){const n=X.length,k=P.w.length,R=new Float64Array(n*k),lw=P.w.map(Math.log);let ll=0;const lpx=new Float64Array(n);
+  for(let i=0;i<n;i++){let mx=-Infinity;for(let j=0;j<k;j++){const v=lw[j]+logN(X[i],P.mu[j],P.S[j]);R[i*k+j]=v;if(v>mx)mx=v;}
+    let s=0;for(let j=0;j<k;j++)s+=Math.exp(R[i*k+j]-mx);const lse=mx+Math.log(s);lpx[i]=lse;ll+=lse;for(let j=0;j<k;j++)R[i*k+j]=Math.exp(R[i*k+j]-lse);}
+  return{R,ll:ll/n,lpx};}
+function gInitResp(X,k,mode,seed){const n=X.length,R=new Float64Array(n*k);
+  if(mode==="random"){const r=rngFor(seed,5);for(let i=0;i<n;i++){let s=0;for(let j=0;j<k;j++){const v=r();R[i*k+j]=v;s+=v;}for(let j=0;j<k;j++)R[i*k+j]/=s;}return{R};}
+  const km=lloyd(X,initPP(X,k,rngFor(seed,2)).C);for(let i=0;i<n;i++)R[i*k+km.L[i]]=1;return{R,km};}
+function gmm(X,k,cov,mode,seed,keep,maxIter,tol){maxIter=maxIter||100;tol=tol==null?1e-3:tol;
+  const ini=gInitResp(X,k,mode,seed);let P=gParams(X,ini.R,k,cov);const fr=keep?[{ph:0,type:"init",P,R:ini.R}]:null;
+  let prev=-Infinity,ll=-Infinity,conv=false,it=0;const lls=[];
+  for(it=1;it<=maxIter;it++){const e=gE(X,P);ll=e.ll;lls.push(ll);if(keep)fr.push({ph:1,type:"E",it,P,R:e.R,ll,prev});
+    const P2=gParams(X,e.R,k,cov);if(keep)fr.push({ph:2,type:"M",it,P:P2,Pp:P,R:e.R,ll,prev});P=P2;
+    if(Math.abs(ll-prev)<tol){conv=true;break;}prev=ll;}
+  const e=gE(X,P);const L=new Int32Array(X.length);for(let i=0;i<X.length;i++){let b=0;for(let j=1;j<k;j++)if(e.R[i*k+j]>e.R[i*k+b])b=j;L[i]=b;}
+  if(keep&&fr.length){fr[fr.length-1].final=true;fr[fr.length-1].conv=conv;fr[fr.length-1].ph=conv?3:2;}
+  return{P,R:e.R,L,ll:e.ll,lls,iters:Math.min(it,maxIter),conv,fr,lowerBound:ll};}
+function gmmBest(X,k,cov,mode,seed0,nI){let b=null,bs=seed0;for(let r=0;r<nI;r++){const g=gmm(X,k,cov,mode,seed0+r,false);if(!b||g.ll>b.ll+1e-9){b=g;bs=seed0+r;}}b.seed=bs;return b;}
+function nParams(k,cov){return cov==="full"?6*k-1:cov==="diag"?5*k-1:4*k-1;}
+
+/* ---- 실루엣 ---- */
+function silhouette(D,n,L){const lab=[...new Set(Array.from(L).filter(v=>v>=0))].sort((a,b)=>a-b);const s=new Float64Array(n).fill(NaN);
+  if(lab.length<2)return{s,mean:NaN,nC:lab.length,used:0};const idx=new Map(lab.map((v,i)=>[v,i])),K=lab.length,cnt=new Float64Array(K);
+  for(let i=0;i<n;i++)if(L[i]>=0)cnt[idx.get(L[i])]++;let tot=0,used=0;const acc=new Float64Array(K);
+  for(let i=0;i<n;i++){if(L[i]<0)continue;acc.fill(0);for(let j=0;j<n;j++)if(L[j]>=0)acc[idx.get(L[j])]+=D[i*n+j];
+    const own=idx.get(L[i]);let v;if(cnt[own]<=1)v=0;else{const a=acc[own]/(cnt[own]-1);let b=Infinity;for(let c=0;c<K;c++)if(c!==own&&cnt[c])b=Math.min(b,acc[c]/cnt[c]);v=(b-a)/Math.max(a,b);if(!isFinite(v))v=0;}
+    s[i]=v;tot+=v;used++;}
+  return{s,mean:K<used?tot/used:NaN,nC:K,used};}
+function silDetail(D,n,L,i){if(L[i]<0)return null;const lab=[...new Set(Array.from(L).filter(v=>v>=0))].sort((a,b)=>a-b);const m={};lab.forEach(c=>m[c]={s:0,c:0});
+  for(let j=0;j<n;j++)if(L[j]>=0){m[L[j]].s+=D[i*n+j];m[L[j]].c++;}
+  const own=L[i];const a=m[own].c>1?m[own].s/(m[own].c-1):0;let b=Infinity,bc=-1;lab.forEach(c=>{if(c!==own&&m[c].c){const v=m[c].s/m[c].c;if(v<b){b=v;bc=c;}}});
+  const s=m[own].c>1?(b-a)/Math.max(a,b):0;return{a,b,bc,s,own,m,lab};}
+
+/* ================= 상태 ================= */
+const ALGOS=["kmeans","kpp","pam","dbscan","meanshift","gmm"];
+const ANAME={kmeans:"K-means",kpp:"K-means++",pam:"K-medoids (PAM)",dbscan:"DBSCAN",meanshift:"Mean Shift",gmm:"GMM (EM)"};
+const TABS=["run","pick","compare","code"];
+const S={algo:"kmeans",tab:"run",preset:"blobs",dseed:1,n:150,edited:false,X:[],ver:0,
+  k:3,seed:0,kmInit:"random",manual:[],nInit:10,eps:.4,minS:5,bw:1.2,msView:"all",
+  cov:"full",gInit:"kmeans",gView:"mix",g2s:true,gBg:false,vor:true,trail:true,pamKm:true,dbAll:false,kde:true,
+  probe:0,click:"probe",speed:1,frame:0};
+let FR={frames:[]},playT=null;
+const CACHE={};function cached(key,fn){if(CACHE[key]&&CACHE[key].ver===S.ver)return CACHE[key].v;const v=fn();CACHE[key]={ver:S.ver,v};return v;}
+const getD=()=>cached("D",()=>distMat(S.X));
+
+/* ================= 색 ================= */
+function pal(){const p={k:[]};for(let i=0;i<10;i++)p.k.push(hexRgb(css("--k"+i)));
+  [["ink","--ink"],["surface","--surface"],["s2","--surface-2"],["line","--line"],["ls","--line-strong"],["muted","--muted"],["faint","--faint"],["kde","--kde"],["leak","--leak"],["use","--use"]].forEach(([a,b])=>p[a]=hexRgb(css(b)));return p;}
+const kc=(p,l)=>p.k[((l%10)+10)%10];
+const kvar=l=>`var(--k${((l%10)+10)%10})`;
+
+/* ================= 캔버스 그리기 ================= */
+function view(cv){const {ctx,w,h}=fitCanvas(cv);const s=w/(2*WB);return{ctx,w,h,s,X:v=>(v+WB)*s,Y:v=>(WB-v)*s,iX:px=>px/s-WB,iY:py=>WB-py/s};}
+function ptR(V){return clamp(V.w/125,2.2,5.2);}
+function drawGrid(V,p,small){const{ctx,w,h}=V;ctx.fillStyle=rgb(p.surface);ctx.fillRect(0,0,w,h);}
+function drawAxes(V,p,small){const{ctx,w,h}=V;ctx.save();ctx.lineWidth=1;
+  for(let v=-3;v<=3;v++){ctx.strokeStyle=rgba(p.line,v===0?1:.7);ctx.beginPath();ctx.moveTo(V.X(v)+.5,0);ctx.lineTo(V.X(v)+.5,h);ctx.moveTo(0,V.Y(v)+.5);ctx.lineTo(w,V.Y(v)+.5);ctx.stroke();}
+  if(!small){ctx.fillStyle=rgb(p.faint);ctx.font="11px "+css("--mono");ctx.textAlign="center";ctx.textBaseline="bottom";
+    for(let v=-2;v<=2;v++)ctx.fillText(String(v).replace("-","−"),V.X(v),h-3);
+    ctx.textAlign="left";ctx.textBaseline="middle";for(let v=-2;v<=2;v++)if(v)ctx.fillText(String(v).replace("-","−"),4,V.Y(v));
+    ctx.font="600 12px "+css("--sans");ctx.fillStyle=rgb(p.muted);ctx.textAlign="right";ctx.textBaseline="bottom";ctx.fillText("혈당 →",w-6,h-16);
+    ctx.textAlign="left";ctx.textBaseline="top";ctx.fillText("↑ BMI",6,6);}
+  ctx.restore();}
+function bgNearest(V,p,C,alpha){const{ctx,w,h}=V;const W=Math.max(2,Math.round(w/2)),H=Math.max(2,Math.round(h/2));const oc=document.createElement("canvas");oc.width=W;oc.height=H;const o=oc.getContext("2d");const im=o.createImageData(W,H),d=im.data;
+  const cols=C.map((_,k)=>{const c=kc(p,k);return[p.surface[0]+(c[0]-p.surface[0])*alpha,p.surface[1]+(c[1]-p.surface[1])*alpha,p.surface[2]+(c[2]-p.surface[2])*alpha];});
+  for(let y=0;y<H;y++){const wy=V.iY((y+.5)*h/H);for(let x=0;x<W;x++){const wx=V.iX((x+.5)*w/W);let b=0,bd=Infinity;for(let k=0;k<C.length;k++){const dx=wx-C[k][0],dy=wy-C[k][1],dd=dx*dx+dy*dy;if(dd<bd){bd=dd;b=k;}}
+    const o4=(y*W+x)*4,c=cols[b];d[o4]=c[0];d[o4+1]=c[1];d[o4+2]=c[2];d[o4+3]=255;}}
+  o.putImageData(im,0,0);ctx.save();ctx.imageSmoothingEnabled=false;ctx.drawImage(oc,0,0,w,h);ctx.restore();}
+function bgGmm(V,p,P,alpha){const{ctx,w,h}=V;const W=Math.max(2,Math.round(w/3)),H=Math.max(2,Math.round(h/3));const oc=document.createElement("canvas");oc.width=W;oc.height=H;const o=oc.getContext("2d");const im=o.createImageData(W,H),d=im.data;const k=P.w.length,lw=P.w.map(Math.log),g=new Float64Array(k);
+  for(let y=0;y<H;y++){const wy=V.iY((y+.5)*h/H);for(let x=0;x<W;x++){const wx=V.iX((x+.5)*w/W);let mx=-Infinity;for(let j=0;j<k;j++){g[j]=lw[j]+logN([wx,wy],P.mu[j],P.S[j]);if(g[j]>mx)mx=g[j];}let s=0;for(let j=0;j<k;j++){g[j]=Math.exp(g[j]-mx);s+=g[j];}
+    let r=0,gg=0,b=0;for(let j=0;j<k;j++){const c=kc(p,j),t=g[j]/s;r+=c[0]*t;gg+=c[1]*t;b+=c[2]*t;}const o4=(y*W+x)*4;d[o4]=p.surface[0]+(r-p.surface[0])*alpha;d[o4+1]=p.surface[1]+(gg-p.surface[1])*alpha;d[o4+2]=p.surface[2]+(b-p.surface[2])*alpha;d[o4+3]=255;}}
+  o.putImageData(im,0,0);ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(oc,0,0,w,h);ctx.restore();}
+function bgKde(V,p,X,bw){const{ctx,w,h}=V;const G=90,grid=new Float64Array((G+1)*(G+1)),b2=bw*bw;let mx=0;
+  for(let gy=0;gy<=G;gy++){const wy=WB-2*WB*gy/G;for(let gx=0;gx<=G;gx++){const wx=-WB+2*WB*gx/G;let s=0;for(let i=0;i<X.length;i++){const dx=X[i][0]-wx,dy=X[i][1]-wy,u=(dx*dx+dy*dy)/b2;if(u<1)s+=1-u;}grid[gy*(G+1)+gx]=s;if(s>mx)mx=s;}}
+  if(!mx)return;const lv=[.08,.2,.35,.5,.65,.8,.92];const cw=w/G,ch=h/G;
+  const oc=document.createElement("canvas");oc.width=G;oc.height=G;const o=oc.getContext("2d"),im=o.createImageData(G,G),dd=im.data;
+  for(let gy=0;gy<G;gy++)for(let gx=0;gx<G;gx++){const v=(grid[gy*(G+1)+gx]+grid[gy*(G+1)+gx+1]+grid[(gy+1)*(G+1)+gx]+grid[(gy+1)*(G+1)+gx+1])/4/mx;let l=0;while(l<lv.length&&v>=lv[l])l++;if(!l)continue;const q=(gy*G+gx)*4;dd[q]=p.kde[0];dd[q+1]=p.kde[1];dd[q+2]=p.kde[2];dd[q+3]=Math.round((.05+.045*l)*255);}
+  o.putImageData(im,0,0);ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(oc,0,0,w,h);
+  ctx.strokeStyle=rgba(p.kde,.55);ctx.lineWidth=1;ctx.beginPath();
+  lv.forEach(L=>{const t=L*mx;for(let gy=0;gy<G;gy++)for(let gx=0;gx<G;gx++){const a=grid[gy*(G+1)+gx],b=grid[gy*(G+1)+gx+1],c=grid[(gy+1)*(G+1)+gx+1],d=grid[(gy+1)*(G+1)+gx];
+    const pts=[];const e=(v1,v2,x1,y1,x2,y2)=>{if((v1<t)!==(v2<t)){const f=(t-v1)/(v2-v1);pts.push([(x1+(x2-x1)*f)*cw,(y1+(y2-y1)*f)*ch]);}};
+    e(a,b,gx,gy,gx+1,gy);e(b,c,gx+1,gy,gx+1,gy+1);e(d,c,gx,gy+1,gx+1,gy+1);e(a,d,gx,gy,gx,gy+1);
+    for(let q=0;q+1<pts.length;q+=2){ctx.moveTo(pts[q][0],pts[q][1]);ctx.lineTo(pts[q+1][0],pts[q+1][1]);}}});
+  ctx.stroke();ctx.restore();}
+function dot(ctx,x,y,r,fill,stroke,lw){ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lw||1;ctx.stroke();}}
+function cross(ctx,x,y,r,col,lw){ctx.strokeStyle=col;ctx.lineWidth=lw||1.6;ctx.beginPath();ctx.moveTo(x-r,y-r);ctx.lineTo(x+r,y+r);ctx.moveTo(x+r,y-r);ctx.lineTo(x-r,y+r);ctx.stroke();}
+function diamond(ctx,x,y,r,fill,stroke,lw,dash){ctx.save();ctx.beginPath();ctx.moveTo(x,y-r);ctx.lineTo(x+r,y);ctx.lineTo(x,y+r);ctx.lineTo(x-r,y);ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){if(dash)ctx.setLineDash(dash);ctx.strokeStyle=stroke;ctx.lineWidth=lw||2;ctx.stroke();}ctx.restore();}
+function arrow(ctx,x1,y1,x2,y2,col,lw){const L=Math.hypot(x2-x1,y2-y1);if(L<2)return;ctx.save();ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=lw||2;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  const a=Math.atan2(y2-y1,x2-x1),hs=Math.min(10,4+L*.25);ctx.beginPath();ctx.moveTo(x2,y2);ctx.lineTo(x2-hs*Math.cos(a-.42),y2-hs*Math.sin(a-.42));ctx.lineTo(x2-hs*Math.cos(a+.42),y2-hs*Math.sin(a+.42));ctx.closePath();ctx.fill();ctx.restore();}
+function ellipse(ctx,V,m,S,sc,col,lw,dash,fill){const a=S[0],b=S[1],c=S[2],tr=(a+c)/2,df=Math.sqrt(((a-c)/2)**2+b*b),l1=tr+df,l2=Math.max(1e-12,tr-df),ang=.5*Math.atan2(2*b,a-c);
+  ctx.save();ctx.beginPath();ctx.ellipse(V.X(m[0]),V.Y(m[1]),sc*Math.sqrt(l1)*V.s,sc*Math.sqrt(l2)*V.s,-ang,0,Math.PI*2);if(fill){ctx.fillStyle=fill;ctx.fill();}if(dash)ctx.setLineDash(dash);ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.stroke();ctx.restore();}
+function pie(ctx,x,y,r,R,i,k,p){let a0=-Math.PI/2;for(let j=0;j<k;j++){const g=R[i*k+j];if(g<1e-4)continue;const a1=a0+g*Math.PI*2;ctx.beginPath();ctx.moveTo(x,y);ctx.arc(x,y,r,a0,a1);ctx.closePath();ctx.fillStyle=rgb(kc(p,j));ctx.fill();a0=a1;}
+  ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.strokeStyle=rgba(p.surface,.9);ctx.lineWidth=.8;ctx.stroke();}
+function mixCol(p,R,i,k){let r=0,g=0,b=0;for(let j=0;j<k;j++){const c=kc(p,j),t=R[i*k+j];r+=c[0]*t;g+=c[1]*t;b+=c[2]*t;}return[r,g,b];}
+/* 공용 결과 그림 (썸네일·비교 캔버스) */
+function drawResult(cv,X,res,algo,opt){opt=opt||{};const V=view(cv),p=pal(),{ctx}=V,r=Math.max(1.6,ptR(V)*(opt.small?.82:1));drawGrid(V,p);
+  if((algo==="kmeans"||algo==="kpp"||algo==="pam")&&res.C)bgNearest(V,p,res.C,.13);
+  if(algo==="gmm"&&res.P&&opt.gbg)bgGmm(V,p,res.P,.2);
+  drawAxes(V,p,true);
+  const k=res.P?res.P.w.length:0;
+  for(let i=0;i<X.length;i++){const x=V.X(X[i][0]),y=V.Y(X[i][1]),l=res.L[i];
+    if(l<0){cross(ctx,x,y,r*.8,rgb(p.faint),1.3);continue;}
+    if(algo==="gmm"&&res.R&&opt.soft)dot(ctx,x,y,r,rgb(mixCol(p,res.R,i,k)),rgba(p.surface,.8),.6);
+    else if(algo==="dbscan"&&res.type&&res.type[i]===1)dot(ctx,x,y,r*.82,rgb(p.surface),rgb(kc(p,l)),1.5);
+    else dot(ctx,x,y,r,rgb(kc(p,l)),rgba(p.surface,.8),.6);}
+  if(algo==="gmm"&&res.P){for(let j=0;j<k;j++){ellipse(ctx,V,res.P.mu[j],res.P.S[j],1,rgb(kc(p,j)),1.6);ellipse(ctx,V,res.P.mu[j],res.P.S[j],2,rgb(kc(p,j)),1,[4,3]);}}
+  if(res.C&&algo!=="dbscan"){const rr=opt.small?r*1.9:r*2.3;res.C.forEach((c,j)=>{if(algo==="pam")dot(ctx,V.X(c[0]),V.Y(c[1]),r*1.6,rgb(kc(p,j)),rgb(p.ink),2);else diamond(ctx,V.X(c[0]),V.Y(c[1]),rr,rgb(kc(p,j)),rgb(p.ink),opt.small?1.4:2);});}
+  if(opt.overlay)opt.overlay(V,p,r);}
+
+/* ================= 차트 (SVG) ================= */
+function lineChart(host,o){const W=Math.max(260,Math.round(host.clientWidth||520)),H=o.h||220,mL=o.mL||52,mR=o.mR||14,mT=14,mB=38,pw=W-mL-mR,ph=H-mT-mB;
+  const x0=o.xMin,x1=o.xMax,lo=o.yMin,hi=o.yMax;const X=v=>mL+pw*(x1>x0?(v-x0)/(x1-x0):.5),Y=v=>mT+ph*(1-clamp((v-lo)/((hi-lo)||1),0,1));let s="";
+  (o.yTicks||niceTicks(lo,hi,4)).forEach(v=>{const y=Y(v);s+=`<line class="gl" x1="${mL}" x2="${mL+pw}" y1="${y}" y2="${y}"/><text class="ax" x="${mL-6}" y="${y+4}" text-anchor="end">${o.yFmt?o.yFmt(v):fmt(v,Math.abs(hi-lo)<2?2:Math.abs(hi-lo)<20?1:0)}</text>`;});
+  (o.xTicks||[]).forEach(v=>{s+=`<text class="ax" x="${X(v)}" y="${mT+ph+16}" text-anchor="middle">${o.xFmt?o.xFmt(v):v}</text>`;});
+  s+=`<line class="gl0" x1="${mL}" x2="${mL+pw}" y1="${mT+ph}" y2="${mT+ph}"/><text class="axl" x="${mL+pw/2}" y="${H-4}" text-anchor="middle">${o.xLabel||""}</text>`;
+  if(o.yLabel)s+=`<text class="axl" x="12" y="${mT+ph/2}" text-anchor="middle" transform="rotate(-90 12 ${mT+ph/2})">${o.yLabel}</text>`;
+  (o.hrefs||[]).forEach(r=>{const y=Y(r.v);s+=`<line x1="${mL}" x2="${mL+pw}" y1="${y}" y2="${y}" style="stroke:${r.color};stroke-width:1.5;stroke-dasharray:5 4"/><text class="lbl" style="fill:${r.color}" x="${r.right?mL+pw-6:mL+6}" y="${r.below?y+14:y-5}" text-anchor="${r.right?"end":"start"}">${r.label}</text>`;});
+  (o.vrefs||[]).forEach(r=>{const x=X(r.v);s+=`<line x1="${x}" x2="${x}" y1="${mT}" y2="${mT+ph}" style="stroke:${r.color};stroke-width:1.4;stroke-dasharray:4 4"/><text class="lbl" style="fill:${r.color}" x="${x+(x>mL+pw-90?-5:5)}" y="${mT+11}" text-anchor="${x>mL+pw-90?"end":"start"}">${r.label}</text>`;});
+  o.series.forEach(se=>{let d="",pen=false;se.pts.forEach(q=>{if(!isFinite(q[1])){pen=false;return;}d+=(pen?"L":"M")+X(q[0]).toFixed(1)+","+Y(q[1]).toFixed(1);pen=true;});
+    s+=`<path class="sr" style="stroke:${se.color};${se.dash?"stroke-dasharray:"+se.dash+";":""}${se.w?"stroke-width:"+se.w+";":""}" d="${d}"/>`;
+    if(se.labels)se.pts.forEach((q,i)=>{if(isFinite(q[1])&&se.labels[i]!=null)s+=`<text class="lbl" style="fill:${se.color}" x="${X(q[0])}" y="${Y(q[1])-8}" text-anchor="middle">${se.labels[i]}</text>`;});
+    if(se.dots)se.pts.forEach((q,i)=>{if(isFinite(q[1]))s+=`<circle cx="${X(q[0])}" cy="${Y(q[1])}" r="${se.hi===i?5:3}" style="fill:${se.hi===i?se.color:"var(--surface)"};stroke:${se.color};stroke-width:1.6"/>`;});});
+  if(o.marker!=null){const x=X(o.marker);s+=`<line class="mk" x1="${x}" x2="${x}" y1="${mT}" y2="${mT+ph}"/>`;if(o.markerLabel)s+=`<text class="mkt" x="${x+(x>mL+pw-70?-5:5)}" y="${mT+11}" text-anchor="${x>mL+pw-70?"end":"start"}">${o.markerLabel}</text>`;}
+  (o.points||[]).forEach(q=>{s+=`<circle cx="${X(q[0])}" cy="${Y(q[1])}" r="${q[3]||5}" style="fill:${q[2]};stroke:var(--surface);stroke-width:1.5"/>`;});
+  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${s}</svg>`;
+  return{toData(evt){const svg=host.querySelector("svg");const rc=svg.getBoundingClientRect();const px=(evt.clientX-rc.left)*W/rc.width,py=(evt.clientY-rc.top)*H/rc.height;return{x:x0+(px-mL)/pw*(x1-x0),y:lo+(1-(py-mT)/ph)*(hi-lo),inside:px>=mL&&px<=mL+pw&&py>=mT&&py<=mT+ph};}};}
+
+/* ================= 탭 · 해시 ================= */
+function setHash(){const h="#"+S.algo+(S.tab!=="run"?"-"+S.tab:"");if(location.hash!==h)history.replaceState(null,"",h);}
+function showTab(t,focus){if(!TABS.includes(t))t="run";S.tab=t;
+  TABS.forEach(k=>{const b=$("tab-"+k),on=k===t;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;$("pane-"+k).hidden=!on;});
+  if(focus)$("tab-"+t).focus();if(t!=="run")stopPlay();setHash();renderTab();}
+TABS.forEach(t=>$("tab-"+t).addEventListener("click",()=>showTab(t)));
+document.querySelector(".sk-tabs").addEventListener("keydown",e=>{if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;e.preventDefault();e.stopPropagation();
+  const i=TABS.indexOf(S.tab),n=(i+(e.key==="ArrowRight"?1:-1)+TABS.length)%TABS.length;showTab(TABS[n],true);});
+function setAlgo(a,keepFrame){if(!ALGOS.includes(a))a="kmeans";const changed=a!==S.algo;S.algo=a;segSet($("algoSeg"),a);
+  document.querySelectorAll("[data-for]").forEach(el=>{el.hidden=!el.dataset.for.split(" ").includes(a);});
+  document.querySelectorAll("[data-x]").forEach(el=>{el.hidden=el.dataset.x!==a;});
+  $("dClickCenter").hidden=!(a==="kmeans"&&S.kmInit==="manual");
+  if(S.click==="center"&&$("dClickCenter").hidden){S.click="probe";segSet($("dClick"),"probe");}
+  $("aKl").textContent=a==="gmm"?"성분 수 k (n_components)":"군집 수 k";
+  stopPlay();setHash();rebuild(changed&&!keepFrame?"start":"keep");renderTab();}
+segInit($("algoSeg"),v=>setAlgo(v));
+window.addEventListener("hashchange",()=>{const [a,t]=location.hash.slice(1).split("-");if(ALGOS.includes(a)&&a!==S.algo)setAlgo(a);if(TABS.includes(t||"run")&&(t||"run")!==S.tab)showTab(t||"run");});
+
+/* ================= 데이터 조작 ================= */
+function dataChanged(){S.ver++;S.probe=clamp(S.probe,0,S.X.length-1);$("dInfo").textContent=`${PRE[S.preset].name}${S.edited?" (편집함)":""} · 점 ${S.X.length}개 · 정답 라벨 없음`;rebuild("keep");renderTab();}
+function loadPreset(key,opts){opts=opts||{};S.preset=key;segSet($("dPreset"),key);const P=PRE[key];
+  if(opts.n)S.n=opts.n;else if(!opts.keepN)S.n=P.n;$("dN").value=S.n;$("dNv").textContent=S.n;
+  S.X=makeData(key,S.dseed,S.n);S.edited=false;S.probe=0;S.manual=[];
+  if(!opts.keepParams){S.eps=P.eps;S.minS=P.minS;S.bw=P.bw;if(!opts.keepK)S.k=P.k;syncParamUI();}
+  dataChanged();}
+segInit($("dPreset"),v=>{stopPlay();loadPreset(v);});
+$("dN").addEventListener("input",e=>{S.n=+e.target.value;$("dNv").textContent=S.n;});
+$("dN").addEventListener("change",()=>{stopPlay();loadPreset(S.preset,{keepN:true,keepParams:true});});
+$("dSeed").addEventListener("change",e=>{S.dseed=clamp(parseInt(e.target.value)||0,0,9999);e.target.value=S.dseed;stopPlay();loadPreset(S.preset,{keepN:true,keepParams:true});});
+$("dNew").onclick=()=>{S.dseed=(S.dseed+1)%10000;$("dSeed").value=S.dseed;stopPlay();loadPreset(S.preset,{keepN:true,keepParams:true});};
+segInit($("dClick"),v=>{S.click=v;$("cvMain").dataset.mode=v;});
+function nearestPt(wx,wy,maxPx,V){let b=-1,bd=Infinity;S.X.forEach((q,i)=>{const d=sq(q,[wx,wy]);if(d<bd){bd=d;b=i;}});return b>=0&&Math.sqrt(bd)*V.s<=maxPx?b:-1;}
+$("cvMain").addEventListener("click",e=>{const cv=$("cvMain"),rc=cv.getBoundingClientRect(),s=rc.width/(2*WB);const V={s};
+  const wx=(e.clientX-rc.left)/s-WB,wy=WB-(e.clientY-rc.top)/s;const rx=Math.round(wx*1000)/1000,ry=Math.round(wy*1000)/1000;
+  if(S.click==="probe"){const i=nearestPt(wx,wy,18,V);if(i>=0){S.probe=i;renderRun();}return;}
+  if(S.click==="add"){if(S.X.length>=400)return;S.X.push([clamp(rx,-3.1,3.1),clamp(ry,-3.1,3.1)]);S.edited=true;stopPlay();dataChanged();return;}
+  if(S.click==="del"){const i=nearestPt(wx,wy,18,V);if(i>=0&&S.X.length>12){S.X.splice(i,1);S.edited=true;if(S.probe>=i&&S.probe>0)S.probe--;stopPlay();dataChanged();}return;}
+  if(S.click==="center"){S.manual.push([rx,ry]);if(S.manual.length>S.k)S.manual.shift();stopPlay();rebuild(S.manual.length>=S.k?"start":"keep");renderTab();}});
+
+/* ================= 설정 UI ================= */
+function syncParamUI(){$("aK").value=S.k;$("aKv").textContent=S.k;$("aSeed").value=S.seed;segSet($("aInit"),S.kmInit);
+  $("aEps").value=S.eps;$("aEpsV").textContent=fmt(S.eps,2);$("aMin").value=S.minS;$("aMinV").textContent=S.minS;
+  $("aBw").value=S.bw;$("aBwV").textContent=fmt(S.bw,2);segSet($("aCov"),S.cov);segSet($("aGInit"),S.gInit);segSet($("aGView"),S.gView);segSet($("aMsView"),S.msView);
+  $("aManualClear").hidden=S.kmInit!=="manual";$("dClickCenter").hidden=!(S.algo==="kmeans"&&S.kmInit==="manual");$("kSel").value=S.k;$("kSelV").textContent=S.k;}
+function param(fn,mode){return(...a)=>{stopPlay();fn(...a);rebuild(mode||"keep");renderTab();};}
+$("aK").addEventListener("input",param(e=>{S.k=+e.target.value;$("aKv").textContent=S.k;if(S.manual.length>S.k)S.manual=S.manual.slice(-S.k);}));
+$("aSeed").addEventListener("change",param(e=>{S.seed=clamp(parseInt(e.target.value)||0,0,9999);e.target.value=S.seed;},"start"));
+$("aSeedNext").onclick=param(()=>{S.seed=(S.seed+1)%10000;$("aSeed").value=S.seed;},"start");
+segInit($("aInit"),param(v=>{S.kmInit=v;$("aManualClear").hidden=v!=="manual";$("dClickCenter").hidden=v!=="manual";
+  if(v==="manual"){S.click="center";segSet($("dClick"),"center");$("cvMain").dataset.mode="center";}else if(S.click==="center"){S.click="probe";segSet($("dClick"),"probe");$("cvMain").dataset.mode="probe";}},"start"));
+$("aManualClear").onclick=param(()=>{S.manual=[];},"start");
+const isLocal=()=>S.kmInit==="random"&&S.seed===5&&S.k===3&&S.preset==="blobs"&&S.dseed===1&&S.n===150&&!S.edited;
+$("aLocal").onclick=()=>{stopPlay();S.dseed=1;$("dSeed").value=1;loadPreset("blobs",{keepParams:false});S.k=3;S.kmInit="random";S.seed=5;S.click="probe";segSet($("dClick"),"probe");$("cvMain").dataset.mode="probe";syncParamUI();rebuild("start");renderTab();};
+$("aVor").addEventListener("change",e=>{S.vor=e.target.checked;renderRun();});
+$("aTrail").addEventListener("change",e=>{S.trail=e.target.checked;renderRun();});
+$("aPamKm").addEventListener("change",e=>{S.pamKm=e.target.checked;renderRun();});
+$("aDbAll").addEventListener("change",e=>{S.dbAll=e.target.checked;renderRun();});
+$("aKde").addEventListener("change",e=>{S.kde=e.target.checked;renderRun();});
+$("aGBg").addEventListener("change",e=>{S.gBg=e.target.checked;renderRun();});
+$("aG2").addEventListener("change",e=>{S.g2s=e.target.checked;renderRun();});
+$("aEps").addEventListener("input",param(e=>{S.eps=+e.target.value;$("aEpsV").textContent=fmt(S.eps,2);}));
+$("aMin").addEventListener("input",param(e=>{S.minS=+e.target.value;$("aMinV").textContent=S.minS;}));
+$("aBw").addEventListener("input",e=>{S.bw=+e.target.value;$("aBwV").textContent=fmt(S.bw,2);});
+$("aBw").addEventListener("change",param(()=>{}));
+$("aBwEst").onclick=param(()=>{const e=estimateBW(getD(),S.X.length,.3);S.bw=Math.round(e.bw*100)/100;$("aBw").value=S.bw;$("aBwV").textContent=fmt(S.bw,2);});
+segInit($("aMsView"),v=>{S.msView=v;renderRun();});
+segInit($("aCov"),param(v=>{S.cov=v;}));
+segInit($("aGInit"),param(v=>{S.gInit=v;},"start"));
+segInit($("aGView"),v=>{S.gView=v;renderRun();});
+
+/* ================= 단계 프레임 만들기 ================= */
+const PH={kmeans:["초기 중심","① 할당","② 갱신","수렴"],kpp:["첫 중심","D(x)² 비례 뽑기","K-means 반복","수렴"],pam:["BUILD (처음 메도이드)","SWAP (교환)","완료"],
+  dbscan:["이웃 세기","점 분류","군집 확장","완료"],meanshift:["시작","창 평균으로 이동","봉우리 합치기","라벨"],gmm:["초기값","E-단계","M-단계","수렴"]};
+function lloydFrames(fr,res,init,phA,phU,phD){let trail=[init];
+  res.steps.forEach((s,i)=>{if(s.conv){fr.push({ph:phD,type:"assign",it:i+1,C:s.C,L:s.L,w:s.w,ch:0,conv:true,trail:trail.slice()});return;}
+    fr.push({ph:phA,type:"assign",it:i+1,C:s.C,L:s.L,w:s.w,ch:s.ch,trail:trail.slice()});
+    fr.push({ph:phU,type:"update",it:i+1,C:s.Cn,Cp:s.C,L:s.L,w:s.w2,wPrev:s.w,trail:trail.slice()});trail.push(s.Cn);});}
+function kmInitNow(){const X=S.X,k=S.k;if(S.kmInit==="manual")return{C:S.manual.slice(0,k).map(c=>c.slice()),manual:true,partial:S.manual.length<k};
+  const rng=rngFor(S.seed,S.kmInit==="bad"?3:1);return S.kmInit==="bad"?initBad(X,k,rng):initRandom(X,k,rng);}
+function buildFrames(){const X=S.X,a=S.algo,fr=[];const out={algo:a,frames:fr};
+  if(a==="kmeans"){const ini=kmInitNow();out.init=ini;fr.push({ph:0,type:"init",C:ini.C,partial:ini.partial});if(ini.partial)return out;
+    const r=lloyd(X,ini.C,true);out.res=r;lloydFrames(fr,r,ini.C,1,2,3);}
+  else if(a==="kpp"){const ini=initPP(X,S.k,rngFor(S.seed,2));out.init=ini;
+    ini.steps.forEach((s,j)=>fr.push({ph:j?1:0,type:j?"pp":"pp0",j,...s,C:ini.idx.slice(0,j+(j?0:1)).map(i=>X[i])}));
+    fr.push({ph:1,type:"init",C:ini.C});const r=lloyd(X,ini.C,true);out.res=r;lloydFrames(fr,r,ini.C,2,2,3);}
+  else if(a==="pam"){const r=pam(X,getD(),S.k,true);out.res=r;r.fr.forEach(f=>fr.push(f));out.km=kmBest(X,S.k,10,"pp",S.seed);}
+  else if(a==="dbscan"){const r=dbscan(X,getD(),S.eps,S.minS);out.res=r;fr.push({ph:0,type:"count"});fr.push({ph:1,type:"classify"});
+    const E=r.ev.length,G=Math.max(1,Math.ceil(E/110));for(let e=0;e<E;e+=G){const e1=Math.min(E,e+G);fr.push({ph:2,type:"grow",e0:e,e1});}
+    fr.push({ph:3,type:"done"});}
+  else if(a==="meanshift"){const r=meanShift(X,S.bw);out.res=r;fr.push({ph:0,type:"start",t:0});const T=r.maxIt+1,G=Math.max(1,Math.ceil(T/120));
+    for(let t=1;t<=T;t+=G)fr.push({ph:1,type:"move",t:Math.min(T,t+G-1)});if(fr[fr.length-1].t!==T)fr.push({ph:1,type:"move",t:T});
+    fr.push({ph:2,type:"merge",t:T});fr.push({ph:3,type:"label",t:T});}
+  else if(a==="gmm"){const r=gmm(X,S.k,S.cov,S.gInit,S.seed,true);out.res=r;r.fr.forEach(f=>fr.push(f));}
+  return out;}
+function rebuild(mode){const wasLast=FR.frames.length&&S.frame>=FR.frames.length-1;FR=buildFrames();const N=FR.frames.length;
+  if(mode==="start")S.frame=0;else if(mode==="end"||wasLast)S.frame=N-1;else S.frame=clamp(S.frame,0,N-1);
+  extrasDirty=true;}
+let extrasDirty=true;
+
+/* ================= 재생 ================= */
+function go(i){S.frame=clamp(i,0,FR.frames.length-1);renderRun(true);}
+function stopPlay(){if(playT){clearTimeout(playT);playT=null;}$("pPlay").textContent="재생";}
+function tick(){if(S.frame>=FR.frames.length-1){stopPlay();return;}go(S.frame+1);playT=setTimeout(tick,Math.max(120,(RM?1100:780)/S.speed));}
+$("pFirst").onclick=()=>{stopPlay();go(0);};$("pPrev").onclick=()=>{stopPlay();go(S.frame-1);};$("pNext").onclick=()=>{stopPlay();go(S.frame+1);};$("pLast").onclick=()=>{stopPlay();go(FR.frames.length-1);};
+$("pPlay").onclick=()=>{if(playT){stopPlay();return;}if(S.frame>=FR.frames.length-1)go(0);$("pPlay").textContent="멈춤";playT=setTimeout(tick,(RM?700:420)/S.speed);};
+$("pSpeed").addEventListener("input",e=>{S.speed=+e.target.value;$("pSpeedV").textContent=S.speed+"×";});
+document.addEventListener("keydown",e=>{if(e.altKey||e.ctrlKey||e.metaKey||e.shiftKey)return;if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;
+  const t=e.target;if(t&&t.closest&&(t.closest(".sk-tabs")||t.closest("input,select,textarea,[contenteditable]")))return;if(S.tab!=="run")return;
+  stopPlay();go(S.frame+(e.key==="ArrowRight"?1:-1));e.preventDefault();});
+
+/* ================= 1번 탭 그리기 ================= */
+const sub=["₀","₁","₂","₃","₄","₅","₆","₇","₈","₉"];const subN=n=>String(n).split("").map(c=>sub[+c]).join("");
+const cTag=l=>l<0?`<b style="color:var(--faint)">잡음</b>`:`<b style="color:${kvar(l)}">C${l+1}</b>`;
+const pTxt=q=>`(${fmt(q[0],2)}, ${fmt(q[1],2)})`;
+const mn=(a,b)=>`${fmt(a,2)} − ${b<0?"("+fmt(b,2)+")":fmt(b,2)}`;
+function stat(v,l,cls){return `<div class="sk-stat"><b${cls?` class="${cls}"`:""}>${v}</b><span>${l}</span></div>`;}
+function renderRun(fromStep){const f=FR.frames[S.frame];if(!f)return;const N=FR.frames.length;
+  $("runTitle").textContent=ANAME[S.algo]+(S.algo==="kpp"?" 초기화 → K-means":"");$("runProg").textContent=`단계 ${S.frame+1} / ${N}`;
+  $("pFirst").disabled=$("pPrev").disabled=S.frame===0;$("pNext").disabled=$("pLast").disabled=S.frame>=N-1;
+  const ph=PH[S.algo];$("runPhases").innerHTML=ph.map((t,i)=>`<li class="${i===f.ph?"on":i<f.ph?"done":""}">${t}</li>`).join("");
+  drawMain();$("runCurve").classList.remove("click");$("runCurve").onclick=null;$("curveNote").hidden=true;sideFor[S.algo](f);
+  if(extrasDirty){extrasDirty=false;renderExtras();}else extrasFrame();}
+
+function drawMain(){const cv=$("cvMain"),V=view(cv),p=pal(),{ctx}=V,f=FR.frames[S.frame],X=S.X,R=ptR(V),a=S.algo;drawGrid(V,p);
+  if(a==="kmeans"||a==="kpp"){
+    const hasL=f.type==="assign"||f.type==="update";
+    if(S.vor&&f.C&&f.C.length&&(hasL||f.type==="init"))bgNearest(V,p,f.C,hasL?.15:.08);
+    drawAxes(V,p);
+    if(f.type==="pp"){const mx=Math.max(...f.D2);for(let i=0;i<X.length;i++){const pr=f.D2[i]/f.tot,r=1.6+Math.sqrt(f.D2[i]/mx)*R*1.6;const near=nearestIdx(X[i],f.prev.map(j=>X[j]));dot(ctx,V.X(X[i][0]),V.Y(X[i][1]),r,rgba(kc(p,near),.75),rgba(p.surface,.8),.6);}}
+    else for(let i=0;i<X.length;i++){const c=hasL?rgb(kc(p,f.L[i])):rgba(p.muted,.6);dot(ctx,V.X(X[i][0]),V.Y(X[i][1]),R,c,rgba(p.surface,.85),.7);}
+    if(S.trail&&f.trail&&f.trail.length>1){ctx.save();ctx.setLineDash([3,3]);f.C.forEach((_,k)=>{ctx.strokeStyle=rgba(kc(p,k),.9);ctx.lineWidth=1.5;ctx.beginPath();f.trail.forEach((C,t)=>{const q=C[k];t?ctx.lineTo(V.X(q[0]),V.Y(q[1])):ctx.moveTo(V.X(q[0]),V.Y(q[1]));});const q=(f.type==="update"?f.Cp:f.C)[k];ctx.lineTo(V.X(q[0]),V.Y(q[1]));ctx.stroke();f.trail.forEach(C=>dot(ctx,V.X(C[k][0]),V.Y(C[k][1]),2.2,rgba(kc(p,k),.9)));});ctx.restore();}
+    if(f.type==="update")f.C.forEach((c,k)=>{arrow(ctx,V.X(f.Cp[k][0]),V.Y(f.Cp[k][1]),V.X(c[0]),V.Y(c[1]),rgb(p.ink),2.2);diamond(ctx,V.X(f.Cp[k][0]),V.Y(f.Cp[k][1]),R*1.8,null,rgba(p.ink,.55),1.4,[3,2]);});
+    if(f.type==="pp"){const ch=X[f.chosen];dot(ctx,V.X(ch[0]),V.Y(ch[1]),R*2.4,null,rgb(p.ink),2.4);}
+    if(f.type==="pp0"){const ch=X[f.chosen];dot(ctx,V.X(ch[0]),V.Y(ch[1]),R*2.4,null,rgb(p.ink),2.4);}
+    if(FR.init&&FR.init.anchor!=null&&f.type==="init"){const q=X[FR.init.anchor];dot(ctx,V.X(q[0]),V.Y(q[1]),R*3.2,null,rgb(p.leak),1.6);}
+    const C=f.type==="pp"?f.prev.map(j=>X[j]):f.C||[];
+    C.forEach((c,k)=>{diamond(ctx,V.X(c[0]),V.Y(c[1]),R*2.3,rgb(kc(p,k)),rgb(p.ink),2.2);label(ctx,V,c,"C"+(k+1),p,R);});
+  } else if(a==="pam"){const M=f.M,C=M.map(i=>X[i]);bgNearest(V,p,C,.13);drawAxes(V,p);
+    const L=labelsNearest(X,C);for(let i=0;i<X.length;i++)dot(ctx,V.X(X[i][0]),V.Y(X[i][1]),R,rgb(kc(p,L[i])),rgba(p.surface,.85),.7);
+    if(f.type==="build"&&f.cands)f.cands.slice(1,4).forEach(c=>dot(ctx,V.X(X[c[0]][0]),V.Y(X[c[0]][1]),R*1.9,null,rgba(p.ink,.45),1.2));
+    if(S.pamKm&&FR.km)FR.km.C.forEach((c,k)=>{diamond(ctx,V.X(c[0]),V.Y(c[1]),R*2.1,rgba(p.surface,.6),rgb(kc(p,k)),2,[3,2]);});
+    if(f.type==="eval"){const o=X[f.sw[1]],nw=X[f.sw[2]];arrow(ctx,V.X(o[0]),V.Y(o[1]),V.X(nw[0]),V.Y(nw[1]),rgb(p.ink),2.4);dot(ctx,V.X(nw[0]),V.Y(nw[1]),R*2.2,null,rgb(p.ink),2.2);}
+    C.forEach((c,k)=>{dot(ctx,V.X(c[0]),V.Y(c[1]),R*1.9,rgb(kc(p,k)),rgb(p.ink),2.6);label(ctx,V,c,"M"+(k+1),p,R);});
+  } else if(a==="dbscan"){drawAxes(V,p);drawDb(V,p,f,R);}
+  else if(a==="meanshift"){if(S.kde)bgKde(V,p,X,S.bw);drawAxes(V,p);drawMs(V,p,f,R);}
+  else if(a==="gmm"){if(S.gBg)bgGmm(V,p,f.P,.22);drawAxes(V,p);drawGmm(V,p,f,R);}
+  const pr=X[S.probe];if(pr){dot(ctx,V.X(pr[0]),V.Y(pr[1]),R+4,null,rgb(p.ink),1.8);}
+  if(S.algo==="kmeans"&&S.kmInit==="manual"&&S.manual.length<S.k){ctx.save();ctx.fillStyle=rgba(p.ink,.85);ctx.font="600 13px "+css("--sans");ctx.textAlign="center";ctx.fillText(`캔버스를 눌러 초기 중심을 놓으세요 (${S.manual.length}/${S.k})`,V.w/2,22);ctx.restore();}}
+function label(ctx,V,c,t,p,R){ctx.save();ctx.font="700 12px "+css("--sans");ctx.textAlign="left";ctx.textBaseline="middle";ctx.lineWidth=3;ctx.strokeStyle=rgba(p.surface,.95);const x=V.X(c[0])+R*2.6,y=V.Y(c[1])-R*1.6;ctx.strokeText(t,x,y);ctx.fillStyle=rgb(p.ink);ctx.fillText(t,x,y);ctx.restore();}
+function nearestIdx(x,C){let b=0,bd=Infinity;C.forEach((c,k)=>{const d=sq(x,c);if(d<bd){bd=d;b=k;}});return b;}
+function labelsNearest(X,C){return Int32Array.from(X,x=>nearestIdx(x,C));}
+function dbState(f){const r=FR.res,n=S.X.length;const lab=new Int32Array(n).fill(-1);let cur=null,added=[];
+  if(f.type==="grow"||f.type==="done"){const e1=f.type==="done"?r.ev.length:f.e1;for(let i=0;i<n;i++)if(r.when[i]>=0&&r.when[i]<e1)lab[i]=r.L[i];if(f.type==="grow"){cur=r.ev[f.e1-1];for(let e=f.e0;e<f.e1;e++)added=added.concat(r.ev[e].added);}}
+  return{lab,cur,added};}
+function drawDb(V,p,f,R){const{ctx}=V,X=S.X,r=FR.res,st=dbState(f);
+  const showType=f.type!=="count";
+  if(S.dbAll&&showType){ctx.save();ctx.fillStyle=rgba(p.kde,.05);ctx.strokeStyle=rgba(p.kde,.18);for(let i=0;i<X.length;i++)if(r.core[i]){ctx.beginPath();ctx.arc(V.X(X[i][0]),V.Y(X[i][1]),S.eps*V.s,0,Math.PI*2);ctx.fill();ctx.stroke();}ctx.restore();}
+  const pr=X[S.probe];if(pr&&(f.type==="count"||f.type==="classify"||f.type==="done")){ctx.save();ctx.fillStyle=rgba(p.ink,.06);ctx.strokeStyle=rgba(p.ink,.7);ctx.setLineDash([4,3]);ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(V.X(pr[0]),V.Y(pr[1]),S.eps*V.s,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();}
+  if(st.cur){const q=X[st.cur.p];ctx.save();ctx.fillStyle=rgba(kc(p,st.cur.c),.1);ctx.strokeStyle=rgb(kc(p,st.cur.c));ctx.lineWidth=1.8;ctx.beginPath();ctx.arc(V.X(q[0]),V.Y(q[1]),S.eps*V.s,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.strokeStyle=rgba(kc(p,st.cur.c),.8);ctx.lineWidth=1.2;st.cur.added.forEach(j=>{ctx.beginPath();ctx.moveTo(V.X(q[0]),V.Y(q[1]));ctx.lineTo(V.X(X[j][0]),V.Y(X[j][1]));ctx.stroke();});ctx.restore();}
+  for(let i=0;i<X.length;i++){const x=V.X(X[i][0]),y=V.Y(X[i][1]),l=st.lab[i];
+    if(!showType){dot(ctx,x,y,R,rgba(p.muted,.6),rgba(p.surface,.85),.7);continue;}
+    const t=r.type[i];const col=l>=0?rgb(kc(p,l)):rgb(p.muted);
+    if(t===0){if(f.type==="done"||f.type==="classify"||l<0)cross(ctx,x,y,R*.85,rgb(p.faint),1.6);}
+    else if(t===1)dot(ctx,x,y,R*.85,rgb(p.surface),l>=0?col:rgb(p.muted),1.8);
+    else dot(ctx,x,y,R,l>=0?col:rgba(p.muted,.85),rgba(p.surface,.85),.7);}
+  if(st.added.length)st.added.forEach(j=>dot(ctx,V.X(X[j][0]),V.Y(X[j][1]),R+2.2,null,rgb(p.ink),1.4));
+  if(st.cur){const q=X[st.cur.p];dot(ctx,V.X(q[0]),V.Y(q[1]),R*1.5,rgb(kc(p,st.cur.c)),rgb(p.ink),2.2);}}
+function drawMs(V,p,f,R){const{ctx}=V,X=S.X,r=FR.res,t=f.t,colored=f.type==="merge"||f.type==="label";const L=r.L;
+  const pos=s=>{const pa=r.paths[s];return pa[Math.min(t,pa.length-1)];};
+  const lab=f.type==="label";
+  for(let i=0;i<X.length;i++)dot(ctx,V.X(X[i][0]),V.Y(X[i][1]),R*.95,lab?rgb(kc(p,L[i])):rgba(p.muted,.45),rgba(p.surface,.8),.6);
+  const seeds=S.msView==="one"?[S.probe]:X.map((_,i)=>i);
+  ctx.save();ctx.lineWidth=S.msView==="one"?2:1;seeds.forEach(s=>{const pa=r.paths[s],m=Math.min(t,pa.length-1);if(m<1)return;ctx.strokeStyle=colored?rgba(kc(p,L[s]),S.msView==="one"?1:.55):rgba(p.ink,S.msView==="one"?.9:.32);ctx.beginPath();ctx.moveTo(V.X(pa[0][0]),V.Y(pa[0][1]));for(let q=1;q<=m;q++)ctx.lineTo(V.X(pa[q][0]),V.Y(pa[q][1]));ctx.stroke();});ctx.restore();
+  if(f.type!=="label")seeds.forEach(s=>{const q=pos(s);dot(ctx,V.X(q[0]),V.Y(q[1]),S.msView==="one"?R*1.1:1.9,colored?rgb(kc(p,L[s])):rgb(p.ink));});
+  const ps=pos(S.probe);if(ps&&f.type!=="label"){const pa=r.paths[S.probe],m=Math.min(t,pa.length-1);ctx.save();ctx.fillStyle=rgba(p.ink,.05);ctx.strokeStyle=rgba(p.ink,.75);ctx.setLineDash([4,3]);ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(V.X(ps[0]),V.Y(ps[1]),S.bw*V.s,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();
+    if(m<pa.length-1){const nx=pa[m+1];arrow(ctx,V.X(ps[0]),V.Y(ps[1]),V.X(nx[0]),V.Y(nx[1]),rgb(p.ink),2);}
+    dot(ctx,V.X(ps[0]),V.Y(ps[1]),R*1.4,rgb(p.ink),rgb(p.surface),1.5);}
+  if(colored)r.C.forEach((c,k)=>{diamond(ctx,V.X(c[0]),V.Y(c[1]),R*2.3,rgb(kc(p,k)),rgb(p.ink),2.2);label(ctx,V,c,"봉우리 "+(k+1),p,R);if(f.type==="merge"){ctx.save();ctx.strokeStyle=rgba(kc(p,k),.8);ctx.setLineDash([2,3]);ctx.beginPath();ctx.arc(V.X(c[0]),V.Y(c[1]),S.bw*V.s,0,Math.PI*2);ctx.stroke();ctx.restore();}});}
+function drawGmm(V,p,f,R){const{ctx}=V,X=S.X,k=f.P.w.length,Rr=f.R;
+  if(f.type==="M"&&f.Pp)for(let j=0;j<k;j++)ellipse(ctx,V,f.Pp.mu[j],f.Pp.S[j],1,rgba(kc(p,j),.5),1.2,[2,3]);
+  for(let j=0;j<k;j++){const c=kc(p,j);ellipse(ctx,V,f.P.mu[j],f.P.S[j],1,rgb(c),2.2,null,rgba(c,.07));if(S.g2s)ellipse(ctx,V,f.P.mu[j],f.P.S[j],2,rgb(c),1.3,[5,4]);}
+  for(let i=0;i<X.length;i++){const x=V.X(X[i][0]),y=V.Y(X[i][1]);
+    if(S.gView==="pie")pie(ctx,x,y,R*1.25,Rr,i,k,p);
+    else if(S.gView==="hard"){let b=0;for(let j=1;j<k;j++)if(Rr[i*k+j]>Rr[i*k+b])b=j;dot(ctx,x,y,R,rgb(kc(p,b)),rgba(p.surface,.85),.7);}
+    else dot(ctx,x,y,R,rgb(mixCol(p,Rr,i,k)),rgba(p.surface,.85),.7);}
+  for(let j=0;j<k;j++){const m=f.P.mu[j];if(f.type==="M"&&f.Pp)arrow(ctx,V.X(f.Pp.mu[j][0]),V.Y(f.Pp.mu[j][1]),V.X(m[0]),V.Y(m[1]),rgb(p.ink),1.8);
+    diamond(ctx,V.X(m[0]),V.Y(m[1]),R*1.9,rgb(kc(p,j)),rgb(p.ink),2);label(ctx,V,m,`π${subN(j+1)}=${fmt(f.P.w[j],2)}`,p,R);}}
+
+/* ---- 1번 탭: 옆 패널 (알고리즘별) ---- */
+function legend(items){$("runLegend").innerHTML=items.join("");}
+const LG={ctr:`<span><i class="pc-dia"></i>중심(평균)</span>`,pt:`<span><i class="pc-dot" style="background:var(--muted)"></i>데이터 점</span>`,sel:`<span><i class="pc-ring" style="border-color:var(--ink)"></i>선택한 점</span>`};
+function wcssCurve(f){const fr=FR.frames,pts=[],xs=[];let x=0;fr.forEach((g,i)=>{if(g.w!=null){pts.push([i,g.w]);}});
+  if(!pts.length){$("runCurve").innerHTML=`<p class="sk-hint" style="margin:0">아직 할당이 없어 WCSS를 계산할 수 없습니다. 다음 단계로 가세요.</p>`;return;}
+  const ys=pts.map(q=>q[1]),lo=Math.min(...ys),hi=Math.max(...ys),pad=Math.max((hi-lo)*.08,1e-3*Math.max(1,Math.abs(hi)));const cur=pts.findIndex(q=>q[0]===S.frame);
+  lineChart($("runCurve"),{xMin:pts[0][0],xMax:Math.max(pts[0][0]+1,fr.length-1),yMin:Math.max(0,lo-pad),yMax:hi+pad,xTicks:[],xLabel:"단계 (할당 → 갱신 → 할당 …)",
+    series:[{pts,color:"var(--k0)",dots:true,hi:cur}],marker:S.frame>=pts[0][0]?S.frame:null,markerLabel:f.w!=null?"WCSS "+fmt(f.w,2):""});
+  $("curveTitle").textContent="WCSS (군집 내 제곱합) 변화";$("curveHint").textContent="할당·갱신 모두 WCSS를 줄입니다";}
+const sideFor={
+kmeans(f){sideKM(f);},kpp(f){sideKM(f);},
+pam(f){const X=S.X,D=getD(),n=X.length,M=f.M,L=labelsNearest(X,M.map(i=>X[i]));
+  legend([`<span><i class="pc-dot" style="background:var(--k0);box-shadow:0 0 0 2px var(--ink)"></i>메도이드 (실제 데이터 점)</span>`,S.pamKm?`<span><i class="pc-dia" style="border-style:dashed;background:transparent"></i>K-means 평균 중심 (비교)</span>`:"",LG.sel]);
+  let cap="";if(f.type==="build")cap=f.t===0?`<b>BUILD 1</b>: 모든 점까지의 거리 합이 가장 작은 점 <b>#${f.added+1}</b>을 첫 메도이드로 고릅니다. 총 거리 TD = <b>${fmt(f.td,2)}</b>.`:`<b>BUILD ${f.t+1}</b>: 메도이드로 추가했을 때 총 거리 TD를 가장 많이 줄이는 점 <b>#${f.added+1}</b>을 고릅니다. TD ${fmt(f.td0,2)} → <b>${fmt(f.td,2)}</b>. (점선 원 = 다음 후보들)`;
+  else if(f.type==="eval")cap=`<b>SWAP ${f.s}회차 · 평가</b>: 메도이드 ${S.k}개 × 비메도이드 ${n-S.k}개 = <b>${f.nPairs}가지</b> 교환의 총 거리 변화 ΔTD를 모두 계산했습니다. 가장 많이 줄이는 교환은 M${f.sw[0]+1}(#${f.sw[1]+1}) → <b>#${f.sw[2]+1}</b>, ΔTD = <b class="pc-good">${fmt(f.sw[3],3)}</b>.`;
+  else if(f.type==="swap")cap=`<b>SWAP ${f.s}회차 · 교환 실행</b>: 메도이드를 #${f.sw[1]+1} → #${f.sw[2]+1}로 바꾸고 점을 가장 가까운 메도이드에 다시 배정합니다. TD = <b>${fmt(f.td,2)}</b>.`;
+  else cap=`<b>완료</b>: 어떤 교환도 TD를 줄이지 못합니다 (가장 좋은 ΔTD = ${fmt(f.best,3)} ≥ 0). 교환 ${f.s}번, 최종 TD = <b>${fmt(f.td,2)}</b>. 중심이 항상 <b>실제 환자 한 명</b>이라 해석하기 쉽습니다.`;
+  $("runCap").innerHTML=cap;
+  $("runStats").innerHTML=stat(f.type==="build"?"BUILD":"SWAP "+(f.s||0),"단계")+stat(fmt(f.td,2),"총 거리 TD")+stat(f.type==="eval"?fmt(f.sw[3],2):f.type==="done"?fmt(f.best,2):"–","최선 ΔTD");
+  $("runFormula").textContent=`목적함수  TD = Σᵢ min_m d(xᵢ, m)      (거리 그대로, 제곱 아님)\n메도이드  m ∈ 데이터 점 (평균이 아니라 실제 점)\nBUILD     TD를 가장 많이 줄이는 점을 하나씩 추가\nSWAP      ΔTD(m → o) = TD(m 대신 o) − TD,  가장 작은 ΔTD < 0 이면 교환`;
+  const i=S.probe,xi=X[i];$("probeTitle").textContent=`점 #${i+1}의 가장 가까운 메도이드`;
+  const rows=M.map((m,k)=>`d(x, M${subN(k+1)}=#${m+1}) = √((${mn(xi[0],X[m][0])})² + (${mn(xi[1],X[m][1])})²) = ${fmt(D[i*n+m],3)}${k===L[i]?"  ← 최소":""}`);
+  $("runProbe").innerHTML=`<div class="sk-formula pc-pre">${rows.join("\n")}\n→ ${cTag(L[i])}</div>`;
+  const pts=FR.frames.map((g,j)=>[j,g.td]);const ys=pts.map(q=>q[1]),lo=Math.min(...ys),hi=Math.max(...ys),pad=Math.max((hi-lo)*.1,1e-3*Math.max(1,Math.abs(hi)));
+  lineChart($("runCurve"),{xMin:0,xMax:Math.max(1,pts.length-1),yMin:lo-pad,yMax:hi+pad,xTicks:[],xLabel:"단계 (BUILD → SWAP)",series:[{pts,color:"var(--k0)",dots:true,hi:S.frame}],marker:S.frame,markerLabel:"TD "+fmt(f.td,2)});
+  $("curveTitle").textContent="총 거리 TD 변화";$("curveHint").textContent="교환할 때마다 줄어듭니다";$("curveNote").hidden=true;},
+dbscan(f){const X=S.X,r=FR.res,n=X.length,st=dbState(f);
+  legend([`<span><i class="pc-dot" style="background:var(--k0)"></i>핵심점 (이웃 ≥ min_samples)</span>`,`<span><i class="pc-ring" style="border-color:var(--k0)"></i>경계점</span>`,`<span><i class="pc-x">×</i>잡음 (−1)</span>`,`<span>원 = 반경 eps</span>`]);
+  const nCore=sum(r.core),nNoise=Array.from(r.type).filter(t=>t===0).length,nBorder=n-nCore-nNoise;let cap;
+  const pc=r.nb[S.probe].length;
+  if(f.type==="count")cap=`각 점의 <b>반경 eps = ${fmt(S.eps,2)}</b> 안 이웃 수를 셉니다(자기 자신 포함). 점선 원은 선택한 점 #${S.probe+1}의 이웃 범위로, 이웃 <b>${pc}개</b> → ${pc>=S.minS?"핵심점":"핵심점 아님"} (min_samples = ${S.minS}).`;
+  else if(f.type==="classify")cap=`점 분류: <b>핵심점 ${nCore}개</b>(이웃 ≥ ${S.minS}), <b>경계점 ${nBorder}개</b>(핵심점의 eps 안에 있지만 자신은 핵심 아님), <b>잡음 ${nNoise}개</b>. 아직 군집 번호는 없습니다.`;
+  else if(f.type==="grow"){const e=st.cur,nl=Array.from(st.lab).filter(v=>v>=0).length;cap=`<b>군집 C${e.c+1} 확장</b> (너비 우선 탐색): ${e.first?"아직 군집이 없는 핵심점에서 <b>새 군집</b>을 시작합니다. ":""}핵심점 #${e.p+1}의 eps 이웃 중 군집이 없던 점 <b>${st.added.length}개</b>를 C${e.c+1}에 넣고, 그중 핵심점은 대기열에 넣습니다. 대기열 남은 점 ${e.qlen}개 · 배정된 점 ${nl}/${n}.`;}
+  else cap=`<b>완료</b>: 군집 <b>${r.nC}개</b>, 잡음 <b>${nNoise}개</b>(라벨 −1). k를 정하지 않았는데도 밀도로 이어진 모양을 따라 군집이 생겼습니다. eps가 너무 작으면 잡음이 늘고, 너무 크면 군집이 합쳐집니다.`;
+  $("runCap").innerHTML=cap;
+  $("runStats").innerHTML=stat(f.type==="count"||f.type==="classify"?"–":String(new Set(Array.from(st.lab).filter(v=>v>=0)).size),"군집")+stat(nCore,"핵심점")+stat(nBorder,"경계점")+stat(nNoise,"잡음");
+  $("runFormula").textContent=`N_eps(p) = { q : ‖p − q‖ ≤ eps }        (자기 자신 포함)\n핵심점   |N_eps(p)| ≥ min_samples\n경계점   핵심점은 아니지만 어떤 핵심점의 N_eps 안\n잡음     둘 다 아님 → 라벨 −1\n군집     핵심점끼리 eps 안으로 이어지면(밀도 연결) 같은 군집`;
+  const i=S.probe,nb=r.nb[i];$("probeTitle").textContent=`점 #${i+1}의 eps 이웃`;
+  const t=r.type[i],tn=t===2?"핵심점":t===1?"경계점":"잡음";const nearCore=nb.filter(j=>r.core[j]&&j!==i);
+  $("runProbe").innerHTML=`<div class="sk-formula pc-pre">|N_eps(#${i+1})| = ${nb.length}  (자기 자신 포함)  ${nb.length>=S.minS?"≥":"<"} min_samples ${S.minS}\n이웃 중 핵심점: ${nearCore.length}개${nearCore.length?" (#"+nearCore.slice(0,6).map(j=>j+1).join(", #")+(nearCore.length>6?" …":"")+")":""}\n→ ${tn}${f.type==="done"||f.type==="grow"?" · "+(st.lab[i]>=0?"C"+(st.lab[i]+1):(f.type==="done"?"라벨 −1":"아직 미배정")):""}</div>`;
+  const kd=cached("kd"+S.minS,()=>kDist(getD(),n,S.minS));const srt=Array.from(kd).sort((a,b)=>a-b);const hi=Math.max(srt[n-1]*1.05,S.eps*1.15);
+  const kn=knee(srt);
+  const ch=lineChart($("runCurve"),{xMin:0,xMax:n-1,yMin:0,yMax:hi,xTicks:niceTicks(0,n-1,5).filter(v=>v<=n-1),xFmt:v=>v,xLabel:"점 (k-거리 오름차순 정렬)",series:[{pts:srt.map((v,j)=>[j,v]),color:"var(--k0)"}],
+    hrefs:[{v:S.eps,color:"var(--leak)",label:`eps = ${fmt(S.eps,2)} (아래 = 핵심점 ${nCore}개)`,below:S.eps<kn.v},{v:kn.v,color:"var(--use)",label:`무릎 ≈ ${fmt(kn.v,2)}`,right:true,below:kn.v<S.eps}]});
+  $("runCurve").classList.add("click");$("runCurve").onclick=e=>{const d=ch.toData(e);if(!d.inside)return;S.eps=clamp(Math.round(d.y*100)/100,.05,1.5);$("aEps").value=S.eps;$("aEpsV").textContent=fmt(S.eps,2);stopPlay();rebuild("keep");renderTab();};
+  $("curveTitle").textContent=`k-거리 그래프 (k = min_samples = ${S.minS})`;$("curveHint").textContent="그래프를 누르면 그 높이로 eps 설정";
+  $("curveNote").hidden=false;$("curveNote").innerHTML=`각 점에서 <b>${S.minS}번째로 가까운 점</b>(자기 자신 포함)까지 거리를 정렬했습니다. 이 값이 eps 이하인 점이 곧 핵심점입니다. 곡선이 급하게 꺾이는 <b>무릎</b> 근처가 eps 후보입니다. <button type="button" class="sk-btn sk-btn--sm" id="kneeApply">무릎 값 ${fmt(kn.v,2)} 쓰기</button>`;
+  $("kneeApply").onclick=()=>{S.eps=clamp(Math.round(kn.v*100)/100,.05,1.5);$("aEps").value=S.eps;$("aEpsV").textContent=fmt(S.eps,2);stopPlay();rebuild("keep");renderTab();};},
+meanshift(f){const X=S.X,r=FR.res,n=X.length,t=f.t;
+  legend([`<span><i class="pc-dot" style="background:var(--ink)"></i>출발점의 현재 위치</span>`,`<span>선 = 이동 궤적</span>`,`<span><i class="pc-dia"></i>봉우리 (군집 중심)</span>`,S.kde?`<span><i style="background:var(--kde);opacity:.4"></i>밀도 등고선</span>`:""]);
+  const moving=r.paths.filter(pa=>pa.length-1>t).length;const pa=r.paths[S.probe],m=Math.min(t,pa.length-1),cur=pa[m];
+  let cap;if(f.type==="start")cap=`모든 데이터 점에서 출발합니다(출발점 ${n}개). 점선 원 = 선택한 점의 <b>창(반경 h = ${fmt(S.bw,2)})</b>. 배경 등고선은 이 창으로 본 밀도입니다. 각 출발점은 <b>창 안 점들의 평균</b>으로 계속 옮겨 가며 밀도 봉우리를 오릅니다.`;
+  else if(f.type==="move")cap=`<b>이동 ${t}회</b>: 각 출발점이 자기 창 안 점들의 평균 위치로 이동했습니다. 아직 움직이는 점 <b>${moving}개</b>${moving?"":" — 모두 멈췄습니다"}. 이동량이 0.001·h 이하이면 멈춥니다.`;
+  else if(f.type==="merge")cap=`도착한 위치 ${r.nUnique}곳을 정리합니다: 창 안 점이 많은(밀도가 높은) 봉우리부터 남기고, 그 반경 h 안의 다른 봉우리는 지웁니다 → <b>봉우리 ${r.C.length}개</b>.`;
+  else cap=`<b>라벨</b>: 각 점을 가장 가까운 봉우리의 군집으로 정합니다 → <b>군집 ${r.C.length}개</b>. 군집 수를 지정하지 않았고, <b>bandwidth</b>가 군집 수를 결정합니다.`;
+  $("runCap").innerHTML=cap;
+  $("runStats").innerHTML=stat(t,"이동 횟수")+stat(moving,"움직이는 점")+stat(f.type==="merge"||f.type==="label"?r.C.length:"–","봉우리")+stat(fmt(S.bw,2),"bandwidth h");
+  $("runFormula").textContent=`창 안 점   W(x) = { xᵢ : ‖xᵢ − x‖ ≤ h }      (평평한 커널)\n평균 이동  m(x) = (1/|W(x)|) Σ_{xᵢ∈W(x)} xᵢ,   x ← m(x)\n멈춤       ‖m(x) − x‖ ≤ 0.001·h\n봉우리 정리 창 안 점이 많은 순서로, 서로 h 안이면 하나만 남김`;
+  $("probeTitle").textContent=`점 #${S.probe+1}에서 출발한 이동`;
+  let win=0,sx=0,sy=0;X.forEach(q=>{if(sq(q,cur)<=S.bw*S.bw){win++;sx+=q[0];sy+=q[1];}});const nx=win?[sx/win,sy/win]:cur;
+  $("runProbe").innerHTML=`<div class="sk-formula pc-pre">현재 위치 x = ${pTxt(cur)}  (이동 ${m}회째${m>=pa.length-1?", 멈춤":""})\n창 안 점 |W(x)| = ${win}개\nm(x) = (${fmt(sx,2)}/${win}, ${fmt(sy,2)}/${win}) = ${pTxt(nx)}\n이동량 ‖m(x) − x‖ = ${fmt(Math.sqrt(sq(nx,cur)),4)}  ${Math.sqrt(sq(nx,cur))<=1e-3*S.bw?"≤":">"} 0.001·h = ${fmt(1e-3*S.bw,4)}${f.type==="label"||f.type==="merge"?"\n→ "+(f.type==="label"?"군집 ":"가장 가까운 봉우리 ")+(r.L[S.probe]+1):""}</div>`;
+  const T=r.maxIt+1,pts=[];for(let q=0;q<=T;q++)pts.push([q,r.paths.filter(p2=>p2.length-1>q).length]);
+  lineChart($("runCurve"),{xMin:0,xMax:Math.max(1,T),yMin:0,yMax:n,xTicks:niceTicks(0,T,5).filter(v=>Number.isInteger(v)),xLabel:"이동 횟수",series:[{pts,color:"var(--k0)"}],marker:Math.min(t,T),markerLabel:`움직이는 점 ${moving}`});
+  $("curveTitle").textContent="아직 움직이는 출발점 수";$("curveHint").textContent="0이 되면 모두 봉우리에 도착";$("curveNote").hidden=true;},
+gmm(f){const X=S.X,k=S.k,n=X.length,r=FR.res;
+  legend([`<span><i class="pc-dot" style="background:linear-gradient(90deg,var(--k0),var(--k1))"></i>점 색 = 소속 확률 혼합</span>`,`<span>실선 타원 = 1σ · 점선 = 2σ</span>`,`<span><i class="pc-dia"></i>평균 μₖ (π = 가중치)</span>`]);
+  let cap;const unc=countUnc(f.R,n,k);
+  if(f.type==="init")cap=S.gInit==="kmeans"?`<b>초기값</b>: K-means 결과(하드 라벨)로 성분마다 가중치 π, 평균 μ, 공분산 Σ를 계산했습니다(scikit-learn 기본 init_params="kmeans"). 타원은 1σ·2σ 등고선입니다.`:`<b>초기값</b>: 각 점의 소속 확률을 무작위로 정하고 그것으로 π, μ, Σ를 계산했습니다. 처음엔 성분들이 거의 겹쳐 있습니다.`;
+  else if(f.type==="E")cap=`<b>반복 ${f.it} · E-단계</b>: 현재 π, μ, Σ로 각 점이 성분 k에서 나왔을 확률 γ를 계산합니다(점 색 = 확률 혼합). 평균 로그우도 ℓ = <b>${fmt(f.ll,4)}</b>. 소속이 애매한 점(최대 γ &lt; 0.8) ${unc}개.`;
+  else cap=`<b>반복 ${f.it} · M-단계</b>: γ를 가중치로 π, μ, Σ를 다시 추정했습니다(흐린 점선 = 이전 타원, 화살표 = 평균 이동).${f.final?(f.conv?` <b>수렴</b>: |Δℓ| = ${fmt(Math.abs(f.ll-f.prev),5)} &lt; 0.001 → 멈춤 (반복 ${f.it}회).`+(S.gInit==="random"&&f.it<=3?` 단, 무작위 소속으로 시작하면 성분들이 거의 같은 자리에서 출발해 ℓ이 아주 조금씩만 변하므로 <b>tol에 걸려 너무 일찍 멈출 수</b> 있습니다(scikit-learn도 같음). K-means 결과로 시작하거나 tol을 줄이세요.`:""):" 최대 반복 횟수에 도달했습니다."):""}`;
+  $("runCap").innerHTML=cap;
+  $("runStats").innerHTML=stat(f.it||0,"반복")+stat(f.ll!=null?fmt(f.ll,4):"–","평균 로그우도 ℓ")+stat(f.prev!=null&&isFinite(f.prev)?fmt(f.ll-f.prev,4):"–","Δℓ")+stat(unc,"애매한 점");
+  $("runFormula").textContent=`p(x) = Σₖ πₖ 𝒩(x | μₖ, Σₖ)\nE-단계  γᵢₖ = πₖ 𝒩(xᵢ|μₖ,Σₖ) / Σⱼ πⱼ 𝒩(xᵢ|μⱼ,Σⱼ)\nM-단계  Nₖ = Σᵢ γᵢₖ,  πₖ = Nₖ/n,  μₖ = Σᵢ γᵢₖ xᵢ / Nₖ\n        Σₖ = Σᵢ γᵢₖ (xᵢ−μₖ)(xᵢ−μₖ)ᵀ / Nₖ   (${S.cov==="full"?"full: 모든 원소":S.cov==="diag"?"diag: 대각만, 축 방향 타원":"spherical: 분산 하나, 원"})\n로그우도 ℓ = (1/n) Σᵢ log p(xᵢ)   (반복마다 줄지 않음)`;
+  const i=S.probe,xi=X[i],P=f.type==="M"?f.Pp:f.P;const terms=P.w.map((w,j)=>{const ln=logN(xi,P.mu[j],P.S[j]);return{w,N:Math.exp(ln),wN:w*Math.exp(ln)};});const tot=terms.reduce((s,q)=>s+q.wN,0);
+  $("probeTitle").textContent=`점 #${i+1}의 소속 확률 γ`;
+  $("runProbe").innerHTML=`<div class="sk-scroll"><table class="sk-table pc-tbl"><thead><tr><th>성분</th><th>πₖ</th><th>𝒩(x|μₖ,Σₖ)</th><th>πₖ·𝒩</th><th>γ = 비율</th></tr></thead><tbody>${terms.map((q,j)=>`<tr${q.wN/tot>=.5?' class="on"':""}><td>${cTag(j)}</td><td class="n">${fmt(q.w,3)}</td><td class="n">${q.N<1e-4?q.N.toExponential(2):fmt(q.N,4)}</td><td class="n">${q.wN<1e-4?q.wN.toExponential(2):fmt(q.wN,4)}</td><td class="n">${fmt(q.wN/tot,3)}</td></tr>`).join("")}</tbody></table></div><p class="sk-hint" style="margin:6px 0 0">x = ${pTxt(xi)} · 분모 p(x) = Σ πₖ𝒩 = ${tot<1e-4?tot.toExponential(3):fmt(tot,4)}${f.type==="M"?" · (이번 M-단계 직전 모수로 계산)":""}</p>`;
+  const pts=r.lls.map((v,j)=>[j+1,v]);const ys=r.lls,lo=Math.min(...ys),hi=Math.max(...ys),pad=Math.max((hi-lo)*.08,.02);
+  lineChart($("runCurve"),{xMin:1,xMax:Math.max(2,pts.length),yMin:lo-pad,yMax:hi+pad,xTicks:niceTicks(1,Math.max(2,pts.length),5).filter(v=>Number.isInteger(v)),xLabel:"반복 (E-단계에서 계산)",series:[{pts,color:"var(--k0)",dots:pts.length<40,hi:f.it?f.it-1:-1}],marker:f.it||null,markerLabel:f.ll!=null?"ℓ "+fmt(f.ll,3):""});
+  $("curveTitle").textContent="평균 로그우도 ℓ";$("curveHint").textContent="EM은 ℓ을 단조 증가시킵니다";$("curveNote").hidden=true;}
+};
+function countUnc(R,n,k){let c=0;for(let i=0;i<n;i++){let m=0;for(let j=0;j<k;j++)m=Math.max(m,R[i*k+j]);if(m<.8)c++;}return c;}
+function knee(srt){const n=srt.length,y0=srt[0],y1=srt[n-1];let b=0,bd=-Infinity;
+  for(let i=0;i<n;i++){const u=i/(n-1),v=(srt[i]-y0)/((y1-y0)||1);const d=u-v;if(d>bd){bd=d;b=i;}}return{i:b,v:srt[b]};}
+function sideKM(f){const X=S.X,n=X.length,isPP=S.algo==="kpp";$("runCurve").classList.remove("click");$("runCurve").onclick=null;$("curveNote").hidden=true;
+  legend([LG.ctr,`<span>배경 = 가장 가까운 중심의 영역 (보로노이)</span>`,isPP?`<span>뽑기 단계: 점 크기 = 뽑힐 확률</span>`:"",S.kmInit==="bad"&&!isPP?`<span><i class="pc-ring" style="border-color:var(--leak)"></i>몰린 초기화의 기준 점</span>`:"",LG.sel]);
+  let cap="";const k=S.k;
+  if(f.type==="pp0")cap=`<b>K-means++ 1단계</b>: 첫 중심은 데이터 점 중 하나를 <b>균등 무작위</b>로 고릅니다 → 점 <b>#${f.chosen+1}</b>. (seed ${S.seed})`;
+  else if(f.type==="pp"){const pr=f.D2[f.chosen]/f.tot;cap=`<b>중심 ${f.j+1} 뽑기</b>: 각 점의 <b>D(x)²</b>(가장 가까운 기존 중심까지 거리의 제곱)에 비례하는 확률로 뽑습니다. 멀리 있는 점일수록 크게 그렸습니다. 난수 u = ${fmt(f.u/f.tot,3)} × ΣD² → 점 <b>#${f.chosen+1}</b> (확률 ${pct(pr,1)}).`;}
+  else if(f.type==="init"){if(isPP)cap=`초기 중심 ${k}개가 정해졌습니다. 서로 멀리 퍼져 있어 나쁜 국소 최적에 빠질 가능성이 줄어듭니다. 이제 보통의 K-means(할당 ↔ 갱신)를 반복합니다.`;
+    else if(f.partial)cap=`<b>직접 클릭</b>: 캔버스를 눌러 초기 중심을 ${k}개 놓으세요 (${S.manual.length}/${k}). 다 놓으면 단계가 만들어집니다.`;
+    else if(S.kmInit==="bad")cap=`<b>한쪽에 몰린 초기화</b>: 빨간 원 점 근처의 점 ${k}개를 초기 중심으로 골랐습니다. 이렇게 시작하면 한 덩어리를 여러 중심이 나눠 갖고, 다른 덩어리들은 한 중심에 뭉쳐 <b>국소 최적</b>에 멈추기 쉽습니다.`;
+    else if(S.kmInit==="manual")cap=`직접 놓은 초기 중심 ${k}개로 시작합니다. <b>다음 단계</b>(또는 <span class="pc-kbd">→</span>)를 누르세요.`;
+    else if(isLocal())cap=`<b>국소 최적 사례</b> (무작위 초기화, seed 5): 초기 중심 두 개가 같은 덩어리 근처에서 출발합니다. 끝까지 진행하면 한 덩어리는 둘로 쪼개지고 다른 두 덩어리는 하나로 합쳐진 채 <b>수렴</b>합니다. 할당이 더 바뀌지 않으므로 K-means는 스스로 빠져나오지 못합니다.`;
+    else cap=`<b>초기 중심 ${k}개</b>를 데이터 점 중에서 무작위로 골랐습니다 (seed ${S.seed}). 아직 어떤 점도 군집에 속하지 않습니다. <b>다음 단계</b>(또는 <span class="pc-kbd">→</span>)를 누르면 ① 할당이 시작됩니다.`;}
+  else if(f.type==="assign")cap=f.conv?`<b>수렴</b> (반복 ${f.it-1}회): 다시 할당해도 바뀌는 점이 <b>0개</b>라 멈춥니다. 최종 WCSS = <b>${fmt(f.w,2)}</b>.${isLocal()&&!isPP?" 한 덩어리가 쪼개지고 두 덩어리가 합쳐진 <b>나쁜 국소 최적</b>입니다(최선은 58.95).":""} ${isLocal()&&!isPP?"":`이것은 <b>이 초기값에서의</b> 국소 최적입니다${isPP?"":" — 아래 n_init 카드에서 다른 초기값과 비교해 보세요"}.`}`
+      :`<b>반복 ${f.it} · ① 할당</b>: 각 점을 <b>가장 가까운 중심</b>의 군집으로 보냅니다(배경 = 보로노이 영역). 군집이 바뀐 점 <b>${f.ch}개</b>, WCSS = <b>${fmt(f.w,2)}</b>.`;
+  else if(f.type==="update")cap=`<b>반복 ${f.it} · ② 갱신</b>: 각 중심을 자기 군집 점들의 <b>평균 위치</b>로 옮깁니다(화살표). WCSS ${fmt(f.wPrev,2)} → <b>${fmt(f.w,2)}</b>.`;
+  $("runCap").innerHTML=cap;
+  const sizes=f.L?f.C.map((_,c)=>Array.from(f.L).filter(v=>v===c).length):null;
+  $("runStats").innerHTML=stat(f.conv?f.it-1:(f.it||0),"반복 (갱신 횟수)")+stat(f.w!=null?fmt(f.w,2):"–","WCSS")+stat(f.type==="assign"&&!f.conv?f.ch:f.conv?0:"–","바뀐 점")+(sizes?stat(sizes.join(" · "),"군집 크기"):"");
+  $("runFormula").textContent=(isPP?`K-means++  D(x) = 가장 가까운 기존 중심까지 거리\n           P(x를 다음 중심으로) = D(x)² / Σ D(x')²\n`:"")+`목적함수  WCSS = Σₖ Σ_{xᵢ∈Cₖ} ‖xᵢ − μₖ‖²\n① 할당   cᵢ = argminₖ ‖xᵢ − μₖ‖²\n② 갱신   μₖ = (1/|Cₖ|) Σ_{xᵢ∈Cₖ} xᵢ\n수렴     할당이 하나도 바뀌지 않으면 멈춤`;
+  const i=S.probe,xi=X[i];
+  if(f.type==="pp"){$("probeTitle").textContent=`D(x)² 비례 뽑기 (중심 ${f.j+1})`;renderRoulette(f);}
+  else if(f.type==="update"){const c=f.L[i],mem=X.filter((_,j)=>f.L[j]===c);const sx=mem.reduce((s,q)=>s+q[0],0),sy=mem.reduce((s,q)=>s+q[1],0);
+    $("probeTitle").textContent=`점 #${i+1}이 속한 군집 C${c+1}의 새 중심`;
+    $("runProbe").innerHTML=`<div class="sk-formula pc-pre">C${c+1}의 점 ${mem.length}개\nμ${subN(c+1)} = (Σx/${mem.length}, Σy/${mem.length}) = (${fmt(sx,2)}/${mem.length}, ${fmt(sy,2)}/${mem.length})\n   = ${pTxt(f.C[c])}   (이전 ${pTxt(f.Cp[c])})\n이동 거리 = ${fmt(Math.sqrt(sq(f.C[c],f.Cp[c])),3)}</div>`;}
+  else if(f.C&&f.C.length){const ds=f.C.map(c=>sq(xi,c)),b=ds.indexOf(Math.min(...ds));$("probeTitle").textContent=`점 #${i+1}과 각 중심의 거리²`;
+    $("runProbe").innerHTML=`<div class="sk-formula pc-pre">x = ${pTxt(xi)}\n${f.C.map((c,k2)=>`‖x − μ${subN(k2+1)}‖² = (${fmt(xi[0]-c[0],2)})² + (${fmt(xi[1]-c[1],2)})² = ${fmt(ds[k2],3)}${k2===b?"  ← 최소":""}`).join("\n")}\n→ ${cTag(b)}${f.type==="pp0"||f.type==="init"?" 로 갈 예정":""}</div>`;}
+  else{$("probeTitle").textContent="선택한 점의 계산";$("runProbe").innerHTML=`<p class="sk-hint" style="margin:0">중심이 정해지면 거리 계산이 보입니다.</p>`;}
+  wcssCurve(f);}
+function renderRoulette(f){const X=S.X,n=X.length,tot=f.tot,W=600,H=40;let x=0,s="";const prevC=f.prev.map(j=>X[j]);
+  for(let i=0;i<n;i++){const w=f.D2[i]/tot*W;if(w<=0)continue;const c=nearestIdx(X[i],prevC);s+=`<rect x="${x.toFixed(2)}" y="6" width="${Math.max(.3,w).toFixed(2)}" height="${H-12}" style="fill:${kvar(c)};opacity:${i===f.chosen?1:.55}"${i===f.chosen?' stroke="var(--ink)" stroke-width="2"':""}/>`;x+=w;}
+  const ux=f.u/tot*W;s+=`<line x1="${ux}" x2="${ux}" y1="0" y2="${H}" style="stroke:var(--ink);stroke-width:2.5"/><path d="M${ux-6},0 L${ux+6},0 L${ux},7 Z" style="fill:var(--ink)"/>`;
+  const top=Array.from(f.D2,(v,i)=>[i,v]).sort((a,b)=>b[1]-a[1]).slice(0,7);if(!top.some(t=>t[0]===f.chosen))top.push([f.chosen,f.D2[f.chosen]]);
+  $("runProbe").innerHTML=`<p class="pc-sub" style="margin-bottom:4px">룰렛: 칸 너비 = 뽑힐 확률 · 검은 선 = 난수 u</p><svg class="pc-roul" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:40px" aria-hidden="true">${s}</svg>
+  <div class="sk-scroll" style="margin-top:8px"><table class="sk-table pc-tbl"><thead><tr><th>점</th><th>D(x)</th><th>D(x)²</th><th>확률</th><th></th></tr></thead><tbody>${top.map(t=>`<tr${t[0]===f.chosen?' class="on"':""}><td>#${t[0]+1}</td><td class="n">${fmt(Math.sqrt(t[1]),3)}</td><td class="n">${fmt(t[1],3)}</td><td class="n">${pct(t[1]/tot,1)}</td><td>${t[0]===f.chosen?"뽑힘":""}</td></tr>`).join("")}</tbody></table></div>
+  <p class="sk-hint" style="margin:6px 0 0">ΣD(x)² = ${fmt(tot,2)} · 확률 큰 순서 7개 (+뽑힌 점)</p>`;}
+
+/* ---- 1번 탭: 알고리즘별 아래 카드 ---- */
+const jobX=Job();
+function renderExtras(){const a=S.algo;
+  if(a==="kmeans")renderNinit();
+  if(a==="kpp")renderPPdist();
+  if(a==="pam"){extrasFrame();renderPamKm();}
+  if(a==="dbscan")renderDbKm();
+  if(a==="meanshift")renderMsTable();
+  if(a==="gmm"){renderGmmSoft();renderBicCard();}}
+function extrasFrame(){if(S.algo==="pam")renderSwapTable();}
+function renderNinit(){const X=S.X,k=S.k,nI=S.nInit;const runs=[];for(let r=0;r<nI;r++){const res=lloyd(X,initRandom(X,k,rngFor(S.seed+r,1)).C);runs.push({seed:S.seed+r,w:res.wcss,it:res.nAssign});}
+  const best=runs.reduce((b,q)=>q.w<b.w-1e-12?q:b,runs[0]),worst=Math.max(...runs.map(q=>q.w));const nearBest=runs.filter(q=>q.w<=best.w*1.001).length;
+  const host=$("xNiChart"),W=Math.max(260,Math.round(host.clientWidth||600)),H=200,mL=52,mR=10,mT=12,mB=34,pw=W-mL-mR,ph=H-mT-mB,hi=worst*1.08;const Y=v=>mT+ph*(1-v/hi);let s="";
+  niceTicks(0,hi,4).forEach(v=>{s+=`<line class="gl" x1="${mL}" x2="${mL+pw}" y1="${Y(v)}" y2="${Y(v)}"/><text class="ax" x="${mL-6}" y="${Y(v)+4}" text-anchor="end">${fmt(v,0)}</text>`;});
+  const bw=pw/nI;runs.forEach((q,i)=>{const isB=q===best,cur=S.kmInit==="random"&&q.seed===S.seed;s+=`<rect class="bar" data-seed="${q.seed}" x="${mL+i*bw+bw*.15}" y="${Y(q.w)}" width="${bw*.7}" height="${mT+ph-Y(q.w)}" rx="2" style="fill:${isB?"var(--use)":q.w<=best.w*1.001?"color-mix(in srgb,var(--use) 45%,var(--surface))":"var(--line-strong)"};${cur?"stroke:var(--ink);stroke-width:2":""}"><title>실행 ${i+1} (seed ${q.seed}): WCSS ${fmt(q.w,2)}</title></rect>`;
+    if(nI<=20||i%5===0)s+=`<text class="ax" x="${mL+i*bw+bw/2}" y="${mT+ph+14}" text-anchor="middle">${i+1}</text>`;});
+  s+=`<line x1="${mL}" x2="${mL+pw}" y1="${Y(best.w)}" y2="${Y(best.w)}" style="stroke:var(--use);stroke-width:1.4;stroke-dasharray:5 4"/><text class="lbl" style="fill:var(--use)" x="${mL+pw-4}" y="${Y(best.w)-5}" text-anchor="end">최선 ${fmt(best.w,2)}</text><text class="axl" x="${mL+pw/2}" y="${H-3}" text-anchor="middle">실행 번호 (seed ${S.seed}부터)</text>`;
+  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" aria-hidden="true">${s}</svg>`;
+  host.querySelectorAll("rect.bar").forEach(b=>b.addEventListener("click",()=>{S.seed=+b.dataset.seed;S.kmInit="random";syncParamUI();stopPlay();rebuild("start");renderTab();}));
+  $("xNiStats").innerHTML=stat(fmt(best.w,2),"최선 WCSS (선택됨)","pc-good")+stat(fmt(worst,2),"최악 WCSS")+stat(`${nearBest} / ${nI}`,"최선에 도달한 실행")+stat(`seed ${best.seed}`,"최선 실행");
+  $("xNiProg").textContent=`k = ${k} · init="random"`;
+  $("xNiNote").innerHTML=nearBest===nI?`이 데이터에서는 ${nI}번 모두 같은 결과에 도달했습니다. <b>국소 최적 사례 불러오기</b>나 <b>크기·밀도가 다른 덩어리</b>, 더 큰 k로 바꿔 보세요.`:`${nI}번 중 <b>${nI-nearBest}번</b>은 더 나쁜 국소 최적(WCSS가 큼)에 멈췄습니다. <code>KMeans(n_init=${nI})</code>는 이 중 WCSS가 가장 작은 실행(초록 막대)을 최종 결과로 고릅니다.`;
+  $("xNiBest").onclick=()=>{S.seed=best.seed;S.kmInit="random";syncParamUI();stopPlay();rebuild("start");renderTab();};}
+$("xNi").addEventListener("input",e=>{S.nInit=+e.target.value;$("xNiV").textContent=S.nInit;renderNinit();});
+function renderPPdist(){const X=S.X,k=S.k,R=50;const A=[],B=[];
+  for(let s=0;s<R;s++){const ia=initRandom(X,k,rngFor(s,1)),ib=initPP(X,k,rngFor(s,2));const wa0=assignC(X,ia.C).w,wb0=assignC(X,ib.C).w;const ra=lloyd(X,ia.C),rb=lloyd(X,ib.C);A.push({w:ra.wcss,w0:wa0,it:ra.nAssign,s});B.push({w:rb.wcss,w0:wb0,it:rb.nAssign,s});}
+  const all=A.concat(B).map(q=>q.w),best=Math.min(...all),lo=best*.97,hi=Math.max(...all)*1.03;
+  const host=$("xPpChart"),W=Math.max(260,Math.round(host.clientWidth||600)),H=170,mL=96,mR=14,mT=14,mB=34,pw=W-mL-mR;const X_=v=>mL+pw*(v-lo)/((hi-lo)||1);let s="";
+  niceTicks(lo,hi,5).forEach(v=>{s+=`<line class="gl" x1="${X_(v)}" x2="${X_(v)}" y1="${mT}" y2="${H-mB}"/><text class="ax" x="${X_(v)}" y="${H-mB+15}" text-anchor="middle">${fmt(v,hi-lo<20?1:0)}</text>`;});
+  [[A,"무작위","var(--k1)",mT+30],[B,"K-means++","var(--k0)",mT+92]].forEach(([arr,nm,col,y])=>{s+=`<text class="axl" x="${mL-10}" y="${y+4}" text-anchor="end">${nm}</text>`;
+    const cnt={};arr.forEach(q=>{const key=Math.round(X_(q.w)/4);cnt[key]=(cnt[key]||0)+1;const off=((cnt[key]-1)%7-3)*5.5;s+=`<circle cx="${X_(q.w)}" cy="${y+off}" r="4" style="fill:${col};opacity:.75;stroke:var(--surface);stroke-width:1"><title>seed ${q.s}: ${fmt(q.w,2)}</title></circle>`;});
+    const m=arr.reduce((a,q)=>a+q.w,0)/arr.length;s+=`<line x1="${X_(m)}" x2="${X_(m)}" y1="${y-24}" y2="${y+24}" style="stroke:var(--ink);stroke-width:2"/>`;});
+  s+=`<text class="axl" x="${mL+pw/2}" y="${H-3}" text-anchor="middle">최종 WCSS (검은 세로선 = 평균)</text>`;host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" aria-hidden="true">${s}</svg>`;
+  const st=arr=>{const m=arr.reduce((a,q)=>a+q.w,0)/arr.length,m0=arr.reduce((a,q)=>a+q.w0,0)/arr.length,it=arr.reduce((a,q)=>a+q.it,0)/arr.length,ok=arr.filter(q=>q.w<=best*1.01).length;return{m,m0,it,ok,mx:Math.max(...arr.map(q=>q.w))};};
+  const a=st(A),b=st(B);$("xPpTable").innerHTML=`<thead><tr><th>초기화</th><th>초기 WCSS 평균</th><th>최종 WCSS 평균</th><th>최종 최악</th><th>평균 할당 횟수</th><th>최선 1% 이내</th></tr></thead><tbody>
+   <tr><td><span class="pc-dot" style="background:var(--k1)"></span>무작위 (init="random")</td><td class="n">${fmt(a.m0,2)}</td><td class="n">${fmt(a.m,2)}</td><td class="n">${fmt(a.mx,2)}</td><td class="n">${fmt(a.it,1)}</td><td class="n">${a.ok} / ${R}</td></tr>
+   <tr class="on"><td><span class="pc-dot" style="background:var(--k0)"></span>K-means++</td><td class="n">${fmt(b.m0,2)}</td><td class="n">${fmt(b.m,2)}</td><td class="n">${fmt(b.mx,2)}</td><td class="n">${fmt(b.it,1)}</td><td class="n">${b.ok} / ${R}</td></tr></tbody>`;
+  $("xPpProg").textContent=`k = ${k} · 데이터 ${PRE[S.preset].name}`;
+  $("xPpNote").innerHTML=`K-means++는 시작부터 WCSS가 작고(초기 ${fmt(a.m0,1)} → ${fmt(b.m0,1)}), 최선 근처에 도달하는 비율이 ${a.ok} → <b>${b.ok}</b> / ${R}입니다. 그래서 scikit-learn <code>KMeans</code>의 기본값이 <code>init="k-means++"</code>입니다. (scikit-learn은 후보 여러 개 중 가장 좋은 것을 고르는 greedy 변형을 씁니다.)`;}
+function renderSwapTable(){const f=FR.frames[S.frame],X=S.X,n=X.length;if(!f)return;
+  if(f.type==="build"){$("xSwTitle").textContent=`BUILD ${f.t+1}: 후보 점별 추가 후 총 거리`;
+    $("xSwTable").innerHTML=`<thead><tr><th>순위</th><th>후보 점</th><th>위치 (혈당, BMI)</th><th>${f.t?"추가 후 TD":"모든 점까지 거리 합"}</th></tr></thead><tbody>${f.cands.map((c,i)=>`<tr${i===0?' class="on"':""}><td class="n">${i+1}</td><td>#${c[0]+1}${i===0?" ← 선택":""}</td><td class="n">${pTxt(X[c[0]])}</td><td class="n">${fmt(c[1],3)}</td></tr>`).join("")}</tbody>`;
+    $("xSwNote").innerHTML=`BUILD는 욕심쟁이(greedy) 방식으로 메도이드를 하나씩 추가합니다. 메도이드 ${S.k}개가 다 정해지면 SWAP 단계에서 개선합니다.`;return;}
+  if(f.type==="swap"){$("xSwTitle").textContent=`SWAP ${f.s}회차: 교환 실행`;$("xSwTable").innerHTML=`<tbody><tr class="on"><td>M${f.sw[0]+1}: #${f.sw[1]+1} → #${f.sw[2]+1}</td><td class="n">ΔTD = ${fmt(f.sw[3],3)}</td><td class="n">TD = ${fmt(f.td,3)}</td></tr></tbody>`;$("xSwNote").innerHTML=`교환 후 다시 모든 (메도이드, 비메도이드) 쌍을 평가합니다.`;return;}
+  $("xSwTitle").textContent=f.type==="eval"?`SWAP ${f.s}회차: 교환 ${f.nPairs}가지 중 ΔTD가 작은 8개`:`완료: 교환 ${f.nPairs}가지 중 ΔTD가 작은 8개`;
+  $("xSwTable").innerHTML=`<thead><tr><th>순위</th><th>나가는 메도이드</th><th>들어오는 점</th><th>ΔTD</th><th>교환 후 TD</th></tr></thead><tbody>${f.top.map((q,i)=>`<tr class="${q[2]<-1e-9?"neg":"pos"}${i===0&&f.type==="eval"?" on":""}"><td class="n">${i+1}</td><td>${cTag(q[0])} #${f.M[q[0]]+1}</td><td>#${q[1]+1} ${pTxt(X[q[1]])}</td><td class="n d">${q[2]>=0?"+":""}${fmt(q[2],3)}</td><td class="n">${fmt(f.td+q[2],3)}</td></tr>`).join("")}</tbody>`;
+  $("xSwNote").innerHTML=f.type==="eval"?`ΔTD가 가장 작은(가장 음수인) 교환 하나만 실행합니다. 계산량이 메도이드 수 × 비메도이드 수 × 점 수 = ${S.k}×${n-S.k}×${n} ≈ ${fmt(S.k*(n-S.k)*n/1e6,2)}백만 번이라 데이터가 크면 느립니다.`:`모든 ΔTD ≥ 0 → 어떤 교환도 총 거리를 줄이지 못하므로 멈춥니다.`;}
+function matchTo(Cref,C){const k=C.length,pairs=[];C.forEach((c,j)=>Cref.forEach((r,q)=>pairs.push([j,q,sq(c,r)])));pairs.sort((a,b)=>a[2]-b[2]);const perm=new Array(k).fill(-1),used=new Set();
+  pairs.forEach(([j,q])=>{if(perm[j]<0&&!used.has(q)){perm[j]=q;used.add(q);}});for(let j=0;j<k;j++)if(perm[j]<0){let q=0;while(used.has(q))q++;perm[j]=q;used.add(q);}return perm;}
+function renderPamKm(){const X=S.X,km=FR.km,pr=FR.res;const perm=matchTo(km.C,pr.C),Cm=[];pr.C.forEach((c,j)=>Cm[perm[j]]=c);
+  drawResult($("cvPkA"),X,km,"kmeans");drawResult($("cvPkB"),X,{L:Int32Array.from(pr.L,l=>perm[l]),C:Cm},"pam");
+  const D=getD(),n=X.length;let tdKm=0;for(let i=0;i<n;i++)tdKm+=Math.sqrt(sq(X[i],km.C[km.L[i]]));
+  $("xPkA").textContent=`WCSS ${fmt(km.wcss,2)} · 총 거리 ${fmt(tdKm,2)}`;$("xPkB").textContent=`TD ${fmt(pr.td,2)} · 메도이드 #${pr.M.map(i=>i+1).join(", #")}`;
+  const pairs=pr.C.map(m=>{const j=nearestIdx(m,km.C);return Math.sqrt(sq(m,km.C[j]));});const mx=Math.max(...pairs);
+  $("xPkNote").innerHTML=`평균은 멀리 떨어진 점에 끌려가지만, 메도이드는 군집 안의 실제 점이라 덜 흔들립니다. 메도이드와 가장 가까운 K-means 중심 사이 거리: 최대 <b>${fmt(mx,2)}</b>. ${S.preset==="outlier"?"오른쪽 위 이상값들이 K-means 중심을 어디로 끌어가는지 보세요.":"<b>이상값 포함 데이터</b>로 바꾸면 차이가 뚜렷합니다."} 거리 합(제곱 아님)을 쓰기 때문에 이상값의 영향도 작습니다.`;}
+function renderDbKm(){const X=S.X,k=PRE[S.preset].k;const km=kmBest(X,k,10,"pp",0);const db=FR.res;
+  drawResult($("cvDkA"),X,km,"kmeans",{small:true});drawResult($("cvDkB"),X,{L:db.L,type:db.type},"dbscan",{small:true});
+  $("xDkAt").textContent=`K-means (k = ${k})`;$("xDkBt").textContent=`DBSCAN (eps ${fmt(S.eps,2)}, min_samples ${S.minS})`;
+  const D=getD(),n=X.length,sa=silhouette(D,n,km.L).mean,sb=silhouette(D,n,db.L).mean;const noise=Array.from(db.L).filter(v=>v<0).length;
+  $("xDkA").textContent=`군집 ${k} · 실루엣 ${fmt(sa,3)}`;$("xDkB").textContent=`군집 ${db.nC} · 잡음 ${noise} · 실루엣 ${fmt(sb,3)}`;
+  $("xDkNote").innerHTML=(S.preset==="moons"||S.preset==="circles")?`K-means는 중심에서 가까운 점끼리 묶어 <b>직선 경계</b>로 공간을 나누므로 달·고리 모양을 가로질러 자릅니다. DBSCAN은 밀도로 이어진 점을 따라가므로 모양을 그대로 찾습니다. 단, <b>실루엣은 둥근 군집에 유리한 지표</b>라 올바른 DBSCAN 결과가 오히려 낮게 나올 수 있습니다.`:`지금 데이터는 ${PRE[S.preset].name}입니다. <b>달 모양 2개</b>나 <b>동심원</b>을 불러와 비교해 보세요. 잡음 점(×)은 실루엣 계산에서 뺐습니다.`;}
+$("xDbMoons").onclick=()=>{stopPlay();loadPreset("moons");};$("xDbCircles").onclick=()=>{stopPlay();loadPreset("circles");};
+$("xPkLoad").onclick=()=>{stopPlay();loadPreset("outlier");};
+function gBestSeed(){const g=gmmBest(S.X,S.k,S.cov,S.gInit,S.seed,5);S.seed=g.seed;syncParamUI();stopPlay();rebuild("start");renderTab();}
+$("xGsLoad").onclick=()=>{stopPlay();loadPreset("aniso");S.seed=0;gBestSeed();};$("aGBest").onclick=gBestSeed;
+function renderMsTable(){const r=FR.res,X=S.X,n=X.length,D=getD();const e=estimateBW(D,n,.3);
+  $("xMsTable").innerHTML=`<thead><tr><th>봉우리</th><th>위치 (혈당, BMI)</th><th>창 안 점 수</th><th>속한 점</th></tr></thead><tbody>${r.C.map((c,k)=>`<tr><td>${cTag(k)}</td><td class="n">${pTxt(c)}</td><td class="n">${r.cint[k]}</td><td class="n">${Array.from(r.L).filter(v=>v===k).length}</td></tr>`).join("")}</tbody>`;
+  $("xMsEst").textContent=`estimate_bandwidth(X, quantile=0.3)\n  이웃 수 = ⌊n × 0.3⌋ = ⌊${n} × 0.3⌋ = ${e.nn}  (자기 자신 포함)\n  점마다 ${e.nn}번째 이웃까지 거리 → 평균\n  h = ${fmt(e.bw,3)}`;
+  $("xMsNote").innerHTML=`출발점 ${n}개가 도착한 서로 다른 위치는 ${r.nUnique}곳이고, 서로 h 안에 있는 것을 합쳐 <b>${r.C.length}개</b>가 남았습니다. h가 작으면 작은 봉우리가 많아져 군집이 잘게 나뉘고, 크면 합쳐집니다. 2번 탭에서 h에 따른 군집 수를 볼 수 있습니다. 현재 h = ${fmt(S.bw,2)}.`;}
+function renderGmmSoft(){const X=S.X,k=S.k,g=gmmBest(X,k,S.cov,S.gInit,S.seed,5);const km=kmBest(X,k,10,"pp",S.seed);drawResult($("cvGsA"),X,km,"kmeans",{small:true});drawResult($("cvGsB"),X,{L:g.L,P:g.P,R:g.R},"gmm",{small:true,soft:true});
+  const n=X.length,unc=countUnc(g.R,n,k);let agree=0;const D=getD();
+  $("xGsA").textContent=`WCSS ${fmt(km.wcss,2)} · 실루엣 ${fmt(silhouette(D,n,km.L).mean,3)}`;$("xGsB").textContent=`ℓ ${fmt(g.ll,3)} · 소속 애매한 점 ${unc}개 · 실루엣 ${fmt(silhouette(D,n,g.L).mean,3)}`;
+  $("xGsNote").innerHTML=`(GMM은 seed ${S.seed}~${S.seed+4} 초기값 5번 중 로그우도가 가장 큰 결과, K-means는 n_init=10.) K-means는 모든 점을 군집 하나에만 넣고(경계 근처도 확신 100%), 군집을 <b>같은 크기의 원</b>으로 가정합니다. GMM은 각 점에 <b>확률</b>을 주고 공분산으로 <b>기울어진 타원</b>을 표현합니다. ${S.preset==="aniso"?"길쭉한 타원 데이터에서 K-means가 타원을 가로질러 자르는 반면, GMM(full)은 타원 방향을 따라 나눕니다.":"<b>길쭉한 타원 데이터</b>에서 차이가 가장 큽니다."} 공분산 유형을 diag·spherical로 바꾸면 GMM도 K-means처럼 실패합니다.`;}
+function bicSeries(cb){const X=S.X,n=X.length,cov=S.cov,out=[];return function*(){for(let k=2;k<=10;k++){let best=null;for(let r=0;r<3;r++){const g=gmm(X,k,cov,"kmeans",S.seed+r,false);if(!best||g.ll>best.ll)best=g;yield;}
+  const p=nParams(k,cov);out.push({k,ll:best.ll,bic:-2*best.ll*n+p*Math.log(n),aic:-2*best.ll*n+2*p,p});}return out;};}
+const jobBic=Job();
+function drawBic(host,note,res){const ys=res.flatMap(q=>[q.bic,q.aic]),lo=Math.min(...ys),hi=Math.max(...ys),pad=Math.max((hi-lo)*.08,1e-3*Math.max(1,Math.abs(hi)));const bb=res.reduce((a,q)=>q.bic<a.bic?q:a),ba=res.reduce((a,q)=>q.aic<a.aic?q:a);
+  lineChart(host,{xMin:2,xMax:10,yMin:lo-pad,yMax:hi+pad,xTicks:[2,3,4,5,6,7,8,9,10],xLabel:`성분 수 k (covariance_type="${S.cov}")`,series:[{pts:res.map(q=>[q.k,q.bic]),color:"var(--tune)",dots:true,hi:bb.k-2},{pts:res.map(q=>[q.k,q.aic]),color:"var(--eval)",dots:true,dash:"6 4",hi:ba.k-2}],marker:S.k,markerLabel:"현재 k="+S.k});
+  note.innerHTML=`BIC 최소 <b>k = ${bb.k}</b> (BIC ${fmt(bb.bic,1)}), AIC 최소 <b>k = ${ba.k}</b>. 모수 개수 p = ${S.cov==="full"?"6k − 1":S.cov==="diag"?"5k − 1":"4k − 1"}(2차원, ${S.cov}). BIC는 ln n = ${fmt(Math.log(S.X.length),2)}배 벌점이라 AIC보다 작은 k를 고르는 편입니다. 각 k마다 초기값 3번 중 로그우도가 가장 큰 결과를 썼습니다.`;}
+function renderBicCard(){$("xBicProg").textContent="계산 중…";jobBic.run(bicSeries(),res=>{$("xBicProg").textContent=`k = 2 ~ 10 · n = ${S.X.length}`;drawBic($("xBicChart"),$("xBicNote"),res);});}
+
+/* ================= 2. 군집 수 고르기 ================= */
+const jobK=Job();
+function familyRun(k){const X=S.X,a=S.algo;if(a==="pam")return pam(X,getD(),k,false);if(a==="gmm")return gmm(X,k,S.cov,"kmeans",S.seed,false);return kmBest(X,k,10,a==="kpp"?"pp":"rand",S.seed);}
+function renderPick(){const a=S.algo,X=S.X,n=X.length,D=getD();const noK=a==="dbscan"||a==="meanshift";
+  $("kSelWrap").hidden=noK;$("kApply").hidden=noK;$("kBicCard").hidden=a!=="gmm";
+  $("kTitle").textContent=noK?`${ANAME[a]}: 군집 수 대신 ${a==="dbscan"?"eps":"bandwidth"}를 고른다`:`군집 수 k 고르기 (${ANAME[a]})`;
+  $("kLead").innerHTML=noK?`${ANAME[a]}는 k를 받지 않습니다. 대신 ${a==="dbscan"?"eps(와 min_samples)":"bandwidth"}가 군집 수를 결정합니다. 오른쪽 그래프는 그 값을 바꿔 가며 군집 수와 실루엣을 계산한 결과입니다. 엘보 그래프는 K-means 기준 참고용입니다.`:`k = 2 ~ 10으로 바꿔 가며 ${a==="gmm"?"GMM":a==="pam"?"K-medoids":"K-means"}를 실행했습니다. 엘보(WCSS)는 줄어드는 폭이 꺾이는 곳, 실루엣은 가장 큰 곳, ${a==="gmm"?"BIC는 가장 작은 곳이":"두 기준이"} 후보입니다. 정답 라벨이 없으므로 여러 지표와 해석을 함께 봅니다.`;
+  $("kProg").textContent="계산 중…";
+  jobK.run(function*(){const el=[],sil=[],labs={};for(let k=2;k<=10;k++){const r=kmBest(X,k,10,S.algo==="kpp"?"pp":"rand",S.seed);el.push([k,r.wcss]);yield;
+      if(!noK){const fr=a==="kmeans"||a==="kpp"?r:familyRun(k);labs[k]=fr;sil.push([k,silhouette(D,n,fr.L).mean]);yield;}}
+    let sweep=null;if(noK){sweep=[];const vals=a==="dbscan"?Array.from({length:19},(_,i)=>+(0.1+i*.05).toFixed(2)):Array.from({length:18},(_,i)=>+(0.3+i*.1).toFixed(2));
+      for(const v of vals){const r=a==="dbscan"?dbscan(X,D,v,S.minS):meanShift(X,v);const nC=a==="dbscan"?r.nC:r.C.length;sweep.push({v,nC,sil:silhouette(D,n,r.L).mean,noise:a==="dbscan"?Array.from(r.L).filter(q=>q<0).length:0});yield;}}
+    let bic=null;if(a==="gmm"){const g=bicSeries()();let r;while(!(r=g.next()).done)yield;bic=r.value;}
+    return{el,sil,labs,sweep,bic};},res=>{PICK=res;$("kProg").textContent=`데이터 ${PRE[S.preset].name} · n = ${n}`;drawPick();});}
+let PICK=null;
+function drawPick(){if(!PICK)return;const a=S.algo,noK=a==="dbscan"||a==="meanshift",X=S.X,n=X.length,D=getD();
+  const el=PICK.el,ys=el.map(q=>q[1]);const kn=elbowK(el);
+  lineChart($("kElbow"),{xMin:2,xMax:10,yMin:0,yMax:Math.max(...ys)*1.08,xTicks:[2,3,4,5,6,7,8,9,10],xLabel:"군집 수 k",series:[{pts:el,color:"var(--k0)",dots:true,hi:kn-2}],marker:noK?null:+$("kSel").value,markerLabel:noK?"":"k="+$("kSel").value});
+  $("kElbowNote").innerHTML=`k를 늘리면 WCSS는 <b>항상</b> 줄어듭니다(k = n이면 0). 그래서 최솟값이 아니라 줄어드는 폭이 급히 작아지는 <b>팔꿈치</b>를 봅니다. 이 데이터의 꺾임(직선에서 가장 먼 점): <b>k ≈ ${kn}</b>.`;
+  if(!noK){const sil=PICK.sil,b=sil.reduce((p,q)=>q[1]>p[1]?q:p);$("kSilTitle").textContent=`실루엣 평균 (${a==="gmm"?"GMM":a==="pam"?"K-medoids":"K-means"})`;
+    lineChart($("kSil"),{xMin:2,xMax:10,yMin:Math.min(0,...sil.map(q=>q[1])),yMax:1,xTicks:[2,3,4,5,6,7,8,9,10],xLabel:"군집 수 k",yTicks:niceTicks(Math.min(0,...sil.map(q=>q[1])),1,5),yFmt:v=>fmt(v,1),series:[{pts:sil,color:"var(--use)",dots:true,hi:b[0]-2}],marker:+$("kSel").value,markerLabel:"k="+$("kSel").value});
+    $("kSilNote").innerHTML=`실루엣 평균이 가장 큰 k = <b>${b[0]}</b> (${fmt(b[1],3)}). 엘보와 실루엣이 다르면 도메인 해석(예: 환자군을 몇 개로 나눌 때 의미 있는가)으로 정합니다.`;
+    if(a==="gmm"&&PICK.bic)drawBic($("kBic"),$("kBicNote"),PICK.bic);
+    const k=+$("kSel").value,fr=PICK.labs[k];drawSilDia(fr.L,`k = ${k}`);drawSilCalc(fr,k);}
+  else{const sw=PICK.sweep;const nm=a==="dbscan"?"eps":"bandwidth";const cur=a==="dbscan"?S.eps:S.bw;$("kSilTitle").textContent=`${nm}에 따른 군집 수와 실루엣`;
+    const mxC=Math.max(...sw.map(q=>q.nC),2);
+    lineChart($("kSil"),{xMin:sw[0].v,xMax:sw[sw.length-1].v,yMin:Math.min(0,...sw.map(q=>isFinite(q.sil)?q.sil:0)),yMax:1.12,yTicks:[0,.2,.4,.6,.8,1],xTicks:niceTicks(sw[0].v,sw[sw.length-1].v,5),xFmt:v=>fmt(v,1),xLabel:nm,yFmt:v=>fmt(v,1),
+      series:[{pts:sw.map(q=>[q.v,q.sil]),color:"var(--use)",dots:true},{pts:sw.map(q=>[q.v,q.nC/mxC]),color:"var(--k0)",dash:"5 4",dots:true,labels:sw.map((q,i)=>i===0||q.nC!==sw[i-1].nC?q.nC+"개":null)}],marker:cur,markerLabel:"현재 "+fmt(cur,2)});
+    $("kSilNote").innerHTML=`<span style="color:var(--use);font-weight:700">실선 = 실루엣 평균</span> · <span style="color:var(--k0);font-weight:700">점선 = 군집 수 (숫자 = 바뀌는 지점의 군집 수)</span>. ${sw.map(q=>`${fmt(q.v,2)}→${q.nC}개`).filter((_,i)=>i%3===0).join(", ")} … ${a==="dbscan"?"잡음 점은 실루엣에서 뺐습니다.":""} 실루엣이 둥근 군집을 선호한다는 점도 기억하세요.`;
+    const r=FR.res;drawSilDia(r.L,`현재 결과 (${nm} ${fmt(cur,2)})`);drawSilCalc({L:r.L,C:r.C},null);}}
+function elbowK(el){const n=el.length,y0=el[0][1],y1=el[n-1][1];let b=el[0][0],bd=-Infinity;el.forEach((q,i)=>{const u=i/(n-1),v=(q[1]-y1)/((y0-y1)||1),d=(1-u)-v;if(d>bd){bd=d;b=q[0];}});return b;}
+function drawSilDia(L,title){const D=getD(),n=S.X.length,sil=silhouette(D,n,L);const host=$("kDia");$("kDiaTitle").textContent="점별 실루엣 도표 · "+title;
+  if(!isFinite(sil.mean)){host.innerHTML=`<p class="sk-hint" style="margin:0">군집이 2개 이상이어야 실루엣을 계산할 수 있습니다.</p>`;return;}
+  const labs=[...new Set(Array.from(L).filter(v=>v>=0))].sort((a,b)=>a-b);const W=Math.max(260,Math.round(host.clientWidth||520)),gap=6,H=Math.max(220,Math.min(420,sil.used*1.4+labs.length*gap+50)),mL=44,mR=14,mT=10,mB=34,pw=W-mL-mR,ph=H-mT-mB-gap*(labs.length-1);
+  const lo=Math.min(-.2,Math.floor(Math.min(...Array.from(sil.s).filter(isFinite))*10)/10),hi=1;const X_=v=>mL+pw*(v-lo)/(hi-lo);const bh=ph/sil.used;let s="",y=mT;
+  niceTicks(lo,hi,6).forEach(v=>{s+=`<line class="${v===0?"gl0":"gl"}" x1="${X_(v)}" x2="${X_(v)}" y1="${mT}" y2="${H-mB}"/><text class="ax" x="${X_(v)}" y="${H-mB+15}" text-anchor="middle">${fmt(v,1)}</text>`;});
+  labs.forEach(c=>{const vals=[];for(let i=0;i<n;i++)if(L[i]===c)vals.push(sil.s[i]);vals.sort((a,b)=>b-a);let d=`M${X_(0)},${y}`;vals.forEach((v,j)=>{d+=`L${X_(v)},${y+j*bh}L${X_(v)},${y+(j+1)*bh}`;});d+=`L${X_(0)},${y+vals.length*bh}Z`;
+    s+=`<path d="${d}" style="fill:${kvar(c)};opacity:.85"/><text class="lbl" x="${mL-6}" y="${y+vals.length*bh/2+4}" text-anchor="end" style="fill:${kvar(c)}">C${c+1}</text>`;y+=vals.length*bh+gap;});
+  s+=`<line x1="${X_(sil.mean)}" x2="${X_(sil.mean)}" y1="${mT}" y2="${H-mB}" style="stroke:var(--leak);stroke-width:1.6;stroke-dasharray:5 4"/><text class="lbl" style="fill:var(--leak)" x="${X_(sil.mean)+5}" y="${mT+12}">평균 ${fmt(sil.mean,3)}</text><text class="axl" x="${mL+pw/2}" y="${H-3}" text-anchor="middle">실루엣 계수 s(i)</text>`;
+  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" aria-hidden="true">${s}</svg>`;}
+function drawSilCalc(fr,k){const D=getD(),n=S.X.length,i=S.probe,d=silDetail(D,n,fr.L,i);const algo=S.algo==="pam"?"pam":S.algo==="gmm"?"gmm":S.algo==="dbscan"?"dbscan":S.algo==="meanshift"?"meanshift":"kmeans";
+  drawResult($("cvKSil"),S.X,algo==="dbscan"?{L:fr.L,type:FR.res.type}:algo==="gmm"?{L:fr.L,P:fr.P}:{L:fr.L,C:fr.C||null},algo,{small:true,overlay:(V,p,r)=>{const q=S.X[i];dot(V.ctx,V.X(q[0]),V.Y(q[1]),r+4,null,rgb(p.ink),2);}});
+  if(!d){$("kSilF").textContent=`점 #${i+1}은 잡음(−1)이라 실루엣 계산에서 뺍니다.`;return;}
+  $("kSilF").textContent=`점 #${i+1} (군집 C${d.own+1}${k?", k = "+k:""})\na(i) = 같은 군집 다른 점 ${d.m[d.own].c-1}개까지 평균 거리 = ${fmt(d.a,3)}\n${d.lab.filter(c=>c!==d.own).map(c=>`  C${c+1}까지 평균 거리 = ${fmt(d.m[c].s/d.m[c].c,3)}${c===d.bc?"  ← 최소":""}`).join("\n")}\nb(i) = 가장 가까운 다른 군집까지 평균 거리 = ${fmt(d.b,3)}\ns(i) = (b − a) / max(a, b) = (${fmt(d.b,3)} − ${fmt(d.a,3)}) / ${fmt(Math.max(d.a,d.b),3)} = ${fmt(d.s,3)}`;}
+$("kSel").addEventListener("input",e=>{$("kSelV").textContent=e.target.value;drawPick();});
+$("kApply").onclick=()=>{S.k=+$("kSel").value;syncParamUI();rebuild("end");showTab("run");};
+
+/* ================= 3. 알고리즘 비교 ================= */
+const jobC=Job();
+function curParams(){return{k:S.k,seed:S.seed,kmInit:S.kmInit,manual:S.manual,eps:S.eps,minS:S.minS,bw:S.bw,cov:S.cov,gInit:S.gInit};}
+function runFinal(a,X,D,P){if(a==="kmeans"){let C;if(P.kmInit==="manual"&&P.manual.length>=P.k)C=P.manual.slice(0,P.k);else C=(P.kmInit==="bad"?initBad(X,P.k,rngFor(P.seed,3)):initRandom(X,P.k,rngFor(P.seed,1))).C;const r=lloyd(X,C);return{L:r.L,C:r.C,nC:P.k,txt:`WCSS ${fmt(r.wcss,1)}`};}
+  if(a==="kpp"){const r=lloyd(X,initPP(X,P.k,rngFor(P.seed,2)).C);return{L:r.L,C:r.C,nC:P.k,txt:`WCSS ${fmt(r.wcss,1)}`};}
+  if(a==="pam"){const r=pam(X,D,P.k,false);return{L:r.L,C:r.C,nC:P.k,txt:`TD ${fmt(r.td,1)}`};}
+  if(a==="dbscan"){const r=dbscan(X,D,P.eps,P.minS);const nz=Array.from(r.L).filter(v=>v<0).length;return{L:r.L,type:r.type,nC:r.nC,txt:`잡음 ${nz}`};}
+  if(a==="meanshift"){const r=meanShift(X,P.bw);return{L:r.L,C:r.C,nC:r.C.length,txt:`h ${fmt(P.bw,2)}`};}
+  const g=P.nInit>1?gmmBest(X,P.k,P.cov,P.gInit,P.seed,P.nInit):gmm(X,P.k,P.cov,P.gInit,P.seed,false);return{L:g.L,P:g.P,R:g.R,nC:P.k,txt:`ℓ ${fmt(g.ll,2)}`};}
+function renderCompare(){const X=S.X,D=getD(),n=X.length,P=curParams();
+  $("cmpThumbs").innerHTML=ALGOS.map(a=>`<div class="pc-th"><b>${ANAME[a]}</b><canvas id="th-${a}" aria-label="${ANAME[a]} 결과"></canvas><span id="ths-${a}">계산 중…</span></div>`).join("");
+  const rows=[["K-means","필요 (k)","둥글고 크기가 비슷한 볼록 덩어리","없음 · 중심이 이상값에 끌려감","하드","빠름 · O(n·k·반복)","큼 · 표준화 필수"],
+    ["K-means++","필요 (k)","K-means와 같음","없음","하드","초기화 O(n·k) 추가, 수렴은 더 빠름","큼 · 표준화 필수"],
+    ["K-medoids (PAM)","필요 (k)","둥근 덩어리 · 중심 = 실제 점","강함 (거리 합 · 실제 점)","하드","느림 · SWAP 1회 O(k·(n−k)·n)","큼 · 어떤 거리도 사용 가능"],
+    ["DBSCAN","불필요 (eps, min_samples)","모양 자유 · 밀도로 연결","잡음(−1)으로 분리","하드","O(n log n) ~ O(n²)","큼 · eps가 거리 단위"],
+    ["Mean Shift","불필요 (bandwidth)","밀도 봉우리 · 모양 일부 자유","작은 봉우리로 남거나 흡수","하드","느림 · O(n²·반복)","큼 · h가 거리 단위"],
+    ["GMM (EM)","필요 (성분 수 · BIC로 선택)","타원 (가우스 분포)","확률이 낮게 나올 뿐 분리 안 함","소프트 (확률)","중간 · O(n·k·d²·반복)","작음 (full 공분산) · 초기화는 영향"]];
+  $("cmpTable").innerHTML=`<thead><tr><th>알고리즘</th><th>군집 수 지정</th><th>모양 가정</th><th>잡음·이상값</th><th>소프트/하드</th><th>계산량</th><th>스케일 민감도</th></tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}</tbody>`;
+  const mx=$("cmpMatrix");mx.innerHTML=`<div class="h"></div>`+ALGOS.map(a=>`<div class="h">${ANAME[a]}</div>`).join("")+PKEYS.map(pk=>`<div class="r">${PRE[pk].name}</div>`+ALGOS.map(a=>`<div class="c"><canvas id="mx-${pk}-${a}" aria-label="${PRE[pk].name}, ${ANAME[a]}"></canvas><span id="mxs-${pk}-${a}">…</span></div>`).join("")).join("");
+  $("cmpProg").textContent="계산 중…";
+  jobC.run(function*(){for(const a of ALGOS){const r=runFinal(a,X,D,P);const s=silhouette(D,n,r.L).mean;drawResult($("th-"+a),X,r,a,{small:true,soft:true});$("ths-"+a).textContent=`군집 ${r.nC} · 실루엣 ${fmt(s,2)} · ${r.txt}`;yield;}
+    for(const pk of PKEYS){const pr=PRE[pk],Xp=makeData(pk,1,pr.n),Dp=distMat(Xp);const pp={k:pr.k,seed:0,kmInit:"random",manual:[],eps:pr.eps,minS:pr.minS,bw:pr.bw,cov:"full",gInit:"kmeans",nInit:5};
+      for(const a of ALGOS){const r=runFinal(a,Xp,Dp,pp);drawResult($("mx-"+pk+"-"+a),Xp,r,a,{small:true});$("mxs-"+pk+"-"+a).textContent=`${r.nC}개 · s ${fmt(silhouette(Dp,Xp.length,r.L).mean,2)}`;yield;}}},()=>{$("cmpProg").textContent="데이터 seed 1 · 각 모양의 기본값";});}
+
+/* ================= 4. 코드 ================= */
+let codeTxt="";
+function hl(code){return code.split("\n").map(line=>{const i=line.indexOf("#");let a=line,c="";if(i>=0&&!/["'][^"']*#/.test(line.slice(0,i+1))){a=line.slice(0,i);c=line.slice(i);}
+  let out="",last=0;a.replace(/"[^"]*"|\b(?:import|from|for|in|print|range|round|True|False|None|as|def|return|if|else|while|len|lambda)\b/g,(m,off)=>{out+=esc(a.slice(last,off))+(m[0]==='"'?`<span class="st">${esc(m)}</span>`:`<span class="kw">${m}</span>`);last=off+m.length;return m;});
+  return out+esc(a.slice(last))+(c?`<span class="cm">${esc(c)}</span>`:"");}).join("\n");}
+function genCode(){const all=$("cAll").checked,inc=$("cData").checked,sc=$("cScale").checked,plot=$("cPlot").checked,own=$("cPam").checked;const algos=all?ALGOS:[S.algo];const X=S.X,n=X.length;
+  let c=`import numpy as np\n`;if(sc)c+=`from sklearn.preprocessing import StandardScaler\n`;c+=`from sklearn.metrics import silhouette_score\n`;
+  const need=new Set(algos);if(need.has("kmeans")||need.has("kpp")||need.has("gmm"))c+=`from sklearn.cluster import KMeans\n`;if(need.has("dbscan"))c+=`from sklearn.cluster import DBSCAN\nfrom sklearn.neighbors import NearestNeighbors\n`;
+  if(need.has("meanshift"))c+=`from sklearn.cluster import MeanShift, estimate_bandwidth\n`;if(need.has("gmm"))c+=`from sklearn.mixture import GaussianMixture\n`;
+  if(need.has("pam")&&!own)c+=`from sklearn_extra.cluster import KMedoids   # pip install scikit-learn-extra\n`;if(plot)c+=`import matplotlib.pyplot as plt\n`;
+  c+=`\n# 1) 데이터: 열 = [혈당, BMI]\n`;
+  if(inc){c+=`# 시뮬레이터 화면의 점 ${n}개 (이미 표준화된 z 단위)\nX = np.array([\n`;for(let i=0;i<n;i+=4)c+="    "+X.slice(i,i+4).map(q=>`[${q[0]}, ${q[1]}]`).join(", ")+",\n";c+=`])\n`;}
+  else c+=genData();
+  c+=sc?`\n# 2) 거리 기반 알고리즘은 특성 단위에 민감 → 표준화 (평균 0, 표준편차 1)\nX_s = StandardScaler().fit_transform(X)${inc?"   # 화면과 똑같은 숫자를 원하면 X_s = X 로 두세요":""}\n`:`\nX_s = X   # 표준화 생략 (혈당·BMI처럼 단위가 다르면 꼭 StandardScaler를 쓰세요)\n`;
+  if(need.has("pam")&&own)c+=`\n# K-medoids(PAM) 직접 구현: BUILD 후 SWAP (scikit-learn-extra가 NumPy 2와 안 맞을 때)\ndef pam(X, k, max_iter=300):\n    D = np.sqrt(((X[:, None, :] - X[None, :, :]) ** 2).sum(-1))\n    n = len(X)\n    medoids = [int(D.sum(axis=0).argmin())]              # BUILD 1: 거리 합 최소인 점\n    while len(medoids) < k:                               # BUILD: TD를 가장 많이 줄이는 점 추가\n        near = D[:, medoids].min(axis=1)\n        gain = np.maximum(near[:, None] - D, 0).sum(axis=0)\n        gain[medoids] = -1\n        medoids.append(int(gain.argmax()))\n    for _ in range(max_iter):                             # SWAP: 가장 좋은 교환 하나씩\n        td = D[:, medoids].min(axis=1).sum()\n        best = (0, None, None)\n        for mi in range(k):\n            for o in range(n):\n                if o in medoids:\n                    continue\n                trial = medoids[:mi] + [o] + medoids[mi + 1:]\n                delta = D[:, trial].min(axis=1).sum() - td\n                if delta < best[0] - 1e-9:\n                    best = (delta, mi, o)\n        if best[1] is None:\n            break\n        medoids[best[1]] = best[2]\n    labels = D[:, medoids].argmin(axis=1)\n    return np.array(medoids), labels, D[:, medoids].min(axis=1).sum()\n`;
+  let step=3;const res=[];
+  algos.forEach(a=>{c+=`\n# ${step++}) ${ANAME[a]}\n`;
+    if(a==="kmeans"){if(S.kmInit==="manual"&&S.manual.length>=S.k){c+=`init_centers = np.array(${JSON.stringify(S.manual.slice(0,S.k))})   # 직접 놓은 초기 중심\nkm = KMeans(n_clusters=${S.k}, init=init_centers, n_init=1)\n`;}
+      else c+=`km = KMeans(n_clusters=${S.k}, init="random", n_init=${S.nInit}, random_state=${S.seed})   # 무작위 초기화 ${S.nInit}번 중 WCSS 최소\n`;
+      c+=`labels_km = km.fit_predict(X_s)\nprint("K-means WCSS(inertia_):", round(km.inertia_, 3), " 반복:", km.n_iter_)\nprint("실루엣:", round(silhouette_score(X_s, labels_km), 3))\n`;res.push(["labels_km","K-means"]);}
+    if(a==="kpp"){c+=`kpp = KMeans(n_clusters=${S.k}, init="k-means++", n_init=1, random_state=${S.seed})\nlabels_kpp = kpp.fit_predict(X_s)\nprint("K-means++ WCSS:", round(kpp.inertia_, 3))\n# 무작위 초기화와 비교: seed 50개의 최종 WCSS\nfor init in ["random", "k-means++"]:\n    w = [KMeans(${S.k}, init=init, n_init=1, random_state=s).fit(X_s).inertia_ for s in range(50)]\n    print(init, "평균", round(np.mean(w), 3), "최악", round(np.max(w), 3))\n`;res.push(["labels_kpp","K-means++"]);}
+    if(a==="pam"){c+=own?`medoid_idx, labels_pam, td = pam(X_s, ${S.k})\nprint("메도이드 행 번호:", medoid_idx, " 총 거리 TD:", round(td, 3))\n`:`pam = KMedoids(n_clusters=${S.k}, metric="euclidean", method="pam", init="build", max_iter=300)\nlabels_pam = pam.fit_predict(X_s)\nprint("메도이드 행 번호:", pam.medoid_indices_, " 총 거리 TD:", round(pam.inertia_, 3))\n`;c+=`print("실루엣:", round(silhouette_score(X_s, labels_pam), 3))\n`;res.push(["labels_pam","K-medoids"]);}
+    if(a==="dbscan"){c+=`# eps 고르기: k-거리 그래프 (k = min_samples, 자기 자신 포함)\nnn = NearestNeighbors(n_neighbors=${S.minS}).fit(X_s)\nk_dist = np.sort(nn.kneighbors(X_s)[0][:, -1])\n# plt.plot(k_dist); plt.axhline(${S.eps})   # 꺾이는 무릎 근처가 eps 후보\n\ndb = DBSCAN(eps=${S.eps}, min_samples=${S.minS})\nlabels_db = db.fit_predict(X_s)      # -1 = 잡음\nn_clusters = len(set(labels_db)) - (1 if -1 in labels_db else 0)\nprint("군집 수:", n_clusters, " 잡음:", (labels_db == -1).sum(), " 핵심점:", len(db.core_sample_indices_))\nmask = labels_db != -1\nif n_clusters >= 2:\n    print("실루엣(잡음 제외):", round(silhouette_score(X_s[mask], labels_db[mask]), 3))\n`;res.push(["labels_db","DBSCAN"]);}
+    if(a==="meanshift"){c+=`print("estimate_bandwidth:", round(estimate_bandwidth(X_s, quantile=0.3), 3))   # 자동 추정값\nms = MeanShift(bandwidth=${S.bw})          # 평평한 커널, 모든 점에서 출발\nlabels_ms = ms.fit_predict(X_s)\nprint("봉우리(군집) 수:", len(ms.cluster_centers_), " 반복:", ms.n_iter_)\nprint("봉우리 위치:\\n", ms.cluster_centers_.round(3))\n`;res.push(["labels_ms","Mean Shift"]);}
+    if(a==="gmm"){c+=`gmm = GaussianMixture(n_components=${S.k}, covariance_type="${S.cov}", init_params="${S.gInit==="kmeans"?"kmeans":"random"}",\n                      max_iter=100, tol=1e-3, n_init=1, random_state=${S.seed})   # n_init=5로 늘리면 로그우도 최대 결과 선택\ngmm.fit(X_s)\nproba = gmm.predict_proba(X_s)        # 소프트 군집: 점마다 성분별 확률\nlabels_gmm = proba.argmax(axis=1)     # 하드로 바꾸면 = gmm.predict(X_s)\nprint("평균 로그우도:", round(gmm.score(X_s), 4), " 반복:", gmm.n_iter_, " 수렴:", gmm.converged_)\nprint("가중치 π:", gmm.weights_.round(3))\nprint("애매한 점(최대 확률 < 0.8):", (proba.max(axis=1) < 0.8).sum())\n# 성분 수 고르기: BIC / AIC (작을수록 좋음)\nfor k in range(2, 11):\n    g = GaussianMixture(k, covariance_type="${S.cov}", random_state=${S.seed}).fit(X_s)\n    print(k, "BIC", round(g.bic(X_s), 1), "AIC", round(g.aic(X_s), 1))\n`;res.push(["labels_gmm","GMM"]);}});
+  if(algos.some(a=>a==="kmeans"||a==="kpp"||a==="pam"))c+=`\n# 군집 수 고르기: 엘보(WCSS)와 실루엣\nfor k in range(2, 11):\n    m = KMeans(k, init="k-means++", n_init=10, random_state=0).fit(X_s)\n    print(k, "WCSS", round(m.inertia_, 2), "실루엣", round(silhouette_score(X_s, m.labels_), 3))\n`;
+  if(plot){c+=`\n# 결과 그리기\nfig, axes = plt.subplots(1, ${res.length}, figsize=(${4*res.length}, 4))\naxes = np.atleast_1d(axes)\nfor ax, (lab, name) in zip(axes, [${res.map(r=>`(${r[0]}, "${r[1]}")`).join(", ")}]):\n    ax.scatter(X_s[:, 0], X_s[:, 1], c=lab, cmap="tab10", s=12)\n    ax.set_title(name); ax.set_xlabel("혈당 (표준화)"); ax.set_ylabel("BMI (표준화)")\nplt.tight_layout(); plt.show()\n`;}
+  return c;}
+function genData(){const pk=S.preset,m={blobs:`from sklearn.datasets import make_blobs\nX, _ = make_blobs(n_samples=${S.n}, centers=[[-1.6, -1.1], [1.5, -1.3], [0.0, 1.55]], cluster_std=0.45, random_state=${S.dseed})\n`,
+  varied:`from sklearn.datasets import make_blobs\nX, _ = make_blobs(n_samples=[${Math.round(S.n*.52)}, ${Math.round(S.n*.24)}, ${S.n-Math.round(S.n*.52)-Math.round(S.n*.24)}], centers=[[-1.2, 0.45], [1.75, 1.7], [1.6, -1.7]],\n                  cluster_std=[0.85, 0.22, 0.3], random_state=${S.dseed})\n`,
+  aniso:`from sklearn.datasets import make_blobs\nX, _ = make_blobs(n_samples=${S.n}, centers=[[0, -0.95], [0, 0], [0, 0.95]], cluster_std=1.0, random_state=${S.dseed})\nX = X * [1.0, 0.16] + [[0, 0]]          # 한 방향으로 길쭉하게 (비슷한 모양)\nth = np.deg2rad(35); X = X @ np.array([[np.cos(th), np.sin(th)], [-np.sin(th), np.cos(th)]])\n`,
+  moons:`from sklearn.datasets import make_moons\nX, _ = make_moons(n_samples=${S.n}, noise=0.075, random_state=${S.dseed})\nX = (X - [0.5, 0.25]) * 1.6\n`,
+  circles:`from sklearn.datasets import make_circles\nX, _ = make_circles(n_samples=${S.n}, factor=0.45, noise=0.04, random_state=${S.dseed})\nX = X * 2.2\n`,
+  outlier:`from sklearn.datasets import make_blobs\nrng = np.random.default_rng(${S.dseed})\nX, _ = make_blobs(n_samples=${S.n-Math.max(6,Math.round(S.n*.06))}, centers=[[-1.6, -1.25], [1.45, -1.4], [-0.35, 0.75]], cluster_std=0.4, random_state=${S.dseed})\nX = np.vstack([X, rng.normal([2.35, 2.35], 0.55, size=(${Math.max(6,Math.round(S.n*.06))}, 2))])   # 이상값\n`};
+  return `# 시뮬레이터의 "${PRE[pk].name}"와 비슷한 모양 (난수 생성기가 달라 점은 같지 않음)\n`+m[pk];}
+function renderCode(){codeTxt=genCode();$("cCode").innerHTML=hl(codeTxt);
+  $("cNote").innerHTML=`<b>현재 점 데이터 포함</b>을 켜고 StandardScaler 줄을 <code>X_s = X</code>로 바꾸면 이 페이지의 결과(K-means 같은 초기 중심일 때의 라벨, DBSCAN 라벨, Mean Shift 봉우리, GMM 로그우도)와 같은 숫자가 나옵니다. K-medoids의 <code>scikit-learn-extra</code>는 NumPy 2 환경에서 설치·불러오기에 실패할 수 있어, 그럴 때는 <b>직접 구현 함수</b>를 켜세요.`;}
+["cAll","cData","cScale","cPlot","cPam"].forEach(id=>$(id).addEventListener("change",renderCode));
+$("cCopy").onclick=async()=>{try{await navigator.clipboard.writeText(codeTxt);$("cCopy").textContent="복사됨";}catch(e){const r=document.createRange();r.selectNodeContents($("cCode"));const s=getSelection();s.removeAllRanges();s.addRange(r);$("cCopy").textContent="선택됨";}setTimeout(()=>$("cCopy").textContent="복사",1400);};
+
+/* ================= 탭 그리기 · 테마 ================= */
+function renderTab(){if(S.tab==="run")renderRun();else if(S.tab==="pick")renderPick();else if(S.tab==="compare")renderCompare();else renderCode();}
+function redraw(){if(S.tab==="run"){drawMain();if(S.algo==="pam")renderPamKm();if(S.algo==="dbscan")renderDbKm();if(S.algo==="gmm")renderGmmSoft();}
+  else if(S.tab==="pick")drawPick();else if(S.tab==="compare")renderCompare();}
+new MutationObserver(redraw).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",redraw);}catch(e){}
+let rzT,lastW=window.innerWidth;window.addEventListener("resize",()=>{if(window.innerWidth===lastW)return;lastW=window.innerWidth;clearTimeout(rzT);rzT=setTimeout(()=>{if(S.tab==="run"){renderRun();extrasDirty=true;renderExtras();}else redraw();},160);});
+
+/* ================= 시작 ================= */
+(function start(){const [a,t]=(location.hash||"").slice(1).split("-");S.algo=ALGOS.includes(a)?a:"kmeans";S.tab=TABS.includes(t||"")?t:"run";
+  S.X=makeData(S.preset,S.dseed,S.n);S.ver=1;$("dInfo").textContent=`${PRE[S.preset].name} · 점 ${S.X.length}개 · 정답 라벨 없음`;syncParamUI();
+  segSet($("algoSeg"),S.algo);document.querySelectorAll("[data-for]").forEach(el=>{el.hidden=!el.dataset.for.split(" ").includes(S.algo);});document.querySelectorAll("[data-x]").forEach(el=>{el.hidden=el.dataset.x!==S.algo;});
+  $("aKl").textContent=S.algo==="gmm"?"성분 수 k (n_components)":"군집 수 k";
+  rebuild("start");showTab(S.tab);})();
+})();
+</script>
+</body>
+</html>

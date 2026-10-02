@@ -1,0 +1,1561 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PCA 차원 축소 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20260930c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20260930c">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 파랑 = 데이터 · 보라 = 내가 돌리는 축(학습) · 초록 = 주성분(답) · 청록 = 사영 분산 · PC2
+   주황 = 재구성 오차(평가) · 빨강 = 한계 */
+:root{ --sk-accent: var(--cat-ml);
+  --c-data:#2563EB; --c-axis:#7C3AED; --c-pc:#15803D; --c-pc2:#0E7490; --c-var:#0E7490; --c-err:#EA580C; --c-bad:#DC2626;
+  --g0:#2563EB; --g1:#EA580C; --g2:#7C3AED; --g3:#15803D; --g4:#DB2777; --g5:#A16207;
+  --pos:#2563EB; --neg:#EA580C;
+  --seq0:#3B4CC0; --seq1:#1F9E89; --seq2:#7FB82E; --seq3:#F2A541; --seq4:#D1495B; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --c-data:#6AA5FF; --c-axis:#B294FF; --c-pc:#4ADE80; --c-pc2:#22D3EE; --c-var:#22D3EE; --c-err:#FF914D; --c-bad:#F87171;
+  --g0:#6AA5FF; --g1:#FF914D; --g2:#B294FF; --g3:#4ADE80; --g4:#F472B6; --g5:#FACC15;
+  --pos:#6AA5FF; --neg:#FF914D;
+  --seq0:#7B8CFF; --seq1:#36C9B4; --seq2:#A6DA4E; --seq3:#FFBE66; --seq4:#FF6F86; } }
+:root[data-theme="dark"]{
+  --c-data:#6AA5FF; --c-axis:#B294FF; --c-pc:#4ADE80; --c-pc2:#22D3EE; --c-var:#22D3EE; --c-err:#FF914D; --c-bad:#F87171;
+  --g0:#6AA5FF; --g1:#FF914D; --g2:#B294FF; --g3:#4ADE80; --g4:#F472B6; --g5:#FACC15;
+  --pos:#6AA5FF; --neg:#FF914D;
+  --seq0:#7B8CFF; --seq1:#36C9B4; --seq2:#A6DA4E; --seq3:#FFBE66; --seq4:#FF6F86; }
+
+.pc-pane{display:flex;flex-direction:column;gap:16px}
+.pc-dot, .sk-legend i.pc-dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.pc-ln, .sk-legend i.pc-ln{display:inline-block;width:20px;height:0;border-radius:0;border-top:3px solid;margin-right:5px;vertical-align:3px;background:none}
+.pc-ln.dash, .sk-legend i.pc-ln.dash{border-top-style:dashed}
+.pc-ln.thick, .sk-legend i.pc-ln.thick{border-top-width:8px;opacity:.45;vertical-align:1px}
+
+.pc-cv{display:block;width:100%;border-radius:10px;border:1px solid var(--line);background:var(--surface)}
+#cv1{aspect-ratio:3/2;cursor:crosshair;touch-action:none}
+#cv1c{aspect-ratio:16/5;cursor:pointer}
+#cv2{aspect-ratio:4/3}
+#cvScree{aspect-ratio:16/10;cursor:pointer}
+#cvBi{aspect-ratio:1/1}
+#cvLoss{aspect-ratio:16/9}
+#cvLa,#cvLb,#cvLc{aspect-ratio:1/1}
+#cvLa{touch-action:none}
+#cvV2{aspect-ratio:4/3}
+#cvV2s{aspect-ratio:4/3}
+
+.pc-main{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(290px,1fr);gap:20px;align-items:start}
+.pc-main2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:980px){.pc-main,.pc-main2{grid-template-columns:minmax(0,1fr)}}
+.pc-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.pc-col .sk-slider{min-width:0}
+.pc-info{font-size:13px;color:var(--muted);margin:0;min-height:1.5em;font-family:var(--mono)}
+.pc-sub{font-size:12.5px;color:var(--muted);margin:0}
+
+.pc-gauge{display:grid;gap:6px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.pc-gauge .row{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted)}
+.pc-gauge .row b{font-family:var(--mono);color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.pc-bar{position:relative;height:14px;border-radius:7px;background:var(--surface);border:1px solid var(--line)}
+.pc-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:7px;transition:width .15s}
+.pc-bar s{position:absolute;top:-4px;bottom:-4px;width:0;border-left:2px dashed var(--c-pc)}
+.pc-msg{font-size:13.5px;margin:2px 0 0;color:var(--text)}
+.pc-msg b{color:var(--ink)}
+.pc-ok{color:var(--c-pc);font-weight:700}
+.pc-bad{color:var(--c-bad);font-weight:700}
+.pc-mut{color:var(--muted)}
+
+.pc-formula{white-space:pre;margin:0}
+.pc-eqblock{display:flex;flex-direction:column;gap:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto;font-size:13px}
+.pc-eq{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-family:var(--mono);font-size:13px;color:var(--ink)}
+.pc-eq .t{white-space:nowrap}
+.pc-br{display:inline-flex;padding:3px 5px;border-left:2px solid var(--ink);border-right:2px solid var(--ink);border-radius:7px;background:var(--surface)}
+.pc-br .sk-mat .c{min-width:52px;padding:0 6px;background:transparent}
+.pc-br .sk-mat .c.h1{border-color:var(--c-pc);background:color-mix(in srgb,var(--c-pc) 12%,transparent)}
+.pc-br .sk-mat .c.h2{border-color:var(--c-pc2);background:color-mix(in srgb,var(--c-pc2) 12%,transparent)}
+.pc-br .sk-mat .c.hd{color:var(--muted)}
+.pc-txt{font-size:13.5px;color:var(--text);margin:0;line-height:1.6}
+.pc-txt b{color:var(--ink)}
+
+.pc-stepper{display:flex;gap:6px;list-style:none;margin:0;padding:0;overflow-x:auto;padding-bottom:2px}
+.pc-stepper li{flex:1 0 auto}
+.pc-stepper button{appearance:none;font:inherit;width:100%;border:0;border-radius:8px;padding:7px 10px;font-size:12.5px;font-weight:600;background:var(--surface-2);color:var(--faint);white-space:nowrap;cursor:pointer}
+.pc-stepper button.done{color:var(--muted)}
+.pc-stepper button.on{background:var(--ink);color:var(--on-ink)}
+.pc-stepper button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.pc-kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--ink)}
+
+.pc-heat td.h{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
+.pc-heat td.h.top{font-weight:700;outline:1.5px solid var(--ink);outline-offset:-2px}
+.pc-heat th.pcol{text-align:right}
+.pc-shares{display:grid;gap:5px}
+.pc-share{display:grid;grid-template-columns:96px minmax(0,1fr) 52px;gap:8px;align-items:center;font-size:13px}
+.pc-share span:first-child{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-share .bar{height:11px;border-radius:6px;background:var(--surface-2);border:1px solid var(--line);overflow:hidden}
+.pc-share .bar i{display:block;height:100%;background:var(--c-data)}
+.pc-share b{font-family:var(--mono);font-size:12.5px;text-align:right;color:var(--ink);font-variant-numeric:tabular-nums}
+
+details.pc-more{font-size:13.5px;color:var(--muted)}
+details.pc-more summary{cursor:pointer;font-weight:600;color:var(--ink)}
+details.pc-more summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+details.pc-more[open] summary{margin-bottom:8px}
+.pc-ta{width:100%;min-height:140px;font-family:var(--mono);font-size:12.5px;resize:vertical}
+.pc-copyrow{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.pc-flash{font-size:13px;color:var(--c-pc);font-weight:600}
+.pc-code{white-space:pre;margin:0;max-height:620px;overflow:auto;font-size:12.5px;line-height:1.6}
+.pc-tablewrap{max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.pc-table tr.big td{font-weight:700}
+.pc-table td.d{color:var(--c-err)}
+
+.pc-imgs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.pc-imgbox{display:flex;flex-direction:column;gap:5px;min-width:0}
+.pc-imgbox span{font-size:12.5px;color:var(--muted);font-weight:600}
+.pc-img{display:block;width:100%;aspect-ratio:1/1;image-rendering:pixelated;border-radius:8px;border:1px solid var(--line);background:var(--surface-2)}
+.pc-strip{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px}
+#eig4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.pc-strip .pc-imgbox span{font-family:var(--mono);font-size:11.5px;text-align:center}
+@media (max-width:620px){.pc-strip{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.pc-cap{font-size:12.5px;color:var(--muted);margin:0;text-align:center}
+.pc-cmp td{white-space:normal;vertical-align:top;line-height:1.5}
+.pc-cmp th:first-child,.pc-cmp td:first-child{white-space:nowrap;font-weight:600;color:var(--ink)}
+.pc-list{margin:0;padding-left:20px;font-size:14px;color:var(--text);display:grid;gap:6px}
+.pc-list b{color:var(--ink)}
+
+@media (max-width:520px){
+  #cv1{aspect-ratio:1/1}
+  #cv1c{aspect-ratio:4/3}
+  #cvScree{aspect-ratio:4/3}
+  .sk-slider{min-width:0;width:100%}
+  .sk-controls{gap:10px 12px}
+  .pc-eq{font-size:12px}
+  .pc-br .sk-mat .c{min-width:44px;padding:0 4px}
+  .pc-share{grid-template-columns:78px minmax(0,1fr) 48px}
+  .pc-imgs{gap:8px}
+}
+@media (prefers-reduced-motion: reduce){ .pc-bar i{transition:none} }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)" aria-current="page">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">PCA 차원 축소 시뮬레이터</h1>
+      <p class="ds-hero__lede">주성분 분석(PCA)은 데이터가 가장 넓게 퍼진 방향부터 차례로 새 좌표축을 잡습니다. 2차원에서 축을 직접 돌려 분산 최대와 재구성 오차 최소가 같은 축임을 확인하고, 공분산 행렬의 고유값 분해, 10개 항목 건강검진 데이터의 축소·복원, PCA의 한계까지 차례로 살펴봅니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button type="button" class="sk-tab" role="tab" id="tab-find" aria-controls="pane-find" aria-selected="true"><span class="sk-num">1</span>2D에서 주성분 찾기</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-cov" aria-controls="pane-cov" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>공분산 행렬과 고유벡터</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-hd" aria-controls="pane-hd" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>고차원 데이터 축소</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-recon" aria-controls="pane-recon" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>복원과 정보 손실</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-limit" aria-controls="pane-limit" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>PCA의 한계</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>코드</button>
+  </nav>
+
+  <!-- ================= 1. 2D에서 주성분 찾기 ================= -->
+  <section id="pane-find" class="pc-pane" role="tabpanel" aria-labelledby="tab-find">
+    <div class="sk-card">
+      <div class="pc-main">
+        <div class="pc-col">
+          <div class="sk-head"><h2>축을 돌려 데이터가 가장 넓게 퍼진 방향 찾기</h2>
+            <div class="sk-legend"><span><i class="pc-dot" style="background:var(--c-data)"></i>환자</span><span><i class="pc-ln" style="border-color:var(--c-axis)"></i>내 축</span><span><i class="pc-ln" style="border-color:var(--c-err)"></i>수선(오차)</span><span><i class="pc-ln thick" style="border-color:var(--c-var)"></i>사영 값 ±1 표준편차</span><span><i class="pc-ln dash" style="border-color:var(--c-pc)"></i>PC1</span></div>
+          </div>
+          <div class="sk-controls">
+            <div class="sk-slider"><div class="sk-sl-head"><label for="s1Rho">수축기–이완기 상관 ρ</label><b id="v1Rho"></b></div><input type="range" id="s1Rho" min="-0.95" max="0.95" step="0.05" value="0.7"></div>
+            <div class="sk-slider"><div class="sk-sl-head"><label for="s1N">환자 수 n</label><b id="v1N"></b></div><input type="range" id="s1N" min="10" max="150" step="1" value="40"></div>
+            <button type="button" class="sk-btn sk-btn--sm" id="b1Seed">다른 난수</button>
+          </div>
+          <canvas id="cv1" class="pc-cv" role="img" aria-label="수축기 혈압과 이완기 혈압 산점도. 평균을 지나는 내 축과 각 점의 수선, 사영된 점이 그려져 있다. 점을 끌면 이동, 빈 곳을 끌면 축이 돈다"></canvas>
+          <p class="sk-hint" style="margin:0">점 끌기 = 이동 · 빈 곳 끌기 = 축 돌리기 · 가로·세로 눈금 간격이 같아(1:1) 수선이 실제 직각으로 보입니다</p>
+          <p class="pc-info" id="info1" aria-live="polite"></p>
+        </div>
+        <div class="pc-col">
+          <h3>내 축 &nbsp;<span class="sk-mono">u = (cos θ, sin θ)</span></h3>
+          <div class="sk-slider"><div class="sk-sl-head"><label for="s1Th">축 각도 θ (수축기 축에서 반시계)</label><b id="v1Th"></b></div><input type="range" id="s1Th" min="0" max="180" step="0.5" value="20"></div>
+          <div class="sk-controls">
+            <button type="button" class="sk-btn sk-btn--primary" id="b1Fit">PC1으로 맞추기</button>
+            <label class="sk-check"><input type="checkbox" id="c1Pc">PC1 표시</label>
+          </div>
+          <div class="sk-controls" style="gap:8px 16px">
+            <label class="sk-check"><input type="checkbox" id="c1Perp" checked>수선</label>
+            <label class="sk-check"><input type="checkbox" id="c1Foot" checked>사영된 점</label>
+          </div>
+          <div class="pc-gauge" aria-live="polite">
+            <div class="row"><span><i class="pc-dot" style="background:var(--c-var)"></i>사영 분산 Var(z) · 클수록 좋음</span><b id="g1Var"></b></div>
+            <div class="pc-bar"><i id="b1Var" style="background:var(--c-var)"></i><s id="m1Var"></s></div>
+            <div class="row"><span><i class="pc-dot" style="background:var(--c-err)"></i>재구성 오차 Σd²/(n−1) · 작을수록 좋음</span><b id="g1Err"></b></div>
+            <div class="pc-bar"><i id="b1Err" style="background:var(--c-err)"></i><s id="m1Err"></s></div>
+            <p class="pc-msg" id="g1Msg"></p>
+          </div>
+          <div class="sk-formula pc-formula" id="f1"></div>
+        </div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>각도에 따른 사영 분산과 재구성 오차</h2>
+        <div class="sk-legend"><span><i class="pc-ln" style="border-color:var(--c-var)"></i>사영 분산</span><span><i class="pc-ln" style="border-color:var(--c-err)"></i>재구성 오차 Σd²/(n−1)</span><span><i class="pc-ln" style="border-color:var(--c-axis)"></i>지금 θ</span><span><i class="pc-dot" style="background:var(--c-pc)"></i>PC1</span></div></div>
+      <canvas id="cv1c" class="pc-cv" role="img" aria-label="축 각도 0도부터 180도까지 사영 분산 곡선과 재구성 오차 곡선. 누르면 그 각도로 축을 돌린다"></canvas>
+      <p class="sk-note" id="note1"></p>
+    </div>
+  </section>
+
+  <!-- ================= 2. 공분산 행렬과 고유벡터 ================= -->
+  <section id="pane-cov" class="pc-pane" role="tabpanel" aria-labelledby="tab-cov" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>공분산 행렬 → 고유값 분해 → 투영, 한 단계씩</h2><span class="sk-hint">키보드 <span class="pc-kbd">→</span> 다음 단계 · <span class="pc-kbd">←</span> 이전 단계</span></div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">데이터</span>
+          <div class="sk-seg" id="seg2Src" role="group" aria-label="데이터 선택">
+            <button type="button" data-v="s1" aria-pressed="true">1번 화면 데이터</button>
+            <button type="button" data-v="hand" aria-pressed="false">손계산 예제 5명</button>
+          </div>
+        </div>
+        <label class="sk-check"><input type="checkbox" id="c2Std">② 표준화 단계 포함</label>
+      </div>
+      <ol class="pc-stepper" id="step2" aria-label="진행 단계"></ol>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button type="button" class="sk-btn" id="b2First">처음</button>
+          <button type="button" class="sk-btn" id="b2Prev">이전</button>
+          <button type="button" class="sk-btn sk-btn--primary" id="b2Next">다음</button>
+          <button type="button" class="sk-btn" id="b2Play">재생</button>
+        </div>
+        <div class="sk-slider" style="min-width:160px"><div class="sk-sl-head"><label for="s2Spd">속도</label><b id="v2Spd"></b></div><input type="range" id="s2Spd" min="0" max="4" step="1" value="2"></div>
+      </div>
+    </div>
+    <div class="pc-main2">
+      <div class="sk-card">
+        <div class="sk-head"><h3 id="cap2"></h3>
+          <div class="sk-legend" id="leg2"></div></div>
+        <canvas id="cv2" class="pc-cv" role="img" aria-label="현재 단계의 데이터 그림. 중심화, 공분산 타원, 고유벡터 화살표, 회전된 좌표계를 차례로 보여준다"></canvas>
+      </div>
+      <div class="sk-card">
+        <h3 id="ft2"></h3>
+        <div class="pc-eqblock" id="f2"></div>
+        <p class="sk-note" id="note2"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 3. 고차원 데이터 축소 ================= -->
+  <section id="pane-hd" class="pc-pane" role="tabpanel" aria-labelledby="tab-hd" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>건강검진 항목 여러 개를 몇 개의 주성분으로</h2><span class="sk-hint">가상 수검자 · 숨은 요인 3개(비만·대사, 혈압·나이, 지질)로 생성 · 난수 고정</span></div>
+      <p class="sk-lead">항목이 10개면 산점도로 한 번에 볼 수 없습니다. PCA로 분산이 큰 방향 몇 개만 남기면 2차원 그림 한 장에 대부분의 정보를 담을 수 있습니다. 집단 색은 그림에만 쓰고 PCA 계산에는 쓰지 않습니다.</p>
+      <div class="sk-controls">
+        <label class="sk-check"><input type="checkbox" id="c3Std" checked>표준화 (StandardScaler)</label>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="s3N">수검자 수 n</label><b id="v3N"></b></div><input type="range" id="s3N" min="60" max="400" step="10" value="200"></div>
+        <button type="button" class="sk-btn sk-btn--sm" id="b3Seed">다른 난수</button>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">누적 설명 분산 기준</span>
+          <div class="sk-seg" id="seg3Thr" role="group" aria-label="누적 설명 분산 기준">
+            <button type="button" data-v="0.8" aria-pressed="true">80%</button>
+            <button type="button" data-v="0.9" aria-pressed="false">90%</button>
+            <button type="button" data-v="0.95" aria-pressed="false">95%</button>
+          </div>
+        </div>
+        <div class="sk-slider" style="min-width:220px"><div class="sk-sl-head"><label for="s3K">남길 성분 수 n_components</label><b id="v3K"></b></div><input type="range" id="s3K" min="1" max="10" step="1" value="3"></div>
+      </div>
+      <div class="sk-stats" id="stats3"></div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h3>스크리 도표 (고유값 크기 순)</h3>
+          <div class="sk-legend"><span><i style="background:var(--c-pc)"></i>남긴 성분</span><span><i style="background:var(--line-strong)"></i>버린 성분</span><span><i class="pc-ln" style="border-color:var(--c-err)"></i>누적</span></div></div>
+        <canvas id="cvScree" class="pc-cv" role="img" aria-label="주성분별 설명 분산 비율 막대와 누적 설명 분산 꺾은선, 80 90 95 퍼센트 기준선. 막대를 누르면 그 개수까지 남긴다"></canvas>
+        <p class="pc-sub" id="sub3Scree"></p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h3>주성분 점수 산점도 · 바이플롯</h3>
+          <div class="sk-legend" id="leg3"></div></div>
+        <div class="sk-controls">
+          <div class="sk-seg" id="seg3Ax" role="group" aria-label="산점도 축">
+            <button type="button" data-v="0,1" aria-pressed="true">PC1–PC2</button>
+            <button type="button" data-v="0,2" aria-pressed="false">PC1–PC3</button>
+            <button type="button" data-v="1,2" aria-pressed="false">PC2–PC3</button>
+          </div>
+          <label class="sk-check"><input type="checkbox" id="c3Bi" checked>변수 화살표</label>
+        </div>
+        <canvas id="cvBi" class="pc-cv" role="img" aria-label="수검자들의 주성분 점수 산점도와 각 변수의 방향을 나타내는 화살표"></canvas>
+        <p class="pc-sub">화살표 = 각 변수의 성분 값(components_)을 점수 크기에 맞게 늘린 것. 같은 방향 화살표끼리는 함께 움직이는 변수입니다.</p>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h3>로딩: 변수가 각 주성분에 기여하는 정도</h3>
+          <div class="sk-seg" id="seg3Load" role="group" aria-label="표시 값">
+            <button type="button" data-v="comp" aria-pressed="true">성분 (components_)</button>
+            <button type="button" data-v="load" aria-pressed="false">로딩 = 성분×√λ</button>
+          </div></div>
+        <div class="sk-scroll"><table class="sk-table pc-heat" aria-label="변수별 주성분 성분 히트맵"><thead id="heatHead"></thead><tbody id="heatBody"></tbody></table></div>
+        <p class="sk-note" id="note3Load"></p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h3>표준화 끔 vs 켬</h3><span class="sk-hint">단위가 큰 변수가 PC1을 독차지하는지</span></div>
+        <div class="sk-scroll"><table class="sk-table pc-table" aria-label="표준화 여부에 따른 비교"><thead><tr><th>설정</th><th>PC1 설명 분산</th><th>PC1 최대 성분</th><th>90%에 필요한 성분 수</th></tr></thead><tbody id="cmp3"></tbody></table></div>
+        <h3 style="margin-top:4px">원래 단위에서 각 변수 분산이 전체 분산에서 차지하는 몫</h3>
+        <div class="pc-shares" id="shares3"></div>
+        <p class="sk-note" id="note3Std"></p>
+      </div>
+    </div>
+    <div class="sk-card">
+      <details class="pc-more"><summary>데이터 표 · CSV (내 데이터 붙여 넣기)</summary>
+        <p class="pc-sub">첫 줄은 열 이름. 숫자 열은 모두 PCA 변수로 쓰고, 글자 열이 있으면 첫 번째 글자 열을 집단(색칠용)으로 씁니다. 숫자 열 3개 이상, 행 10개 이상.</p>
+        <textarea class="sk-input pc-ta" id="csv3" aria-label="CSV 입력" spellcheck="false"></textarea>
+        <div class="pc-copyrow" style="margin-top:8px">
+          <button type="button" class="sk-btn sk-btn--sm sk-btn--primary" id="b3Apply">적용</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="b3Fill">현재 데이터 가져오기</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="b3Def">기본 데이터로</button>
+          <span class="pc-flash" id="m3Csv" aria-live="polite"></span>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ================= 4. 복원과 정보 손실 ================= -->
+  <section id="pane-recon" class="pc-pane" role="tabpanel" aria-labelledby="tab-recon" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>k개 성분만으로 되돌리기 &nbsp;<span class="sk-mono">X̂ = Z_k V_kᵀ + μ</span></h2><span class="sk-hint">3번 화면의 데이터·표준화 설정을 그대로 사용</span></div>
+      <div class="sk-controls">
+        <div class="sk-slider" style="min-width:220px"><div class="sk-sl-head"><label for="s4K">남길 성분 수 k</label><b id="v4K"></b></div><input type="range" id="s4K" min="1" max="10" step="1" value="3"></div>
+        <div class="sk-slider" style="min-width:220px"><div class="sk-sl-head"><label for="s4I">수검자 번호</label><b id="v4I"></b></div><input type="range" id="s4I" min="1" max="200" step="1" value="1"></div>
+        <button type="button" class="sk-btn sk-btn--sm" id="b4Rand">무작위 수검자</button>
+      </div>
+      <div class="pc-eqblock" id="f4"></div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h3 id="t4Rec">원래 값 vs 복원 값</h3>
+          <div class="sk-legend"><span><i style="background:var(--c-data)"></i>원래</span><span><i style="background:var(--c-pc)"></i>복원</span></div></div>
+        <canvas id="cvRec" class="pc-cv" role="img" aria-label="변수별 원래 값과 복원 값을 표준점수로 나란히 비교한 막대"></canvas>
+        <div class="sk-scroll"><table class="sk-table pc-table" aria-label="변수별 원래 값과 복원 값"><thead><tr><th>변수</th><th>원래</th><th>복원</th><th>차이</th></tr></thead><tbody id="tb4"></tbody></table></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h3>성분 수와 정보 손실</h3>
+          <div class="sk-legend"><span><i style="background:var(--c-err)"></i>잃은 분산 비율</span><span><i class="pc-ln" style="border-color:var(--c-pc)"></i>누적 설명 분산</span></div></div>
+        <canvas id="cvLoss" class="pc-cv" role="img" aria-label="남긴 성분 수 k에 따른 잃은 분산 비율 막대와 누적 설명 분산 선"></canvas>
+        <div class="sk-stats" id="stats4"></div>
+        <p class="sk-note" id="note4"></p>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>이미지로 보기: 16×16 흑백 그림 120장의 주성분</h2><span class="sk-hint">원·십자·세로 막대·사각형을 위치·크기·굵기를 조금씩 바꿔 생성 · 픽셀 256개 = 256차원</span></div>
+      <div class="sk-controls">
+        <div class="sk-slider" style="min-width:240px"><div class="sk-sl-head"><label for="s4Ik">남길 성분 수 k</label><b id="v4Ik"></b></div><input type="range" id="s4Ik" min="0" max="60" step="1" value="8"></div>
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--sm" id="b4Iprev">이전 그림</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="b4Inext">다음 그림</button>
+          <span class="pc-sub sk-mono" id="v4Ii"></span>
+        </div>
+      </div>
+      <div class="pc-main2">
+        <div class="pc-col">
+          <div class="pc-imgs">
+            <div class="pc-imgbox"><span>원본</span><canvas class="pc-img" id="im4Orig" role="img" aria-label="원본 16×16 그림"></canvas></div>
+            <div class="pc-imgbox"><span id="im4RecL">복원</span><canvas class="pc-img" id="im4Rec" role="img" aria-label="k개 성분으로 복원한 그림"></canvas></div>
+            <div class="pc-imgbox"><span>평균 그림 μ</span><canvas class="pc-img" id="im4Mean" role="img" aria-label="120장의 평균 그림"></canvas></div>
+          </div>
+          <div class="sk-stats" id="stats4i"></div>
+        </div>
+        <div class="pc-col">
+          <h3>주성분 그림 (고유 얼굴처럼 읽기) · 밝음 = +, 어두움 = −</h3>
+          <div class="pc-strip" id="eig4"></div>
+        </div>
+      </div>
+      <h3>성분 수에 따른 복원</h3>
+      <div class="pc-strip" id="ser4"></div>
+      <p class="sk-note" id="note4i"></p>
+    </div>
+  </section>
+
+  <!-- ================= 5. PCA의 한계 ================= -->
+  <section id="pane-limit" class="pc-pane" role="tabpanel" aria-labelledby="tab-limit" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>① 휘어진 구조는 직선 축으로 펼 수 없다</h2>
+        <div class="sk-seg" id="seg5" role="group" aria-label="데이터 모양">
+          <button type="button" data-v="circ" aria-pressed="true">동심원 (2D → 1D)</button>
+          <button type="button" data-v="roll" aria-pressed="false">스위스롤 (3D → 2D)</button>
+        </div></div>
+      <div class="sk-controls" id="ctl5Roll" hidden>
+        <div class="sk-slider" style="min-width:220px"><div class="sk-sl-head"><label for="s5Yaw">3D 보기 회전</label><b id="v5Yaw"></b></div><input type="range" id="s5Yaw" min="-180" max="180" step="1" value="-30"></div>
+        <span class="sk-hint">왼쪽 그림을 끌어도 돕니다</span>
+      </div>
+      <div class="sk-grid3">
+        <div class="pc-col"><canvas id="cvLa" class="pc-cv" role="img" aria-label="원래 데이터"></canvas><p class="pc-cap" id="capLa"></p></div>
+        <div class="pc-col"><canvas id="cvLb" class="pc-cv" role="img" aria-label="선형 PCA 결과"></canvas><p class="pc-cap" id="capLb"></p></div>
+        <div class="pc-col"><canvas id="cvLc" class="pc-cv" role="img" aria-label="비선형 방법 또는 이상적으로 펼친 결과"></canvas><p class="pc-cap" id="capLc"></p></div>
+      </div>
+      <p class="sk-note sk-note--warn" id="note5a"></p>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>② 분산이 크다고 분류에 유용한 것은 아니다</h2>
+        <div class="sk-legend"><span><i class="pc-dot" style="background:var(--g0)"></i>정상</span><span><i class="pc-dot" style="background:var(--g1)"></i>질환</span><span><i class="pc-ln" style="border-color:var(--c-pc)"></i>PC1</span><span><i class="pc-ln" style="border-color:var(--c-pc2)"></i>PC2</span><span><i class="pc-ln dash" style="border-color:var(--c-axis)"></i>라벨을 쓰는 방향(LDA)</span></div></div>
+      <p class="sk-lead">PCA는 라벨을 보지 않습니다. 두 집단이 분산이 작은 방향으로만 갈라져 있으면, PC1 하나만 남기는 순간 두 집단이 겹칩니다.</p>
+      <div class="sk-controls">
+        <div class="sk-slider"><div class="sk-sl-head"><label for="s5Gap">두 집단 간격</label><b id="v5Gap"></b></div><input type="range" id="s5Gap" min="0" max="3" step="0.1" value="1.6"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="s5Sd">길쭉한 정도 (긴 방향 표준편차)</label><b id="v5Sd"></b></div><input type="range" id="s5Sd" min="0.5" max="5" step="0.1" value="3"></div>
+        <button type="button" class="sk-btn sk-btn--sm" id="b5Seed">다른 난수</button>
+      </div>
+      <div class="sk-grid2">
+        <canvas id="cvV2" class="pc-cv" role="img" aria-label="두 집단 산점도와 PC1, PC2, LDA 방향"></canvas>
+        <canvas id="cvV2s" class="pc-cv" role="img" aria-label="PC1, PC2, LDA 방향으로 사영한 1차원 분포와 한 기준값으로 나눴을 때의 최고 정확도"></canvas>
+      </div>
+      <p class="sk-note sk-note--warn" id="note5b"></p>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <h2>③ 해석의 어려움</h2>
+        <ul class="pc-list" id="list5"></ul>
+      </div>
+      <div class="sk-card">
+        <h2>휘어진 구조에는 다른 방법</h2>
+        <div class="sk-scroll">
+          <table class="sk-table pc-cmp" aria-label="다른 차원 축소 방법">
+            <thead><tr><th>방법</th><th>한 줄 설명</th></tr></thead>
+            <tbody>
+              <tr><td>커널 PCA</td><td>점들 사이의 유사도(커널)로 보이지 않는 고차원으로 옮긴 뒤 PCA. 원 모양처럼 휘어진 경계를 펼 수 있음 (<code class="sk-mono">KernelPCA(kernel="rbf")</code>)</td></tr>
+              <tr><td>t-SNE</td><td>가까운 이웃 관계를 보존하도록 2~3차원에 배치. 시각화 전용, 축과 거리의 절대값은 의미 없음</td></tr>
+              <tr><td>UMAP</td><td>이웃 그래프를 저차원에 펼침. t-SNE보다 빠르고 전체 구조를 조금 더 보존 (<code class="sk-mono">umap-learn</code>)</td></tr>
+              <tr><td>LDA (판별분석)</td><td>라벨을 써서 집단이 가장 잘 갈리는 방향을 찾음. ②의 보라 점선</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 6. 코드 ================= -->
+  <section id="pane-code" class="pc-pane" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>현재 설정으로 만든 파이썬 코드</h2><span class="sk-hint">scikit-learn · 3번 화면의 데이터·표준화·성분 수 반영 · 주석의 숫자는 이 화면의 계산 결과</span></div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">n_components 지정</span>
+          <div class="sk-seg" id="seg6Mode" role="group" aria-label="n_components 지정 방식">
+            <button type="button" data-v="k" aria-pressed="true">개수 k</button>
+            <button type="button" data-v="ratio" aria-pressed="false">설명 분산 비율</button>
+          </div>
+        </div>
+        <span class="sk-hint" id="h6"></span>
+      </div>
+      <div class="pc-copyrow">
+        <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="b6Copy">코드 복사</button>
+        <button type="button" class="sk-btn sk-btn--sm" id="b6Csv">데이터 CSV 내려받기</button>
+        <button type="button" class="sk-btn sk-btn--sm" id="b6CsvCopy">데이터 CSV 복사</button>
+        <span class="pc-flash" id="m6" aria-live="polite"></span>
+      </div>
+      <pre class="sk-formula pc-code" id="code6" tabindex="0" aria-label="파이썬 코드"></pre>
+    </div>
+    <div class="sk-card">
+      <h2>코드 속 이름과 이 화면의 대응</h2>
+      <div class="sk-scroll">
+        <table class="sk-table pc-cmp" aria-label="scikit-learn 속성과 화면 대응">
+          <thead><tr><th>scikit-learn</th><th>뜻</th><th>이 화면</th></tr></thead>
+          <tbody>
+            <tr><td>StandardScaler()</td><td>열마다 평균 0, 표준편차 1로 (표준편차는 n으로 나눔)</td><td>3번 [표준화]</td></tr>
+            <tr><td>pca.explained_variance_</td><td>고유값 λᵢ (n−1로 나눈 공분산 행렬 기준)</td><td>2번 ④, 3번 스크리</td></tr>
+            <tr><td>pca.explained_variance_ratio_</td><td>λᵢ / Σλ</td><td>2번 ⑥, 3번 스크리 막대</td></tr>
+            <tr><td>pca.components_</td><td>고유벡터를 행으로 쌓은 행렬 Vᵀ (k×p). 부호는 각 행의 절댓값 최대 원소가 양수가 되도록 맞춤</td><td>3번 로딩 표</td></tr>
+            <tr><td>pca.transform(X)</td><td>Z = (X − μ)V_k, 주성분 점수</td><td>2번 ⑤, 3번 산점도</td></tr>
+            <tr><td>pca.inverse_transform(Z)</td><td>X̂ = Z V_kᵀ + μ</td><td>4번 복원</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20260930c"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const reduceMotion = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+  /* ================================================================
+     공통 도구
+     ================================================================ */
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  function parseColor(s) {
+    s = (s || "").trim();
+    if (s[0] === "#") { let h = s.slice(1); if (h.length === 3) h = h.split("").map(c => c + c).join("");
+      const n = parseInt(h.slice(0, 6), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+    const m = s.match(/[\d.]+/g); return m ? [+m[0], +m[1], +m[2]] : [128, 128, 128];
+  }
+  const rgba = (c, a) => { const [r, g, b] = parseColor(c); return `rgba(${r},${g},${b},${a})`; };
+  const mixc = (a, b, t) => [0, 1, 2].map(i => Math.round(a[i] + (b[i] - a[i]) * t));
+  function colors() {
+    const k = ["--bg", "--surface", "--surface-2", "--ink", "--text", "--muted", "--faint", "--line", "--line-strong",
+      "--c-data", "--c-axis", "--c-pc", "--c-pc2", "--c-var", "--c-err", "--c-bad", "--g0", "--g1", "--g2", "--g3", "--g4", "--g5",
+      "--pos", "--neg", "--seq0", "--seq1", "--seq2", "--seq3", "--seq4"];
+    const o = {}; k.forEach(n => o[n.replace(/^--/, "").replace(/-/g, "_")] = css(n));
+    o.groups = [o.g0, o.g1, o.g2, o.g3, o.g4, o.g5];
+    o.seq = [o.seq0, o.seq1, o.seq2, o.seq3, o.seq4].map(parseColor);
+    o.mono = css("--mono") || "monospace"; o.sans = css("--sans") || "sans-serif";
+    return o;
+  }
+  function seqColor(C, t) { t = clamp(t, 0, 1) * 4; const i = Math.min(3, Math.floor(t)); const c = mixc(C.seq[i], C.seq[i + 1], t - i); return `rgb(${c})`; }
+  function fitCanvas(cv) {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const w = Math.max(60, cv.clientWidth), h = Math.max(60, cv.clientHeight);
+    const W = Math.round(w * dpr), H = Math.round(h * dpr);
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+    return { ctx, w, h };
+  }
+  function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function gauss(r) { let u = 0; while (u === 0) u = r(); const v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+  const r1 = v => Math.round(v * 10) / 10;
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const minus = s => s.replace(/-/g, "−");
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  function fmt(v, d = 2) {
+    if (v === null || v === undefined || Number.isNaN(v)) return "—";
+    if (!isFinite(v)) return v > 0 ? "∞" : "−∞";
+    if (Math.abs(v) < 0.5 * Math.pow(10, -d)) v = 0;
+    return minus(v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }));
+  }
+  const fmtP = (v, d = 1) => fmt(v * 100, d) + "%";
+  function fmtS(v, s = 3) { if (!isFinite(v)) return fmt(v); if (v === 0) return "0";
+    const a = Math.abs(v); if (a >= 1e-3 && a < 1e6) { const d = Math.max(0, s - 1 - Math.floor(Math.log10(a))); return fmt(v, Math.min(d, 8)); }
+    const [m, e] = v.toExponential(s - 1).split("e"); return minus(m) + "×10" + String(+e).split("").map(c => ({ "-": "⁻", "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹" }[c] || c)).join(""); }
+  const py = (v, d) => { let s = (+v).toFixed(d); if (/^-0\.?0*$/.test(s)) s = s.slice(1); return s; };
+  function niceStep(range, n) { const raw = range / Math.max(1, n); const p = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / p;
+    return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p; }
+  function ticks(a, b, n) { const s = niceStep(b - a, n); const out = []; for (let v = Math.ceil(a / s) * s; v <= b + s * 1e-9; v += s) out.push(Math.abs(v) < s * 1e-9 ? 0 : v); return { list: out, step: s }; }
+  const tickFmt = (v, step) => { const d = Math.max(0, -Math.floor(Math.log10(step) + 1e-9)); return fmt(v, Math.min(d, 6)); };
+  const ease = t => t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t);
+
+  /* 공통 플롯 틀 */
+  function padFor(w) { const small = w < 420; return { l: small ? 40 : 50, r: 12, t: 12, b: small ? 34 : 40 }; }
+  function frame(ctx, w, h, xr, yr, C, lab, opt = {}) {
+    const small = w < 420, pad = opt.pad || padFor(w);
+    const pw = w - pad.l - pad.r, ph = h - pad.t - pad.b;
+    const sx = v => pad.l + (v - xr[0]) / (xr[1] - xr[0]) * pw;
+    const sy = v => pad.t + (1 - (v - yr[0]) / (yr[1] - yr[0])) * ph;
+    const ix = px => xr[0] + (px - pad.l) / pw * (xr[1] - xr[0]);
+    const iy = py => yr[0] + (1 - (py - pad.t) / ph) * (yr[1] - yr[0]);
+    ctx.fillStyle = C.surface; ctx.fillRect(pad.l, pad.t, pw, ph);
+    ctx.font = `${small ? 10 : 11}px ${C.mono}`;
+    const tx = opt.xTicks || ticks(xr[0], xr[1], small ? 5 : 8), ty = opt.yTicks || ticks(yr[0], yr[1], small ? 5 : 7);
+    ctx.lineWidth = 1;
+    tx.list.forEach(v => { const x = Math.round(sx(v)) + .5; if (!opt.noXGrid) { ctx.strokeStyle = C.line; ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t + ph); ctx.stroke(); }
+      ctx.fillStyle = C.muted; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(opt.xFmt ? opt.xFmt(v) : tickFmt(v, tx.step), x, pad.t + ph + 5); });
+    ty.list.forEach(v => { const y = Math.round(sy(v)) + .5; ctx.strokeStyle = C.line; ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + pw, y); ctx.stroke();
+      ctx.fillStyle = C.muted; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(opt.yFmt ? opt.yFmt(v) : tickFmt(v, ty.step), pad.l - 5, y); });
+    if (opt.origin) { ctx.strokeStyle = rgba(C.ink, .45); ctx.lineWidth = 1.3;
+      if (xr[0] < 0 && xr[1] > 0) { const x = Math.round(sx(0)) + .5; ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t + ph); ctx.stroke(); }
+      if (yr[0] < 0 && yr[1] > 0) { const y = Math.round(sy(0)) + .5; ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + pw, y); ctx.stroke(); } }
+    ctx.strokeStyle = C.line_strong; ctx.lineWidth = 1; ctx.strokeRect(pad.l + .5, pad.t + .5, pw - 1, ph - 1);
+    ctx.fillStyle = C.muted; ctx.font = `600 ${small ? 11 : 12}px ${C.sans}`;
+    ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText(lab[0], pad.l + pw / 2, h - 1);
+    ctx.save(); ctx.translate(11, pad.t + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText(lab[1], 0, -8); ctx.restore();
+    return { sx, sy, ix, iy, pad, pw, ph, xr, yr };
+  }
+  /* 가로·세로 눈금 간격이 같은 틀 (cx, cy 중심, 최소 반폭 hw, hh) */
+  function eqFrame(ctx, w, h, v, C, lab, opt = {}) {
+    const pad = padFor(w), pw = w - pad.l - pad.r, ph = h - pad.t - pad.b;
+    const k = Math.min(pw / (2 * v.hw), ph / (2 * v.hh));
+    const xr = [v.cx - pw / (2 * k), v.cx + pw / (2 * k)], yr = [v.cy - ph / (2 * k), v.cy + ph / (2 * k)];
+    const F = frame(ctx, w, h, xr, yr, C, lab, opt); F.k = k; return F;
+  }
+  function clipRect(ctx, F) { ctx.save(); ctx.beginPath(); ctx.rect(F.pad.l, F.pad.t, F.pw, F.ph); ctx.clip(); }
+  function arrow(ctx, x0, y0, x1, y1, color, width, head = 9) {
+    const a = Math.atan2(y1 - y0, x1 - x0), L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const hh = Math.min(head, L * 0.5);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - hh * 0.6 * Math.cos(a), y1 - hh * 0.6 * Math.sin(a)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - hh * Math.cos(a - .42), y1 - hh * Math.sin(a - .42)); ctx.lineTo(x1 - hh * Math.cos(a + .42), y1 - hh * Math.sin(a + .42)); ctx.closePath(); ctx.fill();
+    ctx.lineCap = "butt";
+  }
+  function label(ctx, text, x, y, color, C, opt = {}) {
+    ctx.font = opt.font || `600 12px ${C.mono}`; ctx.textAlign = opt.align || "left"; ctx.textBaseline = opt.base || "middle";
+    const m = ctx.measureText(text), wd = m.width + 8, ht = 18;
+    let bx = x - (ctx.textAlign === "center" ? wd / 2 : ctx.textAlign === "right" ? wd - 4 : 4), by = y - (ctx.textBaseline === "middle" ? ht / 2 : ctx.textBaseline === "bottom" ? ht - 2 : 2);
+    ctx.fillStyle = rgba(C.surface, .86); ctx.fillRect(bx, by, wd, ht);
+    ctx.fillStyle = color; ctx.fillText(text, x, y);
+  }
+  function dot(ctx, x, y, r, fill, stroke, lw = 1.3) { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = fill; ctx.fill(); if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); } }
+
+  /* ================================================================
+     고유값 분해: 대칭 행렬 야코비 회전법 (직접 구현)
+     A = V Λ Vᵀ, 회전 J(p,q,θ)로 비대각 원소를 하나씩 0으로 만든다
+     ================================================================ */
+  function jacobi(A, n) { // A: 길이 n*n (행 우선, 대칭)
+    const a = Float64Array.from(A), V = new Float64Array(n * n);
+    for (let i = 0; i < n; i++) V[i * n + i] = 1;
+    let tot = 0; for (let i = 0; i < n * n; i++) tot += a[i] * a[i];
+    let sweeps = 0;
+    for (; sweeps < 80; sweeps++) {
+      let off = 0; for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) off += a[p * n + q] * a[p * n + q];
+      if (off === 0 || off <= 1e-30 * tot) break;
+      for (let p = 0; p < n - 1; p++) for (let q = p + 1; q < n; q++) {
+        const apq = a[p * n + q]; if (Math.abs(apq) < 1e-300) continue;
+        const th = (a[q * n + q] - a[p * n + p]) / (2 * apq);
+        const t = (th >= 0 ? 1 : -1) / (Math.abs(th) + Math.sqrt(th * th + 1));
+        const c = 1 / Math.sqrt(t * t + 1), s = t * c;
+        for (let k = 0; k < n; k++) { const kp = k * n + p, kq = k * n + q, x = a[kp], y = a[kq]; a[kp] = c * x - s * y; a[kq] = s * x + c * y; }
+        for (let k = 0; k < n; k++) { const pk = p * n + k, qk = q * n + k, x = a[pk], y = a[qk]; a[pk] = c * x - s * y; a[qk] = s * x + c * y; }
+        for (let k = 0; k < n; k++) { const kp = k * n + p, kq = k * n + q, x = V[kp], y = V[kq]; V[kp] = c * x - s * y; V[kq] = s * x + c * y; }
+      }
+    }
+    const idx = [...Array(n).keys()].sort((i, j) => a[j * n + j] - a[i * n + i]);
+    const vals = idx.map(i => a[i * n + i]);
+    const vecs = idx.map(i => { const v = new Float64Array(n); for (let k = 0; k < n; k++) v[k] = V[k * n + i]; return v; });
+    return { vals, vecs, sweeps };
+  }
+  function eigSym(M) { const n = M.length, A = new Float64Array(n * n); for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) A[i * n + j] = M[i][j]; return jacobi(A, n); }
+  /* scikit-learn 부호 규칙: 각 성분에서 절댓값이 가장 큰 원소가 양수 */
+  function signFlip(v) { let m = 0; for (let i = 1; i < v.length; i++) if (Math.abs(v[i]) > Math.abs(v[m]) + 1e-12) m = i; if (v[m] < 0) for (let i = 0; i < v.length; i++) v[i] = -v[i]; return v; }
+
+  /* ================================================================
+     1. 2D에서 주성분 찾기 (수축기·이완기 혈압)
+     ================================================================ */
+  const S1 = { rho: 0.7, n: 40, seed: 7, pts: [], th: 20, showPC: false, perp: true, foot: true, drag: null, F: null, sel: -1, anim: 0 };
+  const VIEW1 = { cx: 128, cy: 80, hw: 60, hh: 37 };
+  let T1 = null;
+  function genBP(rho, n, seed) {
+    const r = mulberry32(seed * 9301 + 49297), out = [], q = Math.sqrt(1 - rho * rho);
+    for (let i = 0; i < n; i++) { const z1 = gauss(r), z2 = gauss(r);
+      out.push({ x: clamp(r1(128 + 16 * z1), 70, 186), y: clamp(r1(80 + 10 * (rho * z1 + q * z2)), 44, 116) }); }
+    return out;
+  }
+  function stats2d(P) {
+    const n = P.length; if (n < 3) return null;
+    let mx = 0, my = 0; P.forEach(p => { mx += p.x; my += p.y; }); mx /= n; my /= n;
+    let Sxx = 0, Sxy = 0, Syy = 0; P.forEach(p => { const dx = p.x - mx, dy = p.y - my; Sxx += dx * dx; Sxy += dx * dy; Syy += dy * dy; });
+    const a = Sxx / (n - 1), b = Sxy / (n - 1), c = Syy / (n - 1);
+    if (a + c < 1e-12) return null;
+    const E = eigSym([[a, b], [b, c]]); const v1 = signFlip(E.vecs[0]);
+    let phi = Math.atan2(v1[1], v1[0]) * 180 / Math.PI; phi = ((phi % 180) + 180) % 180;
+    return { n, mx, my, Sxx, Sxy, Syy, a, b, c, lam: E.vals, v1, phi, tot: a + c, r: b / Math.sqrt(a * c || 1) };
+  }
+  const varAt = (T, th) => { const t = th * Math.PI / 180, u0 = Math.cos(t), u1 = Math.sin(t); return T.a * u0 * u0 + 2 * T.b * u0 * u1 + T.c * u1 * u1; };
+  function proj1(T, th) {
+    const t = th * Math.PI / 180, u = [Math.cos(t), Math.sin(t)]; let sz = 0, sd = 0; const z = [], d = [];
+    S1.pts.forEach(p => { const dx = p.x - T.mx, dy = p.y - T.my, zi = dx * u[0] + dy * u[1], di = -dx * u[1] + dy * u[0]; z.push(zi); d.push(di); sz += zi * zi; sd += di * di; });
+    return { u, z, d, varz: sz / (T.n - 1), sse: sd, err: sd / (T.n - 1) };
+  }
+  const cv1 = $("cv1"), cv1c = $("cv1c");
+  function draw1() {
+    if ($("pane-find").hidden) return;
+    const C = colors(); const { ctx, w, h } = fitCanvas(cv1);
+    const F = eqFrame(ctx, w, h, VIEW1, C, ["수축기 혈압 (mmHg)", "이완기 혈압 (mmHg)"]); S1.F = F;
+    const T = T1; if (!T) { ctx.fillStyle = C.muted; ctx.font = `600 13px ${C.sans}`; ctx.textAlign = "center"; ctx.fillText("점이 3개 이상 필요합니다", F.pad.l + F.pw / 2, F.pad.t + 30); return; }
+    const pr = proj1(T, S1.th), u = pr.u, mx = T.mx, my = T.my, L = 400;
+    clipRect(ctx, F);
+    // PC1 / PC2 (정답)
+    if (S1.showPC) { const v = T.v1;
+      ctx.setLineDash([8, 6]); ctx.strokeStyle = C.c_pc; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(F.sx(mx - L * v[0]), F.sy(my - L * v[1])); ctx.lineTo(F.sx(mx + L * v[0]), F.sy(my + L * v[1])); ctx.stroke();
+      ctx.setLineDash([2, 5]); ctx.strokeStyle = rgba(C.c_pc, .6); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(F.sx(mx + L * v[1]), F.sy(my - L * v[0])); ctx.lineTo(F.sx(mx - L * v[1]), F.sy(my + L * v[0])); ctx.stroke(); ctx.setLineDash([]); }
+    // 사영 값 ±1 표준편차 막대
+    const sd = Math.sqrt(pr.varz);
+    ctx.strokeStyle = rgba(C.c_var, .32); ctx.lineWidth = 12; ctx.lineCap = "butt";
+    ctx.beginPath(); ctx.moveTo(F.sx(mx - sd * u[0]), F.sy(my - sd * u[1])); ctx.lineTo(F.sx(mx + sd * u[0]), F.sy(my + sd * u[1])); ctx.stroke();
+    // 수선
+    if (S1.perp) { ctx.strokeStyle = rgba(C.c_err, .85); ctx.lineWidth = 1.4;
+      S1.pts.forEach((p, i) => { const fx = mx + pr.z[i] * u[0], fy = my + pr.z[i] * u[1]; ctx.beginPath(); ctx.moveTo(F.sx(p.x), F.sy(p.y)); ctx.lineTo(F.sx(fx), F.sy(fy)); ctx.stroke(); }); }
+    // 내 축
+    ctx.strokeStyle = C.c_axis; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(F.sx(mx - L * u[0]), F.sy(my - L * u[1])); ctx.lineTo(F.sx(mx + L * u[0]), F.sy(my + L * u[1])); ctx.stroke();
+    // 사영된 점
+    if (S1.foot) S1.pts.forEach((p, i) => { const fx = mx + pr.z[i] * u[0], fy = my + pr.z[i] * u[1]; dot(ctx, F.sx(fx), F.sy(fy), 3, C.c_axis); });
+    ctx.restore();
+    // 각도 호
+    const cxp = F.sx(mx), cyp = F.sy(my), R = 34, t = S1.th * Math.PI / 180;
+    ctx.strokeStyle = rgba(C.ink, .35); ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(cxp, cyp); ctx.lineTo(cxp + R + 14, cyp); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = C.c_axis; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(cxp, cyp, R, 0, -t, true); ctx.stroke();
+    // 점
+    S1.pts.forEach((p, i) => { dot(ctx, F.sx(p.x), F.sy(p.y), 4.6, C.c_data, C.surface, 1.4); if (i === S1.sel) { ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(F.sx(p.x), F.sy(p.y), 8.5, 0, 7); ctx.stroke(); } });
+    // 평균
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(cxp - 7, cyp); ctx.lineTo(cxp + 7, cyp); ctx.moveTo(cxp, cyp - 7); ctx.lineTo(cxp, cyp + 7); ctx.stroke();
+    label(ctx, `θ = ${fmt(S1.th, 1)}°`, F.pad.l + 8, F.pad.t + 14, C.c_axis, C);
+    label(ctx, "평균 (x̄, ȳ)", cxp + 9, cyp + 14, C.muted, C, { font: `600 11px ${C.sans}` });
+  }
+  function draw1c() {
+    if ($("pane-find").hidden) return;
+    const C = colors(); const { ctx, w, h } = fitCanvas(cv1c); const T = T1; if (!T) return;
+    const top = T.tot * 1.1;
+    const F = frame(ctx, w, h, [0, 180], [0, top], C, ["축 각도 θ (°)", "분산 (mmHg²)"], { xTicks: { list: [0, 30, 60, 90, 120, 150, 180], step: 30 }, xFmt: v => v + "°" });
+    S1.Fc = F;
+    clipRect(ctx, F);
+    // 총분산 선
+    ctx.setLineDash([3, 4]); ctx.strokeStyle = rgba(C.ink, .4); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(F.pad.l, F.sy(T.tot)); ctx.lineTo(F.pad.l + F.pw, F.sy(T.tot)); ctx.stroke(); ctx.setLineDash([]);
+    const path = f => { ctx.beginPath(); for (let a = 0; a <= 180; a += 0.5) { const x = F.sx(a), y = F.sy(f(a)); a ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } };
+    path(a => varAt(T, a)); ctx.lineTo(F.sx(180), F.sy(0)); ctx.lineTo(F.sx(0), F.sy(0)); ctx.closePath(); ctx.fillStyle = rgba(C.c_var, .1); ctx.fill();
+    path(a => varAt(T, a)); ctx.strokeStyle = C.c_var; ctx.lineWidth = 2.4; ctx.stroke();
+    path(a => T.tot - varAt(T, a)); ctx.strokeStyle = C.c_err; ctx.lineWidth = 2.4; ctx.stroke();
+    // PC1 표시
+    const xp = F.sx(T.phi); ctx.strokeStyle = rgba(C.c_pc, .7); ctx.setLineDash([6, 5]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(xp, F.pad.t); ctx.lineTo(xp, F.pad.t + F.ph); ctx.stroke(); ctx.setLineDash([]);
+    ctx.restore();
+    // 지금 θ
+    const xt = F.sx(S1.th); ctx.strokeStyle = C.c_axis; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(xt, F.pad.t); ctx.lineTo(xt, F.pad.t + F.ph); ctx.stroke();
+    const vv = varAt(T, S1.th);
+    dot(ctx, xt, F.sy(vv), 5, C.c_var, C.surface, 1.5); dot(ctx, xt, F.sy(T.tot - vv), 5, C.c_err, C.surface, 1.5);
+    dot(ctx, xp, F.sy(T.lam[0]), 6, C.c_pc, C.surface, 1.8); dot(ctx, xp, F.sy(T.lam[1]), 6, C.surface, C.c_pc, 2.2);
+    const right = T.phi > 120, small = w < 420;
+    label(ctx, `최대 분산 λ₁ = ${fmt(T.lam[0], 1)}`, xp + (right ? -10 : 10), F.sy(T.lam[0]) + 13, C.c_pc, C, { align: right ? "right" : "left", font: `600 ${small ? 10.5 : 12}px ${C.mono}` });
+    label(ctx, `최소 오차 = λ₂ = ${fmt(T.lam[1], 1)}`, xp + (right ? -10 : 10), F.sy(T.lam[1]) - 13, C.c_pc, C, { align: right ? "right" : "left", font: `600 ${small ? 10.5 : 12}px ${C.mono}` });
+    label(ctx, `총분산 ${fmt(T.tot, 1)}`, F.pad.l + F.pw - 6, F.sy(T.tot) - 10, C.muted, C, { align: "right", font: `600 11px ${C.mono}` });
+  }
+  function text1() {
+    $("v1Rho").textContent = fmt(S1.rho, 2); $("v1N").textContent = S1.n; $("v1Th").textContent = fmt(S1.th, 1) + "°";
+    $("s1Th").value = S1.th;
+    const T = T1; if (!T) { $("f1").textContent = "점이 3개 이상 필요합니다."; return; }
+    const pr = proj1(T, S1.th);
+    $("g1Var").textContent = `${fmt(pr.varz, 2)}  (${fmtP(pr.varz / T.tot)})`;
+    $("g1Err").textContent = `${fmt(pr.err, 2)}  (${fmtP(pr.err / T.tot)})`;
+    $("b1Var").style.width = (pr.varz / T.tot * 100) + "%"; $("b1Err").style.width = (pr.err / T.tot * 100) + "%";
+    $("m1Var").style.left = (T.lam[0] / T.tot * 100) + "%"; $("m1Err").style.left = (T.lam[1] / T.tot * 100) + "%";
+    let dth = Math.abs(S1.th - T.phi); dth = Math.min(dth, 180 - dth);
+    $("g1Msg").innerHTML = dth < 0.5 ? `<b class="pc-ok">PC1과 같은 축입니다.</b> 사영 분산이 최대(λ₁)이고 재구성 오차가 최소(λ₂)입니다.`
+      : `PC1까지 <b>${fmt(dth, 1)}°</b>. 분산은 최댓값의 <b>${fmtP(pr.varz / T.lam[0])}</b>, 오차는 최솟값의 <b>${fmt(pr.err / Math.max(T.lam[1], 1e-12), 2)}배</b>. 점선 눈금이 목표입니다.`;
+    const u = pr.u;
+    $("f1").textContent =
+`n = ${T.n},  평균 (x̄, ȳ) = (${fmt(T.mx, 2)}, ${fmt(T.my, 2)})
+u = (cos ${fmt(S1.th, 1)}°, sin ${fmt(S1.th, 1)}°) = (${fmt(u[0], 4)}, ${fmt(u[1], 4)})
+
+zᵢ = (xᵢ − x̄)·u        ← 축 위 좌표 (사영 값)
+dᵢ = 점에서 축까지 수선 길이
+‖xᵢ − x̄‖² = zᵢ² + dᵢ²   ← 피타고라스
+
+Var(z)      = Σzᵢ²/(n−1) = ${fmt(pr.varz, 2)}
+Σdᵢ²        = ${fmt(pr.sse, 1)}
+Σdᵢ²/(n−1)  = ${fmt(pr.err, 2)}
+합          = ${fmt(pr.varz + pr.err, 2)} = s²(수축기) + s²(이완기)
+            = ${fmt(T.a, 2)} + ${fmt(T.c, 2)}   (θ와 무관하게 일정)`;
+    $("note1").innerHTML = `두 곡선을 더하면 언제나 총분산 <b>${fmt(T.tot, 2)}</b>입니다. 그래서 <b>사영 분산이 가장 큰 각도(${fmt(T.phi, 1)}°)가 곧 재구성 오차가 가장 작은 각도</b>입니다. 그 축이 PC1이고, 그때의 분산이 공분산 행렬의 가장 큰 고유값 λ₁ = ${fmt(T.lam[0], 2)}입니다. 90° 돌린 축(PC2)에서는 분산이 λ₂ = ${fmt(T.lam[1], 2)}로 가장 작습니다. 표본 상관 r = ${fmt(T.r, 3)}.`;
+  }
+  function render1() { T1 = stats2d(S1.pts); text1(); draw1(); draw1c(); }
+  function regen1() { S1.pts = genBP(S1.rho, S1.n, S1.seed); S1.sel = -1; render1(); dirty2(); }
+  $("s1Rho").addEventListener("input", e => { S1.rho = +e.target.value; regen1(); });
+  $("s1N").addEventListener("input", e => { S1.n = +e.target.value; regen1(); });
+  $("b1Seed").onclick = () => { S1.seed = (S1.seed * 31 + 7) % 9973 + 1; regen1(); };
+  $("s1Th").addEventListener("input", e => { cancelAnimationFrame(S1.anim); S1.th = +e.target.value; text1(); draw1(); draw1c(); });
+  $("c1Pc").addEventListener("change", e => { S1.showPC = e.target.checked; draw1(); });
+  $("c1Perp").addEventListener("change", e => { S1.perp = e.target.checked; draw1(); });
+  $("c1Foot").addEventListener("change", e => { S1.foot = e.target.checked; draw1(); });
+  function setTheta(v) { S1.th = Math.round((((v % 180) + 180) % 180) * 10) / 10; if (S1.th >= 180) S1.th = 0; text1(); draw1(); draw1c(); }
+  $("b1Fit").onclick = () => {
+    if (!T1) return; cancelAnimationFrame(S1.anim);
+    let d = T1.phi - S1.th; if (d > 90) d -= 180; if (d < -90) d += 180;
+    const from = S1.th, t0 = performance.now(), dur = reduceMotion ? 0 : 650;
+    const step = now => { const k = dur ? ease((now - t0) / dur) : 1; S1.th = (((from + d * k) % 180) + 180) % 180; text1(); draw1(); draw1c();
+      if (k < 1) S1.anim = requestAnimationFrame(step); else { S1.th = Math.round(T1.phi * 1000) / 1000; text1(); draw1(); draw1c(); } };
+    S1.anim = requestAnimationFrame(step);
+  };
+  function evPos(cv, e) { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+  function hit1(px, py, rad) { const F = S1.F; if (!F) return -1; let best = -1, bd = rad * rad;
+    S1.pts.forEach((p, i) => { const dx = F.sx(p.x) - px, dy = F.sy(p.y) - py, d = dx * dx + dy * dy; if (d <= bd) { bd = d; best = i; } }); return best; }
+  function rotFrom(px, py) { const F = S1.F, T = T1; if (!F || !T) return; const dx = px - F.sx(T.mx), dy = -(py - F.sy(T.my)); if (Math.hypot(dx, dy) < 8) return;
+    cancelAnimationFrame(S1.anim); setTheta(Math.atan2(dy, dx) * 180 / Math.PI); }
+  cv1.addEventListener("pointerdown", e => {
+    if (!S1.F || e.button !== 0) return; const [px, py] = evPos(cv1, e), h = hit1(px, py, e.pointerType === "touch" ? 18 : 10);
+    if (h >= 0) { S1.drag = { type: "pt", i: h }; S1.sel = h; const p = S1.pts[h]; $("info1").textContent = `#${h + 1} 수축기 ${fmt(p.x, 1)}, 이완기 ${fmt(p.y, 1)}`; draw1(); }
+    else { S1.drag = { type: "rot" }; rotFrom(px, py); }
+    try { cv1.setPointerCapture(e.pointerId); } catch (_) {} e.preventDefault();
+  });
+  cv1.addEventListener("pointermove", e => {
+    const [px, py] = evPos(cv1, e);
+    if (!S1.drag) { cv1.style.cursor = hit1(px, py, 10) >= 0 ? "grab" : "crosshair"; return; }
+    if (S1.drag.type === "rot") { rotFrom(px, py); return; }
+    const F = S1.F, p = S1.pts[S1.drag.i]; if (!p) return;
+    p.x = clamp(r1(F.ix(px)), Math.ceil(F.xr[0]), Math.floor(F.xr[1])); p.y = clamp(r1(F.iy(py)), Math.ceil(F.yr[0]), Math.floor(F.yr[1]));
+    cv1.style.cursor = "grabbing"; $("info1").textContent = `#${S1.drag.i + 1} 수축기 ${fmt(p.x, 1)}, 이완기 ${fmt(p.y, 1)}`;
+    render1();
+  });
+  const end1 = () => { if (S1.drag && S1.drag.type === "pt") dirty2(); S1.drag = null; cv1.style.cursor = "crosshair"; };
+  cv1.addEventListener("pointerup", end1); cv1.addEventListener("pointercancel", end1);
+  let c1drag = false;
+  const c1set = e => { const F = S1.Fc; if (!F) return; const [px] = evPos(cv1c, e); cancelAnimationFrame(S1.anim); setTheta(clamp(F.ix(px), 0, 179.5)); };
+  cv1c.addEventListener("pointerdown", e => { c1drag = true; c1set(e); try { cv1c.setPointerCapture(e.pointerId); } catch (_) {} });
+  cv1c.addEventListener("pointermove", e => { if (c1drag) c1set(e); });
+  cv1c.addEventListener("pointerup", () => c1drag = false); cv1c.addEventListener("pointercancel", () => c1drag = false);
+
+  /* ================================================================
+     2. 공분산 행렬과 고유벡터 (단계 진행)
+     ================================================================ */
+  const HAND = [[120, 80], [130, 85], [140, 90], [110, 70], [150, 95]];
+  const STEPS2 = ["원자료", "① 중심화", "② 표준화", "③ 공분산 행렬", "④ 고유값 분해", "⑤ 투영 Z = X̃V", "⑥ 설명 분산 비율"];
+  const SPD2 = [0.5, 0.75, 1, 1.5, 2.5];
+  const S2 = { src: "s1", std: false, step: 0, t: 1, playing: false, speed: 2, raf: 0, timer: 0 };
+  let D2 = null, d2dirty = true;
+  function dirty2() { d2dirty = true; if (!$("pane-cov").hidden) render2(); }
+  function data2() {
+    const P = S2.src === "hand" ? HAND.map(([x, y]) => ({ x, y })) : S1.pts.map(p => ({ x: p.x, y: p.y }));
+    const n = P.length; if (n < 3) return null;
+    let mx = 0, my = 0; P.forEach(p => { mx += p.x; my += p.y; }); mx /= n; my /= n;
+    const Xc = P.map(p => [p.x - mx, p.y - my]);
+    let s0 = 0, s1 = 0; Xc.forEach(r => { s0 += r[0] * r[0]; s1 += r[1] * r[1]; }); const s = [Math.sqrt(s0 / (n - 1)), Math.sqrt(s1 / (n - 1))];
+    const Xs = S2.std ? Xc.map(r => [r[0] / (s[0] || 1), r[1] / (s[1] || 1)]) : Xc;
+    let Sxx = 0, Sxy = 0, Syy = 0, pos = 0, neg = 0;
+    Xs.forEach(r => { Sxx += r[0] * r[0]; Syy += r[1] * r[1]; const pr = r[0] * r[1]; Sxy += pr; if (pr >= 0) pos += pr; else neg += pr; });
+    const a = Sxx / (n - 1), b = Sxy / (n - 1), c = Syy / (n - 1);
+    // 2×2 닫힌 해
+    const tr = a + c, det = a * c - b * b, disc = Math.sqrt(Math.max(0, tr * tr / 4 - det));
+    const l1 = tr / 2 + disc, l2 = tr / 2 - disc;
+    let v1 = Math.abs(b) > 1e-12 ? [b, l1 - a] : (a >= c ? [1, 0] : [0, 1]); const nv = Math.hypot(v1[0], v1[1]); v1 = signFlip([v1[0] / nv, v1[1] / nv]);
+    const v2 = [-v1[1], v1[0]];
+    // 야코비 회전법으로 따로 계산 (검산)
+    const J = eigSym([[a, b], [b, c]]); const j1 = signFlip(Array.from(J.vecs[0]));
+    const chk = Math.max(Math.abs(J.vals[0] - l1), Math.abs(J.vals[1] - l2), Math.abs(j1[0] - v1[0]), Math.abs(j1[1] - v1[1]));
+    const phi = Math.atan2(v1[1], v1[0]);
+    const Z = Xs.map(r => [r[0] * v1[0] + r[1] * v1[1], r[0] * v2[0] + r[1] * v2[1]]);
+    let z11 = 0, z22 = 0, z12 = 0; Z.forEach(z => { z11 += z[0] * z[0]; z22 += z[1] * z[1]; z12 += z[0] * z[1]; });
+    let R0 = 0, Rs = 0; Xc.forEach(r => { R0 = Math.max(R0, Math.hypot(r[0], r[1])); }); Xs.forEach(r => { Rs = Math.max(Rs, Math.hypot(r[0], r[1])); });
+    let xmax = 0, ymax = 0; P.forEach(p => { xmax = Math.max(xmax, p.x); ymax = Math.max(ymax, p.y); });
+    return { P, n, mu: [mx, my], s, Xc, Xs, Sxx, Sxy, Syy, pos, neg, a, b, c, tr, det, disc, l1, l2, v1, v2, J, chk, phi, Z,
+      zv: [z11 / (n - 1), z22 / (n - 1), z12 / (n - 1)], R0: R0 * 1.12 || 1, Rs: Rs * 1.12 || 1, raw: { cx: xmax / 2, cy: ymax / 2, hw: xmax / 2 * 1.08 + 4, hh: ymax / 2 * 1.08 + 4 } };
+  }
+  function state2() { // 현재 단계·진행률 → 그림 상태
+    const st = S2.step, t = ease(S2.t), std = S2.std;
+    const o = { a: 1, b: std ? 1 : 0, r: 0, quad: false, eig: false, bars: false };
+    if (st === 0) { o.a = 0; o.b = 0; }
+    else if (st === 1) { o.a = t; o.b = 0; }
+    else if (st === 2) { o.b = std ? t : 0; }
+    else if (st === 3) o.quad = true;
+    else if (st === 4) o.eig = true;
+    else if (st === 5) { o.eig = true; o.r = t; }
+    else if (st === 6) { o.eig = true; o.r = 1; o.bars = true; }
+    return o;
+  }
+  function view2(D, o) {
+    const vc = { cx: 0, cy: 0, hw: D.R0, hh: D.R0 }, vs = { cx: 0, cy: 0, hw: D.Rs, hh: D.Rs };
+    const lerpV = (A, B, t) => ({ cx: A.cx + (B.cx - A.cx) * t, cy: A.cy + (B.cy - A.cy) * t, hw: A.hw * Math.pow(B.hw / A.hw, t), hh: A.hh * Math.pow(B.hh / A.hh, t) });
+    let v = o.a < 1 ? lerpV(D.raw, vc, o.a) : vc;
+    if (S2.std && o.b > 0) v = lerpV(vc, vs, o.b);
+    return v;
+  }
+  function pos2(D, i, o) {
+    let x = D.P[i].x - o.a * D.mu[0], y = D.P[i].y - o.a * D.mu[1];
+    if (S2.std && o.b > 0) { x /= 1 + o.b * (D.s[0] - 1); y /= 1 + o.b * (D.s[1] - 1); }
+    if (o.r) { const g = -o.r * D.phi, c = Math.cos(g), s = Math.sin(g); return [c * x - s * y, s * x + c * y]; }
+    return [x, y];
+  }
+  function draw2() {
+    if ($("pane-cov").hidden || !D2) return;
+    const D = D2, C = colors(), o = state2(); const { ctx, w, h } = fitCanvas($("cv2"));
+    const stdOn = S2.std && o.b > 0.5, rot = o.r > 0.5;
+    const lab = rot ? ["PC1 점수 z₁", "PC2 점수 z₂"] : stdOn ? ["수축기 (표준화)", "이완기 (표준화)"] : o.a > 0.5 ? ["수축기 − 평균 (mmHg)", "이완기 − 평균 (mmHg)"] : ["수축기 혈압 (mmHg)", "이완기 혈압 (mmHg)"];
+    const F = eqFrame(ctx, w, h, view2(D, o), C, lab, { origin: true });
+    const scl = o.b > 0 && S2.std ? [1 + o.b * (D.s[0] - 1), 1 + o.b * (D.s[1] - 1)] : [1, 1];
+    clipRect(ctx, F);
+    if (o.quad) { // 사분면: 곱 xy의 부호
+      const x0 = F.sx(0), y0 = F.sy(0);
+      ctx.fillStyle = rgba(C.pos, .07); ctx.fillRect(x0, F.pad.t, F.pad.l + F.pw - x0, y0 - F.pad.t); ctx.fillRect(F.pad.l, y0, x0 - F.pad.l, F.pad.t + F.ph - y0);
+      ctx.fillStyle = rgba(C.neg, .07); ctx.fillRect(F.pad.l, F.pad.t, x0 - F.pad.l, y0 - F.pad.t); ctx.fillRect(x0, y0, F.pad.l + F.pw - x0, F.pad.t + F.ph - y0);
+      ctx.font = `700 13px ${C.mono}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillStyle = rgba(C.pos, .8); ctx.fillText("x̃ỹ > 0", (x0 + F.pad.l + F.pw) / 2, (F.pad.t + y0) / 2); ctx.fillText("x̃ỹ > 0", (x0 + F.pad.l) / 2, (y0 + F.pad.t + F.ph) / 2);
+      ctx.fillStyle = rgba(C.neg, .8); ctx.fillText("x̃ỹ < 0", (x0 + F.pad.l) / 2, (F.pad.t + y0) / 2); ctx.fillText("x̃ỹ < 0", (x0 + F.pad.l + F.pw) / 2, (y0 + F.pad.t + F.ph) / 2);
+    }
+    // 원래 좌표축 방향(회전 중)
+    if (o.r > 0) { const g = -o.r * D.phi, L = Math.max(F.xr[1], F.yr[1]) * 2;
+      [[1, 0, "수축기 축"], [0, 1, "이완기 축"]].forEach(([ex, ey, nm]) => { const x = Math.cos(g) * ex - Math.sin(g) * ey, y = Math.sin(g) * ex + Math.cos(g) * ey;
+        ctx.setLineDash([4, 5]); ctx.strokeStyle = rgba(C.muted, .7); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(F.sx(-L * x), F.sy(-L * y)); ctx.lineTo(F.sx(L * x), F.sy(L * y)); ctx.stroke(); ctx.setLineDash([]);
+        const tx = F.sx(x * D.R0 * 0.0 + x * (F.xr[1] * 0.78)), ty = F.sy(y * (F.yr[1] * 0.78)); label(ctx, nm, tx, ty, C.muted, C, { align: "center", font: `600 11px ${C.sans}` }); }); }
+    if (o.eig) { // 공분산 타원(1σ, 2σ)과 고유벡터
+      const g = -o.r * D.phi, rot2 = (x, y) => [Math.cos(g) * x - Math.sin(g) * y, Math.sin(g) * x + Math.cos(g) * y];
+      const s1 = Math.sqrt(Math.max(D.l1, 0)), s2 = Math.sqrt(Math.max(D.l2, 0));
+      [1, 2].forEach(m => { ctx.beginPath(); for (let k = 0; k <= 96; k++) { const a = k / 96 * 2 * Math.PI, ca = Math.cos(a) * s1 * m, sa = Math.sin(a) * s2 * m;
+        const [x, y] = rot2(D.v1[0] * ca + D.v2[0] * sa, D.v1[1] * ca + D.v2[1] * sa); k ? ctx.lineTo(F.sx(x), F.sy(y)) : ctx.moveTo(F.sx(x), F.sy(y)); }
+        ctx.strokeStyle = rgba(C.c_pc, m === 1 ? .7 : .35); ctx.lineWidth = 1.4; ctx.setLineDash(m === 1 ? [] : [5, 5]); ctx.stroke(); ctx.setLineDash([]); });
+    }
+    ctx.restore();
+    // 점
+    const prodCol = (i) => { const r = D.Xs[i]; return r[0] * r[1] >= 0 ? C.pos : C.neg; };
+    for (let i = 0; i < D.n; i++) { const [x, y] = pos2(D, i, o); dot(ctx, F.sx(x), F.sy(y), D.n <= 10 ? 6 : 4.4, o.quad ? prodCol(i) : C.c_data, C.surface, 1.3); }
+    if (S2.src === "hand") { ctx.font = `600 11px ${C.mono}`; for (let i = 0; i < D.n; i++) { const [x, y] = pos2(D, i, o); label(ctx, "#" + (i + 1), F.sx(x) + 8, F.sy(y) - 10, C.muted, C, { font: `600 11px ${C.mono}` }); } }
+    // 평균(→원점)
+    { const mx = (1 - o.a) * D.mu[0], my = (1 - o.a) * D.mu[1]; const X = F.sx(mx), Y = F.sy(my);
+      ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X - 8, Y); ctx.lineTo(X + 8, Y); ctx.moveTo(X, Y - 8); ctx.lineTo(X, Y + 8); ctx.stroke();
+      if (S2.step <= 1) label(ctx, S2.step === 1 && S2.t >= 1 ? "평균 → 원점 (0, 0)" : `평균 (${fmt(D.mu[0], 1)}, ${fmt(D.mu[1], 1)})`, X + 10, Y - 14, C.ink, C, { font: `600 11.5px ${C.mono}` }); }
+    if (o.eig) {
+      const g = -o.r * D.phi, rot2 = (x, y) => [Math.cos(g) * x - Math.sin(g) * y, Math.sin(g) * x + Math.cos(g) * y];
+      const s1 = Math.sqrt(Math.max(D.l1, 0)), s2 = Math.sqrt(Math.max(D.l2, 0));
+      const [a1, b1] = rot2(D.v1[0] * s1, D.v1[1] * s1), [a2, b2] = rot2(D.v2[0] * s2, D.v2[1] * s2);
+      arrow(ctx, F.sx(0), F.sy(0), F.sx(a1), F.sy(b1), C.c_pc, 3.2, 12); arrow(ctx, F.sx(0), F.sy(0), F.sx(a2), F.sy(b2), C.c_pc2, 3.2, 10);
+      label(ctx, rot ? "PC1" : "v₁·√λ₁", F.sx(a1) + 8, F.sy(b1) - 12, C.c_pc, C); label(ctx, rot ? "PC2" : "v₂·√λ₂", F.sx(a2) + 8, F.sy(b2) - 12, C.c_pc2, C);
+      if (o.bars) { const y0 = F.sy(0), x0 = F.sx(0);
+        ctx.strokeStyle = rgba(C.c_pc, .35); ctx.lineWidth = 12; ctx.beginPath(); ctx.moveTo(F.sx(-s1), y0); ctx.lineTo(F.sx(s1), y0); ctx.stroke();
+        ctx.strokeStyle = rgba(C.c_pc2, .35); ctx.beginPath(); ctx.moveTo(x0, F.sy(-s2)); ctx.lineTo(x0, F.sy(s2)); ctx.stroke();
+        label(ctx, `PC1 ${fmtP(D.l1 / D.tr)}`, F.sx(-s1) , y0 + 18, C.c_pc, C, { align: "left" });
+        label(ctx, `PC2 ${fmtP(D.l2 / D.tr)}`, x0 + 10, F.sy(s2) - 4, C.c_pc2, C, { base: "bottom" }); }
+    }
+  }
+  function mat(M, d, opt = {}) {
+    const cols = M[0].length;
+    return `<span class="pc-br"><span class="sk-mat sk-mat--sm" style="grid-template-columns:repeat(${cols},auto)">${M.map((r, i) => r.map((v, j) => {
+      const cl = opt.cls ? opt.cls(i, j) : ""; return `<span class="c ${cl}">${typeof v === "string" ? v : fmt(v, d)}</span>`; }).join("")).join("")}</span></span>`;
+  }
+  const headRows = (D, M, d) => { const k = Math.min(D.n, 5); const R = M.slice(0, k).map(r => r.slice()); if (D.n > k) R.push(M[0].map(() => "⋮")); return R; };
+  const eq = (...parts) => `<div class="pc-eq">${parts.map(p => p.startsWith("<") ? p : `<span class="t">${p}</span>`).join("")}</div>`;
+  function formula2() {
+    const D = D2, st = S2.step; if (!D) return;
+    $("ft2").textContent = STEPS2[st] + (st === 0 ? ": 데이터 행렬 X" : "");
+    const n = D.n, nm = `(${n}×2)`; let html = "", note = "";
+    const X = D.P.map(p => [p.x, p.y]);
+    const dX = S2.src === "hand" ? 0 : 1;
+    if (st === 0) {
+      html = eq(`X ${nm} =`, mat(headRows(D, X, dX), dX), "← 열: 수축기, 이완기") +
+        eq(`x̄ = ΣX/n =`, mat([[D.mu[0], D.mu[1]]], 2));
+      note = `점 하나 = 환자 한 명, 열 하나 = 변수 하나입니다. PCA는 먼저 <b>평균을 빼서</b> 데이터의 중심을 원점으로 옮깁니다. [다음]을 누르세요.`;
+    } else if (st === 1) {
+      html = eq("X̃ = X − x̄ =", mat(headRows(D, X, dX), dX), "−", mat([[D.mu[0], D.mu[1]]], 2), "=", mat(headRows(D, D.Xc, 2), 2)) +
+        eq(`열 합 ΣX̃ = (${fmt(D.Xc.reduce((s, r) => s + r[0], 0), 6)}, ${fmt(D.Xc.reduce((s, r) => s + r[1], 0), 6)})`);
+      note = `각 점에서 평균을 뺐습니다. 모양은 그대로이고 위치만 원점으로 옮겨졌습니다. 이제 각 열의 합이 0입니다.`;
+    } else if (st === 2) {
+      if (S2.std) {
+        html = eq(`s = √(ΣX̃²/(n−1)) =`, mat([[D.s[0], D.s[1]]], 3)) + eq("Z = X̃ / s =", mat(headRows(D, D.Xs, 3), 3));
+        note = `각 열을 표준편차로 나눠 단위를 없앴습니다. 이후 공분산 행렬은 <b>상관행렬</b>이 되고, 변수가 2개면 고유벡터가 항상 45° 방향이 됩니다. (scikit-learn StandardScaler는 n으로 나눈 표준편차를 써서 값이 n/(n−1)배 다르지만 고유벡터와 설명 비율은 같습니다.)`;
+      } else {
+        html = eq("건너뜀: 표준화하지 않음") + eq(`s = (${fmt(D.s[0], 2)}, ${fmt(D.s[1], 2)}) mmHg`);
+        note = `두 변수 모두 mmHg 단위라서 그대로 씁니다. 단위가 다른 변수(예: 나이와 콜레스테롤)를 섞을 때는 표준화가 필요합니다. 위의 [② 표준화 단계 포함]을 켜 보세요. 3번 화면에서 그 차이를 크게 볼 수 있습니다.`;
+      }
+    } else if (st === 3) {
+      const nmX = S2.std ? "Z" : "X̃";
+      html = eq(`${nmX}ᵀ${nmX} =`, mat([["Σx̃²", "Σx̃ỹ"], ["Σx̃ỹ", "Σỹ²"]], 0), "=", mat([[D.Sxx, D.Sxy], [D.Sxy, D.Syy]], 2)) +
+        eq(`Σ = ${nmX}ᵀ${nmX} / (n−1) = 1/${n - 1} ×`, mat([[D.Sxx, D.Sxy], [D.Sxy, D.Syy]], 2), "=", mat([[D.a, D.b], [D.b, D.c]], 3, { cls: (i, j) => i === j ? "" : "h2" })) +
+        eq(`Σx̃ỹ = (곱이 양수인 점의 합 ${fmt(D.pos, 2)}) + (음수인 점의 합 ${fmt(D.neg, 2)}) = ${fmt(D.Sxy, 2)}`);
+      note = `대각선은 각 변수의 <b>분산</b>, 비대각선은 두 변수의 <b>공분산</b>입니다. 파란 사분면(곱 > 0)의 점이 많을수록 공분산이 커집니다. Σ는 대칭 행렬이라 고유벡터가 서로 직교합니다.`;
+    } else if (st === 4) {
+      html = eq("det(Σ − λI) = (a − λ)(c − λ) − b² = 0") +
+        eq(`λ² − ${fmt(D.tr, 3)}·λ + ${fmt(D.det, 3)} = 0`, "<span class='pc-mut'>(tr = a + c, det = ac − b²)</span>") +
+        eq(`λ = tr/2 ± √((tr/2)² − det) = ${fmt(D.tr / 2, 3)} ± ${fmt(D.disc, 3)}`) +
+        eq("λ₁ =", `<b class="pc-ok">${fmt(D.l1, 3)}</b>`, "&nbsp; λ₂ =", `<b style="color:var(--c-pc2)">${fmt(D.l2, 3)}</b>`) +
+        eq("v₁ ∝ (b, λ₁ − a) →", mat([[D.v1[0]], [D.v1[1]]], 4, { cls: () => "h1" }), "&nbsp; v₂ ⟂ v₁ →", mat([[D.v2[0]], [D.v2[1]]], 4, { cls: () => "h2" })) +
+        eq("Σv₁ =", mat([[D.a, D.b], [D.b, D.c]], 3), mat([[D.v1[0]], [D.v1[1]]], 4), "=", mat([[D.a * D.v1[0] + D.b * D.v1[1]], [D.b * D.v1[0] + D.c * D.v1[1]]], 4), `= λ₁v₁ = ${fmt(D.l1, 3)} ×`, mat([[D.v1[0]], [D.v1[1]]], 4)) +
+        eq(`PC1 각도 = ½·atan2(2b, a − c) = ${fmt(D.phi * 180 / Math.PI, 2)}°`);
+      note = `<b>검산</b> 야코비 회전법(대칭 행렬의 비대각 원소를 회전으로 하나씩 없애는 방법, ${D.J.sweeps}회 반복)으로 따로 구한 고유값·고유벡터와의 최대 차이 = ${fmtS(D.chk, 2)} → ${D.chk < 1e-9 ? '<span class="pc-ok">일치</span>' : '<span class="pc-bad">불일치</span>'}. 초록 화살표 길이 = √λ₁ (그 방향의 표준편차), 실선 타원 = 1σ, 점선 = 2σ.`;
+    } else if (st === 5) {
+      const nmX = S2.std ? "Z_std" : "X̃";
+      html = eq("V = [v₁ v₂] =", mat([[D.v1[0], D.v2[0]], [D.v1[1], D.v2[1]]], 4, { cls: (i, j) => j === 0 ? "h1" : "h2" })) +
+        eq(`Z = ${nmX}·V =`, mat(headRows(D, D.Z, 3), 3)) +
+        eq(`Var(z₁) = ${fmt(D.zv[0], 3)} = λ₁, &nbsp;Var(z₂) = ${fmt(D.zv[1], 3)} = λ₂, &nbsp;Cov(z₁, z₂) = ${fmt(D.zv[2], 6)}`);
+      note = `좌표계를 PC1이 가로축이 되도록 ${fmt(D.phi * 180 / Math.PI, 1)}° 돌렸습니다. 새 좌표(점수) z₁, z₂는 <b>서로 상관이 0</b>이고 분산이 고유값과 같습니다. 고유벡터의 부호는 임의라 (−v)도 정답입니다. 여기서는 scikit-learn처럼 절댓값이 큰 원소가 양수가 되도록 맞췄습니다.`;
+    } else {
+      html = eq("설명 분산 비율 = λᵢ / (λ₁ + λ₂)") + eq(`λ₁ + λ₂ = ${fmt(D.l1 + D.l2, 3)}`, `= tr(Σ) = ${fmt(D.a, 3)} + ${fmt(D.c, 3)}`, "<span class='pc-mut'>(총분산)</span>") +
+        eq(`PC1: ${fmt(D.l1, 3)} / ${fmt(D.tr, 3)} =`, `<b class="pc-ok">${fmtP(D.l1 / D.tr, 2)}</b>`) +
+        eq(`PC2: ${fmt(D.l2, 3)} / ${fmt(D.tr, 3)} =`, `<b style="color:var(--c-pc2)">${fmtP(D.l2 / D.tr, 2)}</b>`);
+      note = `PC1 하나만 남기면(2차원 → 1차원) 전체 분산의 <b>${fmtP(D.l1 / D.tr, 1)}</b>를 보존합니다. 잃는 몫 ${fmtP(D.l2 / D.tr, 1)}가 1번 화면의 최소 재구성 오차 λ₂입니다.`;
+    }
+    $("f2").innerHTML = html; $("note2").innerHTML = note;
+    $("cap2").textContent = ["원자료 산점도", "평균을 빼서 원점으로", "표준화 (단위 없애기)", "공분산: 곱 x̃ỹ의 부호", "공분산 타원과 고유벡터", "좌표계를 PC1 방향으로 회전", "주성분별 분산"][st];
+    const leg = [];
+    if (st === 3) leg.push(`<span><i class="pc-dot" style="background:var(--pos)"></i>x̃ỹ &gt; 0</span><span><i class="pc-dot" style="background:var(--neg)"></i>x̃ỹ &lt; 0</span>`);
+    else leg.push(`<span><i class="pc-dot" style="background:var(--c-data)"></i>환자</span>`);
+    if (st >= 4) leg.push(`<span><i class="pc-ln" style="border-color:var(--c-pc)"></i>v₁·√λ₁</span><span><i class="pc-ln" style="border-color:var(--c-pc2)"></i>v₂·√λ₂</span>`);
+    $("leg2").innerHTML = leg.join("");
+  }
+  function stepper2() {
+    $("step2").innerHTML = STEPS2.map((s, i) => `<li><button type="button" data-i="${i}" class="${i === S2.step ? "on" : i < S2.step ? "done" : ""}"${i === S2.step ? ' aria-current="step"' : ""}>${s}${i === 2 && !S2.std ? " (건너뜀)" : ""}</button></li>`).join("");
+    $("b2Prev").disabled = S2.step === 0; $("b2Next").disabled = S2.step === STEPS2.length - 1;
+    $("b2Play").textContent = S2.playing ? "멈춤" : "재생";
+  }
+  $("step2").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; stop2(); go2(+b.dataset.i); });
+  function render2() { if (d2dirty || !D2) { D2 = data2(); d2dirty = false; } stepper2(); formula2(); draw2(); }
+  function animate2(done) {
+    cancelAnimationFrame(S2.raf);
+    if (reduceMotion) { S2.t = 1; draw2(); if (done) done(); return; }
+    const t0 = performance.now(), dur = 1100 / SPD2[S2.speed];
+    const f = now => { S2.t = Math.min(1, (now - t0) / dur); draw2(); if (S2.t < 1) S2.raf = requestAnimationFrame(f); else if (done) done(); };
+    S2.raf = requestAnimationFrame(f);
+  }
+  function go2(i, done) { S2.step = clamp(i, 0, STEPS2.length - 1); S2.t = 0; stepper2(); formula2(); animate2(done); }
+  function next2() { if (S2.step < STEPS2.length - 1) go2(S2.step + 1); }
+  function prev2() { if (S2.step > 0) { stop2(); S2.step--; S2.t = 1; render2(); } }
+  function stop2() { S2.playing = false; clearTimeout(S2.timer); stepper2(); }
+  function play2() {
+    if (S2.step >= STEPS2.length - 1) { S2.step = 0; S2.t = 1; render2(); }
+    S2.playing = true; stepper2();
+    const tick = () => { if (!S2.playing) return; if (S2.step >= STEPS2.length - 1) { stop2(); return; }
+      go2(S2.step + 1, () => { if (S2.playing) S2.timer = setTimeout(tick, 1300 / SPD2[S2.speed]); }); };
+    tick();
+  }
+  $("b2First").onclick = () => { stop2(); cancelAnimationFrame(S2.raf); S2.step = 0; S2.t = 1; render2(); };
+  $("b2Prev").onclick = prev2;
+  $("b2Next").onclick = () => { stop2(); next2(); };
+  $("b2Play").onclick = () => { if (S2.playing) stop2(); else play2(); };
+  $("s2Spd").addEventListener("input", e => { S2.speed = +e.target.value; $("v2Spd").textContent = SPD2[S2.speed] + "×"; });
+  $("c2Std").addEventListener("change", e => { S2.std = e.target.checked; d2dirty = true; render2(); });
+  segBind("seg2Src", v => { S2.src = v; d2dirty = true; render2(); });
+  document.addEventListener("keydown", e => {
+    if ($("pane-cov").hidden || e.altKey || e.ctrlKey || e.metaKey) return;
+    const t = e.target; if (t && t.closest && t.closest("input,textarea,select,.sk-tab,.sk-seg,[contenteditable]")) return;
+    if (e.key === "ArrowRight") { stop2(); next2(); e.preventDefault(); } else if (e.key === "ArrowLeft") { prev2(); e.preventDefault(); }
+  });
+
+  function segBind(id, fn) {
+    const seg = $(id); seg.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+      seg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false")); fn(b.dataset.v); });
+  }
+  function segSet(id, v) { $(id).querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x.dataset.v === v ? "true" : "false")); }
+
+  /* ================================================================
+     3. 고차원 데이터 (가상 건강검진)
+     ================================================================ */
+  // [이름, 단위, 평균, 표준편차, 요인 부하(비만·대사, 혈압·나이, 지질), 소수 자리]
+  const VARS = [
+    ["나이", "세", 52, 12, [0.15, 0.75, 0.0], 0],
+    ["BMI", "kg/m²", 24.5, 3.6, [0.85, 0.1, 0.05], 1],
+    ["허리둘레", "cm", 84, 9.5, [0.88, 0.12, 0.05], 0],
+    ["수축기혈압", "mmHg", 124, 15, [0.3, 0.8, 0.0], 0],
+    ["이완기혈압", "mmHg", 78, 10, [0.3, 0.75, 0.0], 0],
+    ["공복혈당", "mg/dL", 100, 20, [0.6, 0.3, 0.1], 0],
+    ["총콜레스테롤", "mg/dL", 195, 35, [0.15, 0.1, 0.9], 0],
+    ["LDL", "mg/dL", 120, 30, [0.15, 0.05, 0.88], 0],
+    ["HDL", "mg/dL", 52, 12, [-0.6, 0.0, 0.15], 0],
+    ["중성지방", "mg/dL", 140, 65, [0.7, 0.1, 0.3], 0]];
+  const GROUPS = [["정상", [-0.7, -0.6, -0.2], 0.45], ["대사 위험", [1.1, 0.2, 0.4], 0.30], ["고혈압", [0.1, 1.25, 0.0], 0.25]];
+  const S3 = { seed: 3, n: 200, std: true, k: 3, thr: 0.8, ax: [0, 1], bi: true, load: "comp", custom: null };
+  let DS = null, P3 = null, P3o = null;
+  function genHealth(seed, n) {
+    const r = mulberry32(seed * 7919 + 101), X = [], g = [];
+    for (let i = 0; i < n; i++) {
+      const u = r(); const gi = u < GROUPS[0][2] ? 0 : u < GROUPS[0][2] + GROUPS[1][2] ? 1 : 2;
+      const F = GROUPS[gi][1].map(m => m + 0.8 * gauss(r));
+      X.push(VARS.map(([, , mu, sd, L, dec]) => { const s2 = L.reduce((s, l) => s + l * l, 0), uq = 0.7 * Math.sqrt(Math.max(0.08, 1 - s2));
+        let v = mu + sd * (L[0] * F[0] + L[1] * F[1] + L[2] * F[2] + uq * gauss(r)); v = Math.max(v, mu * 0.35);
+        const p = Math.pow(10, dec); return Math.round(v * p) / p; }));
+      g.push(gi);
+    }
+    return { names: VARS.map(v => v[0]), units: VARS.map(v => v[1]), dec: VARS.map(v => v[5]), X, g, gnames: GROUPS.map(x => x[0]), n, p: VARS.length };
+  }
+  function pcaFit(D, std) {
+    const { X, n, p } = D, mu = new Array(p).fill(0), sd0 = new Array(p).fill(0), sd1 = new Array(p).fill(0);
+    X.forEach(r => r.forEach((v, j) => mu[j] += v)); for (let j = 0; j < p; j++) mu[j] /= n;
+    X.forEach(r => r.forEach((v, j) => sd0[j] += (v - mu[j]) * (v - mu[j])));
+    for (let j = 0; j < p; j++) { const ss = sd0[j]; sd0[j] = Math.sqrt(ss / n); sd1[j] = Math.sqrt(ss / (n - 1)); }
+    const sc = sd0.map(s => std ? (s > 1e-12 ? s : 1) : 1);
+    const Xp = X.map(r => r.map((v, j) => (v - mu[j]) / sc[j]));
+    const A = new Float64Array(p * p);
+    for (const r of Xp) for (let i = 0; i < p; i++) { const ri = r[i]; for (let j = i; j < p; j++) A[i * p + j] += ri * r[j]; }
+    for (let i = 0; i < p; i++) for (let j = i; j < p; j++) { A[i * p + j] /= (n - 1); A[j * p + i] = A[i * p + j]; }
+    const E = jacobi(A, p); const lam = E.vals.map(v => Math.max(v, 0)); const V = E.vecs.map(v => signFlip(v));
+    const tot = lam.reduce((s, v) => s + v, 0), ratio = lam.map(v => v / tot); const cum = []; ratio.reduce((s, v, i) => (cum[i] = s + v), 0);
+    const Z = Xp.map(r => V.map(v => { let s = 0; for (let j = 0; j < p; j++) s += r[j] * v[j]; return s; }));
+    const rawVar = sd1.map(s => s * s), rawTot = rawVar.reduce((s, v) => s + v, 0);
+    return { std, mu, sd0, sd1, sc, Xp, C: A, lam, V, tot, ratio, cum, Z, sweeps: E.sweeps, rawShare: rawVar.map(v => v / rawTot) };
+  }
+  const kFor = (P, thr) => { for (let i = 0; i < P.cum.length; i++) if (P.cum[i] > thr - 1e-12) return i + 1; return P.cum.length; };
+  function data3() { DS = S3.custom || genHealth(S3.seed, S3.n); P3 = pcaFit(DS, S3.std); P3o = pcaFit(DS, !S3.std);
+    const p = DS.p; $("s3K").max = p; $("s4K").max = p; if (S3.thr) S3.k = kFor(P3, S3.thr); S3.k = clamp(S3.k, 1, p);
+    $("s4I").max = DS.n; S4.i = clamp(S4.i, 0, DS.n - 1); }
+  function grpColor(C, g) { return C.groups[g % C.groups.length]; }
+  function drawScree() {
+    const C = colors(), cv = $("cvScree"); const { ctx, w, h } = fitCanvas(cv); const P = P3, p = DS.p, small = w < 420;
+    const F = frame(ctx, w, h, [0.4, p + 0.6], [0, 105], C, ["주성분", "설명 분산 비율 (%)"], { xTicks: { list: [...Array(p).keys()].map(i => i + 1), step: 1 }, xFmt: v => (p > 12 && v % 2 === 0) ? "" : (small ? String(v) : "PC" + v), noXGrid: true, yTicks: { list: [0, 20, 40, 60, 80, 100], step: 20 } });
+    S3.Fs = F; const bw = Math.min(46, F.pw / p * 0.62);
+    [0.8, 0.9, 0.95].forEach(t => { const y = F.sy(t * 100), on = S3.thr === t; ctx.setLineDash([5, 4]); ctx.strokeStyle = on ? C.ink : rgba(C.muted, .55); ctx.lineWidth = on ? 1.6 : 1; ctx.beginPath(); ctx.moveTo(F.pad.l, y); ctx.lineTo(F.pad.l + F.pw, y); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = on ? C.ink : C.muted; ctx.font = `600 10.5px ${C.mono}`; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.fillText(Math.round(t * 100) + "%", F.pad.l + 3, y - 1); });
+    for (let i = 0; i < p; i++) { const x = F.sx(i + 1), y = F.sy(P.ratio[i] * 100); ctx.fillStyle = i < S3.k ? C.c_pc : rgba(C.muted, .35); ctx.fillRect(x - bw / 2, y, bw, F.sy(0) - y);
+      if (bw > 20) { ctx.fillStyle = C.ink; ctx.font = `600 ${small ? 9.5 : 10.5}px ${C.mono}`; ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText(fmt(P.ratio[i] * 100, P.ratio[i] < 0.1 ? 1 : 0), x, y - 2); } }
+    ctx.strokeStyle = C.c_err; ctx.lineWidth = 2.2; ctx.beginPath(); P.cum.forEach((c, i) => { const x = F.sx(i + 1), y = F.sy(c * 100); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+    P.cum.forEach((c, i) => dot(ctx, F.sx(i + 1), F.sy(c * 100), i === S3.k - 1 ? 5.5 : 3.5, C.c_err, C.surface, 1.3));
+    const ck = P.cum[S3.k - 1]; label(ctx, `누적 ${fmtP(ck)}`, F.sx(S3.k) + (S3.k > p * 0.7 ? -8 : 8), F.sy(ck * 100) + 14, C.c_err, C, { align: S3.k > p * 0.7 ? "right" : "left" });
+  }
+  function drawBi() {
+    const C = colors(), cv = $("cvBi"); const { ctx, w, h } = fitCanvas(cv); const P = P3, p = DS.p, [a, b] = S3.ax.map(i => Math.min(i, p - 1));
+    let mx = 1e-9, my = 1e-9; P.Z.forEach(z => { mx = Math.max(mx, Math.abs(z[a])); my = Math.max(my, Math.abs(z[b])); });
+    const F = eqFrame(ctx, w, h, { cx: 0, cy: 0, hw: mx * 1.08, hh: my * 1.08 }, C, [`PC${a + 1} 점수 (${fmtP(P.ratio[a])})`, `PC${b + 1} 점수 (${fmtP(P.ratio[b])})`], { origin: true });
+    clipRect(ctx, F);
+    P.Z.forEach((z, i) => dot(ctx, F.sx(z[a]), F.sy(z[b]), 3.6, rgba(grpColor(C, DS.g[i] || 0), .78), C.surface, 0.8));
+    ctx.restore();
+    if (S3.bi) {
+      let am = 1e-9; for (let j = 0; j < p; j++) am = Math.max(am, Math.hypot(P.V[a][j], P.V[b][j]));
+      const s = 0.85 * Math.min(Math.abs(F.xr[1]), Math.abs(F.yr[1])) / am, small = w < 420;
+      for (let j = 0; j < p; j++) { const x = P.V[a][j] * s, y = P.V[b][j] * s; arrow(ctx, F.sx(0), F.sy(0), F.sx(x), F.sy(y), C.ink, 1.6, 8); }
+      const boxes = [], fnt = `600 ${small ? 10 : 11.5}px ${C.sans}`; ctx.font = fnt;
+      const order = [...Array(p).keys()].sort((u, v) => Math.hypot(P.V[a][v], P.V[b][v]) - Math.hypot(P.V[a][u], P.V[b][u]));
+      for (const j of order) { const x = P.V[a][j] * s, y = P.V[b][j] * s, L = Math.hypot(x, y) || 1;
+        const tx = F.sx(x) + (x / L) * 8; let ty = F.sy(y) - (y / L) * 8; const tw = ctx.measureText(DS.names[j]).width + 8, x0 = x >= 0 ? tx - 4 : tx - tw + 4;
+        const hitB = yy => boxes.some(q => x0 < q[0] + q[2] && x0 + tw > q[0] && yy - 9 < q[1] + 18 && yy + 9 > q[1]);
+        for (let tries = 0; tries < 8 && hitB(ty); tries++) ty += (y >= 0 ? -1 : 1) * 15;
+        boxes.push([x0, ty - 9, tw]);
+        label(ctx, DS.names[j], tx, ty, C.ink, C, { align: x >= 0 ? "left" : "right", font: fnt }); }
+    }
+  }
+  function render3() {
+    const P = P3, p = DS.p, k = S3.k;
+    $("v3N").textContent = DS.n; $("s3N").value = S3.custom ? $("s3N").value : S3.n; $("s3N").disabled = !!S3.custom; $("b3Seed").disabled = !!S3.custom;
+    $("v3K").textContent = k; $("s3K").value = k;
+    segSet("seg3Thr", S3.thr ? String(S3.thr) : "");
+    $("stats3").innerHTML = [[`${p} → ${k}`, "차원"], [fmtP(P.cum[k - 1]), `PC1~PC${k} 누적 설명 분산`], [fmtP(1 - P.cum[k - 1]), "버린 분산 (정보 손실)"], [fmt(P.lam[0], 3), "λ₁ (가장 큰 고유값)"]]
+      .map(s => `<div class="sk-stat"><b>${s[0]}</b><span>${s[1]}</span></div>`).join("");
+    const kai = P.lam.filter(l => l >= 1).length;
+    $("sub3Scree").innerHTML = (S3.thr ? `누적 ${Math.round(S3.thr * 100)}%를 처음 넘는 성분 수 = <b>${k}</b>. ` : "") + (S3.std ? `표준화했다면 고유값 ≥ 1인 성분만 남기는 카이저 기준도 쓰입니다 (지금 ${kai}개). ` : "") + "막대를 누르면 그 성분까지 남깁니다.";
+    $("leg3").innerHTML = DS.gnames.map((gname, i) => `<span><i class="pc-dot" style="background:var(--g${i % 6})"></i>${esc(gname)}</span>`).join("");
+    // 로딩 표
+    const m = Math.min(p, Math.max(k, 2), 10), vals = [];
+    for (let j = 0; j < p; j++) { const row = []; for (let i = 0; i < m; i++) row.push(S3.load === "comp" ? P.V[i][j] : P.V[i][j] * Math.sqrt(P.lam[i])); vals.push(row); }
+    const mxv = Math.max(1e-9, ...vals.flat().map(Math.abs));
+    const tops = []; for (let i = 0; i < m; i++) { let best = 0; for (let j = 1; j < p; j++) if (Math.abs(vals[j][i]) > Math.abs(vals[best][i])) best = j; tops.push(best); }
+    $("heatHead").innerHTML = `<tr><th>변수</th>${[...Array(m).keys()].map(i => `<th class="pcol">PC${i + 1}</th>`).join("")}</tr>`;
+    $("heatBody").innerHTML = vals.map((row, j) => `<tr><td>${esc(DS.names[j])}</td>${row.map((v, i) => `<td class="h${tops[i] === j ? " top" : ""}" style="background:color-mix(in srgb, var(${v >= 0 ? "--pos" : "--neg"}) ${Math.round(Math.abs(v) / mxv * 62)}%, transparent)">${fmt(v, 2)}</td>`).join("")}</tr>`).join("");
+    const top4 = [...Array(p).keys()].sort((x, y) => Math.abs(P.V[0][y]) - Math.abs(P.V[0][x])).slice(0, 4);
+    $("note3Load").innerHTML = `파랑 = 양수, 주황 = 음수, 진할수록 큼. 굵은 테두리 = 그 성분에서 가장 큰 변수. PC1에 크게 기여하는 변수: ${top4.map(j => `<b>${esc(DS.names[j])}</b>(${fmt(P.V[0][j], 2)})`).join(", ")}. ` +
+      (S3.load === "comp" ? "성분 벡터는 길이가 1이라 제곱합이 1입니다." : "로딩은 성분에 √λ를 곱한 값으로, 표준화했다면 변수와 주성분 점수의 상관에 해당합니다.");
+    // 표준화 비교
+    const Pst = S3.std ? P3 : P3o, Praw = S3.std ? P3o : P3;
+    const topVar = Q => { let b = 0; for (let j = 1; j < p; j++) if (Math.abs(Q.V[0][j]) > Math.abs(Q.V[0][b])) b = j; return `${esc(DS.names[b])} ${fmt(Q.V[0][b], 2)}`; };
+    $("cmp3").innerHTML = [["표준화 끔 (원래 단위)", Praw, !S3.std], ["표준화 켬", Pst, S3.std]].map(([nm, Q, on]) => `<tr class="${on ? "big" : ""}"><td>${nm}${on ? " ← 지금" : ""}</td><td class="n">${fmtP(Q.ratio[0])}</td><td>${topVar(Q)}</td><td class="n">${kFor(Q, 0.9)}</td></tr>`).join("");
+    const shares = P.rawShare, sm = Math.max(...shares);
+    $("shares3").innerHTML = shares.map((s, j) => `<div class="pc-share"><span title="${esc(DS.names[j])}">${esc(DS.names[j])}</span><span class="bar"><i style="width:${s / sm * 100}%"></i></span><b>${fmtP(s)}</b></div>`).join("");
+    let bigj = 0; shares.forEach((s, j) => { if (s > shares[bigj]) bigj = j; });
+    $("note3Std").innerHTML = `원래 단위로 PCA를 하면 분산이 큰 <b>${esc(DS.names[bigj])}</b>(전체 분산의 ${fmtP(shares[bigj])})가 PC1을 거의 혼자 차지합니다 (PC1 성분 ${fmt(Praw.V[0][bigj], 2)}). 혈당 1 mg/dL과 BMI 1 kg/m²는 같은 크기가 아닌데 숫자만 보고 계산하기 때문입니다. 단위가 다른 변수를 섞을 때는 표준화 후 PCA가 기본입니다.`;
+    drawScree(); drawBi();
+  }
+  function rerender3(all) { if (all) data3(); if (!$("pane-hd").hidden) render3(); dirty4(); code6dirty = true; }
+  $("c3Std").addEventListener("change", e => { S3.std = e.target.checked; rerender3(true); });
+  $("s3N").addEventListener("input", e => { S3.n = +e.target.value; rerender3(true); });
+  $("b3Seed").onclick = () => { S3.seed = (S3.seed * 13 + 5) % 997 + 1; rerender3(true); };
+  segBind("seg3Thr", v => { S3.thr = +v; S3.k = kFor(P3, S3.thr); rerender3(false); });
+  $("s3K").addEventListener("input", e => { S3.k = +e.target.value; S3.thr = null; rerender3(false); });
+  segBind("seg3Ax", v => { S3.ax = v.split(",").map(Number); drawBi(); });
+  $("c3Bi").addEventListener("change", e => { S3.bi = e.target.checked; drawBi(); });
+  segBind("seg3Load", v => { S3.load = v; render3(); });
+  $("cvScree").addEventListener("click", e => { const F = S3.Fs; if (!F) return; const [px] = evPos($("cvScree"), e); const i = Math.round(F.ix(px)); if (i >= 1 && i <= DS.p) { S3.k = i; S3.thr = null; rerender3(false); } });
+  function toCSV(D) { const hasG = D.gnames && D.gnames.length; return [D.names.concat(hasG ? ["집단"] : []).join(",")].concat(D.X.map((r, i) => r.map((v, j) => D.dec ? v.toFixed(D.dec[j]) : String(v)).concat(hasG ? [D.gnames[D.g[i]]] : []).join(","))).join("\n"); }
+  function parseCSV(txt) {
+    const lines = txt.split(/\r?\n/).map(l => l.trim()).filter(l => l); if (lines.length < 11) return "행이 너무 적습니다 (제목 + 10행 이상).";
+    const sep = lines[0].includes("\t") ? "\t" : lines[0].includes(";") && !lines[0].includes(",") ? ";" : ",";
+    const head = lines[0].split(sep).map(s => s.trim().replace(/^"|"$/g, "")); const rows = lines.slice(1, 2001).map(l => l.split(sep).map(s => s.trim().replace(/^"|"$/g, "")));
+    const ncol = head.length; const numeric = head.map((_, j) => rows.every(r => r[j] !== undefined && r[j] !== "" && isFinite(+r[j])));
+    const nums = head.map((_, j) => j).filter(j => numeric[j]).slice(0, 30), gcol = head.findIndex((_, j) => !numeric[j]);
+    if (nums.length < 3) return "숫자 열이 3개 이상 필요합니다 (빈 칸 없이).";
+    const gn = [], g = []; if (gcol >= 0) rows.forEach(r => { const v = r[gcol] || "-"; let i = gn.indexOf(v); if (i < 0) { gn.push(v); i = gn.length - 1; } g.push(i); }); else rows.forEach(() => g.push(0));
+    return { names: nums.map(j => head[j] || `x${j + 1}`), units: nums.map(() => ""), dec: null, X: rows.map(r => nums.map(j => +r[j])), g, gnames: gcol >= 0 ? gn : ["전체"], n: rows.length, p: nums.length, ncol };
+  }
+  $("b3Fill").onclick = () => { $("csv3").value = toCSV(DS); $("m3Csv").textContent = `${DS.n}행을 가져왔습니다.`; };
+  $("b3Apply").onclick = () => { const r = parseCSV($("csv3").value); if (typeof r === "string") { $("m3Csv").textContent = r; return; }
+    S3.custom = r; S3.thr = 0.8; segSet("seg3Thr", "0.8"); rerender3(true); $("m3Csv").textContent = `${r.n}행 × ${r.p}변수를 적용했습니다.`; };
+  $("b3Def").onclick = () => { S3.custom = null; S3.thr = 0.8; rerender3(true); $("m3Csv").textContent = "기본 데이터로 돌아왔습니다."; };
+
+  /* ================================================================
+     4. 복원과 정보 손실
+     ================================================================ */
+  const S4 = { i: 0, ik: 8, img: 0 };
+  let d4dirty = true;
+  function dirty4() { d4dirty = true; if (!$("pane-recon").hidden) render4(); }
+  function recon(i, k) {
+    const P = P3, p = DS.p, xp = P.Xp[i], z = P.Z[i].slice(0, k), xh = new Array(p).fill(0);
+    for (let c = 0; c < k; c++) for (let j = 0; j < p; j++) xh[j] += z[c] * P.V[c][j];
+    const xhat = xh.map((v, j) => v * P.sc[j] + P.mu[j]); let e = 0; for (let j = 0; j < p; j++) e += (xp[j] - xh[j]) ** 2;
+    return { z, xh, xhat, err: e };
+  }
+  function render4() {
+    if (!DS) return; const P = P3, p = DS.p, k = S3.k, i = S4.i;
+    $("v4K").textContent = k; $("s4K").value = k; $("v4I").textContent = `#${i + 1} (${esc(DS.gnames[DS.g[i]] || "")})`; $("s4I").value = i + 1;
+    const R = recon(i, k), x = DS.X[i], dec = j => DS.dec ? DS.dec[j] : 2;
+    const zs = j => (x[j] - P.mu[j]) / (P.sd0[j] || 1), zh = j => (R.xhat[j] - P.mu[j]) / (P.sd0[j] || 1);
+    $("f4").innerHTML = eq(`① 전처리 x' = ${S3.std ? "(x − μ) / σ" : "x − μ"}`, "<span class='pc-mut'>(3번 화면 설정)</span>") +
+      eq(`② 점수 z = x'·V_k =`, mat([R.z], 3, { cls: (r, c) => c === 0 ? "h1" : c === 1 ? "h2" : "" }), `<span class="pc-mut">(${k}개 숫자로 압축, 원래 ${p}개)</span>`) +
+      eq(`③ 복원 x̂ = z·V_kᵀ${S3.std ? " × σ" : ""} + μ`, `<span class="pc-mut">= scikit-learn ${S3.std ? "scaler.inverse_transform(pca.inverse_transform(z))" : "pca.inverse_transform(z)"}</span>`) +
+      eq(`이 수검자의 재구성 오차 ‖x' − x̂'‖² = ${fmt(R.err, 4)}`, `<span class="pc-mut">(${S3.std ? "표준화 단위" : "원래 단위"})</span>`);
+    $("t4Rec").textContent = `수검자 #${i + 1}: 원래 값 vs 복원 값 (k = ${k})`;
+    $("tb4").innerHTML = DS.names.map((nm, j) => { const d = R.xhat[j] - x[j]; return `<tr><td>${esc(nm)}${DS.units[j] ? ` <span class="pc-mut">${esc(DS.units[j])}</span>` : ""}</td><td class="n">${fmt(x[j], dec(j))}</td><td class="n">${fmt(R.xhat[j], dec(j) + 1)}</td><td class="n d">${d >= 0 ? "+" : ""}${fmt(d, dec(j) + 1)}</td></tr>`; }).join("");
+    // 막대 (표준점수)
+    { const cv = $("cvRec"); cv.style.height = (p * 30 + 44) + "px"; const C = colors(); const { ctx, w, h } = fitCanvas(cv);
+      let m = 2.5; for (let j = 0; j < p; j++) m = Math.max(m, Math.abs(zs(j)), Math.abs(zh(j))); m = Math.ceil(m * 2) / 2;
+      const small = w < 420, lw = small ? 74 : 104, pad = { l: lw, r: 12, t: 8, b: 30 }, pw = w - pad.l - pad.r, sx = v => pad.l + (v + m) / (2 * m) * pw, rh = (h - pad.t - pad.b) / p;
+      ctx.font = `10.5px ${C.mono}`; ctx.fillStyle = C.muted; ctx.textAlign = "center"; ctx.textBaseline = "top";
+      ticks(-m, m, small ? 4 : 6).list.forEach(v => { const X = Math.round(sx(v)) + .5; ctx.strokeStyle = v === 0 ? rgba(C.ink, .45) : C.line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X, pad.t); ctx.lineTo(X, h - pad.b); ctx.stroke(); ctx.fillText(fmt(v, Math.abs(v - Math.round(v)) < 1e-9 ? 0 : 1), X, h - pad.b + 4); });
+      ctx.font = `600 11px ${C.sans}`; ctx.textBaseline = "bottom"; ctx.fillText("표준점수 (x − μ)/σ", pad.l + pw / 2, h - 1);
+      for (let j = 0; j < p; j++) { const y = pad.t + j * rh, bh = Math.min(10, rh * 0.36), x0 = sx(0);
+        ctx.fillStyle = C.ink; ctx.font = `600 ${small ? 10.5 : 12}px ${C.sans}`; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(DS.names[j], pad.l - 6, y + rh / 2);
+        const a = sx(zs(j)), b = sx(zh(j));
+        ctx.fillStyle = C.c_data; ctx.fillRect(Math.min(x0, a), y + rh / 2 - bh - 1, Math.abs(a - x0), bh);
+        ctx.fillStyle = C.c_pc; ctx.fillRect(Math.min(x0, b), y + rh / 2 + 1, Math.abs(b - x0), bh); }
+    }
+    // 손실 곡선
+    { const C = colors(); const { ctx, w, h } = fitCanvas($("cvLoss"));
+      const F = frame(ctx, w, h, [-0.6, p + 0.6], [0, 100], C, ["남긴 성분 수 k", "비율 (%)"], { xTicks: { list: [...Array(p + 1).keys()], step: 1 }, noXGrid: true, yTicks: { list: [0, 20, 40, 60, 80, 100], step: 20 } });
+      const bw = Math.min(36, F.pw / (p + 1) * 0.6);
+      for (let kk = 0; kk <= p; kk++) { const lost = kk === 0 ? 1 : Math.max(0, 1 - P.cum[kk - 1]); const x = F.sx(kk), y = F.sy(lost * 100);
+        ctx.fillStyle = kk === k ? C.c_err : rgba(C.c_err, .32); ctx.fillRect(x - bw / 2, y, bw, F.sy(0) - y); }
+      ctx.strokeStyle = C.c_pc; ctx.lineWidth = 2.2; ctx.beginPath(); for (let kk = 0; kk <= p; kk++) { const c = kk === 0 ? 0 : P.cum[kk - 1]; const x = F.sx(kk), y = F.sy(c * 100); kk ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+      dot(ctx, F.sx(k), F.sy(P.cum[k - 1] * 100), 5, C.c_pc, C.surface, 1.4);
+      label(ctx, `k = ${k}: 손실 ${fmtP(1 - P.cum[k - 1])}`, F.sx(k) + (k > p * 0.6 ? -8 : 8), F.sy((1 - P.cum[k - 1]) * 100) - 12, C.c_err, C, { align: k > p * 0.6 ? "right" : "left" }); }
+    // 전체 오차 = 버린 고유값의 합
+    let sse = 0; for (let r = 0; r < DS.n; r++) sse += recon(r, k).err;
+    const drop = P.lam.slice(k).reduce((s, v) => s + v, 0);
+    $("stats4").innerHTML = [[fmt(sse / (DS.n - 1), 4), "전체 재구성 오차 ΣΣ(x' − x̂')² / (n−1)"], [fmt(drop, 4), `버린 고유값의 합 λ${k + 1}+…+λ${p}`], [fmtP(1 - P.cum[k - 1]), "잃은 분산 비율"]]
+      .map(s => `<div class="sk-stat"><b>${s[0]}</b><span>${s[1]}</span></div>`).join("");
+    $("note4").innerHTML = `두 숫자가 같습니다: <b>재구성 오차 = 버린 성분들의 고유값 합</b>. PCA는 성분을 k개로 제한했을 때 이 오차가 가장 작은 선형 축소입니다(1번 화면의 2차원 결과를 일반화한 것). 성분을 모두 남기면(k = ${p}) 오차는 0이 되어 완전히 복원됩니다.`;
+    render4img();
+  }
+  $("s4K").addEventListener("input", e => { S3.k = +e.target.value; S3.thr = null; code6dirty = true; render4(); });
+  $("s4I").addEventListener("input", e => { S4.i = +e.target.value - 1; render4(); });
+  $("b4Rand").onclick = () => { S4.i = Math.floor(Math.random() * DS.n); render4(); };
+
+  /* 이미지 PCA: 16×16 = 256차원, 그림 120장 → 그램 행렬(120×120)로 고유분해 */
+  let IM = null;
+  const SHAPES = ["원", "십자", "세로 막대", "사각형"];
+  function genImgs() {
+    const r = mulberry32(20261002), out = [];
+    for (let k = 0; k < 120; k++) {
+      const cls = k % 4, a = new Float64Array(256), cx = 7.5 + (r() - .5) * 3, cy = 7.5 + (r() - .5) * 3, sz = 3.6 + r() * 1.6, w = 1.0 + r() * 0.8, sl = (r() - .5) * 0.5, amp = 0.8 + 0.2 * r();
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+        const dx = x - cx, dy = y - cy; let d;
+        if (cls === 0) d = Math.abs(Math.hypot(dx, dy) - sz);
+        else if (cls === 1) { const L = sz; const d1 = Math.abs(dy) <= L ? Math.abs(dx) : Math.hypot(dx, Math.abs(dy) - L); const d2 = Math.abs(dx) <= L ? Math.abs(dy) : Math.hypot(dy, Math.abs(dx) - L); d = Math.min(d1, d2); }
+        else if (cls === 2) { const L = sz + 1, ddx = dx - sl * dy; d = Math.abs(dy) <= L ? Math.abs(ddx) : Math.hypot(ddx, Math.abs(dy) - L); }
+        else d = Math.abs(Math.max(Math.abs(dx), Math.abs(dy)) - sz * 0.85);
+        a[y * 16 + x] = clamp(amp * clamp(1 - (d - w / 2) / 0.9, 0, 1) + 0.05 * gauss(r), 0, 1);
+      }
+      out.push({ a, cls });
+    }
+    return out;
+  }
+  function pcaImgs() {
+    const imgs = genImgs(), N = imgs.length, P = 256, mu = new Float64Array(P);
+    imgs.forEach(o => { for (let j = 0; j < P; j++) mu[j] += o.a[j] / N; });
+    const Xc = imgs.map(o => { const v = new Float64Array(P); for (let j = 0; j < P; j++) v[j] = o.a[j] - mu[j]; return v; });
+    const G = new Float64Array(N * N); let tr = 0;
+    for (let i = 0; i < N; i++) for (let j = i; j < N; j++) { let s = 0; const a = Xc[i], b = Xc[j]; for (let q = 0; q < P; q++) s += a[q] * b[q]; G[i * N + j] = s; G[j * N + i] = s; if (i === j) tr += s; }
+    const E = jacobi(G, N), K = 60, comps = [], lam = [];
+    for (let c = 0; c < K; c++) { const m = Math.max(E.vals[c], 1e-15), u = E.vecs[c], v = new Float64Array(P);
+      for (let i = 0; i < N; i++) { const ui = u[i]; if (ui) for (let q = 0; q < P; q++) v[q] += Xc[i][q] * ui; }
+      for (let q = 0; q < P; q++) v[q] /= Math.sqrt(m); signFlip(v); comps.push(v); lam.push(E.vals[c] / (N - 1)); }
+    const tot = tr / (N - 1); const cum = []; lam.reduce((s, v, i) => (cum[i] = s + v / tot), 0);
+    return { imgs, N, mu, Xc, comps, lam, tot, cum, sweeps: E.sweeps };
+  }
+  function reconImg(i, k) { const v = Float64Array.from(IM.mu), x = IM.Xc[i];
+    for (let c = 0; c < k; c++) { const w = IM.comps[c]; let z = 0; for (let q = 0; q < 256; q++) z += x[q] * w[q]; for (let q = 0; q < 256; q++) v[q] += z * w[q]; } return v; }
+  const off16 = document.createElement("canvas"); off16.width = off16.height = 16;
+  function paintImg(cv, arr, mode) {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3), w = Math.max(16, cv.clientWidth), W = Math.round(w * dpr);
+    if (cv.width !== W || cv.height !== W) { cv.width = W; cv.height = W; }
+    const oc = off16.getContext("2d"), img = oc.createImageData(16, 16); let m = 1e-9; if (mode === "sym") for (let q = 0; q < 256; q++) m = Math.max(m, Math.abs(arr[q]));
+    for (let q = 0; q < 256; q++) { const g = Math.round(255 * clamp(mode === "sym" ? 0.5 + 0.5 * arr[q] / m : arr[q], 0, 1)); img.data[q * 4] = g; img.data[q * 4 + 1] = g; img.data[q * 4 + 2] = g; img.data[q * 4 + 3] = 255; }
+    oc.putImageData(img, 0, 0); const ctx = cv.getContext("2d"); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false; ctx.drawImage(off16, 0, 0, W, W);
+  }
+  function render4img() {
+    if ($("pane-recon").hidden) return;
+    if (!IM) IM = pcaImgs();
+    const i = S4.img, k = S4.ik, o = IM.imgs[i], rec = reconImg(i, k);
+    $("v4Ik").textContent = k; $("v4Ii").textContent = `#${i + 1} / ${IM.N} · ${SHAPES[o.cls]}`; $("im4RecL").textContent = `복원 (k = ${k})`;
+    paintImg($("im4Orig"), o.a); paintImg($("im4Rec"), rec); paintImg($("im4Mean"), IM.mu);
+    let e = 0; for (let q = 0; q < 256; q++) e += (rec[q] - o.a[q]) ** 2;
+    $("stats4i").innerHTML = [[`256 → ${k}`, "숫자 개수"], [k ? fmtP(IM.cum[k - 1]) : "0%", "누적 설명 분산"], [fmt(e / 256, 4), "이 그림의 픽셀 평균 제곱 오차"]].map(s => `<div class="sk-stat"><b>${s[0]}</b><span>${s[1]}</span></div>`).join("");
+    if (!$("eig4").childElementCount) $("eig4").innerHTML = [...Array(8).keys()].map(c => `<div class="pc-imgbox"><canvas class="pc-img" role="img" aria-label="주성분 ${c + 1} 그림"></canvas><span>PC${c + 1}</span></div>`).join("");
+    [...$("eig4").querySelectorAll("canvas")].forEach((cv, c) => { paintImg(cv, IM.comps[c], "sym"); cv.nextElementSibling.textContent = `PC${c + 1} ${fmt(IM.lam[c] / IM.tot * 100, 1)}%`; });
+    const KS = [0, 1, 2, 4, 8, 16, 32, 60];
+    if (!$("ser4").childElementCount) $("ser4").innerHTML = KS.map(kk => `<div class="pc-imgbox"><canvas class="pc-img" role="img" aria-label="성분 ${kk}개로 복원한 그림"></canvas><span>k = ${kk}</span></div>`).join("");
+    [...$("ser4").querySelectorAll("canvas")].forEach((cv, c) => paintImg(cv, reconImg(i, KS[c])));
+    $("note4i").innerHTML = `그림 한 장은 픽셀 256개짜리 벡터입니다. k = 0이면 평균 그림, 성분을 더할수록 그 그림만의 특징이 살아납니다. 성분 ${k}개로 분산의 <b>${k ? fmtP(IM.cum[k - 1]) : "0%"}</b>를 설명합니다. 그림 수(120)가 차원(256)보다 적어서 256×256 공분산 대신 <b>120×120 그램 행렬 X̃X̃ᵀ</b>를 야코비 회전법으로 분해하고 v = X̃ᵀu/√μ로 바꿨습니다(같은 고유값, 더 빠름).`;
+  }
+  $("s4Ik").addEventListener("input", e => { S4.ik = +e.target.value; render4img(); });
+  $("b4Iprev").onclick = () => { S4.img = (S4.img + 119) % 120; render4img(); };
+  $("b4Inext").onclick = () => { S4.img = (S4.img + 1) % 120; render4img(); };
+
+  /* ================================================================
+     5. PCA의 한계
+     ================================================================ */
+  const S5 = { shape: "circ", yaw: -30, gap: 1.6, sd: 3, seed: 5, drag: null };
+  let L5 = { circ: null, roll: null };
+  function bestAcc(vals, cls) {
+    const idx = vals.map((_, i) => i).sort((a, b) => vals[a] - vals[b]), n = vals.length, n1 = cls.reduce((s, c) => s + c, 0);
+    let l1 = 0, l0 = 0, best = 0;
+    for (let i = 0; i <= n; i++) { const a1 = (l0 + (n1 - l1)) / n; best = Math.max(best, a1, 1 - a1); if (i < n) { if (cls[idx[i]] === 1) l1++; else l0++; } }
+    return best;
+  }
+  function pca2(P) { const n = P.length, d = P[0].length, mu = new Array(d).fill(0); P.forEach(p => p.forEach((v, j) => mu[j] += v / n));
+    const M = [...Array(d)].map(() => new Array(d).fill(0)); P.forEach(p => { for (let i = 0; i < d; i++) for (let j = 0; j < d; j++) M[i][j] += (p[i] - mu[i]) * (p[j] - mu[j]) / (n - 1); });
+    const E = eigSym(M); const V = E.vecs.map(v => signFlip(v)); const Z = P.map(p => V.map(v => v.reduce((s, vj, j) => s + vj * (p[j] - mu[j]), 0))); return { mu, lam: E.vals, V, Z }; }
+  function makeCirc() {
+    const r = mulberry32(4242), P = [], cls = [];
+    for (let i = 0; i < 120; i++) { const c = i < 60 ? 0 : 1, a = ((i % 60) + 0.6 * r()) / 60 * 2 * Math.PI + c * 0.3, rad = (c ? 0.4 : 1) + 0.05 * gauss(r); P.push([rad * Math.cos(a), rad * Math.sin(a)]); cls.push(c); }
+    const L = pca2(P), n = P.length, gm = 2;
+    const K = new Float64Array(n * n); for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) K[i * n + j] = Math.exp(-gm * ((P[i][0] - P[j][0]) ** 2 + (P[i][1] - P[j][1]) ** 2));
+    const rm = new Float64Array(n); let am = 0; for (let i = 0; i < n; i++) { for (let j = 0; j < n; j++) rm[i] += K[i * n + j] / n; am += rm[i] / n; }
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) K[i * n + j] = K[i * n + j] - rm[i] - rm[j] + am;
+    const E = jacobi(K, n); let bc = 0, ba = 0; const kz = [];
+    for (let c = 0; c < 4; c++) { const z = Array.from(E.vecs[c]).map(v => v * Math.sqrt(Math.max(E.vals[c], 0))); kz.push(z); const acc = bestAcc(z, cls); if (acc > ba + 1e-9) { ba = acc; bc = c; } }
+    return { P, cls, L, kz, bc, ba, pa: bestAcc(L.Z.map(z => z[0]), cls), gm };
+  }
+  function makeRoll() {
+    const r = mulberry32(777), P = [], t = [], hgt = [];
+    for (let i = 0; i < 500; i++) { const tt = 1.5 * Math.PI * (1 + 2 * r()), hh = 21 * r(); P.push([tt * Math.cos(tt), hh, tt * Math.sin(tt)]); t.push(tt); hgt.push(hh); }
+    return { P, t, h: hgt, L: pca2(P) };
+  }
+  function stripPlot(ctx, F0, rows, C, opt) { // rows: {name, vals, cls, acc, color}
+    const { x, y, w, h } = F0, small = w < 360, lw = small ? 0 : 0, rh = h / rows.length;
+    rows.forEach((row, ri) => {
+      const y0 = y + ri * rh, mn = Math.min(...row.vals), mx = Math.max(...row.vals), pad = (mx - mn) * 0.06 || 1, sx = v => x + 10 + (v - mn + pad) / (mx - mn + 2 * pad) * (w - 20);
+      ctx.fillStyle = C.ink; ctx.font = `700 ${small ? 11 : 12}px ${C.sans}`; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(row.name, x + 10 + lw, y0 + 6);
+      if (row.acc !== undefined) { ctx.textAlign = "right"; ctx.fillStyle = row.acc > 0.9 ? C.c_pc : row.acc < 0.75 ? C.c_bad : C.muted; ctx.fillText(`최고 정확도 ${fmtP(row.acc, 0)}`, x + w - 10, y0 + 6); }
+      const cy = y0 + rh * 0.6; ctx.strokeStyle = C.line_strong; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + 10, cy); ctx.lineTo(x + w - 10, cy); ctx.stroke();
+      if (row.color) row.vals.forEach((v, i) => dot(ctx, sx(v), cy + (row.cls[i] ? 7 : -7) * (opt && opt.split ? 1 : 0) + ((i * 0.618) % 1 - 0.5) * rh * 0.28, 2.8, row.color(i)));
+    });
+  }
+  function drawL5() {
+    if ($("pane-limit").hidden) return; const C = colors();
+    $("ctl5Roll").hidden = S5.shape !== "roll";
+    if (S5.shape === "circ") {
+      if (!L5.circ) L5.circ = makeCirc(); const D = L5.circ, col = i => D.cls[i] ? C.g1 : C.g0;
+      { const { ctx, w, h } = fitCanvas($("cvLa")); const F = eqFrame(ctx, w, h, { cx: 0, cy: 0, hw: 1.25, hh: 1.25 }, C, ["x₁", "x₂"], { origin: true });
+        const v = D.L.V[0]; ctx.save(); clipRect(ctx, F); ctx.setLineDash([7, 5]); ctx.strokeStyle = C.c_pc; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(F.sx(-3 * v[0]), F.sy(-3 * v[1])); ctx.lineTo(F.sx(3 * v[0]), F.sy(3 * v[1])); ctx.stroke(); ctx.setLineDash([]); ctx.restore(); ctx.restore();
+        D.P.forEach((p, i) => dot(ctx, F.sx(p[0]), F.sy(p[1]), 3.4, col(i), C.surface, .8)); label(ctx, "PC1", F.sx(1.05 * v[0]), F.sy(1.05 * v[1]) - 12, C.c_pc, C); }
+      { const { ctx, w, h } = fitCanvas($("cvLb")); ctx.fillStyle = C.surface; ctx.fillRect(0, 0, w, h);
+        stripPlot(ctx, { x: 0, y: 0, w, h }, [{ name: "선형 PCA: PC1 하나", vals: D.L.Z.map(z => z[0]), cls: D.cls, acc: D.pa, color: col }], C); }
+      { const { ctx, w, h } = fitCanvas($("cvLc")); ctx.fillStyle = C.surface; ctx.fillRect(0, 0, w, h);
+        stripPlot(ctx, { x: 0, y: 0, w, h }, [{ name: `커널 PCA(RBF): PC${D.bc + 1} 하나`, vals: D.kz[D.bc], cls: D.cls, acc: D.ba, color: col }], C); }
+      $("capLa").textContent = "원래 2차원: 바깥 원(파랑)과 안쪽 원(주황)"; $("capLb").textContent = "선형 PCA로 1차원: 두 원이 같은 구간에 겹침"; $("capLc").textContent = `커널 PCA(RBF, γ = ${D.gm})로 1차원: 한 기준값으로 갈림`;
+      $("note5a").innerHTML = `원 모양 데이터는 어느 방향으로 직선 축을 잡아도 분산이 비슷합니다(λ₁ = ${fmt(D.L.lam[0], 3)}, λ₂ = ${fmt(D.L.lam[1], 3)}). 선형 PCA는 <b>회전과 사영</b>만 하므로 안쪽 원이 바깥 원 한가운데에 겹친 채로 남습니다(한 기준값으로 나눌 때 최고 정확도 ${fmtP(D.pa, 0)}). 점 사이 유사도로 비선형 특징을 만드는 커널 PCA는 PC${D.bc + 1} 하나로 ${fmtP(D.ba, 0)}까지 갈라냅니다. (커널 PCA의 PC1·PC2는 원 둘레의 각도를, PC${D.bc + 1}은 반지름을 담습니다.)`;
+    } else {
+      if (!L5.roll) L5.roll = makeRoll(); const D = L5.roll, tmin = 1.5 * Math.PI, tmax = 4.5 * Math.PI, col = i => seqColor(C, (D.t[i] - tmin) / (tmax - tmin));
+      $("v5Yaw").textContent = S5.yaw + "°"; $("s5Yaw").value = S5.yaw;
+      { const { ctx, w, h } = fitCanvas($("cvLa")); ctx.fillStyle = C.surface; ctx.fillRect(0, 0, w, h);
+        const ya = S5.yaw * Math.PI / 180, pi = 1.1, cy = Math.cos(ya), sy = Math.sin(ya), cp = Math.cos(pi), sp = Math.sin(pi), s = Math.min(w, h) / 34;
+        const pr = D.P.map((p, i) => { const x = p[0] * cy + p[2] * sy, z = -p[0] * sy + p[2] * cy, y = p[1] - 10.5; return { X: w / 2 + x * s, Y: h / 2 - (y * cp - z * sp) * s, d: y * sp + z * cp, i }; });
+        pr.sort((a, b) => a.d - b.d).forEach(q => dot(ctx, q.X, q.Y, 3, col(q.i), rgba(C.surface, .7), .6));
+        ctx.fillStyle = C.muted; ctx.font = `600 11px ${C.sans}`; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText("3차원 (끌어서 회전)", 8, 6); }
+      { const { ctx, w, h } = fitCanvas($("cvLb")); const Z = D.L.Z; let m1 = 0, m2 = 0; Z.forEach(z => { m1 = Math.max(m1, Math.abs(z[0])); m2 = Math.max(m2, Math.abs(z[1])); });
+        const F = eqFrame(ctx, w, h, { cx: 0, cy: 0, hw: m1 * 1.06, hh: m2 * 1.06 }, C, ["PC1", "PC2"], { origin: true }); Z.forEach((z, i) => dot(ctx, F.sx(z[0]), F.sy(z[1]), 2.8, col(i))); }
+      { const { ctx, w, h } = fitCanvas($("cvLc")); const F = frame(ctx, w, h, [tmin - 0.3, tmax + 0.3], [-1, 22], C, ["말린 방향 위치 t", "높이"]); D.t.forEach((t, i) => dot(ctx, F.sx(t), F.sy(D.h[i]), 2.8, col(i))); }
+      const r = D.L.lam.reduce((s, v) => s + v, 0);
+      $("capLa").textContent = "원래 3차원: 말린 종이(색 = 말린 방향 위치)"; $("capLb").textContent = `선형 PCA 2차원 (${fmtP((D.L.lam[0] + D.L.lam[1]) / r, 0)} 설명): 말린 채 그대로`; $("capLc").textContent = "이상적으로 펼친 모습 (정답 좌표)";
+      $("note5a").innerHTML = `선형 PCA는 분산이 큰 두 방향을 골라 그림자를 만들 뿐입니다. 여기서는 말린 단면 방향이 뽑혀서 종이가 <b>말린 나선 그대로</b> 남고, 높이 정보는 통째로 버려집니다. 그래서 종이 위에서는 멀리 떨어진 점(같은 색, 다른 높이)이 한 점처럼 겹칩니다. 설명 분산 비율이 높아도 <b>구조를 펼쳤다는 뜻은 아닙니다</b>. 오른쪽처럼 펴려면 이웃 관계를 쓰는 비선형 방법(Isomap, t-SNE, UMAP 등)이 필요합니다.`;
+    }
+  }
+  function genV2() {
+    const r = mulberry32(S5.seed * 131 + 9), P = [], cls = [], ang = 20 * Math.PI / 180, c = Math.cos(ang), s = Math.sin(ang);
+    for (let i = 0; i < 160; i++) { const k = i % 2, u = S5.sd * gauss(r), v = (k ? 1 : -1) * S5.gap / 2 + 0.35 * gauss(r); P.push([c * u - s * v, s * u + c * v]); cls.push(k); }
+    const L = pca2(P);
+    const m = [[0, 0], [0, 0]], cn = [0, 0]; P.forEach((p, i) => { m[cls[i]][0] += p[0]; m[cls[i]][1] += p[1]; cn[cls[i]]++; }); m.forEach((q, k) => { q[0] /= cn[k]; q[1] /= cn[k]; });
+    let a = 0, b = 0, d = 0; P.forEach((p, i) => { const dx = p[0] - m[cls[i]][0], dy = p[1] - m[cls[i]][1]; a += dx * dx; b += dx * dy; d += dy * dy; });
+    const det = a * d - b * b, dm = [m[1][0] - m[0][0], m[1][1] - m[0][1]]; let wv = [(d * dm[0] - b * dm[1]) / det, (-b * dm[0] + a * dm[1]) / det]; const nw = Math.hypot(wv[0], wv[1]) || 1; wv = [wv[0] / nw, wv[1] / nw];
+    const lda = P.map(p => (p[0] - L.mu[0]) * wv[0] + (p[1] - L.mu[1]) * wv[1]);
+    return { P, cls, L, wv, lda, a1: bestAcc(L.Z.map(z => z[0]), cls), a2: bestAcc(L.Z.map(z => z[1]), cls), al: bestAcc(lda, cls) };
+  }
+  let V2 = null;
+  function drawV2() {
+    if ($("pane-limit").hidden) return; if (!V2) V2 = genV2(); const D = V2, C = colors(), col = i => D.cls[i] ? C.g1 : C.g0;
+    $("v5Gap").textContent = fmt(S5.gap, 1); $("v5Sd").textContent = fmt(S5.sd, 1);
+    { const { ctx, w, h } = fitCanvas($("cvV2")); let R = 0; D.P.forEach(p => R = Math.max(R, Math.abs(p[0] - D.L.mu[0]), Math.abs(p[1] - D.L.mu[1])));
+      const F = eqFrame(ctx, w, h, { cx: D.L.mu[0], cy: D.L.mu[1], hw: R * 1.05, hh: R * 0.75 }, C, ["x₁", "x₂"]);
+      D.P.forEach((p, i) => dot(ctx, F.sx(p[0]), F.sy(p[1]), 3.2, rgba(col(i), .85), C.surface, .7));
+      const mx = D.L.mu[0], my = D.L.mu[1], s1 = Math.sqrt(D.L.lam[0]) * 1.8, s2 = Math.max(Math.sqrt(D.L.lam[1]) * 1.8, R * 0.25);
+      arrow(ctx, F.sx(mx), F.sy(my), F.sx(mx + D.L.V[0][0] * s1), F.sy(my + D.L.V[0][1] * s1), C.c_pc, 3, 11);
+      arrow(ctx, F.sx(mx), F.sy(my), F.sx(mx + D.L.V[1][0] * s2), F.sy(my + D.L.V[1][1] * s2), C.c_pc2, 3, 11);
+      ctx.setLineDash([6, 4]); arrow(ctx, F.sx(mx), F.sy(my), F.sx(mx + D.wv[0] * s2 * 1.25), F.sy(my + D.wv[1] * s2 * 1.25), C.c_axis, 2.2, 10); ctx.setLineDash([]);
+      label(ctx, "PC1", F.sx(mx + D.L.V[0][0] * s1) + 6, F.sy(my + D.L.V[0][1] * s1) - 10, C.c_pc, C);
+      label(ctx, "PC2 · LDA", F.sx(mx + D.L.V[1][0] * s2) + 8, F.sy(my + D.L.V[1][1] * s2), C.c_pc2, C); }
+    { const { ctx, w, h } = fitCanvas($("cvV2s")); ctx.fillStyle = C.surface; ctx.fillRect(0, 0, w, h);
+      const tot = D.L.lam[0] + D.L.lam[1];
+      stripPlot(ctx, { x: 0, y: 0, w, h }, [{ name: `PC1 (분산 ${fmtP(D.L.lam[0] / tot, 0)})`, vals: D.L.Z.map(z => z[0]), cls: D.cls, acc: D.a1, color: col },
+        { name: `PC2 (분산 ${fmtP(D.L.lam[1] / tot, 0)})`, vals: D.L.Z.map(z => z[1]), cls: D.cls, acc: D.a2, color: col },
+        { name: "LDA 방향 (라벨 사용)", vals: D.lda, cls: D.cls, acc: D.al, color: col }], C); }
+    $("note5b").innerHTML = `PC1은 분산의 ${fmtP(D.L.lam[0] / (D.L.lam[0] + D.L.lam[1]), 0)}를 설명하지만 PC1 하나로 나누면 정확도가 <b>${fmtP(D.a1, 0)}</b>입니다. 버려질 PC2 쪽이 <b>${fmtP(D.a2, 0)}</b>로 오히려 두 집단을 가릅니다. 분류가 목적이면 PCA 성분 수를 교차검증 성능으로 고르거나, 라벨을 쓰는 방법(LDA 등)과 비교해 보세요.`;
+  }
+  function render5() {
+    drawL5(); drawV2();
+    if (!DS) return; const P = P3, p = DS.p; const top = [...Array(p).keys()].sort((x, y) => Math.abs(P.V[0][y]) - Math.abs(P.V[0][x]));
+    const sg = top.filter(j => Math.abs(P.V[0][j]) > 0.15), posN = sg.filter(j => P.V[0][j] > 0).map(j => DS.names[j]), negN = sg.filter(j => P.V[0][j] < 0).map(j => DS.names[j]);
+    $("list5").innerHTML = [
+      `<b>주성분은 여러 변수의 가중합</b>입니다. 지금 3번 화면의 PC1 = ${top.slice(0, 4).map(j => `${fmt(P.V[0][j], 2)}·${esc(DS.names[j])}`).join(" + ").replace(/\+ −/g, "− ")} + … 처럼 ${p}개 변수가 모두 조금씩 섞여 있어, "비만 지표"처럼 이름을 붙이는 것은 해석자의 판단입니다.`,
+      `양(+)의 방향: ${posN.map(esc).join(", ") || "없음"}${negN.length ? ` / 음(−)의 방향: ${negN.map(esc).join(", ")}` : ""}. 성분의 <b>부호는 임의</b>라 실행 환경에 따라 PC1 전체가 뒤집혀 나올 수 있습니다(scikit-learn은 절댓값이 가장 큰 원소를 양수로 맞춤).`,
+      `<b>표준화 여부</b>에 따라 성분이 완전히 달라집니다(3번 화면 비교). 해석 전에 어떤 전처리를 했는지 꼭 함께 적습니다.`,
+      `분산 기반이라 <b>이상값</b> 몇 개가 축 방향을 끌어당길 수 있습니다(1번 화면에서 점 하나를 멀리 끌어 보세요).`,
+      `주성분 점수는 원래 단위가 없어 "PC1이 1 증가하면…" 같은 설명이 어렵습니다. 설명이 중요한 모형에서는 원래 변수를 쓰거나 변수 선택을 고려합니다.`
+    ].map(s => `<li>${s}</li>`).join("");
+  }
+  segBind("seg5", v => { S5.shape = v; drawL5(); });
+  $("s5Yaw").addEventListener("input", e => { S5.yaw = +e.target.value; drawL5(); });
+  $("cvLa").addEventListener("pointerdown", e => { if (S5.shape !== "roll") return; S5.drag = { x: e.clientX, y0: S5.yaw }; try { $("cvLa").setPointerCapture(e.pointerId); } catch (_) {} e.preventDefault(); });
+  $("cvLa").addEventListener("pointermove", e => { if (!S5.drag) return; let v = Math.round(S5.drag.y0 + (e.clientX - S5.drag.x) * 0.8); v = ((v + 180) % 360 + 360) % 360 - 180; S5.yaw = v; drawL5(); });
+  const end5 = () => S5.drag = null; $("cvLa").addEventListener("pointerup", end5); $("cvLa").addEventListener("pointercancel", end5);
+  $("s5Gap").addEventListener("input", e => { S5.gap = +e.target.value; V2 = null; drawV2(); });
+  $("s5Sd").addEventListener("input", e => { S5.sd = +e.target.value; V2 = null; drawV2(); });
+  $("b5Seed").onclick = () => { S5.seed = (S5.seed * 7 + 3) % 499 + 1; V2 = null; drawV2(); };
+
+  /* ================================================================
+     6. 코드
+     ================================================================ */
+  const S6 = { mode: "k" };
+  let code6dirty = true;
+  function pyList(a, d) { return "[" + a.map(v => py(v, d)).join(", ") + "]"; }
+  function code6() {
+    const P = P3, p = DS.p, std = S3.std, thr = S3.thr || 0.9;
+    const k = S6.mode === "k" ? S3.k : kFor(P, thr);
+    const nc = S6.mode === "k" ? String(k) : py(thr, 2);
+    $("h6").textContent = S6.mode === "k" ? `n_components = ${k} (3번 화면의 k)` : `n_components = ${py(thr, 2)} → 누적 비율이 ${Math.round(thr * 100)}%를 넘는 첫 개수 = ${k}개`;
+    const names = DS.names.map(s => JSON.stringify(s)).join(", ");
+    const Xp = "X_std" , drop = P.lam.slice(k).reduce((s, v) => s + v, 0);
+    let sse = 0; for (let r = 0; r < DS.n; r++) sse += recon(r, k).err;
+    const comp = [...Array(Math.min(k, 3)).keys()].map(i => `#  PC${i + 1}: ${pyList(Array.from(P.V[i]), 3)}`).join("\n");
+    const z0 = P.Z[0].slice(0, k), r0 = recon(0, k);
+    const pre = std ? `scaler = StandardScaler()            # 평균 0, 표준편차 1 (표준편차는 n으로 나눔)
+X_std = scaler.fit_transform(X)` : `X_std = X - X.mean(axis=0)           # 표준화 없음: 평균만 빼기 (PCA도 내부에서 평균을 뺌)`;
+    const inv = std ? `X_hat = scaler.inverse_transform(pca.inverse_transform(Z))   # 원래 단위로 복원` : `X_hat = pca.inverse_transform(Z) + X.mean(axis=0)            # 원래 단위로 복원`;
+    return `import numpy as np
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.pipeline import Pipeline
+
+# 3번 화면 데이터: [데이터 CSV 내려받기] → health_checkup.csv (${DS.n}행 × ${p}변수)
+df = pd.read_csv("health_checkup.csv")
+features = [${names}]
+X = df[features].to_numpy(dtype=float)
+
+# ---------------------------------------------------------------
+# 1) 단계별: ${std ? "표준화 → " : ""}PCA
+# ---------------------------------------------------------------
+${pre}
+
+pca = PCA(n_components=${nc})
+Z = pca.fit_transform(X_std)          # 주성분 점수 (n × ${k})
+print(pca.n_components_)              # ${k}
+print(pca.explained_variance_.round(4))
+# ${pyList(P.lam.slice(0, k), 4)}
+print(pca.explained_variance_ratio_.round(4))
+# ${pyList(P.ratio.slice(0, k), 4)}
+print(pca.explained_variance_ratio_.cumsum().round(4))
+# ${pyList(P.cum.slice(0, k), 4)}
+
+# components_: 행 = 주성분, 열 = 변수 (고유벡터 Vᵀ)
+loadings = pd.DataFrame(pca.components_.T, index=features,
+                        columns=[f"PC{i+1}" for i in range(pca.n_components_)])
+print(loadings.round(3))
+${comp}
+
+print(Z[0].round(4))                  # 첫 번째 수검자의 점수
+# ${pyList(z0, 4)}
+
+# ---------------------------------------------------------------
+# 2) 복원과 정보 손실
+# ---------------------------------------------------------------
+${inv}
+print(X_hat[0].round(2))              # 첫 번째 수검자 복원 값
+# ${pyList(r0.xhat, 2)}
+X_std_hat = pca.inverse_transform(Z)
+err = ((X_std - X_std_hat) ** 2).sum() / (len(X) - 1)
+print(round(err, 4))                  # ${py(sse / (DS.n - 1), 4)}
+full = PCA().fit(X_std)
+print(full.explained_variance_[pca.n_components_:].sum().round(4))  # ${py(drop, 4)}  ← 버린 고유값 합 = 재구성 오차
+
+# ---------------------------------------------------------------
+# 3) Pipeline: 전처리와 PCA를 한 번에 (학습 데이터로만 fit)
+# ---------------------------------------------------------------
+pipe = Pipeline([
+${std ? `    ("scaler", StandardScaler()),\n` : ""}    ("pca", PCA(n_components=${nc})),
+])
+Z2 = pipe.fit_transform(X)
+X_hat2 = pipe.inverse_transform(Z2)
+print(np.allclose(np.abs(Z2), np.abs(Z)))   # True (부호는 성분마다 같은 규칙)
+
+# 분류 모형 앞에 붙일 때 (성분 수는 교차검증으로 고르기)
+# from sklearn.linear_model import LogisticRegression
+# from sklearn.model_selection import GridSearchCV
+# clf = Pipeline([${std ? `("scaler", StandardScaler()), ` : ""}("pca", PCA()), ("lr", LogisticRegression(max_iter=1000))])
+# GridSearchCV(clf, {"pca__n_components": [2, 3, 5, 8]}, cv=5).fit(X, df["집단"])
+`;
+  }
+  function render6() { $("code6").textContent = code6(); code6dirty = false; }
+  segBind("seg6Mode", v => { S6.mode = v; render6(); });
+  function copyText(t, msgEl, okMsg) {
+    const done = () => { msgEl.textContent = okMsg; setTimeout(() => msgEl.textContent = "", 1800); };
+    const fb = () => { const ta = document.createElement("textarea"); ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); done(); } catch (_) { msgEl.textContent = "복사하지 못했습니다. 직접 선택해 복사하세요."; } ta.remove(); };
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(t).then(done, fb); else fb();
+  }
+  $("b6Copy").onclick = () => copyText($("code6").textContent, $("m6"), "코드를 복사했습니다.");
+  $("b6CsvCopy").onclick = () => copyText(toCSV(DS), $("m6"), "CSV를 복사했습니다.");
+  $("b6Csv").onclick = () => { const blob = new Blob(["﻿" + toCSV(DS) + "\n"], { type: "text/csv;charset=utf-8" }), a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "health_checkup.csv"; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); $("m6").textContent = "health_checkup.csv를 내려받았습니다."; };
+
+  /* ================================================================
+     탭 · 다시 그리기
+     ================================================================ */
+  const tabs = [...document.querySelectorAll(".sk-tab")];
+  function renderPane(id) {
+    if (id === "pane-find") render1();
+    else if (id === "pane-cov") render2();
+    else if (id === "pane-hd") render3();
+    else if (id === "pane-recon") render4();
+    else if (id === "pane-limit") render5();
+    else if (id === "pane-code") render6();
+  }
+  function show(t) {
+    tabs.forEach(b => { const on = b === t; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1; $(b.getAttribute("aria-controls")).hidden = !on; });
+    if (t.id !== "tab-cov") { stop2(); cancelAnimationFrame(S2.raf); S2.t = 1; }
+    history.replaceState(null, "", "#" + t.id.replace("tab-", ""));
+    renderPane(t.getAttribute("aria-controls"));
+  }
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => show(b));
+    b.addEventListener("keydown", e => { const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return;
+      const n = tabs[(i + d + tabs.length) % tabs.length]; show(n); n.focus(); e.preventDefault(); });
+  });
+  window.addEventListener("hashchange", () => { const t = $("tab-" + location.hash.slice(1)); if (t && t !== current()) show(t); });
+  const current = () => tabs.find(b => b.getAttribute("aria-selected") === "true");
+  function redraw() {
+    const t = current(); if (!t) return; const id = t.getAttribute("aria-controls");
+    if (id === "pane-find") { draw1(); draw1c(); } else if (id === "pane-cov") draw2(); else if (id === "pane-hd") { drawScree(); drawBi(); }
+    else if (id === "pane-recon") render4(); else if (id === "pane-limit") { drawL5(); drawV2(); }
+  }
+  new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  if (window.matchMedia) { const mq = matchMedia("(prefers-color-scheme: dark)"); if (mq.addEventListener) mq.addEventListener("change", redraw); }
+  let rzT = 0; const onResize = () => { cancelAnimationFrame(rzT); rzT = requestAnimationFrame(redraw); };
+  if (window.ResizeObserver) { const ro = new ResizeObserver(onResize); ["cv1", "cv1c", "cv2", "cvScree", "cvBi", "cvLoss", "cvLa", "cvV2"].forEach(id => ro.observe($(id))); }
+  else window.addEventListener("resize", onResize);
+
+  /* 시작 */
+  $("v2Spd").textContent = SPD2[S2.speed] + "×";
+  S1.pts = genBP(S1.rho, S1.n, S1.seed);
+  data3();
+  const start = $("tab-" + location.hash.slice(1)); show(start || tabs[0]);
+})();
+</script>
+</body>
+</html>

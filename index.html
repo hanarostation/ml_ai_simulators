@@ -289,6 +289,34 @@
       '<path d="M60 26 L74 70 L86 32 L98 64 L108 40 L116 56 L120 50" stroke="var(--faint)" stroke-width="1.8"/>' +
       '<path d="M60 26 C 80 40, 100 48, 120 50" stroke="var(--cat-ml)" stroke-width="2.6"/><circle cx="120" cy="50" r="4" fill="var(--cat-ml)"/>' +
       '<path d="M14 30v40M24 40v30M34 24v46" stroke="var(--cat-nn)" stroke-width="5" stroke-linecap="round" opacity=".7"/></svg>',
+    knn: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      [[40, 30, 0], [60, 70, 0], [52, 48, 1], [86, 26, 1], [120, 70, 0], [140, 40, 1], [150, 78, 0], [70, 20, 0], [108, 50, 1], [30, 74, 1]].map(function (p) {
+        return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="5" fill="' + (p[2] ? "var(--cat-ml)" : "var(--cat-nlp)") + '" opacity=".8"/>';
+      }).join("") + '<circle cx="90" cy="50" r="30" stroke="currentColor" stroke-width="1.6" stroke-dasharray="4 3"/>' +
+      [[86, 26], [108, 50], [70, 20], [60, 70], [120, 70]].slice(0, 3).map(function (p) { return '<path d="M90 50 L' + p[0] + ' ' + p[1] + '" stroke="currentColor" stroke-width="1.4"/>'; }).join("") +
+      '<path d="M90 41 l2.6 5.4 5.9.9-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.1 5.9-.9z" fill="currentColor"/></svg>',
+    svm: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      '<path d="M40 92 L150 8" stroke="currentColor" stroke-width="2.6"/><path d="M22 78 L132 -6 M58 106 L168 22" stroke="currentColor" stroke-width="1.4" stroke-dasharray="4 3" opacity=".7"/>' +
+      [[40, 30], [60, 18], [30, 52], [72, 40]].map(function (p, i) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="5" fill="var(--cat-nlp)" opacity=".85"' + (i === 3 ? ' stroke="var(--ink)" stroke-width="2"' : '') + '/>'; }).join("") +
+      [[130, 80], [150, 62], [160, 84], [112, 64]].map(function (p, i) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="5" fill="var(--cat-ml)" opacity=".9"' + (i === 3 ? ' stroke="var(--ink)" stroke-width="2"' : '') + '/>'; }).join("") + '</svg>',
+    hclust: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      '<path d="M28 90 V62 H48 V90 M38 62 V44 H70 V90 M54 44 V24 H128 M112 90 V70 H132 V90 M122 70 V50 H160 V90 M141 50 V24" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>' +
+      '<path d="M16 40 H176" stroke="var(--cat-ml)" stroke-width="1.6" stroke-dasharray="5 3"/>' +
+      [28, 48, 70, 112, 132, 160].map(function (x, i) { return '<circle cx="' + x + '" cy="92" r="4" fill="' + (i < 3 ? "var(--cat-nlp)" : "var(--cat-ml)") + '"/>'; }).join("") + '</svg>',
+    pclust: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      [[50, 34, "var(--cat-nlp)"], [130, 30, "var(--cat-ml)"], [92, 74, "var(--cat-cv)"]].map(function (c, j) {
+        var s = "", off = [[-12, -6], [8, -10], [-4, 10], [14, 6], [-16, 8], [4, -2]];
+        off.forEach(function (o) { s += '<circle cx="' + (c[0] + o[0]) + '" cy="' + (c[1] + o[1]) + '" r="4" fill="' + c[2] + '" opacity=".75"/>'; });
+        return s + '<path d="M' + (c[0] - 6) + ' ' + c[1] + 'h12M' + c[0] + ' ' + (c[1] - 6) + 'v12" stroke="var(--ink)" stroke-width="2.4"/>';
+      }).join("") + '</svg>',
+    pca: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      [[50, 74], [64, 66], [72, 58], [86, 54], [96, 46], [108, 42], [120, 34], [132, 30], [80, 64], [112, 32], [70, 52], [124, 42]].map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="3.8" fill="currentColor" opacity=".55"/>'; }).join("") +
+      '<ellipse cx="92" cy="52" rx="60" ry="16" transform="rotate(-28 92 52)" stroke="currentColor" stroke-width="1.2" opacity=".5"/>' +
+      '<path d="M92 52 L150 21" stroke="var(--cat-ml)" stroke-width="3" stroke-linecap="round"/><path d="M92 52 L101 69" stroke="var(--cat-nn)" stroke-width="2.4" stroke-linecap="round"/></svg>',
+    assoc: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
+      '<circle cx="74" cy="50" r="32" fill="var(--cat-nlp)" opacity=".25" stroke="var(--cat-nlp)" stroke-width="1.6"/><circle cx="116" cy="50" r="32" fill="var(--cat-ml)" opacity=".25" stroke="var(--cat-ml)" stroke-width="1.6"/>' +
+      '<path d="M95 26 A32 32 0 0 1 95 74 A32 32 0 0 1 95 26Z" fill="currentColor" opacity=".45"/>' +
+      '<text x="58" y="55" font-size="15" fill="currentColor" font-family="sans-serif" font-weight="700">A</text><text x="124" y="55" font-size="15" fill="currentColor" font-family="sans-serif" font-weight="700">B</text></svg>',
     cv: '<svg viewBox="0 0 190 100" fill="none" aria-hidden="true">' +
       (function () { var s = ""; for (var r = 0; r < 5; r++) for (var c = 0; c < 5; c++) s += '<rect x="' + (20 + c * 15) + '" y="' + (13 + r * 15) + '" width="14" height="14" fill="currentColor" opacity="' + (0.1 + ((r * 7 + c * 3) % 9) / 12).toFixed(2) + '"/>'; return s; })() +
       '<rect x="34" y="27" width="44" height="44" stroke="var(--ink)" stroke-width="2"/><path d="M100 50h14" stroke="var(--faint)" stroke-width="2"/>' +

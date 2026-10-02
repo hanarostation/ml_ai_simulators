@@ -1,0 +1,1360 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>연관분석 시뮬레이터 (Apriori · FP-Growth) | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20260930c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20260930c">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색 (강의 도식): 파랑 데이터 / 청록 대치 / 보라 학습·후보 / 주황 평가 / 빨강 한계·가지치기 / 초록 활용·통과
+   연관분석: A(조건) = 파랑, B(결과) = 주황, A와 B 모두 = 보라, 빈발(통과) = 초록, 가지치기 = 빨강 */
+:root{ --sk-accent: var(--cat-ml);
+  --c-data:#2563EB; --c-imp:#0D9488; --c-cv:#7C3AED; --c-eval:#EA580C; --c-leak:#DC2626; --c-use:#15803D;
+  --c-a:var(--c-data); --c-b:var(--c-eval); --c-ab:var(--c-cv); }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --c-data:#6AA5FF; --c-imp:#33D1BD; --c-cv:#B294FF; --c-eval:#FF914D; --c-leak:#FF6B6B; --c-use:#4ADE80; } }
+:root[data-theme="dark"]{ --c-data:#6AA5FF; --c-imp:#33D1BD; --c-cv:#B294FF; --c-eval:#FF914D; --c-leak:#FF6B6B; --c-use:#4ADE80; }
+
+.ar-a{color:var(--c-a)} .ar-b{color:var(--c-b)} .ar-ab{color:var(--c-ab)} .ar-ok{color:var(--c-use)} .ar-bad{color:var(--c-leak)}
+.ar-kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--ink)}
+.ar-note-warn{border-left-color:var(--c-leak);background:color-mix(in srgb,var(--c-leak) 8%,var(--surface))}
+.ar-note-ok{border-left-color:var(--c-use);background:color-mix(in srgb,var(--c-use) 8%,var(--surface))}
+.ar-note-cv{border-left-color:var(--c-cv);background:color-mix(in srgb,var(--c-cv) 7%,var(--surface))}
+
+/* 데이터 막대 */
+.ar-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:10px 16px}
+.ar-bar .sum{font-size:13.5px;color:var(--muted)}
+.ar-bar .sum b{color:var(--ink);font-family:var(--mono);font-weight:600}
+.ar-tag{font-size:12px;font-weight:700;color:var(--c-eval);border:1px solid currentColor;border-radius:999px;padding:1px 8px}
+
+/* 격자 */
+.ar-g2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+.ar-gside{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
+.ar-gfp{display:grid;grid-template-columns:330px minmax(0,1fr);gap:16px;align-items:start}
+.ar-gside.ar-gnet{grid-template-columns:minmax(0,1fr) 400px}
+@media (max-width:1100px){.ar-g2,.ar-gside,.ar-gfp,.ar-gside.ar-gnet{grid-template-columns:minmax(0,1fr)}}
+.ar-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+
+/* 칩 */
+.ar-chips{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.ar-chip{display:inline-flex;align-items:center;gap:2px;border:1.5px solid var(--line-strong);border-radius:999px;padding:1px 3px 1px 9px;font-size:13px;line-height:1.5;background:var(--surface);color:var(--ink);white-space:nowrap}
+.ar-chip.ia{border-color:var(--c-a);background:color-mix(in srgb,var(--c-a) 12%,var(--surface))}
+.ar-chip.ib{border-color:var(--c-b);background:color-mix(in srgb,var(--c-b) 12%,var(--surface))}
+.ar-chip .x{appearance:none;border:0;background:none;color:var(--faint);font:inherit;font-size:14px;line-height:1;width:20px;height:20px;border-radius:50%;cursor:pointer;padding:0}
+.ar-chip .x:hover{background:var(--surface-2);color:var(--ink)}
+.ar-chip .x:focus-visible,.ar-tog:focus-visible,.ar-link:focus-visible,.ar-del:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.ar-chip.ro{padding:1px 9px}
+.ar-add{font-size:12.5px;padding:2px 4px;border-radius:999px;max-width:118px}
+.ar-empty{font-size:12.5px;color:var(--faint);font-style:italic}
+.ar-tog{appearance:none;font:inherit;font-size:13.5px;font-weight:600;border:1.5px solid var(--line-strong);background:var(--surface);color:var(--muted);border-radius:999px;padding:3px 11px;cursor:pointer;white-space:nowrap}
+.ar-tog:hover{color:var(--ink)}
+.ar-tog[aria-pressed="true"].ta{background:var(--c-a);border-color:var(--c-a);color:var(--on-ink)}
+.ar-tog[aria-pressed="true"].tb{background:var(--c-b);border-color:var(--c-b);color:var(--on-ink)}
+.ar-pick{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 10px;align-items:center}
+.ar-pick .lb{font-size:12.5px;font-weight:700;white-space:nowrap}
+.ar-rule{font-size:19px;font-weight:700;color:var(--ink);line-height:1.4;overflow-wrap:anywhere}
+.ar-rule .arr{color:var(--faint);margin:0 6px}
+
+/* 거래 표 */
+.ar-tscroll{max-height:540px;overflow:auto;border:1px solid var(--line);border-radius:10px;position:relative}
+.ar-tscroll .sk-table th{z-index:1}
+.ar-tx td{vertical-align:middle}
+.ar-tx td.id{font-family:var(--mono);font-size:12.5px;color:var(--muted);font-weight:600}
+.ar-tx td.wrap{white-space:normal;min-width:220px}
+.ar-tx tr.r-ab td{background:color-mix(in srgb,var(--c-ab) 15%,var(--surface))}
+.ar-tx tr.r-a td{background:color-mix(in srgb,var(--c-a) 10%,var(--surface))}
+.ar-tx tr.r-b td{background:color-mix(in srgb,var(--c-b) 10%,var(--surface))}
+.ar-mk{display:inline-grid;place-items:center;min-width:20px;height:20px;border-radius:5px;font-size:11.5px;font-weight:700;color:var(--on-ink)}
+.ar-mk.a{background:var(--c-a)} .ar-mk.b{background:var(--c-b)}
+.ar-mk.no{background:none;color:var(--faint)}
+.ar-del{appearance:none;border:1px solid var(--line-strong);background:var(--surface);color:var(--muted);border-radius:7px;font:inherit;font-size:12px;padding:2px 7px;cursor:pointer}
+.ar-del:hover{color:var(--c-leak);border-color:var(--c-leak)}
+.ar-oh th,.ar-oh td{text-align:center;padding:4px 6px}
+.ar-oh th.ca{box-shadow:inset 0 -3px 0 var(--c-a);color:var(--c-a)}
+.ar-oh th.cb{box-shadow:inset 0 -3px 0 var(--c-b);color:var(--c-b)}
+.ar-oh td.one{font-family:var(--mono);font-weight:700;color:var(--ink)}
+.ar-oh td.zero{font-family:var(--mono);color:var(--faint)}
+.ar-oh td.ca.one{background:color-mix(in srgb,var(--c-a) 22%,var(--surface))}
+.ar-oh td.cb.one{background:color-mix(in srgb,var(--c-b) 22%,var(--surface))}
+.ar-oh tfoot td,.ar-oh tfoot th{border-top:2px solid var(--line-strong);background:var(--surface-2);font-family:var(--mono);font-size:12px;position:sticky;bottom:0}
+.ar-oh th small{display:block;font-weight:600;color:var(--faint);font-size:10.5px}
+
+/* 벤 다이어그램·SVG 공통 */
+.ar-svgbox{width:100%;display:block}
+.ar-svgbox svg{display:block;width:100%;height:auto}
+.ar-svg text{font-family:var(--sans)}
+.ar-svg .u{fill:var(--surface-2);stroke:var(--line-strong);stroke-width:1.2}
+.ar-svg .ca{fill:color-mix(in srgb,var(--c-a) 16%,transparent);stroke:var(--c-a);stroke-width:2}
+.ar-svg .cb{fill:color-mix(in srgb,var(--c-b) 16%,transparent);stroke:var(--c-b);stroke-width:2}
+.ar-svg .cab{fill:color-mix(in srgb,var(--c-ab) 40%,var(--surface))}
+.ar-svg .t-s{font-size:12px;fill:var(--muted);font-weight:600}
+.ar-svg .t-n{font-family:var(--mono);font-size:20px;font-weight:600;fill:var(--ink);text-anchor:middle}
+.ar-svg .t-l{font-size:12.5px;font-weight:700;text-anchor:middle}
+.ar-svg .t-a{fill:var(--c-a)} .ar-svg .t-b{fill:var(--c-b)} .ar-svg .t-ab{fill:var(--c-ab)}
+.ar-svg .ax{stroke:var(--line-strong);stroke-width:1}
+.ar-svg .gr{stroke:var(--line);stroke-width:1}
+.ar-svg .tk{font-family:var(--mono);font-size:11px;fill:var(--muted)}
+.ar-svg .tl{font-size:12px;fill:var(--muted);font-weight:600}
+
+/* 지표 */
+.ar-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+@media (max-width:700px){.ar-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ar-metrics .sk-stat{min-width:0}
+.ar-metrics .sk-stat b{font-size:19px}
+.ar-metrics .sk-stat.m-s{border-top:3px solid var(--c-ab)}
+.ar-metrics .sk-stat.m-c{border-top:3px solid var(--c-a)}
+.ar-metrics .sk-stat.m-l{border-top:3px solid var(--c-b)}
+.ar-f{white-space:normal}
+.ar-f .row{display:block;padding:1px 0}
+.ar-f .k{font-family:var(--sans);font-weight:700;color:var(--ink)}
+.ar-f .va{color:var(--c-a);font-weight:600} .ar-f .vb{color:var(--c-b);font-weight:600} .ar-f .vab{color:var(--c-ab);font-weight:600}
+.ar-f .res{font-weight:700;color:var(--ink);background:color-mix(in srgb,var(--sk-accent) 14%,transparent);border-radius:4px;padding:0 3px}
+.ar-gauge{display:flex;flex-direction:column;gap:4px}
+.ar-gauge .tr{position:relative;height:16px;border-radius:8px;background:linear-gradient(90deg,color-mix(in srgb,var(--c-a) 45%,var(--surface)) 0%,var(--surface-2) 33.3%,color-mix(in srgb,var(--c-b) 55%,var(--surface)) 100%);border:1px solid var(--line)}
+.ar-gauge .one{position:absolute;top:-4px;bottom:-4px;left:33.333%;border-left:2px dashed var(--muted)}
+.ar-gauge .pt{position:absolute;top:-6px;width:4px;height:26px;margin-left:-2px;border-radius:2px;background:var(--ink);transition:left .35s}
+.ar-gauge .lb{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.ar-gauge .lb{position:relative}
+.ar-gauge .lb span:nth-child(2){position:absolute;left:33.333%;transform:translateX(-50%)}
+.ar-say{margin:0;font-size:15px;line-height:1.65;color:var(--text)}
+.ar-say b{color:var(--ink)}
+
+/* Apriori */
+.sk-stepper li{padding:0}
+.sk-stepper li button{appearance:none;border:0;background:none;font:inherit;color:inherit;padding:7px 10px;cursor:pointer;border-radius:8px;width:100%}
+.sk-stepper li button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.ar-cap{margin:0;min-height:3.2em;font-size:14.5px;line-height:1.6}
+.ar-cap b{color:var(--ink)}
+.ar-pill{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:1px 8px;white-space:nowrap}
+.ar-pill.freq{background:color-mix(in srgb,var(--c-use) 18%,var(--surface));color:var(--c-use)}
+.ar-pill.infreq{background:var(--surface-2);color:var(--muted)}
+.ar-pill.pruned{background:color-mix(in srgb,var(--c-leak) 14%,var(--surface));color:var(--c-leak)}
+.ar-pill.cand{background:color-mix(in srgb,var(--c-cv) 14%,var(--surface));color:var(--c-cv)}
+.ar-pill.counted{background:color-mix(in srgb,var(--c-cv) 22%,var(--surface));color:var(--ink)}
+.ar-ct tr.pruned td{color:var(--muted)}
+.ar-ct tr.pruned td.set{text-decoration:line-through;text-decoration-color:var(--c-leak)}
+.ar-ct tr.infreq td{color:var(--muted)}
+.ar-ct td.why{white-space:normal;min-width:160px;font-size:12.5px}
+.ar-lv td.cur{box-shadow:inset 3px 0 0 var(--sk-accent)}
+.ar-stats4 .sk-stat{flex:1 1 130px}
+.ar-lat{overflow-x:auto;max-width:100%;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.ar-lat svg{display:block;height:auto}
+.ar-lat .e{stroke:var(--line);stroke-width:1;opacity:.55}
+.ar-lat .e.on{stroke:var(--line-strong);stroke-width:1.2}
+.ar-lat .e.bad{stroke:var(--c-leak);stroke-width:2.2;stroke-dasharray:5 3}
+.ar-lat .n rect{stroke-width:1.5}
+.ar-lat .n text{font-size:12.5px;font-weight:700;text-anchor:middle}
+.ar-lat .n text.c{font-family:var(--mono);font-size:11px;font-weight:600}
+.ar-lat .n.ghost rect{fill:none;stroke:var(--line);stroke-dasharray:2 3}
+.ar-lat .n.ghost text{fill:var(--faint);opacity:.6}
+.ar-lat .n.hide{display:none}
+.ar-lat .n.cand rect{fill:color-mix(in srgb,var(--c-cv) 10%,var(--surface));stroke:var(--c-cv);stroke-dasharray:4 2}
+.ar-lat .n.cand text{fill:var(--ink)}
+.ar-lat .n.counted rect{fill:color-mix(in srgb,var(--c-cv) 18%,var(--surface));stroke:var(--c-cv)}
+.ar-lat .n.counted text{fill:var(--ink)}
+.ar-lat .n.freq rect{fill:color-mix(in srgb,var(--c-use) 24%,var(--surface));stroke:var(--c-use)}
+.ar-lat .n.freq text{fill:var(--ink)}
+.ar-lat .n.infreq rect{fill:var(--surface-2);stroke:var(--line-strong)}
+.ar-lat .n.infreq text{fill:var(--muted)}
+.ar-lat .n.pruned rect{fill:color-mix(in srgb,var(--c-leak) 7%,var(--surface));stroke:var(--c-leak);stroke-dasharray:3 2}
+.ar-lat .n.pruned text{fill:var(--muted)}
+.ar-lat .n.pruned line{stroke:var(--c-leak);stroke-width:2}
+.ar-lat .n.cur rect{stroke-width:2.6}
+.ar-lat .lvl{font-family:var(--mono);font-size:11px;fill:var(--faint);font-weight:600}
+.ar-sw{display:inline-block;width:14px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px;border:1.5px solid}
+.ar-sw.freq{background:color-mix(in srgb,var(--c-use) 24%,var(--surface));border-color:var(--c-use)}
+.ar-sw.infreq{background:var(--surface-2);border-color:var(--line-strong)}
+.ar-sw.pruned{background:color-mix(in srgb,var(--c-leak) 7%,var(--surface));border-color:var(--c-leak);border-style:dashed}
+.ar-sw.cand{background:color-mix(in srgb,var(--c-cv) 10%,var(--surface));border-color:var(--c-cv);border-style:dashed}
+.ar-sw.ghost{background:none;border-color:var(--line-strong);border-style:dotted}
+
+/* 규칙 */
+.ar-rt td.r{white-space:normal;min-width:190px}
+.ar-rt .arr{color:var(--faint);margin:0 4px}
+.ar-rt tr.sel td{background:color-mix(in srgb,var(--sk-accent) 12%,var(--surface))}
+.ar-link{appearance:none;border:0;background:none;font:inherit;color:var(--ink);text-align:left;padding:0;cursor:pointer;font-weight:600}
+.ar-link:hover{text-decoration:underline}
+.ar-link .arr{color:var(--faint);margin:0 4px}
+.ar-sc circle.p{stroke:var(--surface);stroke-width:1;cursor:pointer}
+.ar-sc circle.p.off{fill:var(--faint);opacity:.28;cursor:pointer}
+.ar-sc circle.p.sel{stroke:var(--ink);stroke-width:2.5}
+.ar-sc .th{stroke:var(--c-cv);stroke-width:1.6;stroke-dasharray:6 4}
+.ar-sc .thl{font-size:11.5px;fill:var(--c-cv);font-weight:700;paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round}
+.ar-net .ie{fill:none;stroke:var(--c-a);stroke-width:1.4;opacity:.55}
+.ar-net .oe{fill:none;stroke:var(--c-b);stroke-width:1.8;opacity:.8}
+.ar-net .item{fill:var(--surface);stroke:var(--line-strong);stroke-width:2}
+.ar-net .item.hl{stroke:var(--ink)}
+.ar-net .itl{font-size:12.5px;font-weight:700;fill:var(--ink)}
+.ar-net .rn{stroke:var(--surface);stroke-width:1.2;cursor:pointer}
+.ar-net .rn.sel{stroke:var(--ink);stroke-width:2.6}
+.ar-net .ah{fill:var(--c-b)}
+.ar-lg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);align-items:center}
+.ar-lg i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.ar-detail{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.ar-detail .sk-formula{background:var(--surface);font-size:12.5px}
+.ar-detail h3{margin:0;font-size:15px;overflow-wrap:anywhere}
+.ar-says{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.ar-says li{border-left:3px solid var(--c-b);padding:4px 10px;font-size:14.5px;line-height:1.6;background:color-mix(in srgb,var(--c-b) 6%,var(--surface));border-radius:0 8px 8px 0}
+.ar-says li.neg{border-left-color:var(--c-a);background:color-mix(in srgb,var(--c-a) 6%,var(--surface))}
+
+/* FP-Growth */
+.ar-freq{display:grid;grid-template-columns:minmax(0,auto) minmax(60px,1fr) auto auto;gap:5px 10px;align-items:center;font-size:13.5px}
+.ar-freq .nm{white-space:nowrap;font-weight:600}
+.ar-freq .bar{height:14px;border-radius:4px;background:var(--c-data)}
+.ar-freq .v{font-family:var(--mono);text-align:right}
+.ar-freq .off{opacity:.45}
+.ar-freq .off .bar{background:var(--faint)}
+.ar-freq .rk{font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap}
+.ar-fpt td{font-size:13px}
+.ar-fpt tr.cur td{background:color-mix(in srgb,var(--c-cv) 16%,var(--surface))}
+.ar-fpt tr.done td{color:var(--text)}
+.ar-fpt tr.todo td{color:var(--faint)}
+.ar-fpt td.p{white-space:normal;min-width:130px}
+.ar-fpt .gone{text-decoration:line-through;color:var(--faint)}
+.ar-tree{overflow-x:auto;max-width:100%;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.ar-tree svg{display:block;height:auto}
+.ar-tree .ed{stroke:var(--line-strong);stroke-width:1.5;fill:none}
+.ar-tree .ed.hl{stroke:var(--c-cv);stroke-width:3}
+.ar-tree .lk{fill:none;stroke:var(--faint);stroke-width:1.1;stroke-dasharray:3 3;opacity:.75}
+.ar-tree .lk.hl{stroke:var(--c-eval);stroke-width:1.8;opacity:1}
+.ar-tree .nd rect{fill:var(--surface);stroke:var(--line-strong);stroke-width:1.5}
+.ar-tree .nd text{font-size:12.5px;font-weight:600;fill:var(--ink);text-anchor:middle}
+.ar-tree .nd.root rect{fill:var(--surface-2);stroke-dasharray:3 2}
+.ar-tree .nd.root text{fill:var(--muted)}
+.ar-tree .nd.new rect{fill:color-mix(in srgb,var(--c-use) 22%,var(--surface));stroke:var(--c-use);stroke-width:2.4}
+.ar-tree .nd.inc rect{fill:color-mix(in srgb,var(--c-cv) 20%,var(--surface));stroke:var(--c-cv);stroke-width:2.4}
+.ar-tree .nd.hi rect{fill:color-mix(in srgb,var(--c-eval) 20%,var(--surface));stroke:var(--c-eval);stroke-width:2.2}
+.ar-tree .hd{font-size:12.5px;font-weight:600;fill:var(--ink)}
+.ar-tree .hd.hl{fill:var(--c-eval);font-weight:700}
+.ar-tree .hdc{font-family:var(--mono);font-size:12px;fill:var(--muted);text-anchor:end}
+.ar-tree .hbox{fill:var(--surface-2);stroke:var(--line)}
+.ar-tree .ht{font-size:11.5px;font-weight:700;fill:var(--muted)}
+.ar-fpbox{max-height:470px;overflow:auto;border:1px solid var(--line);border-radius:10px;position:relative}
+.ar-sets{display:flex;flex-wrap:wrap;gap:6px}
+.ar-sets span{font-size:13px;border:1.5px solid var(--c-use);border-radius:8px;padding:2px 8px;background:color-mix(in srgb,var(--c-use) 10%,var(--surface));color:var(--ink);white-space:nowrap}
+.ar-sets span b{font-family:var(--mono);margin-left:4px}
+.ar-cmp td.n b{color:var(--ink)}
+.ar-match{font-weight:700;color:var(--c-use)}
+.ar-mismatch{font-weight:700;color:var(--c-leak)}
+
+/* 최소 지지도 */
+.ar-chart .s1{fill:none;stroke:var(--c-use);stroke-width:2.4}
+.ar-chart .s2{fill:none;stroke:var(--c-b);stroke-width:2.4}
+.ar-chart .d1{fill:var(--c-use)} .ar-chart .d2{fill:var(--c-b)}
+.ar-chart .mk{stroke:var(--ink);stroke-width:1.5;stroke-dasharray:4 3}
+.ar-chart .mkl{font-family:var(--mono);font-size:11.5px;fill:var(--ink);font-weight:600}
+.ar-chart .sl{font-size:12px;font-weight:700}
+.ar-warns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:1000px){.ar-warns{grid-template-columns:minmax(0,1fr)}}
+.ar-warns .sk-note{display:flex;flex-direction:column;gap:6px}
+
+/* 코드 */
+.ar-code{margin:0;font-family:var(--mono);font-size:13px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow:auto;max-height:640px;white-space:pre;color:var(--ink);tab-size:4}
+.ar-code .cm{color:var(--muted)} .ar-code .kw{color:var(--c-cv);font-weight:600} .ar-code .st{color:var(--c-imp)} .ar-code .hl{background:color-mix(in srgb,var(--c-eval) 16%,transparent);border-radius:3px}
+
+@media (max-width:520px){
+  .sk-slider{min-width:0;width:100%}
+  .ar-bar{padding:10px 12px}
+  .ar-rule{font-size:17px}
+  .ar-tx td.wrap{min-width:180px}
+}
+@media (prefers-reduced-motion: reduce){ .ar-gauge .pt{transition:none} }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)" aria-current="page">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">연관분석 시뮬레이터 (Apriori · FP-Growth)</h1>
+      <p class="ds-hero__lede">환자별 동반 진단(고혈압, 당뇨, 고지혈증, 비만 …)을 거래 데이터로 보고, 지지도·신뢰도·향상도를 표에서 직접 세어 봅니다. Apriori의 후보 생성·가지치기와 FP-트리 구축·채굴을 한 단계씩 따라가고, 규칙 표·산점도·네트워크와 mlxtend 코드로 마무리합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <div class="ar-bar" aria-label="데이터 선택">
+    <span class="sk-label">데이터</span>
+    <div class="sk-seg" id="dsSeg" role="group" aria-label="데이터 선택">
+      <button type="button" data-v="small" aria-pressed="true">기본 12건</button>
+      <button type="button" data-v="big" aria-pressed="false">큰 데이터 200건</button>
+    </div>
+    <button type="button" class="sk-btn sk-btn--sm" id="dsSeed" hidden>다른 seed로 생성</button>
+    <button type="button" class="sk-btn sk-btn--sm" id="dsReset" hidden>원래 데이터로</button>
+    <span class="sum" id="dsSum"></span>
+  </div>
+
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button type="button" class="sk-tab" role="tab" id="tab-metric" aria-controls="pane-metric" aria-selected="true"><span class="sk-num">1</span>지표 이해</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-apriori" aria-controls="pane-apriori" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>Apriori 단계별</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-rules" aria-controls="pane-rules" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>규칙 생성</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-fp" aria-controls="pane-fp" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>FP-Growth</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-support" aria-controls="pane-support" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>최소 지지도 정하기</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>코드</button>
+  </nav>
+
+  <!-- ================= 1. 지표 이해 ================= -->
+  <section id="pane-metric" role="tabpanel" aria-labelledby="tab-metric">
+    <div class="ar-g2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>규칙 A → B 고르기</h2><span class="sk-hint">항목을 눌러 A(조건)·B(결과)에 넣고 빼기</span></div>
+        <div class="sk-controls">
+          <span class="sk-label">예시</span>
+          <div class="sk-group">
+            <button type="button" class="sk-btn sk-btn--sm" data-preset="strong">강한 연관</button>
+            <button type="button" class="sk-btn sk-btn--sm" data-preset="trap">함정: 신뢰도 높은데 lift≈1</button>
+            <button type="button" class="sk-btn sk-btn--sm" data-preset="neg">음의 연관</button>
+          </div>
+        </div>
+        <div class="ar-pick">
+          <span class="lb ar-a">A (조건)</span><div class="ar-chips" id="pickA" role="group" aria-label="A에 넣을 항목"></div>
+          <span class="lb ar-b">B (결과)</span><div class="ar-chips" id="pickB" role="group" aria-label="B에 넣을 항목"></div>
+        </div>
+        <div class="ar-rule" id="m1Rule" aria-live="polite"></div>
+        <div class="ar-metrics" id="m1Stats"></div>
+        <div class="ar-svgbox" id="m1Venn" style="max-width:440px"></div>
+        <div class="sk-formula ar-f" id="m1Formula"></div>
+        <div class="ar-gauge" id="m1Gauge"></div>
+        <p class="ar-say" id="m1Say"></p>
+        <div id="m1Warn"></div>
+      </div>
+
+      <div class="sk-card">
+        <div class="sk-head"><h2>거래 표</h2><span class="sk-hint" id="m1Count"></span></div>
+        <div class="sk-controls">
+          <div class="sk-seg" id="m1View" role="group" aria-label="표 형식">
+            <button type="button" data-v="list" aria-pressed="true">거래 목록</button>
+            <button type="button" data-v="onehot" aria-pressed="false">원-핫 행렬</button>
+          </div>
+          <div class="sk-group"><span class="sk-label">보기</span>
+            <div class="sk-seg" id="m1Filt" role="group" aria-label="행 거르기">
+              <button type="button" data-v="all" aria-pressed="true">전체</button>
+              <button type="button" data-v="a" aria-pressed="false">A 포함</button>
+              <button type="button" data-v="ab" aria-pressed="false">A와 B 모두</button>
+            </div></div>
+        </div>
+        <div class="sk-legend">
+          <span><i style="background:color-mix(in srgb,var(--c-ab) 40%,var(--surface))"></i>A와 B 모두 포함</span>
+          <span><i style="background:color-mix(in srgb,var(--c-a) 30%,var(--surface))"></i>A만 포함</span>
+          <span><i style="background:color-mix(in srgb,var(--c-b) 30%,var(--surface))"></i>B만 포함</span>
+        </div>
+        <div class="ar-tscroll" id="m1TableBox"><table class="sk-table ar-tx" id="m1Table"></table></div>
+        <div class="sk-controls">
+          <button type="button" class="sk-btn sk-btn--sm" id="m1AddTx">새 거래 추가</button>
+          <div class="sk-group">
+            <label class="sk-label" for="m1NewItem">새 항목</label>
+            <input class="sk-input" id="m1NewItem" type="text" maxlength="12" placeholder="예: 빈혈" style="width:120px">
+            <button type="button" class="sk-btn sk-btn--sm" id="m1NewItemBtn">항목 목록에 추가</button>
+          </div>
+          <span class="sk-hint" id="m1Msg" aria-live="polite"></span>
+        </div>
+        <p class="sk-hint" style="margin:0">칩의 × 로 진단 삭제, 오른쪽 목록으로 진단 추가. 바꾼 데이터는 모든 화면과 코드에 바로 반영됩니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 2. Apriori ================= -->
+  <section id="pane-apriori" role="tabpanel" aria-labelledby="tab-apriori" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>Apriori: 후보 만들기 → 가지치기 → 세기 → 거르기를 반복</h2><span class="sk-hint">키보드 <span class="ar-kbd">→</span> 다음 단계</span></div>
+      <div class="sk-controls">
+        <div class="sk-slider"><div class="sk-sl-head"><label for="apMs">최소 지지도 min_support</label><b class="js-msv">0.25</b></div><input type="range" class="js-ms" id="apMs" min="0.02" max="0.6" step="0.01" value="0.25"></div>
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--sm" id="apFirst">처음</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="apPrev">이전</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="apNext">다음</button>
+          <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="apPlay">재생</button>
+        </div>
+        <div class="sk-slider" style="min-width:140px"><div class="sk-sl-head"><label for="apSpeed">속도</label><b id="apSpeedV">1×</b></div><input type="range" id="apSpeed" min="0.5" max="4" step="0.5" value="1"></div>
+      </div>
+      <ol class="sk-stepper" id="apStepper" aria-label="Apriori 단계"></ol>
+      <p class="ar-cap" id="apCap" aria-live="polite"></p>
+      <div class="sk-stats ar-stats4" id="apStats"></div>
+      <div class="ar-gside">
+        <div class="ar-col">
+          <h3 id="apTblTitle">후보</h3>
+          <div class="sk-scroll" style="max-height:360px;overflow:auto"><table class="sk-table ar-ct" id="apTbl"></table></div>
+        </div>
+        <div class="ar-col">
+          <h3>단계별 요약</h3>
+          <div class="sk-scroll"><table class="sk-table ar-lv" id="apLv"></table></div>
+        </div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>항목 집합 격자 (Hasse 다이어그램)</h2><span class="sk-hint" id="apLatHint"></span></div>
+      <div class="sk-legend">
+        <span><span class="ar-sw freq"></span>빈발 (최소 지지도 통과)</span>
+        <span><span class="ar-sw infreq"></span>세었지만 비빈발</span>
+        <span><span class="ar-sw pruned"></span>가지치기 × (세지도 않음)</span>
+        <span><span class="ar-sw cand"></span>후보 (아직 안 셈)</span>
+        <span><span class="ar-sw ghost"></span>후보로 만들어지지도 않음</span>
+      </div>
+      <div class="ar-lat" id="apLat" role="img" aria-label="항목 집합 격자"></div>
+      <p class="sk-hint" id="apAbbr" style="margin:0"></p>
+    </div>
+  </section>
+
+  <!-- ================= 3. 규칙 생성 ================= -->
+  <section id="pane-rules" role="tabpanel" aria-labelledby="tab-rules" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>빈발 항목 집합 → 연관규칙</h2><span class="sk-hint">빈발 집합 X를 A ∪ B로 나누어 만든 모든 규칙 중 기준을 넘는 것만</span></div>
+      <div class="sk-controls">
+        <div class="sk-slider"><div class="sk-sl-head"><label for="ruMs">최소 지지도</label><b class="js-msv">0.25</b></div><input type="range" class="js-ms" id="ruMs" min="0.02" max="0.6" step="0.01" value="0.25"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="ruMc">최소 신뢰도 min_confidence</label><b class="js-mcv">0.60</b></div><input type="range" class="js-mc" id="ruMc" min="0" max="1" step="0.05" value="0.6"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="ruMl">최소 향상도 min_lift</label><b class="js-mlv">1.20</b></div><input type="range" class="js-ml" id="ruMl" min="0" max="3" step="0.1" value="1.2"></div>
+        <div class="sk-group"><span class="sk-label">정렬</span>
+          <div class="sk-seg" id="ruSort" role="group" aria-label="정렬 기준">
+            <button type="button" data-v="sup" aria-pressed="false">지지도</button>
+            <button type="button" data-v="conf" aria-pressed="false">신뢰도</button>
+            <button type="button" data-v="lift" aria-pressed="true">향상도</button>
+          </div></div>
+      </div>
+      <div class="sk-stats" id="ruStats"></div>
+      <div class="ar-g2">
+        <div class="ar-col">
+          <h3>규칙 표 <span class="sk-hint">규칙을 누르면 오른쪽 아래에 계산 과정</span></h3>
+          <div class="ar-tscroll" style="max-height:430px"><table class="sk-table ar-rt" id="ruTbl"></table></div>
+        </div>
+        <div class="ar-col">
+          <h3>규칙 산점도 <span class="sk-hint">x = 지지도, y = 신뢰도, 색·크기 = 향상도 · 점을 누르면 상세</span></h3>
+          <div class="ar-svgbox" id="ruScatter"></div>
+          <div class="ar-lg" id="ruLg"></div>
+        </div>
+      </div>
+    </div>
+    <div class="ar-gside ar-gnet">
+      <div class="sk-card">
+        <div class="sk-head"><h2>규칙 네트워크</h2><span class="sk-hint" id="ruNetHint"></span></div>
+        <div class="ar-svgbox" id="ruNet" style="max-width:640px;margin:0 auto"></div>
+        <div class="ar-lg"><span><i style="background:var(--c-a)"></i>조건 항목 → 규칙</span><span><i style="background:var(--c-b)"></i>규칙 → 결과 항목</span><span>규칙 점 크기 = 지지도, 색 = 향상도</span></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>선택한 규칙</h2></div>
+        <div class="ar-detail" id="ruDetail"></div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>자동 해석</h2><span class="sk-hint">정렬 기준 상위 3개 규칙</span></div>
+      <ul class="ar-says" id="ruSay"></ul>
+      <p class="sk-note ar-note-warn" style="margin:0"><b>읽을 때 주의</b> — 규칙은 "함께 나타난다"는 뜻일 뿐, A가 B의 원인이라는 뜻이 아닙니다. 진료 의사결정에 쓰려면 임상적 근거와 별도 검증이 필요합니다.</p>
+    </div>
+  </section>
+
+  <!-- ================= 4. FP-Growth ================= -->
+  <section id="pane-fp" role="tabpanel" aria-labelledby="tab-fp" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>① 스캔 1: 항목 빈도 세기 → 빈도순 정렬</h2><span class="sk-hint">최소 개수 미만 항목은 이 단계에서 버립니다</span></div>
+      <div class="sk-controls">
+        <div class="sk-slider"><div class="sk-sl-head"><label for="fpMs">최소 지지도</label><b class="js-msv">0.25</b></div><input type="range" class="js-ms" id="fpMs" min="0.02" max="0.6" step="0.01" value="0.25"></div>
+        <span class="sk-hint" id="fpMinTxt"></span>
+      </div>
+      <div class="ar-freq" id="fpFreq"></div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>② 스캔 2: 거래를 한 건씩 넣어 FP-트리 만들기</h2><span class="sk-hint">키보드 <span class="ar-kbd">→</span> 다음 거래</span></div>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button type="button" class="sk-btn sk-btn--sm" id="fpFirst">처음</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="fpPrev">이전</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="fpNext">다음</button>
+          <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="fpPlay">재생</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="fpEnd">끝까지</button>
+        </div>
+        <div class="sk-slider" style="min-width:140px"><div class="sk-sl-head"><label for="fpSpeed">속도</label><b id="fpSpeedV">1×</b></div><input type="range" id="fpSpeed" min="0.5" max="8" step="0.5" value="1"></div>
+        <span class="sk-hint" id="fpProg"></span>
+      </div>
+      <p class="ar-cap" id="fpCap" aria-live="polite"></p>
+      <div class="sk-legend">
+        <span><i style="background:color-mix(in srgb,var(--c-use) 40%,var(--surface))"></i>새로 만든 노드</span>
+        <span><i style="background:color-mix(in srgb,var(--c-cv) 40%,var(--surface))"></i>공유 접두 경로 (개수 +1)</span>
+        <span><i style="background:none;border:1.5px dashed var(--faint)"></i>헤더 테이블 → 같은 항목 노드 연결(node-link)</span>
+      </div>
+      <div class="ar-gfp">
+        <div class="ar-fpbox" id="fpTxBox"><table class="sk-table ar-fpt" id="fpTx"></table></div>
+        <div class="ar-tree" id="fpTree" role="img" aria-label="FP-트리"></div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>③ 한 항목씩 채굴: 조건부 패턴 베이스 → 조건부 FP-트리</h2><span class="sk-hint">헤더 테이블의 아래(빈도 낮은 항목)부터</span></div>
+      <div class="sk-controls"><span class="sk-label">항목</span><div class="sk-seg" id="fpItemSeg" role="group" aria-label="채굴할 항목" style="flex-wrap:wrap"></div></div>
+      <div class="ar-g2">
+        <div class="ar-col">
+          <h3 id="fpBaseTitle">조건부 패턴 베이스</h3>
+          <div class="sk-scroll"><table class="sk-table" id="fpBase"></table></div>
+          <div class="sk-formula ar-f" id="fpCondCnt"></div>
+          <h3>찾은 빈발 항목 집합</h3>
+          <div class="ar-sets" id="fpMined"></div>
+        </div>
+        <div class="ar-col">
+          <h3 id="fpCondTitle">조건부 FP-트리</h3>
+          <div class="ar-tree" id="fpCond" role="img" aria-label="조건부 FP-트리"></div>
+          <p class="sk-hint" style="margin:0">조건부 트리에 경로가 여러 갈래면 같은 방법을 재귀적으로 반복합니다. 후보를 만들어 세는 과정이 없습니다.</p>
+        </div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>④ Apriori와 비교</h2><span class="sk-hint" id="fpCmpHint"></span></div>
+      <div class="sk-stats" id="fpCmpStats"></div>
+      <div class="ar-tscroll" style="max-height:380px"><table class="sk-table ar-cmp" id="fpCmp"></table></div>
+    </div>
+  </section>
+
+  <!-- ================= 5. 최소 지지도 정하기 ================= -->
+  <section id="pane-support" role="tabpanel" aria-labelledby="tab-support" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>기준값을 바꾸면 빈발 집합·규칙 수가 어떻게 변할까</h2><span class="sk-hint">점선 = 현재 설정</span></div>
+      <div class="sk-controls">
+        <div class="sk-slider"><div class="sk-sl-head"><label for="spMs">최소 지지도</label><b class="js-msv">0.25</b></div><input type="range" class="js-ms" id="spMs" min="0.02" max="0.6" step="0.01" value="0.25"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="spMc">최소 신뢰도</label><b class="js-mcv">0.60</b></div><input type="range" class="js-mc" id="spMc" min="0" max="1" step="0.05" value="0.6"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="spMl">최소 향상도</label><b class="js-mlv">1.20</b></div><input type="range" class="js-ml" id="spMl" min="0" max="3" step="0.1" value="1.2"></div>
+        <div class="sk-group"><span class="sk-label">y축</span>
+          <div class="sk-seg" id="spScale" role="group" aria-label="y축 눈금"><button type="button" data-v="lin" aria-pressed="true">선형</button><button type="button" data-v="log" aria-pressed="false">로그</button></div></div>
+      </div>
+      <div class="sk-stats" id="spStats"></div>
+      <div class="ar-g2">
+        <div class="ar-col"><h3>min_support에 따른 개수</h3><div class="ar-svgbox ar-chart" id="spChart1"></div></div>
+        <div class="ar-col"><h3>min_confidence에 따른 규칙 수 <span class="sk-hint">현재 최소 지지도·향상도에서</span></h3><div class="ar-svgbox ar-chart" id="spChart2"></div></div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>해석할 때 주의할 점</h2></div>
+      <div class="ar-warns">
+        <div class="sk-note ar-note-warn" id="spFlood"></div>
+        <div class="sk-note ar-note-cv" id="spCause"></div>
+        <div class="sk-note" id="spRare"></div>
+      </div>
+      <h3>현재 최소 지지도에서 빠진 "희귀하지만 강한" 조합</h3>
+      <div class="sk-scroll"><table class="sk-table ar-rt" id="spRareTbl"></table></div>
+    </div>
+  </section>
+
+  <!-- ================= 6. 코드 ================= -->
+  <section id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>현재 데이터·설정을 mlxtend 코드로</h2><span class="sk-hint" id="cHint"></span></div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">규칙 기준 metric</span>
+          <div class="sk-seg" id="cMetric" role="group" aria-label="association_rules metric"><button type="button" data-v="lift" aria-pressed="true">lift</button><button type="button" data-v="confidence" aria-pressed="false">confidence</button></div></div>
+        <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="cCopy">코드 복사</button>
+        <span class="sk-hint" id="cCopyMsg" aria-live="polite"></span>
+      </div>
+      <pre class="ar-code" id="cCode" tabindex="0" aria-label="생성된 파이썬 코드"></pre>
+      <div class="ar-g2">
+        <p class="sk-note"><b>TransactionEncoder</b> — 거래 목록(리스트의 리스트)을 거래 × 항목의 True/False 표(원-핫 행렬)로 바꿉니다. 열 이름은 항목을 가나다순으로 정렬한 것입니다.</p>
+        <p class="sk-note ar-note-cv"><b>apriori · fpgrowth</b> — 같은 min_support면 결과(빈발 항목 집합과 지지도)가 같습니다. 차이는 속도: 항목·거래가 많을수록 FP-Growth가 유리합니다.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20260930c"></script>
+<script>
+(function () {
+"use strict";
+const $ = id => document.getElementById(id);
+const RM = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const f3 = v => !isFinite(v) ? (v>0?"∞":"−∞") : (Math.abs(v)<5e-4?0:v).toFixed(3).replace("-","−");
+const f2 = v => !isFinite(v) ? (v>0?"∞":"−∞") : (Math.abs(v)<5e-3?0:v).toFixed(2).replace("-","−");
+function pct(v){const p=v*100,r=Math.round(p);return (Math.abs(p-r)<0.05?String(r):p.toFixed(1))+"%";}
+function segInit(el,onChange){el.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{segSet(el,b.dataset.v);onChange(b.dataset.v);}));}
+function segSet(el,v){el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x.dataset.v===String(v)?"true":"false"));}
+function hasBatchim(w){const c=w.charCodeAt(w.length-1);if(c>=0xAC00&&c<=0xD7A3)return (c-0xAC00)%28!==0;return /[013678LMNRlmnr]$/.test(w);}
+const jo=(w,a,b)=>w+(hasBatchim(w)?a:b);
+function andList(ns){if(ns.length===1)return ns[0];return ns.slice(0,-2).map(n=>n+", ").join("")+jo(ns[ns.length-2],"과","와")+" "+ns[ns.length-1];}
+
+/* ============================================================
+   알고리즘 (순수 JS)
+   ============================================================ */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const BASE_ITEMS=[["고혈압","혈"],["당뇨","당"],["고지혈증","지"],["비만","비"],["지방간","간"],["수면무호흡","수"],["통풍","통"],["만성신장병","신"],["골다공증","골"],["갑상선질환","갑"]];
+/* 기본 12건: 손으로 따라갈 수 있는 크기 */
+const SMALL=[["고혈압","당뇨","고지혈증"],["고혈압","당뇨","고지혈증","비만"],["고혈압","당뇨","고지혈증"],["고혈압","고지혈증","수면무호흡"],["고혈압","당뇨"],["비만","지방간","수면무호흡"],["비만","지방간"],["고혈압","비만","지방간","수면무호흡"],["고혈압","수면무호흡"],["고혈압","비만"],["당뇨","비만","지방간"],["고혈압","수면무호흡"]];
+/* 큰 데이터: 숨은 규칙 — 고혈압+고지혈증 → 당뇨, 비만 → 지방간·수면무호흡, 통풍 → 만성신장병(희귀), 고혈압은 원래 흔함 */
+function genBig(seed,n){
+  const r=mulberry32(seed),B=p=>r()<p,out=[];
+  while(out.length<n){
+    const ob=B(.34), t=[];
+    const H=B(ob?.86:.64), L=B(ob?.5:.3), D=B(H&&L?.8:.24), F=B(ob?.72:.1), S=B(ob?.5:.06);
+    const G=B(.055), K=B(G?.82:.025), O=B(ob?.04:.2), T=B(.11);
+    if(H)t.push("고혈압");if(D)t.push("당뇨");if(L)t.push("고지혈증");if(ob)t.push("비만");if(F)t.push("지방간");if(S)t.push("수면무호흡");
+    if(G)t.push("통풍");if(K)t.push("만성신장병");if(O)t.push("골다공증");if(T)t.push("갑상선질환");
+    if(t.length)out.push(t);
+  }
+  return out;
+}
+const keyOf=a=>a.join(",");
+function encode(trans,vocab){const idx=new Map(vocab.map((v,i)=>[v,i]));return trans.map(t=>[...new Set(t.map(x=>idx.get(x)))].sort((a,b)=>a-b));}
+function countSets(T,cands){return cands.map(c=>{let n=0;for(const t of T){let ok=true;for(const x of c){if(!t.includes(x)){ok=false;break;}}if(ok)n++;}return n;});}
+function minCountOf(ms,N){return Math.max(1,Math.ceil(ms*N-1e-9));}
+/* Apriori: 단계마다 무슨 일이 일어났는지 기록 */
+function aprioriTrace(T,nItems,minCnt){
+  const steps=[],info=new Map(),levels=[];let scans=0,counted=0,prunedTot=0;
+  const present=[];for(let i=0;i<nItems;i++)if(T.some(t=>t.includes(i)))present.push(i);
+  steps.push({type:"start",k:1});
+  const C=present.map(i=>[i]);const cnt=countSets(T,C);scans++;counted+=C.length;
+  const s1=steps.length;steps.push({type:"count",k:1,scan:scans,n:C.length});
+  C.forEach((c,j)=>info.set(keyOf(c),{set:c,k:1,joined:s1,pruned:-1,reason:null,counted:s1,count:cnt[j],decided:s1+1,freq:cnt[j]>=minCnt}));
+  let L=C.filter((c,j)=>cnt[j]>=minCnt);
+  steps.push({type:"select",k:1,n:L.length,end:!L.length});
+  levels.push({k:1,joined:C.length,pruned:0,counted:C.length,freq:L.length,cands:C.map(keyOf),sJoin:s1});
+  let k=2;
+  while(L.length){
+    const Lset=new Set(L.map(keyOf)),J=[];
+    for(let a=0;a<L.length;a++)for(let b=a+1;b<L.length;b++){
+      const x=L[a],y=L[b];let same=true;for(let q=0;q<k-2;q++)if(x[q]!==y[q]){same=false;break;}
+      if(!same)continue;J.push(x.slice(0,k-2).concat(x[k-2]<y[k-2]?[x[k-2],y[k-2]]:[y[k-2],x[k-2]]));
+    }
+    J.sort((p,q)=>{for(let i=0;i<p.length;i++)if(p[i]!==q[i])return p[i]-q[i];return 0;});
+    const sj=steps.length;steps.push({type:"join",k,n:J.length});
+    if(!J.length){steps[sj].end=true;levels.push({k,joined:0,pruned:0,counted:0,freq:0,cands:[],sJoin:sj});break;}
+    const sp=steps.length;steps.push({type:"prune",k});
+    const keep=[];let np=0;
+    J.forEach(c=>{
+      let bad=null;for(let d=0;d<c.length;d++){const sub=c.slice(0,d).concat(c.slice(d+1));if(!Lset.has(keyOf(sub))){bad=sub;break;}}
+      info.set(keyOf(c),{set:c,k,joined:sj,pruned:bad?sp:-1,reason:bad,counted:-1,count:null,decided:-1,freq:false});
+      if(bad)np++;else keep.push(c);
+    });
+    prunedTot+=np;steps[sp].n=np;steps[sp].keep=keep.length;
+    if(!keep.length){steps[sp].end=true;levels.push({k,joined:J.length,pruned:np,counted:0,freq:0,cands:J.map(keyOf),sJoin:sj});break;}
+    const ck=countSets(T,keep);scans++;counted+=keep.length;
+    const sc=steps.length;steps.push({type:"count",k,scan:scans,n:keep.length});
+    keep.forEach((c,j)=>{const o=info.get(keyOf(c));o.counted=sc;o.count=ck[j];o.decided=sc+1;o.freq=ck[j]>=minCnt;});
+    L=keep.filter((c,j)=>ck[j]>=minCnt);
+    steps.push({type:"select",k,n:L.length,end:!L.length});
+    levels.push({k,joined:J.length,pruned:np,counted:keep.length,freq:L.length,cands:J.map(keyOf),sJoin:sj});
+    k++;
+  }
+  let sc2=0,cc=0,pp=0,ff=0;const vals=[...info.values()];
+  steps.forEach((s,i)=>{
+    if(s.type==="count"){sc2=s.scan;cc+=s.n;}
+    if(s.type==="prune")pp+=s.n;
+    if(s.type==="select")ff+=vals.filter(o=>o.decided===i&&o.freq).length;
+    s.scans=sc2;s.countedSoFar=cc;s.prunedSoFar=pp;s.freqSoFar=ff;
+  });
+  const freq=vals.filter(o=>o.freq).map(o=>({set:o.set,count:o.count}));
+  return{steps,info,levels,freq,scans,counted,pruned:prunedTot,present,minCnt};
+}
+/* FP-트리 */
+function fpOrder(T,nItems,minCnt){
+  const c=new Array(nItems).fill(0);T.forEach(t=>t.forEach(x=>c[x]++));
+  const items=[];for(let i=0;i<nItems;i++)if(c[i]>=minCnt)items.push(i);
+  items.sort((a,b)=>c[b]-c[a]||a-b);
+  const rank=new Map(items.map((x,i)=>[x,i]));
+  const sorted=T.map(t=>t.filter(x=>rank.has(x)).sort((a,b)=>rank.get(a)-rank.get(b)));
+  return{counts:c,items,rank,sorted};
+}
+function fpNew(){return{root:{item:-1,count:0,children:[],parent:null,id:0},nodes:[],links:new Map(),nid:1};}
+function fpInsert(tree,path,w){
+  let cur=tree.root;const touched=[];
+  for(const x of path){
+    let ch=cur.children.find(c=>c.item===x);
+    if(ch){ch.count+=w;touched.push({node:ch,isNew:false});}
+    else{ch={item:x,count:w,children:[],parent:cur,id:tree.nid++};cur.children.push(ch);tree.nodes.push(ch);
+      if(!tree.links.has(x))tree.links.set(x,[]);tree.links.get(x).push(ch);touched.push({node:ch,isNew:true});}
+    cur=ch;
+  }
+  return touched;
+}
+function fpBuild(paths,weights){const tr=fpNew();paths.forEach((p,i)=>fpInsert(tr,p,weights?weights[i]:1));return tr;}
+function patternBase(tree,item){return(tree.links.get(item)||[]).map(n=>{const p=[];let c=n.parent;while(c&&c.item!==-1){p.unshift(c.item);c=c.parent;}return{path:p,count:n.count};});}
+function condTree(base,minCnt,rank){
+  const c=new Map();base.forEach(b=>b.path.forEach(x=>c.set(x,(c.get(x)||0)+b.count)));
+  const keep=new Set([...c.keys()].filter(x=>c.get(x)>=minCnt));
+  const paths=base.map(b=>b.path.filter(x=>keep.has(x)).sort((a,b2)=>rank.get(a)-rank.get(b2)));
+  return{tree:fpBuild(paths,base.map(b=>b.count)),counts:c,keep};
+}
+function fpMine(tree,minCnt,rank,suffix,out,stat){
+  const items=[...tree.links.keys()].sort((a,b)=>rank.get(b)-rank.get(a));
+  for(const x of items){
+    const sup=tree.links.get(x).reduce((s,n)=>s+n.count,0);if(sup<minCnt)continue;
+    const set=[x].concat(suffix);out.push({set:set.slice().sort((a,b)=>a-b),count:sup});
+    const ct=condTree(patternBase(tree,x),minCnt,rank);stat.trees++;
+    if(ct.tree.nodes.length)fpMine(ct.tree,minCnt,rank,set,out,stat);
+  }
+  return out;
+}
+/* 연관규칙: 빈발 집합 X를 A ∪ B (A, B 공집합 아님)로 나눈 모든 경우 */
+function makeRules(freq,N){
+  const sup=new Map(freq.map(f=>[keyOf(f.set),f.count])),R=[];
+  freq.forEach(f=>{
+    const s=f.set,k=s.length;if(k<2)return;
+    for(let m=1;m<(1<<k)-1;m++){
+      const A=[],B=[];for(let i=0;i<k;i++)((m>>i)&1?A:B).push(s[i]);
+      R.push(metricsOf(sup.get(keyOf(A)),sup.get(keyOf(B)),f.count,N,A,B));
+    }
+  });
+  return R;
+}
+function metricsOf(nA,nB,nAB,N,A,B){
+  const sA=nA/N,sB=nB/N,sAB=nAB/N,conf=nA?nAB/nA:NaN,lift=nA&&nB?conf/sB:NaN;
+  return{A,B,key:(A?keyOf(A)+">"+keyOf(B):""),nA,nB,nAB,N,sup:sAB,sA,sB,conf,lift,lev:sAB-sA*sB,conv:!nA?NaN:(conf>=1-1e-12?Infinity:(1-sB)/(1-conf))};
+}
+const passRule=r=>r.conf>=S.mc-1e-9&&r.lift>=S.ml-1e-9;
+
+/* ============================================================
+   상태
+   ============================================================ */
+const PRESET={
+  small:{strong:[["고혈압","고지혈증"],["당뇨"]],trap:[["수면무호흡"],["고혈압"]],neg:[["지방간"],["고혈압"]]},
+  big:{strong:[["고혈압","고지혈증"],["당뇨"]],trap:[["수면무호흡"],["고혈압"]],neg:[["골다공증"],["비만"]]}
+};
+const S={ds:"small",seed:20261002,edited:false,ver:0,vocab:BASE_ITEMS.map(([n,a])=>({n,a})),trans:[],
+  ms:.25,mc:.6,ml:1.2,A:[],B:[],view:"list",filt:"all",sort:"lift",sel:null,ylog:false,fpItem:null,metric:"lift"};
+const vIdx=()=>new Map(S.vocab.map((v,i)=>[v.n,i]));
+const nm=i=>S.vocab[i].n, ab=i=>S.vocab[i].a;
+const setTxt=a=>"{"+a.map(nm).join(", ")+"}";
+function loadDS(){
+  S.trans=S.ds==="small"?SMALL.map(t=>t.slice()):genBig(S.seed,200);
+  S.edited=false;S.ver++;S.ms=S.ds==="small"?.25:.10;S.sel=null;S.fpItem=null;
+  applyPreset("strong",true);syncSliders();
+}
+function applyPreset(p,silent){const q=PRESET[S.ds][p];S.A=q[0].slice();S.B=q[1].slice();if(!silent)renderMetric();}
+function dataChanged(){S.edited=true;S.ver++;MC=null;LOWC=null;S.sel=null;renderBar();renderCur();}
+
+/* 계산 결과 캐시 */
+let MC=null,LOWC=null;
+function M(){
+  const key=S.ver+"|"+S.ms;if(MC&&MC.key===key)return MC;
+  const vocab=S.vocab.map(v=>v.n),T=encode(S.trans,vocab),N=T.length,nI=vocab.length,minCnt=minCountOf(S.ms,N);
+  const ap=aprioriTrace(T,nI,minCnt);
+  const fo=fpOrder(T,nI,minCnt),tree=fpBuild(fo.sorted),st={trees:0},fpm=fpMine(tree,minCnt,fo.rank,[],[],st);
+  const rules=makeRules(ap.freq,N);
+  MC={key,T,N,minCnt,ap,fo,tree,fpm,fpTrees:st.trees,rules};return MC;
+}
+function LOW(){
+  if(LOWC&&LOWC.ver===S.ver)return LOWC;
+  const m=M(),mc=minCountOf(0.02,m.N),ap=aprioriTrace(m.T,S.vocab.length,mc);
+  LOWC={ver:S.ver,mc,sets:ap.freq,rules:makeRules(ap.freq,m.N)};return LOWC;
+}
+function countIn(T,set){let n=0;for(const t of T){if(set.every(x=>t.includes(x)))n++;}return n;}
+
+/* ---------- 슬라이더 동기화 ---------- */
+function syncSliders(){
+  document.querySelectorAll(".js-ms").forEach(e=>e.value=S.ms);document.querySelectorAll(".js-msv").forEach(e=>e.textContent=S.ms.toFixed(2));
+  document.querySelectorAll(".js-mc").forEach(e=>e.value=S.mc);document.querySelectorAll(".js-mcv").forEach(e=>e.textContent=S.mc.toFixed(2));
+  document.querySelectorAll(".js-ml").forEach(e=>e.value=S.ml);document.querySelectorAll(".js-mlv").forEach(e=>e.textContent=S.ml.toFixed(2));
+}
+document.querySelectorAll(".js-ms").forEach(e=>e.addEventListener("input",()=>{S.ms=+e.value;syncSliders();AP.toEnd=true;FP.toEnd=true;renderBar();renderCur();}));
+document.querySelectorAll(".js-mc").forEach(e=>e.addEventListener("input",()=>{S.mc=+e.value;syncSliders();renderCur();}));
+document.querySelectorAll(".js-ml").forEach(e=>e.addEventListener("input",()=>{S.ml=+e.value;syncSliders();renderCur();}));
+
+/* ---------- 데이터 막대 ---------- */
+function renderBar(){
+  const m=M(),present=new Set();S.trans.forEach(t=>t.forEach(x=>present.add(x)));
+  const avg=m.N?S.trans.reduce((s,t)=>s+t.length,0)/m.N:0;
+  $("dsSum").innerHTML=`거래 <b>${m.N}</b>건 · 항목 <b>${present.size}</b>개 · 거래당 평균 <b>${avg.toFixed(1)}</b>개 · 최소 지지도 <b>${S.ms.toFixed(2)}</b> = <b>${m.minCnt}</b>건 이상${S.edited?' <span class="ar-tag">편집됨</span>':""}`;
+  $("dsSeed").hidden=S.ds!=="big";$("dsReset").hidden=!S.edited;
+}
+segInit($("dsSeg"),v=>{S.ds=v;loadDS();MC=null;LOWC=null;AP.step=0;FP.toEnd=true;renderBar();renderCur();});
+$("dsSeed").onclick=()=>{S.seed=(S.seed*7+13)%1000000007;loadDS();MC=null;LOWC=null;AP.step=0;FP.toEnd=true;renderBar();renderCur();};
+$("dsReset").onclick=()=>{const keepMs=S.ms;loadDS();S.ms=keepMs;syncSliders();MC=null;LOWC=null;renderBar();renderCur();};
+
+/* ============================================================
+   공통 그림: 벤 다이어그램 · 수식
+   ============================================================ */
+let clipN=0;
+function vennSVG(nA,nB,nAB,N,la,lb){
+  const W=380,H=226,cx1=148,cx2=232,cy=122,r=74,id="vc"+(++clipN);
+  return `<svg viewBox="0 0 ${W} ${H}" class="ar-svg" role="img" aria-label="벤 다이어그램: A ${nA}건, B ${nB}건, 둘 다 ${nAB}건, 전체 ${N}건">
+  <defs><clipPath id="${id}"><circle cx="${cx1}" cy="${cy}" r="${r}"/></clipPath></defs>
+  <rect class="u" x="3" y="3" width="${W-6}" height="${H-6}" rx="12"/>
+  <text class="t-s" x="16" y="24">전체 거래 N = ${N}</text>
+  <circle class="ca" cx="${cx1}" cy="${cy}" r="${r}"/><circle class="cb" cx="${cx2}" cy="${cy}" r="${r}"/>
+  <circle class="cab" cx="${cx2}" cy="${cy}" r="${r}" clip-path="url(#${id})" opacity=".9"/>
+  <circle cx="${cx1}" cy="${cy}" r="${r}" fill="none" stroke="var(--c-a)" stroke-width="2"/><circle cx="${cx2}" cy="${cy}" r="${r}" fill="none" stroke="var(--c-b)" stroke-width="2"/>
+  <text class="t-n" x="${cx1-38}" y="${cy+7}">${nA-nAB}</text><text class="t-n" x="${(cx1+cx2)/2}" y="${cy+7}">${nAB}</text><text class="t-n" x="${cx2+38}" y="${cy+7}">${nB-nAB}</text>
+  <text class="t-l t-a" x="${cx1-34}" y="${cy-r+20}">A</text><text class="t-l t-b" x="${cx2+34}" y="${cy-r+20}">B</text>
+  <text class="t-l t-ab" x="${(cx1+cx2)/2}" y="${cy+26}" style="font-size:11px">둘 다</text>
+  <text class="t-s" x="${W-14}" y="24" text-anchor="end">둘 다 없음 ${N-nA-nB+nAB}</text>
+  <text class="t-s" x="14" y="${H-12}" style="fill:var(--c-a)">${esc(la)} ${nA}건</text>
+  <text class="t-s" x="${W-14}" y="${H-12}" text-anchor="end" style="fill:var(--c-b)">${esc(lb)} ${nB}건</text>
+  </svg>`;
+}
+function formulaHTML(r){
+  const {nA,nB,nAB,N}=r;
+  const L=[];
+  L.push(`<span class="row">N = ${N} · n(<span class="va">A</span>) = <span class="va">${nA}</span> · n(<span class="vb">B</span>) = <span class="vb">${nB}</span> · n(<span class="vab">A∪B</span>) = <span class="vab">${nAB}</span> <span style="color:var(--muted)">← A와 B 항목을 모두 포함한 거래 수</span></span>`);
+  L.push(`<span class="row"><span class="k">지지도</span> support(A→B) = P(A∩B) = n(A∪B) / N = <span class="vab">${nAB}</span> / ${N} = <span class="res">${f3(r.sup)}</span></span>`);
+  if(!nA){L.push(`<span class="row"><span class="k">신뢰도</span> A를 포함한 거래가 없어 계산할 수 없습니다.</span>`);return L.join("");}
+  L.push(`<span class="row"><span class="k">신뢰도</span> confidence = P(B|A) = sup(A∪B) / sup(A) = ${f3(r.sup)} / <span class="va">${f3(r.sA)}</span> = <span class="vab">${nAB}</span>/<span class="va">${nA}</span> = <span class="res">${f3(r.conf)}</span></span>`);
+  if(!nB){L.push(`<span class="row"><span class="k">향상도</span> B를 포함한 거래가 없어 계산할 수 없습니다.</span>`);return L.join("");}
+  L.push(`<span class="row"><span class="k">향상도</span> lift = conf / sup(B) = ${f3(r.conf)} / <span class="vb">${f3(r.sB)}</span> = <span class="res">${f3(r.lift)}</span> <span style="color:var(--muted)">(${r.lift>1+1e-9?"&gt; 1 양의 연관":r.lift<1-1e-9?"&lt; 1 음의 연관":"= 1 독립"})</span></span>`);
+  L.push(`<span class="row"><span class="k">leverage</span> = sup(A∪B) − sup(A)·sup(B) = ${f3(r.sup)} − ${f3(r.sA)}×${f3(r.sB)} = <span class="res">${f3(r.lev)}</span></span>`);
+  L.push(`<span class="row"><span class="k">conviction</span> = (1 − sup(B)) / (1 − conf) = ${f3(1-r.sB)} / ${f3(1-r.conf)} = <span class="res">${f3(r.conv)}</span>${r.conv===Infinity?' <span style="color:var(--muted)">(신뢰도 1 → 무한대)</span>':""}</span>`);
+  return L.join("");
+}
+function sayRule(r,html){
+  const b=html?(s=>"<b>"+esc(s)+"</b>"):(s=>s);
+  const An=r.A.map(nm),Bn=r.B.map(nm);
+  if(!r.nA||!r.nB)return "규칙을 계산할 수 없습니다.";
+  const subj=andList(An),bt=andList(Bn);
+  const head=`${b(jo(subj,"이","가"))} 있는 환자 ${r.nA}명 중 ${b(pct(r.conf))}`;
+  const tail=Bn.length>1?`${b(bt)} 진단을 모두 받았습니다`:`${b(bt)} 진단도 받았습니다`;
+  if(Math.abs(r.lift-1)<0.1)return `${head}가 ${tail}. 하지만 전체 평균(${pct(r.sB)})과 거의 같아(${f2(r.lift)}배) 연관이 거의 없습니다.`;
+  if(r.lift>1)return `${head}가 ${tail}. 이는 전체 평균(${pct(r.sB)})보다 ${b(f2(r.lift)+"배")} 높습니다.`;
+  return `${head}만 ${b(bt)} 진단을 받아, 전체 평균(${pct(r.sB)})의 ${b(f2(r.lift)+"배")}로 낮습니다 (음의 연관).`;
+}
+const liftFill=l=>{if(!isFinite(l))return"var(--faint)";if(l>=1){const t=Math.min(1,Math.log(l)/Math.log(3));return`color-mix(in srgb,var(--c-b) ${Math.round(25+75*t)}%,var(--line-strong))`;}
+  const t=Math.min(1,-Math.log(l)/Math.log(3));return`color-mix(in srgb,var(--c-a) ${Math.round(25+75*t)}%,var(--line-strong))`;};
+
+/* ============================================================
+   탭
+   ============================================================ */
+const TABS=["metric","apriori","rules","fp","support","code"];let curTab="metric";
+function showTab(k,focus){
+  if(!TABS.includes(k))k="metric";
+  TABS.forEach(t=>{const b=$("tab-"+t),p=$("pane-"+t),on=t===k;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;p.hidden=!on;});
+  const prev=curTab;curTab=k;if(focus)$("tab-"+k).focus();
+  if(location.hash!=="#"+k)history.replaceState(null,"","#"+k);
+  if(prev!==k){AP.stop();FP.stop();}
+  renderCur();
+}
+TABS.forEach(t=>$("tab-"+t).addEventListener("click",()=>showTab(t)));
+document.querySelector(".sk-tabs").addEventListener("keydown",e=>{
+  if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;e.preventDefault();e.stopPropagation();
+  const i=TABS.indexOf(curTab),n=(i+(e.key==="ArrowRight"?1:-1)+TABS.length)%TABS.length;showTab(TABS[n],true);
+});
+window.addEventListener("hashchange",()=>{const k=location.hash.slice(1);if(TABS.includes(k)&&k!==curTab)showTab(k);});
+document.addEventListener("keydown",e=>{
+  if(e.key!=="ArrowRight"||e.altKey||e.ctrlKey||e.metaKey)return;
+  const t=e.target;if(t&&(t.closest(".sk-tabs")||/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)||t.closest(".sk-seg")))return;
+  if(curTab==="apriori"){AP.next();e.preventDefault();}
+  else if(curTab==="fp"){FP.next();e.preventDefault();}
+});
+function renderCur(){({metric:renderMetric,apriori:()=>AP.render(),rules:renderRules,fp:()=>FP.render(),support:renderSupport,code:renderCode})[curTab]();}
+
+/* ============================================================
+   1. 지표 이해
+   ============================================================ */
+function ruleIdx(){const v=vIdx();return{A:S.A.map(x=>v.get(x)).filter(x=>x!==undefined).sort((a,b)=>a-b),B:S.B.map(x=>v.get(x)).filter(x=>x!==undefined).sort((a,b)=>a-b)};}
+function renderMetric(){
+  const m=M(),present=[...new Set(S.trans.flat())],v=vIdx();
+  const shown=[...new Set(present.concat(S.A,S.B))].sort((a,b)=>v.get(a)-v.get(b));
+  $("pickA").innerHTML=shown.map(n=>`<button type="button" class="ar-tog ta" data-it="${esc(n)}" aria-pressed="${S.A.includes(n)}">${esc(n)}</button>`).join("");
+  $("pickB").innerHTML=shown.map(n=>`<button type="button" class="ar-tog tb" data-it="${esc(n)}" aria-pressed="${S.B.includes(n)}">${esc(n)}</button>`).join("");
+  const {A,B}=ruleIdx();
+  const ok=A.length&&B.length;
+  $("m1Rule").innerHTML=ok?`<span class="ar-a">${esc(setTxt(A))}</span><span class="arr">→</span><span class="ar-b">${esc(setTxt(B))}</span>`:`<span style="color:var(--muted);font-size:15px">A와 B에 항목을 하나 이상 넣으세요.</span>`;
+  const nA=countIn(m.T,A),nB=countIn(m.T,B),nAB=countIn(m.T,A.concat(B)),r=metricsOf(nA,nB,nAB,m.N,A,B);
+  if(ok){
+    $("m1Stats").innerHTML=[["m-s","지지도",f3(r.sup)],["m-c","신뢰도",nA?f3(r.conf):"—"],["m-l","향상도",nA&&nB?f3(r.lift):"—"],["","leverage",f3(r.lev)],["","conviction",nA?f3(r.conv):"—"]]
+      .map(([c,l,v])=>`<div class="sk-stat ${c}"><b>${v}</b><span>${l}</span></div>`).join("");
+    $("m1Venn").innerHTML=vennSVG(nA,nB,nAB,m.N,"A "+A.map(nm).join("·"),"B "+B.map(nm).join("·"));
+    $("m1Formula").innerHTML=formulaHTML(r);
+    const lp=nA&&nB&&isFinite(r.lift)?Math.min(r.lift,3)/3*100:null;
+    $("m1Gauge").innerHTML=lp===null?"":`<div class="sk-label">향상도 위치 (0 ~ 3)</div><div class="tr"><span class="one"></span><span class="pt" style="left:${lp}%"></span></div><div class="lb"><span>0 음의 연관</span><span>1 독립</span><span>3+ 양의 연관</span></div>`;
+    $("m1Say").innerHTML=sayRule(r,true);
+    const trap=nA&&nB&&r.conf>=0.6&&Math.abs(r.lift-1)<0.1;
+    $("m1Warn").innerHTML=trap?`<p class="sk-note ar-note-warn"><b>함정</b> — 신뢰도 ${pct(r.conf)}만 보면 강한 규칙 같지만, ${esc(jo(B.map(nm).join("·"),"은","는"))} 원래 전체의 ${pct(r.sB)}에게 있습니다. A를 몰라도 맞힐 확률과 거의 같으므로(lift ${f2(r.lift)}) A와 B는 사실상 독립입니다. 신뢰도는 반드시 향상도와 함께 보세요.</p>`
+      :(nA&&nB&&r.lift<0.9?`<p class="sk-note"><b>음의 연관</b> — A가 있으면 B가 오히려 덜 나타납니다(lift ${f2(r.lift)} &lt; 1). leverage도 음수(${f3(r.lev)})입니다.</p>`:"");
+  } else {["m1Stats","m1Venn","m1Formula","m1Gauge","m1Say","m1Warn"].forEach(id=>$(id).innerHTML="");}
+  // 표
+  const hasA=t=>A.length&&A.every(x=>t.includes(x)),hasB=t=>B.length&&B.every(x=>t.includes(x));
+  $("m1Count").textContent=ok?`A 포함 ${nA}건 · B 포함 ${nB}건 · 둘 다 ${nAB}건 / 전체 ${m.N}건`:`전체 ${m.N}건`;
+  const rows=m.T.map((t,i)=>({i,t,a:hasA(t),b:hasB(t)})).filter(o=>S.filt==="all"||(S.filt==="a"&&o.a)||(S.filt==="ab"&&o.a&&o.b));
+  const cls=o=>o.a&&o.b?"r-ab":o.a?"r-a":o.b?"r-b":"";
+  const vocabAll=S.vocab.map(x=>x.n);
+  if(S.view==="list"){
+    $("m1Table").className="sk-table ar-tx";
+    $("m1Table").innerHTML=`<thead><tr><th>ID</th><th>동반 진단 (항목)</th><th title="A의 항목을 모두 포함">A</th><th title="B의 항목을 모두 포함">B</th><th><span class="sk-hint">삭제</span></th></tr></thead><tbody>`+
+      rows.map(o=>{const items=S.trans[o.i].slice().sort((x,y)=>v.get(x)-v.get(y));
+        const chips=items.map(n=>`<span class="ar-chip${S.A.includes(n)?" ia":S.B.includes(n)?" ib":""}">${esc(n)}<button type="button" class="x" data-row="${o.i}" data-rm="${esc(n)}" aria-label="T${o.i+1}에서 ${esc(n)} 삭제">×</button></span>`).join("")||`<span class="ar-empty">빈 거래</span>`;
+        const opts=vocabAll.filter(n=>!items.includes(n)).map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
+        return `<tr class="${cls(o)}"><td class="id">T${o.i+1}</td><td class="wrap"><div class="ar-chips">${chips}${opts?`<select class="sk-select ar-add" data-add="${o.i}" aria-label="T${o.i+1}에 진단 추가"><option value="">+ 추가</option>${opts}</select>`:""}</div></td>
+          <td>${o.a?'<span class="ar-mk a">A</span>':'<span class="ar-mk no">·</span>'}</td><td>${o.b?'<span class="ar-mk b">B</span>':'<span class="ar-mk no">·</span>'}</td>
+          <td><button type="button" class="ar-del" data-delrow="${o.i}" aria-label="거래 T${o.i+1} 삭제"${m.N<=1?" disabled":""}>삭제</button></td></tr>`;}).join("")+
+      (rows.length?"":`<tr><td colspan="5" class="ar-empty">조건에 맞는 거래가 없습니다.</td></tr>`)+`</tbody>`;
+  } else {
+    const cols=m.ap.present.length?[...new Set(m.ap.present.concat(A,B))].sort((a,b)=>a-b):[];
+    const head=cols.map(c=>`<th class="${A.includes(c)?"ca":B.includes(c)?"cb":""}" title="${esc(nm(c))}">${esc(nm(c))}</th>`).join("");
+    const body=rows.map(o=>`<tr class="${cls(o)}"><td class="id">T${o.i+1}</td>`+cols.map(c=>{const on=o.t.includes(c);return`<td class="${on?"one":"zero"} ${A.includes(c)?"ca":B.includes(c)?"cb":""}">${on?1:0}</td>`;}).join("")+`<td>${o.a?'<span class="ar-mk a">A</span>':""}${o.b?' <span class="ar-mk b">B</span>':""}</td></tr>`).join("");
+    const cnt=cols.map(c=>m.T.filter(t=>t.includes(c)).length);
+    $("m1Table").className="sk-table ar-tx ar-oh";
+    $("m1Table").innerHTML=`<thead><tr><th>ID</th>${head}<th>규칙</th></tr></thead><tbody>${body}</tbody><tfoot><tr><th>합계</th>${cnt.map(c=>`<td>${c}</td>`).join("")}<td></td></tr><tr><th>지지도</th>${cnt.map(c=>`<td>${f2(c/m.N)}</td>`).join("")}<td></td></tr></tfoot>`;
+  }
+}
+function togglePick(side,n){
+  const me=side==="A"?S.A:S.B,other=side==="A"?S.B:S.A;
+  const i=me.indexOf(n);if(i>=0)me.splice(i,1);else{me.push(n);const j=other.indexOf(n);if(j>=0)other.splice(j,1);}
+  renderMetric();
+}
+$("pickA").addEventListener("click",e=>{const b=e.target.closest("[data-it]");if(b)togglePick("A",b.dataset.it);});
+$("pickB").addEventListener("click",e=>{const b=e.target.closest("[data-it]");if(b)togglePick("B",b.dataset.it);});
+document.querySelectorAll("[data-preset]").forEach(b=>b.addEventListener("click",()=>applyPreset(b.dataset.preset)));
+segInit($("m1View"),v=>{S.view=v;renderMetric();});
+segInit($("m1Filt"),v=>{S.filt=v;renderMetric();});
+$("m1Table").addEventListener("click",e=>{
+  const x=e.target.closest("[data-rm]");if(x){const r=+x.dataset.row;S.trans[r]=S.trans[r].filter(n=>n!==x.dataset.rm);dataChanged();return;}
+  const d=e.target.closest("[data-delrow]");if(d&&S.trans.length>1){S.trans.splice(+d.dataset.delrow,1);dataChanged();}
+});
+$("m1Table").addEventListener("change",e=>{const s=e.target.closest("[data-add]");if(s&&s.value){S.trans[+s.dataset.add].push(s.value);dataChanged();}});
+$("m1AddTx").onclick=()=>{S.trans.push([]);S.view="list";segSet($("m1View"),"list");S.filt="all";segSet($("m1Filt"),"all");dataChanged();
+  const box=$("m1TableBox");box.scrollTop=box.scrollHeight;$("m1Msg").textContent=`T${S.trans.length}을(를) 추가했습니다. "+ 추가"로 진단을 넣으세요.`;};
+$("m1NewItemBtn").onclick=()=>{
+  const n=$("m1NewItem").value.trim().replace(/[,"'<>]/g,"");if(!n){$("m1Msg").textContent="항목 이름을 입력하세요.";return;}
+  if(S.vocab.some(v=>v.n===n)){$("m1Msg").textContent=`'${n}'은(는) 이미 목록에 있습니다.`;return;}
+  const used=new Set(S.vocab.map(v=>v.a));let a=n[0];if(used.has(a))a=n.slice(0,2);if(used.has(a))a=n;
+  S.vocab.push({n,a});$("m1NewItem").value="";$("m1Msg").textContent=`'${n}'을(를) 추가했습니다. 거래의 "+ 추가" 목록에서 고를 수 있습니다.`;MC=null;LOWC=null;S.ver++;renderMetric();
+};
+$("m1NewItem").addEventListener("keydown",e=>{if(e.key==="Enter")$("m1NewItemBtn").click();});
+
+/* ============================================================
+   2. Apriori 단계별
+   ============================================================ */
+const sub=k=>`<sub>${k}</sub>`;
+function combos(arr,k){const out=[];(function rec(s,cur){if(cur.length===k){out.push(cur.slice());return;}for(let i=s;i<arr.length;i++){cur.push(arr[i]);rec(i+1,cur);cur.pop();}})(0,[]);return out;}
+function nodeState(o,s){
+  if(!o||s<o.joined)return"ghost";
+  if(o.pruned>=0&&s>=o.pruned)return"pruned";
+  if(o.counted<0||s<o.counted)return"cand";
+  if(s<o.decided)return"counted";
+  return o.freq?"freq":"infreq";
+}
+const AP=(function(){
+  const st={step:0,timer:null,speed:1,toEnd:false};
+  function stepLabel(s){
+    if(s.type==="start")return"시작";
+    if(s.type==="count")return`C${sub(s.k)} 세기`;
+    if(s.type==="select")return`L${sub(s.k)}${s.end?" → 종료":""}`;
+    if(s.type==="join")return s.end?`C${sub(s.k)} 없음 → 종료`:`C${sub(s.k)} 조인`;
+    return`C${sub(s.k)} 가지치기${s.end?" → 종료":""}`;
+  }
+  function caption(ap,s,m){
+    const st=ap.steps[s],N=m.N,mc=ap.minCnt,vals=[...ap.info.values()];
+    if(st.type==="start")return`최소 지지도 <b>${S.ms.toFixed(2)}</b> × 거래 ${N}건 = ${f2(S.ms*N)} → <b>${mc}건 이상</b> 나와야 빈발입니다. 가능한 항목 집합은 2<sup>${ap.present.length}</sup> − 1 = <b>${Math.pow(2,ap.present.length)-1}</b>개. Apriori는 이 중 일부만 셉니다. [다음]을 누르세요.`;
+    if(st.type==="count"&&st.k===1)return`<b>스캔 1</b>: 데이터를 처음부터 끝까지 읽어 항목 ${st.n}개(C${sub(1)})의 개수를 셉니다.`;
+    if(st.type==="count")return`<b>스캔 ${st.scan}</b>: 가지치기에서 살아남은 후보 <b>${st.n}개</b>만 데이터를 다시 읽어 셉니다.`;
+    if(st.type==="select"){
+      const lv=vals.filter(o=>o.k===st.k&&o.counted>=0),out=lv.filter(o=>!o.freq);
+      const t=`L${sub(st.k)}: ${mc}건 이상인 <b>${st.n}개</b>만 남깁니다.`+(out.length?` 탈락: ${out.slice(0,4).map(o=>esc(setTxt(o.set))+" "+o.count+"건").join(", ")}${out.length>4?" …":""}.`:"");
+      return t+(st.end?` 남은 빈발 집합이 없어 <b>종료</b>합니다. 빈발 항목 집합 총 <b>${ap.freq.length}개</b>, 데이터 스캔 <b>${ap.scans}회</b>.`:"");
+    }
+    if(st.type==="join"){
+      if(st.end)return`L${sub(st.k-1)}에서 앞쪽 ${st.k-2}개 항목이 같은 짝이 없어 C${sub(st.k)}가 비었습니다 → <b>종료</b>. 빈발 항목 집합 총 <b>${ap.freq.length}개</b>, 데이터 스캔 <b>${ap.scans}회</b>.`;
+      return st.k===2?`<b>조인</b>: L${sub(1)}의 항목을 두 개씩 짝지어 C${sub(2)} 후보 <b>${st.n}개</b>를 만듭니다.`
+        :`<b>조인</b>: L${sub(st.k-1)}에서 앞쪽 ${st.k-2}개 항목이 같은 두 집합을 합쳐 C${sub(st.k)} 후보 <b>${st.n}개</b>를 만듭니다.`;
+    }
+    // prune
+    if(st.k===2)return`<b>가지치기</b>: 2-항목 후보의 부분집합(1-항목)은 모두 L${sub(1)}에 있으므로 제거할 후보가 없습니다.`;
+    const pr=vals.filter(o=>o.k===st.k&&o.pruned===s);
+    const ex=pr[0]?` 예: ${esc(setTxt(pr[0].set))} ← 부분집합 ${esc(setTxt(pr[0].reason))}${hasBatchim(nm(pr[0].reason[pr[0].reason.length-1]))?"이":"가"} L${sub(st.k-1)}에 없음.`:"";
+    return`<b>가지치기 (Apriori 성질)</b>: 부분집합이 하나라도 빈발하지 않으면 그 상위 집합도 빈발할 수 없습니다. 후보 ${pr.length+st.keep}개 중 <b>${pr.length}개</b>를 데이터를 세지도 않고 제거합니다.${ex}${st.end?" 남은 후보가 없어 <b>종료</b>합니다. 빈발 항목 집합 총 <b>"+ap.freq.length+"개</b>, 데이터 스캔 <b>"+ap.scans+"회</b>.":""}`;
+  }
+  function render(){
+    const m=M(),ap=m.ap,n=ap.steps.length;
+    if(st.toEnd){st.step=n-1;st.toEnd=false;}
+    st.step=Math.max(0,Math.min(st.step,n-1));
+    const s=st.step,cur=ap.steps[s];
+    $("apStepper").innerHTML=ap.steps.map((x,i)=>`<li class="${i===s?"on":i<s?"done":""}"><button type="button" data-s="${i}" aria-current="${i===s?"step":"false"}">${stepLabel(x)}</button></li>`).join("");
+    const onLi=$("apStepper").children[s];if(onLi){const box=$("apStepper");const l=onLi.offsetLeft-box.offsetLeft;if(l<box.scrollLeft||l+onLi.offsetWidth>box.scrollLeft+box.clientWidth)box.scrollLeft=l-40;}
+    $("apCap").innerHTML=caption(ap,s,m);
+    $("apPrev").disabled=s===0;$("apFirst").disabled=s===0;$("apNext").disabled=s===n-1;
+    const total=Math.pow(2,ap.present.length)-1;
+    $("apStats").innerHTML=[["데이터 스캔",cur.scans+"회"],["센 후보 (누적)",cur.countedSoFar+"개"],["가지치기로 제거",cur.prunedSoFar+"개"],["빈발 항목 집합",cur.freqSoFar+"개"],["모든 부분집합을 센다면",total+"개"]]
+      .map(([l,v],i)=>`<div class="sk-stat"${i===4?' style="opacity:.75"':""}><b>${v}</b><span>${l}</span></div>`).join("");
+    // 현재 수준 표
+    const k=cur.k,vals=[...ap.info.values()].filter(o=>o.k===k&&s>=o.joined);
+    $("apTblTitle").innerHTML=cur.type==="start"?"후보":`${k}-항목 집합 (C${sub(k)} → L${sub(k)})`;
+    if(cur.type==="start"||!vals.length){$("apTbl").innerHTML=`<tbody><tr><td class="ar-empty">${cur.type==="start"?"아직 센 것이 없습니다.":"후보가 없습니다."}</td></tr></tbody>`;}
+    else{
+      $("apTbl").innerHTML=`<thead><tr><th>항목 집합</th><th>개수</th><th>지지도</th><th>판정</th></tr></thead><tbody>`+vals.map(o=>{
+        const ns=nodeState(o,s);let pill="",why="";
+        if(ns==="pruned"){pill=`<span class="ar-pill pruned">가지치기</span>`;why=`부분집합 ${esc(setTxt(o.reason))} ∉ L${sub(k-1)}`;}
+        else if(ns==="cand"){pill=`<span class="ar-pill cand">후보</span>`;why=cur.type==="prune"?"부분집합 모두 빈발 → 세기로":"";}
+        else if(ns==="counted"){pill=`<span class="ar-pill counted">셈</span>`;}
+        else if(ns==="freq"){pill=`<span class="ar-pill freq">통과</span>`;why=`${o.count} ≥ ${ap.minCnt}`;}
+        else {pill=`<span class="ar-pill infreq">탈락</span>`;why=`${o.count} &lt; ${ap.minCnt}`;}
+        const shownCnt=o.counted>=0&&s>=o.counted;
+        return`<tr class="${ns}"><td class="set">${esc(setTxt(o.set))}</td><td class="n">${shownCnt?o.count:(ns==="pruned"?"세지 않음":"—")}</td><td class="n">${shownCnt?f3(o.count/m.N):"—"}</td><td class="why">${pill} ${why}</td></tr>`;}).join("")+`</tbody>`;
+    }
+    // 단계별 요약
+    const lvRows=ap.levels.filter(l=>s>=l.sJoin);
+    $("apLv").innerHTML=`<thead><tr><th>k</th><th>조인 후보</th><th>가지치기</th><th>센 후보</th><th>빈발 L<sub>k</sub></th></tr></thead><tbody>`+
+      (lvRows.length?lvRows.map(l=>{const done=ap.steps.findIndex((x,i)=>i>=l.sJoin&&x.k===l.k&&(x.type==="select"||x.end));const fin=done>=0&&s>=done;
+        const pruneStep=ap.steps.findIndex((x,i)=>x.type==="prune"&&x.k===l.k),countStep=ap.steps.findIndex(x=>x.type==="count"&&x.k===l.k);
+        return`<tr><td class="n ${l.k===k?"cur":""}">${l.k}</td><td class="n">${l.joined}</td><td class="n">${l.k===1?"−":(pruneStep>=0&&s>=pruneStep?l.pruned:"…")}</td><td class="n">${countStep>=0&&s>=countStep?l.counted:(l.counted===0&&fin?0:"…")}</td><td class="n"><b>${fin?l.freq:"…"}</b></td></tr>`;}).join("")
+      :`<tr><td colspan="5" class="ar-empty">시작 전</td></tr>`)+`</tbody>`;
+    renderLattice(ap,s,m);
+  }
+  function renderLattice(ap,s,m){
+    const pres=ap.present,full=pres.length<=6,levels=[];
+    if(full){for(let k=1;k<=pres.length;k++)levels.push(combos(pres,k));}
+    else{levels.push(pres.map(i=>[i]));for(let k=2;k<=ap.levels.length;k++){const L=ap.levels[k-1];if(L&&L.cands.length)levels.push(L.cands.map(x=>x.split(",").map(Number)));}}
+    $("apLatHint").textContent=full?`항목 ${pres.length}개 → 가능한 항목 집합 ${Math.pow(2,pres.length)-1}개를 모두 표시`:`항목 ${pres.length}개 → 가능한 집합 ${Math.pow(2,pres.length)-1}개 중 후보로 만들어진 것만 표시`;
+    $("apAbbr").textContent="약자: "+pres.map(i=>ab(i)+" = "+nm(i)).join(", ");
+    const lab=set=>set.map(ab).join("");
+    const cur=ap.steps[s],gap=6,rowH=64,top=16,left=34;
+    const ws=levels.map(L=>Math.max(36,14+Math.max(...L.map(x=>lab(x).length))*12.5));
+    const W=Math.max(...levels.map((L,i)=>L.length*(ws[i]+gap)))+left+16,H=top+levels.length*rowH;
+    const pos=new Map();
+    levels.forEach((L,li)=>{const w=ws[li],tot=L.length*(w+gap)-gap,x0=left+(W-left-16-tot)/2;L.forEach((set,j)=>pos.set(keyOf(set),{x:x0+j*(w+gap),y:top+li*rowH,w,set,li}));});
+    let edges="",nodes="";
+    levels.forEach((L,li)=>{L.forEach(set=>{
+      const p=pos.get(keyOf(set)),o=ap.info.get(keyOf(set)),ns=nodeState(o,s);
+      if(li>0)set.forEach((_,d)=>{const sb=set.slice(0,d).concat(set.slice(d+1)),q=pos.get(keyOf(sb));if(!q)return;
+        const so=nodeState(ap.info.get(keyOf(sb)),s);if(!full&&(ns==="ghost"||so==="ghost"))return;
+        const bad=ns==="pruned"&&o.reason&&keyOf(o.reason)===keyOf(sb);
+        edges+=`<line class="e${bad?" bad":(ns!=="ghost"&&so!=="ghost"?" on":"")}" x1="${q.x+q.w/2}" y1="${q.y+34}" x2="${p.x+p.w/2}" y2="${p.y}"/>`;});
+      const isCur=ns!=="ghost"&&cur.k===set.length&&cur.type!=="start";
+      const showCnt=o&&o.counted>=0&&s>=o.counted;
+      const tip=`${setTxt(set)}: ${ns==="pruned"?"가지치기 (부분집합 "+setTxt(o.reason)+" 비빈발)":showCnt?o.count+"건":ns==="ghost"?"후보 아님":"후보"}`;
+      nodes+=`<g class="n ${ns}${!full&&ns==="ghost"?" hide":""}${isCur?" cur":""}"><title>${esc(tip)}</title><rect x="${p.x}" y="${p.y}" width="${p.w}" height="34" rx="7"/>`+
+        `<text x="${p.x+p.w/2}" y="${p.y+(showCnt?15:22)}">${esc(lab(set))}</text>`+(showCnt?`<text class="c" x="${p.x+p.w/2}" y="${p.y+29}">${o.count}</text>`:"")+
+        (ns==="pruned"?`<line x1="${p.x+4}" y1="${p.y+4}" x2="${p.x+p.w-4}" y2="${p.y+30}"/><line x1="${p.x+p.w-4}" y1="${p.y+4}" x2="${p.x+4}" y2="${p.y+30}"/>`:"")+`</g>`;
+    });});
+    const lv=levels.map((L,li)=>`<text class="lvl" x="6" y="${top+li*rowH+22}">k=${li+1}</text>`).join("");
+    $("apLat").innerHTML=`<svg class="ar-svg" viewBox="0 0 ${W} ${H}" width="${W}" style="width:100%;max-width:${W}px;min-width:${Math.round(Math.min(W,W*0.72))}px">${lv}${edges}${nodes}</svg>`;
+  }
+  function go(i){st.step=i;render();}
+  function next(){const n=M().ap.steps.length;if(st.step<n-1)go(st.step+1);else stop();}
+  function tick(){next();if(st.step>=M().ap.steps.length-1){stop();return;}st.timer=setTimeout(tick,1300/st.speed);}
+  function play(){if(st.timer){stop();return;}if(st.step>=M().ap.steps.length-1)st.step=0;render();$("apPlay").textContent="멈춤";st.timer=setTimeout(tick,RM?900:1300/st.speed);}
+  function stop(){if(st.timer)clearTimeout(st.timer);st.timer=null;$("apPlay").textContent="재생";}
+  $("apFirst").onclick=()=>{stop();go(0);};$("apPrev").onclick=()=>{stop();go(st.step-1);};$("apNext").onclick=()=>{stop();next();};$("apPlay").onclick=play;
+  $("apSpeed").oninput=e=>{st.speed=+e.target.value;$("apSpeedV").textContent=st.speed+"×";};
+  $("apStepper").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(b){stop();go(+b.dataset.s);}});
+  return{render,next,stop,set toEnd(v){st.toEnd=v;},set step(v){st.step=v;},get step(){return st.step;}};
+})();
+
+/* ============================================================
+   3. 규칙 생성
+   ============================================================ */
+function sortRules(R){const k=S.sort==="sup"?"sup":S.sort==="conf"?"conf":"lift";return R.slice().sort((a,b)=>b[k]-a[k]||b.lift-a.lift||b.conf-a.conf||b.sup-a.sup||a.key.localeCompare(b.key));}
+const ruleHTML=r=>`<span class="ar-a">${esc(setTxt(r.A))}</span><span class="arr">→</span><span class="ar-b">${esc(setTxt(r.B))}</span>`;
+function renderRules(){
+  const m=M(),all=m.rules,pass=sortRules(all.filter(passRule));
+  if(S.sel&&!all.some(r=>r.key===S.sel))S.sel=null;
+  if(!S.sel&&pass.length)S.sel=pass[0].key;
+  $("ruStats").innerHTML=[["빈발 항목 집합",m.ap.freq.length],["2개 이상 집합에서 만든 규칙",all.length],["기준 통과 규칙",pass.length]].map(([l,v])=>`<div class="sk-stat"><b>${v}</b><span>${l}</span></div>`).join("");
+  $("ruTbl").innerHTML=`<thead><tr><th>#</th><th>규칙 A → B</th><th>지지도</th><th>신뢰도</th><th>향상도</th><th>leverage</th><th>conviction</th></tr></thead><tbody>`+
+    (pass.length?pass.map((r,i)=>`<tr class="${r.key===S.sel?"sel":""}" data-k="${r.key}"><td class="n">${i+1}</td><td class="r"><button type="button" class="ar-link" data-k="${r.key}">${ruleHTML(r)}</button></td><td class="n">${f3(r.sup)}</td><td class="n">${f3(r.conf)}</td><td class="n"><b>${f3(r.lift)}</b></td><td class="n">${f3(r.lev)}</td><td class="n">${f3(r.conv)}</td></tr>`).join("")
+      :`<tr><td colspan="7" class="ar-empty">기준을 넘는 규칙이 없습니다. 최소 신뢰도·향상도를 낮춰 보세요.</td></tr>`)+`</tbody>`;
+  // 산점도
+  const W=520,H=340,ml=48,mr=14,mt=14,mb=42,xmax=Math.max(.05,Math.ceil(Math.max(S.ms,...all.map(r=>r.sup))*10+0.5)/10);
+  const X=v=>ml+v/xmax*(W-ml-mr),Y=v=>mt+(1-v)*(H-mt-mb);
+  let g="";for(let t=0;t<=xmax+1e-9;t+=xmax>.5?.1:.05){g+=`<line class="gr" x1="${X(t)}" y1="${mt}" x2="${X(t)}" y2="${H-mb}"/><text class="tk" x="${X(t)}" y="${H-mb+16}" text-anchor="middle">${t.toFixed(2)}</text>`;}
+  for(let t=0;t<=1.0001;t+=.2){g+=`<line class="gr" x1="${ml}" y1="${Y(t)}" x2="${W-mr}" y2="${Y(t)}"/><text class="tk" x="${ml-6}" y="${Y(t)+4}" text-anchor="end">${t.toFixed(1)}</text>`;}
+  g+=`<line class="ax" x1="${ml}" y1="${H-mb}" x2="${W-mr}" y2="${H-mb}"/><line class="ax" x1="${ml}" y1="${mt}" x2="${ml}" y2="${H-mb}"/>`;
+  g+=`<text class="tl" x="${(ml+W-mr)/2}" y="${H-6}" text-anchor="middle">지지도 support</text><text class="tl" transform="translate(13 ${(mt+H-mb)/2}) rotate(-90)" text-anchor="middle">신뢰도 confidence</text>`;
+  g+=`<line class="th" x1="${ml}" y1="${Y(S.mc)}" x2="${W-mr}" y2="${Y(S.mc)}"/><text class="thl" x="${ml+6}" y="${Y(S.mc)+(S.mc>.9?14:-5)}">min_confidence ${S.mc.toFixed(2)}</text>`;
+  const order=all.slice().sort((a,b)=>(passRule(a)?1:0)-(passRule(b)?1:0)||(a.key===S.sel?1:0)-(b.key===S.sel?1:0));
+  const pts=order.map(r=>{const p=passRule(r),rad=p?4+2.6*Math.min(isFinite(r.lift)?r.lift:4,4):3.2;
+    return`<circle class="p${p?"":" off"}${r.key===S.sel?" sel":""}" data-k="${r.key}" cx="${X(r.sup).toFixed(1)}" cy="${Y(r.conf).toFixed(1)}" r="${rad.toFixed(1)}"${p?` style="fill:${liftFill(r.lift)}"`:""}><title>${esc(setTxt(r.A)+" → "+setTxt(r.B))} · 지지도 ${f3(r.sup)} · 신뢰도 ${f3(r.conf)} · 향상도 ${f3(r.lift)}${p?"":" (기준 미달)"}</title></circle>`;}).join("");
+  $("ruScatter").innerHTML=`<svg viewBox="0 0 ${W} ${H}" class="ar-svg ar-sc" role="img" aria-label="규칙 산점도">${g}${pts}</svg>`;
+  $("ruLg").innerHTML=`<span><i style="background:${liftFill(0.4)}"></i>lift &lt; 1</span><span><i style="background:${liftFill(1)}"></i>lift ≈ 1</span><span><i style="background:${liftFill(1.7)}"></i>lift 1.7</span><span><i style="background:${liftFill(3)}"></i>lift ≥ 3</span><span><i style="background:var(--faint);opacity:.4"></i>기준 미달 (흐림)</span>`;
+  renderNet(pass);renderDetail();
+  $("ruSay").innerHTML=pass.length?pass.slice(0,3).map(r=>`<li class="${r.lift<1?"neg":""}">${sayRule(r,true)}</li>`).join(""):`<li class="neg">기준을 넘는 규칙이 없습니다.</li>`;
+}
+function renderNet(pass){
+  const top=pass.slice().sort((a,b)=>b.lift-a.lift||b.conf-a.conf).slice(0,12);
+  $("ruNetHint").textContent=pass.length>12?`향상도 상위 12개 (전체 ${pass.length}개)`:`통과 규칙 ${pass.length}개`;
+  if(!top.length){$("ruNet").innerHTML=`<p class="ar-empty">표시할 규칙이 없습니다.</p>`;return;}
+  const W=600,H=440,cx=W/2,cy=H/2,R=168;
+  const items=[...new Set(top.flatMap(r=>r.A.concat(r.B)))].sort((a,b)=>a-b);
+  const ip=new Map(items.map((it,i)=>{const a=-Math.PI/2+i*2*Math.PI/items.length;return[it,{x:cx+R*Math.cos(a),y:cy+R*Math.sin(a),a}];}));
+  const maxS=Math.max(...top.map(r=>r.sup));
+  const rn=top.map(r=>{const ps=r.A.concat(r.B).map(i=>ip.get(i));let x=ps.reduce((s,p)=>s+p.x,0)/ps.length,y=ps.reduce((s,p)=>s+p.y,0)/ps.length;
+    x=cx+(x-cx)*.62;y=cy+(y-cy)*.62;return{r,x,y,x0:x,y0:y,rad:5+9*Math.sqrt(r.sup/maxS)};});
+  // 겹침 풀기 (결정적)
+  rn.forEach((p,i)=>{p.x+=Math.cos(i*2.4)*6;p.y+=Math.sin(i*2.4)*6;});
+  for(let it=0;it<120;it++){
+    for(let i=0;i<rn.length;i++)for(let j=i+1;j<rn.length;j++){const a=rn[i],b=rn[j],dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||.01,min=a.rad+b.rad+10;
+      if(d<min){const f=(min-d)/2,ux=dx/d,uy=dy/d;a.x-=ux*f;a.y-=uy*f;b.x+=ux*f;b.y+=uy*f;}}
+    rn.forEach(p=>{items.forEach(it=>{const q=ip.get(it),dx=p.x-q.x,dy=p.y-q.y,d=Math.hypot(dx,dy)||.01,min=p.rad+34;if(d<min){p.x+=dx/d*(min-d);p.y+=dy/d*(min-d);}});
+      p.x+=(p.x0-p.x)*.03;p.y+=(p.y0-p.y)*.03;p.x=Math.max(20,Math.min(W-20,p.x));p.y=Math.max(20,Math.min(H-20,p.y));});
+  }
+  let ed="",nd="";
+  rn.forEach(p=>{
+    p.r.A.forEach(i=>{const q=ip.get(i);ed+=`<line class="ie" x1="${q.x.toFixed(1)}" y1="${q.y.toFixed(1)}" x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}"/>`;});
+    p.r.B.forEach(i=>{const q=ip.get(i),dx=q.x-p.x,dy=q.y-p.y,d=Math.hypot(dx,dy)||1,ex=q.x-dx/d*24,ey=q.y-dy/d*24;
+      ed+=`<line class="oe" x1="${p.x.toFixed(1)}" y1="${p.y.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" marker-end="url(#arh)"/>`;});
+  });
+  const selR=rn.find(p=>p.r.key===S.sel),hlItems=new Set(selR?selR.r.A.concat(selR.r.B):[]);
+  rn.slice().sort((a,b)=>(a.r.key===S.sel?1:0)-(b.r.key===S.sel?1:0)).forEach(p=>{nd+=`<circle class="rn${p.r.key===S.sel?" sel":""}" data-k="${p.r.key}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${p.rad.toFixed(1)}" style="fill:${liftFill(p.r.lift)}"><title>${esc(setTxt(p.r.A)+" → "+setTxt(p.r.B))} · 지지도 ${f3(p.r.sup)} · 신뢰도 ${f3(p.r.conf)} · 향상도 ${f3(p.r.lift)}</title></circle>`;});
+  items.forEach(it=>{const q=ip.get(it),tx=cx+(R+30)*Math.cos(q.a),ty=cy+(R+30)*Math.sin(q.a),anc=Math.abs(Math.cos(q.a))<.3?"middle":Math.cos(q.a)>0?"start":"end";
+    nd+=`<circle class="item${hlItems.has(it)?" hl":""}" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="20"/><text class="itl" x="${q.x.toFixed(1)}" y="${(q.y+5).toFixed(1)}" text-anchor="middle">${esc(ab(it))}</text>`+
+      `<text class="itl" x="${tx.toFixed(1)}" y="${(ty+4).toFixed(1)}" text-anchor="${anc}">${esc(nm(it))}</text>`;});
+  $("ruNet").innerHTML=`<svg viewBox="-60 0 ${W+120} ${H}" class="ar-svg ar-net" role="img" aria-label="규칙 네트워크 그래프"><defs><marker id="arh" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker></defs>${ed}${nd}</svg>`;
+}
+function renderDetail(){
+  const m=M(),r=m.rules.find(x=>x.key===S.sel);
+  if(!r){$("ruDetail").innerHTML=`<p class="ar-empty" style="margin:0">규칙 표·산점도·네트워크에서 규칙을 고르세요.</p>`;return;}
+  $("ruDetail").innerHTML=`<h3>${ruleHTML(r)}${passRule(r)?"":' <span class="sk-hint">(기준 미달)</span>'}</h3><div class="ar-svgbox">${vennSVG(r.nA,r.nB,r.nAB,r.N,"A "+r.A.map(nm).join("·"),"B "+r.B.map(nm).join("·"))}</div>
+    <div class="sk-formula ar-f">${formulaHTML(r)}</div><p class="ar-say" style="font-size:14px">${sayRule(r,true)}</p>
+    <div><button type="button" class="sk-btn sk-btn--sm" id="ruToM1">1번 화면에서 거래 표로 확인</button></div>`;
+  $("ruToM1").onclick=()=>{S.A=r.A.map(nm);S.B=r.B.map(nm);S.filt="all";segSet($("m1Filt"),"all");showTab("metric");window.scrollTo({top:$("main").offsetTop-70,behavior:RM?"auto":"smooth"});};
+}
+function pickRule(k){S.sel=k;renderRules();}
+["ruTbl","ruScatter","ruNet"].forEach(id=>$(id).addEventListener("click",e=>{const t=e.target.closest("[data-k]");if(t)pickRule(t.dataset.k);}));
+segInit($("ruSort"),v=>{S.sort=v;renderRules();});
+
+/* ============================================================
+   4. FP-Growth
+   ============================================================ */
+const tw=s=>[...s].reduce((w,ch)=>w+(/[가-힣]/.test(ch)?12.6:7.4),0);
+function treeSVG(tree,head,headCnt,opt){
+  opt=opt||{};
+  const lab=n=>n.item===-1?"루트":(opt.compact?ab(n.item):nm(n.item))+":"+n.count;
+  const pos=new Map();let leaf=0,maxD=0;
+  (function lay(n,d){maxD=Math.max(maxD,d);if(!n.children.length){pos.set(n,{x:leaf++,d});return;}n.children.forEach(c=>lay(c,d+1));
+    const a=pos.get(n.children[0]),b=pos.get(n.children[n.children.length-1]);pos.set(n,{x:(a.x+b.x)/2,d});})(tree.root,0);
+  let maxW=40;tree.nodes.forEach(n=>maxW=Math.max(maxW,tw(lab(n))+16));
+  const dx=maxW+12,dy=62,hw=head.length?Math.max(...head.map(i=>tw(opt.compact?ab(i)+" "+nm(i):nm(i))))+56:0,ox=hw+24+maxW/2,oy=24;
+  const W=Math.max(ox+(leaf-1)*dx+maxW/2+16,hw+200),H=Math.max(oy+maxD*dy+50,head.length*24+56);
+  const P=n=>{const p=pos.get(n);return{x:ox+p.x*dx,y:oy+p.d*dy};};
+  const tset=opt.touched||new Map();
+  let ed="",nd="",lk="",hd="";
+  tree.nodes.forEach(n=>{const a=P(n.parent),b=P(n);ed+=`<line class="ed${tset.has(n)?" hl":""}" x1="${a.x}" y1="${a.y+13}" x2="${b.x}" y2="${b.y-13}"/>`;});
+  [tree.root].concat(tree.nodes).forEach(n=>{const p=P(n),w=n.item===-1?52:tw(lab(n))+16,c=n.item===-1?"root":tset.get(n)||(opt.hl!==undefined&&n.item===opt.hl?"hi":"");
+    nd+=`<g class="nd ${c}"><title>${n.item===-1?"루트(null)":esc(nm(n.item))+": "+n.count+"건"}</title><rect x="${p.x-w/2}" y="${p.y-13}" width="${w}" height="26" rx="7"/><text x="${p.x}" y="${p.y+4.5}">${esc(lab(n))}</text></g>`;});
+  if(head.length){
+    hd+=`<rect class="hbox" x="6" y="6" width="${hw}" height="${head.length*24+30}" rx="8"/><text class="ht" x="14" y="23">헤더 테이블</text>`;
+    head.forEach((it,i)=>{const y=44+i*24,hl=opt.hl===it;
+      hd+=`<text class="hd${hl?" hl":""}" x="14" y="${y}">${esc(opt.compact?ab(it)+" "+nm(it):nm(it))}</text><text class="hdc" x="${hw-6}" y="${y}">${headCnt.get(it)}</text>`;
+      const nodes=tree.links.get(it)||[];let px=hw+6,py=y-4;
+      nodes.forEach(n=>{const p=P(n),w=tw(lab(n))+16,tx=p.x-w/2,ty=p.y;const mx=(px+tx)/2;
+        lk+=`<path class="lk${hl?" hl":""}" d="M${px},${py} C${mx},${py} ${mx},${ty} ${tx},${ty}"/>`;px=p.x+w/2;py=p.y;});
+    });
+  }
+  return`<svg class="ar-svg" viewBox="0 0 ${W} ${H}" width="${W}" style="width:100%;max-width:${W}px;min-width:${Math.round(W*.75)}px">${hd}${ed}${lk}${nd}</svg>`;
+}
+const FP=(function(){
+  const st={step:0,timer:null,speed:1,toEnd:true};
+  function render(){
+    const m=M(),fo=m.fo,N=m.N,mc=m.minCnt;
+    if(st.toEnd){st.step=N;st.toEnd=false;}
+    st.step=Math.max(0,Math.min(st.step,N));
+    $("fpMinTxt").innerHTML=`최소 개수 = ${mc}건 (거래 ${N}건 × ${S.ms.toFixed(2)})`;
+    // ① 빈도
+    const allItems=[...new Set(m.T.flat())];
+    const ord=fo.items.concat(allItems.filter(i=>!fo.rank.has(i)).sort((a,b)=>fo.counts[b]-fo.counts[a]||a-b));
+    const mx=Math.max(1,...ord.map(i=>fo.counts[i]));
+    $("fpFreq").innerHTML=ord.map(i=>{const on=fo.rank.has(i);return`<span class="nm${on?"":" off"}">${esc(nm(i))}</span><div class="${on?"":"off"}"><div class="bar" style="width:${fo.counts[i]/mx*100}%"></div></div><span class="v">${fo.counts[i]}</span><span class="rk">${on?(fo.rank.get(i)+1)+"위":"제거 (&lt; "+mc+")"}</span>`;}).join("");
+    // ② 트리
+    const s=st.step,tree=fpNew();let touched=[];
+    for(let i=0;i<s;i++)touched=fpInsert(tree,fo.sorted[i],1);
+    const tmap=new Map(touched.map(t=>[t.node,t.isNew?"new":"inc"]));
+    const head=fo.items.filter(i=>tree.links.has(i)),hc=new Map(head.map(i=>[i,(tree.links.get(i)||[]).reduce((a,n)=>a+n.count,0)]));
+    const compact=fo.items.length>6||m.tree.nodes.length>26;
+    $("fpTree").innerHTML=treeSVG(tree,head,hc,{touched:tmap,compact});
+    $("fpProg").textContent=`${s} / ${N}건 삽입 · 노드 ${tree.nodes.length}개`;
+    if(s===0)$("fpCap").innerHTML=`빈 트리(루트만)에서 시작합니다. 거래를 <b>빈도순으로 정렬한 순서</b>대로 루트부터 내려가며 넣습니다.`;
+    else{const p=fo.sorted[s-1];
+      $("fpCap").innerHTML=p.length?`<b>T${s}</b> [${esc(S.trans[s-1].join(", "))}] → 정렬·필터: <b>${esc(p.map(nm).join(" → "))}</b>. `+touched.map(t=>t.isNew?`${esc(nm(t.node.item))} <span class="ar-ok">새 노드</span>`:`${esc(nm(t.node.item))} <span class="ar-ab">공유 ${t.node.count-1}→${t.node.count}</span>`).join(", ")+"."+(s===N?` 트리 완성: 거래 ${N}건이 노드 ${tree.nodes.length}개로 압축되었습니다.`:"")
+        :`<b>T${s}</b>: 빈발 항목이 없어 트리에 넣지 않습니다.`;}
+    const VI=vIdx();
+    $("fpTx").innerHTML=`<thead><tr><th>ID</th><th>원래 거래</th><th>정렬·필터</th></tr></thead><tbody>`+m.T.map((t,i)=>{
+      const orig=S.trans[i].slice().sort((a,b)=>VI.get(a)-VI.get(b));
+      return`<tr class="${i===s-1?"cur":i<s?"done":"todo"}"><td class="id sk-mono">T${i+1}</td><td class="p">${orig.map(n=>{const ix=VI.get(n);return fo.rank.has(ix)?esc(n):`<span class="gone">${esc(n)}</span>`;}).join(", ")||"—"}</td><td class="p">${esc(fo.sorted[i].map(compact?ab:nm).join(" → "))||"—"}</td></tr>`;}).join("")+`</tbody>`;
+    const box=$("fpTxBox"),row=$("fpTx").tBodies[0].rows[Math.max(0,s-1)];
+    if(row&&s>0){const y=row.offsetTop;if(y<box.scrollTop+30||y>box.scrollTop+box.clientHeight-30)box.scrollTop=y-60;}else if(s===0)box.scrollTop=0;
+    $("fpPrev").disabled=s===0;$("fpFirst").disabled=s===0;$("fpNext").disabled=s===N;$("fpEnd").disabled=s===N;
+    renderMine(m,compact);renderCmp(m);
+  }
+  function renderMine(m,compact){
+    const fo=m.fo,mc=m.minCnt,items=fo.items.slice().reverse();
+    if(!items.length){$("fpItemSeg").innerHTML="";["fpBase","fpCondCnt","fpMined","fpCond"].forEach(id=>$(id).innerHTML="");$("fpMined").innerHTML=`<span class="ar-empty" style="border:0;background:none">빈발 항목이 없습니다.</span>`;return;}
+    const mineOf=x=>{const base=patternBase(m.tree,x),ct=condTree(base,mc,fo.rank),out=[{set:[x],count:fo.counts[x]}];fpMine(ct.tree,mc,fo.rank,[x],out,{trees:0});return{base,ct,out};};
+    if(S.fpItem===null||!fo.rank.has(S.fpItem)){let best=items[0],bn=-1;items.forEach(x=>{const n=mineOf(x).out.length;if(n>bn){bn=n;best=x;}});S.fpItem=best;}
+    $("fpItemSeg").innerHTML=items.map(x=>`<button type="button" data-v="${x}" aria-pressed="${x===S.fpItem}">${esc(nm(x))}</button>`).join("");
+    const x=S.fpItem,{base,ct,out}=mineOf(x);
+    $("fpBaseTitle").innerHTML=`조건부 패턴 베이스: <span class="ar-b">${esc(nm(x))}</span>로 끝나는 경로 ${base.length}개`;
+    $("fpBase").innerHTML=`<thead><tr><th>${esc(nm(x))} 노드 위쪽 경로 (접두 경로)</th><th>개수</th></tr></thead><tbody>`+base.map(b=>`<tr><td>${b.path.length?esc(b.path.map(nm).join(" → ")):'<span class="ar-empty">(루트 바로 아래)</span>'}</td><td class="n">${b.count}</td></tr>`).join("")+`</tbody>`;
+    const cc=[...ct.counts.entries()].sort((a,b)=>fo.rank.get(a[0])-fo.rank.get(b[0]));
+    $("fpCondCnt").innerHTML=`<span class="row"><span class="k">경로 안 항목 개수</span> `+(cc.length?cc.map(([i,c])=>`${esc(nm(i))} ${c}${c>=mc?' <span class="ar-ok">유지</span>':' <span class="ar-bad">제거</span>'}`).join(" · "):"없음")+`</span><span class="row" style="color:var(--muted)">최소 개수 ${mc} 이상만 조건부 FP-트리에 남깁니다.</span>`;
+    $("fpCondTitle").innerHTML=`조건부 FP-트리 (<span class="ar-b">${esc(nm(x))}</span> 조건)`;
+    const head=fo.items.filter(i=>ct.keep.has(i)),hc=new Map(head.map(i=>[i,ct.counts.get(i)]));
+    $("fpCond").innerHTML=ct.tree.nodes.length?treeSVG(ct.tree,head,hc,{compact}):`<p class="ar-empty" style="padding:12px;margin:0">남는 항목이 없어 조건부 트리가 비었습니다 → {${esc(nm(x))}} 하나만 빈발입니다.</p>`;
+    $("fpMined").innerHTML=out.sort((a,b)=>a.set.length-b.set.length||b.count-a.count).map(o=>`<span>${esc(setTxt(o.set))}<b>${o.count}</b></span>`).join("");
+  }
+  function renderCmp(m){
+    const A=new Map(m.ap.freq.map(f=>[keyOf(f.set),f])),F=new Map(m.fpm.map(f=>[keyOf(f.set),f]));
+    const keys=[...new Set([...A.keys(),...F.keys()])];
+    const same=keys.every(k=>A.has(k)&&F.has(k)&&A.get(k).count===F.get(k).count);
+    $("fpCmpHint").innerHTML=same?`<span class="ar-match">결과 일치</span>: 두 방법 모두 빈발 항목 집합 ${keys.length}개`:`<span class="ar-mismatch">불일치</span>`;
+    $("fpCmpStats").innerHTML=[["데이터 스캔",`Apriori ${m.ap.scans}회 · FP ${m.N?2:0}회`],["센 후보 집합",`Apriori ${m.ap.counted}개 · FP 0개`],["가지치기한 후보 (Apriori)",m.ap.pruned+"개"],["조건부 FP-트리 (FP)",m.fpTrees+"개"],["빈발 항목 집합",`${A.size} = ${F.size}`]]
+      .map(([l,v])=>`<div class="sk-stat"><b style="font-size:16px">${v}</b><span>${l}</span></div>`).join("");
+    const rows=keys.map(k=>({k,set:(A.get(k)||F.get(k)).set})).sort((a,b)=>a.set.length-b.set.length||(A.get(b.k)||F.get(b.k)).count-(A.get(a.k)||F.get(a.k)).count||a.k.localeCompare(b.k));
+    $("fpCmp").innerHTML=`<thead><tr><th>항목 집합</th><th>크기</th><th>Apriori 개수</th><th>FP-Growth 개수</th><th>지지도</th><th>일치</th></tr></thead><tbody>`+
+      rows.map(r=>{const a=A.get(r.k),f=F.get(r.k),ok=a&&f&&a.count===f.count;return`<tr><td>${esc(setTxt(r.set))}</td><td class="n">${r.set.length}</td><td class="n">${a?a.count:"—"}</td><td class="n">${f?f.count:"—"}</td><td class="n">${f3((a||f).count/m.N)}</td><td>${ok?'<span class="ar-match">일치</span>':'<span class="ar-mismatch">다름</span>'}</td></tr>`;}).join("")+`</tbody>`;
+  }
+  function go(i){st.step=i;render();}
+  function next(){if(st.step<M().N)go(st.step+1);else stop();}
+  function tick(){next();if(st.step>=M().N){stop();return;}st.timer=setTimeout(tick,1100/st.speed);}
+  function play(){if(st.timer){stop();return;}if(st.step>=M().N)st.step=0;render();$("fpPlay").textContent="멈춤";st.timer=setTimeout(tick,1100/st.speed);}
+  function stop(){if(st.timer)clearTimeout(st.timer);st.timer=null;$("fpPlay").textContent="재생";}
+  $("fpFirst").onclick=()=>{stop();go(0);};$("fpPrev").onclick=()=>{stop();go(st.step-1);};$("fpNext").onclick=()=>{stop();next();};$("fpPlay").onclick=play;$("fpEnd").onclick=()=>{stop();go(M().N);};
+  $("fpSpeed").oninput=e=>{st.speed=+e.target.value;$("fpSpeedV").textContent=st.speed+"×";};
+  $("fpItemSeg").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b){S.fpItem=+b.dataset.v;render();}});
+  return{render,next,stop,set toEnd(v){st.toEnd=v;}};
+})();
+
+/* ============================================================
+   5. 최소 지지도 정하기
+   ============================================================ */
+function lineChart(o){
+  const W=520,H=320,ml=52,mr=16,mt=16,mb=44;
+  const ymaxRaw=Math.max(1,...o.series.flatMap(s=>s.ys));
+  const tr=v=>o.log?Math.log10(1+v):v,ymax=o.log?Math.log10(1+ymaxRaw)*1.05:niceMax(ymaxRaw);
+  const X=v=>ml+(v-o.x0)/(o.x1-o.x0)*(W-ml-mr),Y=v=>mt+(1-tr(v)/ymax)*(H-mt-mb);
+  let g="";
+  o.xt.forEach(t=>{g+=`<line class="gr" x1="${X(t)}" y1="${mt}" x2="${X(t)}" y2="${H-mb}"/><text class="tk" x="${X(t)}" y="${H-mb+16}" text-anchor="middle">${t.toFixed(o.xd)}</text>`;});
+  const yt=o.log?[0,1,3,10,30,100,300,1000,3000,10000].filter(t=>tr(t)<=ymax):ticks(ymax);
+  yt.forEach(t=>{g+=`<line class="gr" x1="${ml}" y1="${Y(t)}" x2="${W-mr}" y2="${Y(t)}"/><text class="tk" x="${ml-6}" y="${Y(t)+4}" text-anchor="end">${t}</text>`;});
+  g+=`<line class="ax" x1="${ml}" y1="${H-mb}" x2="${W-mr}" y2="${H-mb}"/><line class="ax" x1="${ml}" y1="${mt}" x2="${ml}" y2="${H-mb}"/>`;
+  g+=`<text class="tl" x="${(ml+W-mr)/2}" y="${H-6}" text-anchor="middle">${o.xl}</text><text class="tl" transform="translate(14 ${(mt+H-mb)/2}) rotate(-90)" text-anchor="middle">개수</text>`;
+  o.series.forEach((s,si)=>{g+=`<path class="s${si+1}" d="${s.ys.map((y,i)=>(i?"L":"M")+X(o.xs[i]).toFixed(1)+","+Y(y).toFixed(1)).join("")}"/>`;});
+  const mxv=o.mark;g+=`<line class="mk" x1="${X(mxv)}" y1="${mt}" x2="${X(mxv)}" y2="${H-mb}"/>`;
+  o.series.forEach((s,si)=>{const v=s.at;g+=`<circle class="d${si+1}" cx="${X(mxv)}" cy="${Y(v)}" r="5"/><text class="mkl" x="${X(mxv)+(X(mxv)>W-120?-8:8)}" y="${Y(v)-7}" text-anchor="${X(mxv)>W-120?"end":"start"}">${v}</text>`;});
+  const lg=o.series.map((s,si)=>`<text class="sl" x="${W-mr-6}" y="${mt+14+si*17}" text-anchor="end" style="fill:${si?"var(--c-b)":"var(--c-use)"}">${s.name}</text>`).join("");
+  return`<svg viewBox="0 0 ${W} ${H}" class="ar-svg" role="img" aria-label="${o.aria}">${g}${lg}</svg>`;
+}
+function niceMax(v){const p=Math.pow(10,Math.floor(Math.log10(v))),m=v/p;return(m<=1?1:m<=2?2:m<=5?5:10)*p;}
+function ticks(mx){const st=mx/5;return[0,1,2,3,4,5].map(i=>Math.round(i*st*100)/100);}
+function renderSupport(){
+  const m=M(),low=LOW(),N=m.N;
+  const xs=[];for(let v=.02;v<=.6001;v+=.01)xs.push(Math.round(v*100)/100);
+  const fc=xs.map(x=>{const mc=minCountOf(x,N);return low.sets.filter(s=>s.count>=mc).length;});
+  const rc=xs.map(x=>{const mc=minCountOf(x,N);return low.rules.filter(r=>r.nAB>=mc&&passRule(r)).length;});
+  const curF=m.ap.freq.length,curR=m.rules.filter(passRule).length;
+  $("spChart1").innerHTML=lineChart({xs,x0:.02,x1:.6,xt:[.1,.2,.3,.4,.5,.6],xd:1,xl:"최소 지지도 min_support",log:S.ylog,mark:S.ms,
+    series:[{name:"빈발 항목 집합",ys:fc,at:curF},{name:`규칙 (신뢰도 ≥ ${S.mc.toFixed(2)}, lift ≥ ${S.ml.toFixed(1)})`,ys:rc,at:curR}],aria:"최소 지지도에 따른 빈발 집합과 규칙 수"});
+  const cx=[];for(let v=0;v<=1.0001;v+=.05)cx.push(Math.round(v*100)/100);
+  const rules=m.rules.filter(r=>r.lift>=S.ml-1e-9);
+  const cr=cx.map(c=>rules.filter(r=>r.conf>=c-1e-9).length);
+  $("spChart2").innerHTML=lineChart({xs:cx,x0:0,x1:1,xt:[0,.2,.4,.6,.8,1],xd:1,xl:"최소 신뢰도 min_confidence",log:S.ylog,mark:S.mc,
+    series:[{name:"빈발 항목 집합 (변화 없음)",ys:cx.map(()=>curF),at:curF},{name:"규칙",ys:cr,at:curR}],aria:"최소 신뢰도에 따른 규칙 수"});
+  const maxR=rc[0],maxF=fc[0];
+  $("spStats").innerHTML=[["현재 최소 개수",m.minCnt+"건"],["빈발 항목 집합",curF],["통과 규칙",curR],["min_support 0.02일 때 규칙",maxR]].map(([l,v])=>`<div class="sk-stat"><b>${v}</b><span>${l}</span></div>`).join("");
+  $("spFlood").innerHTML=`<b>규칙 홍수</b><span>최소 지지도를 0.02까지 낮추면 빈발 집합 ${maxF}개, 규칙 ${maxR}개가 쏟아집니다(현재 ${curR}개). 항목이 많을수록 조합이 기하급수로 늘어 사람이 읽을 수 없게 되고, 우연히 맞아떨어진 규칙도 섞입니다. 반대로 너무 높이면 뻔한 규칙만 남습니다.</span>`;
+  // 상관 ≠ 인과: lift 대칭
+  const pair=m.rules.filter(r=>passRule(r)&&r.A.length===1&&r.B.length===1).sort((a,b)=>b.lift-a.lift)[0]||m.rules.filter(r=>r.A.length===1&&r.B.length===1).sort((a,b)=>b.lift-a.lift)[0];
+  if(pair){const rev=m.rules.find(r=>r.key===keyOf(pair.B)+">"+keyOf(pair.A));
+    $("spCause").innerHTML=`<b>상관 ≠ 인과</b><span>${esc(setTxt(pair.A))} → ${esc(setTxt(pair.B))}의 향상도 ${f3(pair.lift)}, 거꾸로 ${esc(setTxt(pair.B))} → ${esc(setTxt(pair.A))}도 ${f3(rev?rev.lift:pair.lift)}로 <b>같습니다</b>(lift는 대칭). 신뢰도만 ${f3(pair.conf)} / ${f3(rev?rev.conf:NaN)}로 다를 뿐, 어느 쪽이 원인인지 규칙은 말해 주지 않습니다. 나이·생활습관 같은 공통 원인이 둘 다를 만들 수도 있습니다.</span>`;}
+  else $("spCause").innerHTML=`<b>상관 ≠ 인과</b><span>lift(A→B) = lift(B→A)로 대칭입니다. 규칙은 함께 나타난다는 뜻일 뿐 원인 방향을 말해 주지 않습니다.</span>`;
+  const rare=low.rules.filter(r=>r.nAB>=2&&r.sup<S.ms-1e-9&&r.lift>=2&&r.conf>=.6).sort((a,b)=>b.lift-a.lift||b.conf-a.conf).slice(0,8);
+  $("spRare").innerHTML=`<b>희귀하지만 중요한 조합을 놓침</b><span>최소 지지도는 "자주 나오는 것"만 남깁니다. 환자 수가 적은 질환 조합은 향상도가 매우 높아도 걸러집니다. 아래는 현재 기준(${S.ms.toFixed(2)})에서 빠진 강한 규칙입니다(지지도 &lt; ${S.ms.toFixed(2)}, 신뢰도 ≥ 0.6, lift ≥ 2). 필요하면 관심 항목만 따로 낮은 기준으로 분석합니다.</span>`;
+  $("spRareTbl").innerHTML=`<thead><tr><th>규칙</th><th>건수</th><th>지지도</th><th>신뢰도</th><th>향상도</th></tr></thead><tbody>`+
+    (rare.length?rare.map(r=>`<tr><td class="r">${ruleHTML(r)}</td><td class="n">${r.nAB}</td><td class="n">${f3(r.sup)}</td><td class="n">${f3(r.conf)}</td><td class="n"><b>${f3(r.lift)}</b></td></tr>`).join("")
+      :`<tr><td colspan="5" class="ar-empty">현재 기준에서 빠진 강한 규칙이 없습니다${S.ds==="small"?" (큰 데이터 200건에서 확인해 보세요)":""}.</td></tr>`)+`</tbody>`;
+}
+segInit($("spScale"),v=>{S.ylog=v==="log";renderSupport();});
+
+/* ============================================================
+   6. 코드
+   ============================================================ */
+function genCode(){
+  const m=M(),pass=sortRules(m.rules.filter(passRule)).sort((a,b)=>b.lift-a.lift||b.conf-a.conf);
+  const L=[];
+  L.push("# 연관분석: Apriori · FP-Growth (mlxtend)","# pip install mlxtend pandas","import pandas as pd","from mlxtend.preprocessing import TransactionEncoder","from mlxtend.frequent_patterns import apriori, fpgrowth, association_rules","");
+  L.push(`# 1. 거래 데이터: 환자 1명 = 거래 1건, 동반 진단 = 항목 (${m.N}건)`,"transactions = [");
+  S.trans.forEach((t,i)=>L.push(`    [${t.map(x=>'"'+x+'"').join(", ")}],   # T${i+1}`));
+  L.push("]","");
+  L.push("# 2. 원-핫 인코딩: 거래 × 항목 True/False 표","te = TransactionEncoder()","onehot = te.fit(transactions).transform(transactions)","df = pd.DataFrame(onehot, columns=te.columns_)","print(df.astype(int))","");
+  L.push(`# 3. 빈발 항목 집합: min_support = ${S.ms.toFixed(2)} (${m.N}건 중 ${m.minCnt}건 이상)`,
+    `freq = apriori(df, min_support=${S.ms.toFixed(2)}, use_colnames=True)`,
+    `freq_fp = fpgrowth(df, min_support=${S.ms.toFixed(2)}, use_colnames=True)`,
+    `freq["length"] = freq["itemsets"].apply(len)`,
+    `print(freq.sort_values(["length", "support"], ascending=[True, False]))   # ${m.ap.freq.length}개`,"",
+    "# Apriori와 FP-Growth 결과 비교 (항목 집합과 지지도)",
+    "a = {s: round(v, 10) for s, v in zip(freq[\"itemsets\"], freq[\"support\"])}",
+    "b = {s: round(v, 10) for s, v in zip(freq_fp[\"itemsets\"], freq_fp[\"support\"])}",
+    "print(\"결과 일치:\", a == b)   # True","");
+  if(S.metric==="lift"){
+    L.push(`# 4. 연관규칙: 향상도 ≥ ${S.ml.toFixed(1)} 이고 신뢰도 ≥ ${S.mc.toFixed(2)}`,
+      `rules = association_rules(freq, num_itemsets=len(df), metric="lift", min_threshold=${S.ml.toFixed(1)})`,
+      `rules = rules[rules["confidence"] >= ${S.mc.toFixed(2)}]`);
+  } else {
+    L.push(`# 4. 연관규칙: 신뢰도 ≥ ${S.mc.toFixed(2)} 이고 향상도 ≥ ${S.ml.toFixed(1)}`,
+      `rules = association_rules(freq, num_itemsets=len(df), metric="confidence", min_threshold=${S.mc.toFixed(2)})`,
+      `rules = rules[rules["lift"] >= ${S.ml.toFixed(1)}]`);
+  }
+  L.push(`cols = ["antecedents", "consequents", "support", "confidence", "lift", "leverage", "conviction"]`,
+    `print(rules[cols].sort_values("lift", ascending=False).round(3).to_string())   # ${pass.length}개`);
+  if(pass.length){
+    L.push("","# 시뮬레이터 결과 (향상도 순 상위 "+Math.min(8,pass.length)+"개)","#   A → B : 지지도 / 신뢰도 / 향상도");
+    pass.slice(0,8).forEach(r=>L.push(`#   ${setTxt(r.A)} → ${setTxt(r.B)} : ${f3(r.sup)} / ${f3(r.conf)} / ${f3(r.lift)}`));
+  }
+  L.push("","# 5. 해석 문장 만들기","for _, r in rules.sort_values(\"lift\", ascending=False).head(3).iterrows():",
+    "    lhs, rhs = \", \".join(sorted(r[\"antecedents\"])), \", \".join(sorted(r[\"consequents\"]))",
+    "    print(f\"{lhs} 환자의 {r['confidence']:.0%}가 {rhs} 진단도 받았고, 평균보다 {r['lift']:.2f}배 높습니다.\")");
+  return L.join("\n");
+}
+function hl(code){
+  return code.split("\n").map(line=>{
+    const i=line.indexOf("#");let a=line,b="";
+    if(i>=0){const before=line.slice(0,i);if(((before.match(/"/g)||[]).length%2)===0){a=before;b=line.slice(i);}}
+    let h=esc(a).replace(/(&quot;[^&]*?&quot;)/g,'<span class="st">$1</span>').replace(/\b(import|from|as|print|for|in|True|False)\b/g,'<span class="kw">$1</span>');
+    h=h.replace(/(min_support=[0-9.]+|min_threshold=[0-9.]+|&gt;= [0-9.]+)/g,'<span class="hl">$1</span>');
+    return h+(b?`<span class="cm">${esc(b)}</span>`:"");}).join("\n");
+}
+function renderCode(){
+  const m=M();$("cHint").textContent=`거래 ${m.N}건 · min_support ${S.ms.toFixed(2)} · min_confidence ${S.mc.toFixed(2)} · min_lift ${S.ml.toFixed(1)}`;
+  $("cCode").innerHTML=hl(genCode());
+}
+segInit($("cMetric"),v=>{S.metric=v;renderCode();});
+$("cCopy").onclick=()=>{const txt=genCode();const done=()=>{$("cCopyMsg").textContent="복사했습니다.";setTimeout(()=>$("cCopyMsg").textContent="",1800);};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(done,()=>fallback(txt,done));else fallback(txt,done);};
+function fallback(txt,done){const ta=document.createElement("textarea");ta.value=txt;ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();try{document.execCommand("copy");done();}catch(e){}ta.remove();}
+
+/* ---------- 테마가 바뀌면 다시 그리기 ---------- */
+new MutationObserver(()=>renderCur()).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+if(window.matchMedia)matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>renderCur());
+
+/* ---------- 시작 ---------- */
+loadDS();renderBar();
+const startTab=location.hash.slice(1);showTab(TABS.includes(startTab)?startTab:"metric");
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1266 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KNN (k-최근접 이웃) 시뮬레이터 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20260930c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20260930c">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 클래스 정상 파랑 · 당뇨 주황 · 전단계 자홍 / 거리 원·모델 보라 · 검증 청록 · 학습 파랑 · 한계 빨강 · 최적 초록 */
+:root{ --sk-accent: var(--cat-ml);
+  --c0:#2563EB; --c1:#EA580C; --c2:#C026D3; --mdl:#7C3AED; --val:#0D9488; --trn:#2563EB; --lim:#DC2626; --ok:#16A34A; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --c0:#6AA5FF; --c1:#FF914D; --c2:#E879F9; --mdl:#B294FF; --val:#33D1BD; --trn:#6AA5FF; --lim:#F87171; --ok:#4ADE80; } }
+:root[data-theme="dark"]{ --c0:#6AA5FF; --c1:#FF914D; --c2:#E879F9; --mdl:#B294FF; --val:#33D1BD; --trn:#6AA5FF; --lim:#F87171; --ok:#4ADE80; }
+
+.kn-main{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:1000px){.kn-main{grid-template-columns:minmax(0,1fr)}}
+.kn-stack{display:flex;flex-direction:column;gap:16px;min-width:0}
+.kn-mt{margin-top:16px}
+.kn-cv{display:block;width:100%;border-radius:10px;touch-action:none}
+.kn-cv--2d{aspect-ratio:5/4;cursor:crosshair}
+.kn-cv--sq{aspect-ratio:1/1}
+.kn-cv--43{aspect-ratio:4/3;cursor:crosshair}
+.kn-cv--strip{aspect-ratio:3/1;touch-action:auto}
+.kn-cv--reg{aspect-ratio:16/10;cursor:ew-resize}
+.kn-cv--hist{aspect-ratio:16/7;touch-action:auto}
+@media (max-width:600px){.kn-cv--2d{aspect-ratio:1/1}.kn-cv--reg{aspect-ratio:5/4}.kn-cv--hist{aspect-ratio:16/10}.kn-cv--strip{aspect-ratio:2/1}}
+.kn-cv:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+.kn-dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.kn-sq{display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:-1px}
+.kn-tri{display:inline-block;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:11px solid currentColor;margin-right:5px;vertical-align:-1px}
+.kn-ln{display:inline-block;width:18px;height:3px;border-radius:2px;margin-right:5px;vertical-align:3px}
+.kn-ln.dash{height:0;border-top:2px dashed currentColor;background:none!important}
+.kn-f{white-space:pre-wrap}
+.kn-f .m{color:var(--mdl);font-weight:600} .kn-f .c{color:var(--muted)} .kn-f b{color:var(--ink)}
+.kn-f .v{color:var(--val);font-weight:600} .kn-f .r{color:var(--lim);font-weight:600} .kn-f .g{color:var(--ok);font-weight:600}
+.kn-sub{font-size:12.5px;color:var(--muted);margin:0}
+.kn-row{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.kn-warn{color:var(--lim);font-weight:700}
+.kn-kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--ink)}
+
+/* 예측 결과 */
+.kn-result{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.kn-result .big{font-size:24px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:8px}
+.kn-result .big i{width:16px;height:16px;border-radius:50%;display:inline-block}
+.kn-votes{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px 10px;align-items:center;font-size:13.5px}
+.kn-votes .nm{font-weight:600;color:var(--text);white-space:nowrap}
+.kn-votes .tr{height:18px;background:var(--surface-2);border-radius:5px;overflow:hidden;position:relative}
+.kn-votes .fl{position:absolute;left:0;top:0;bottom:0;border-radius:5px;transition:width .2s}
+.kn-votes .vv{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);text-align:right;white-space:nowrap}
+.kn-votes .win .nm{color:var(--ink);font-weight:700}
+
+/* 표 */
+.kn-tbl td.cls{white-space:nowrap}
+.kn-tbl tr.out td{color:var(--faint)}
+.kn-tbl tr.cut td{border-top:2px dashed var(--mdl)}
+.kn-tbl tr.in td.n.d{color:var(--mdl);font-weight:700}
+.kn-tbl .calc{font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+.kn-tblwrap{max-height:430px;overflow:auto}
+
+/* 거리 종류 카드 */
+.kn-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:700px){.kn-metrics{grid-template-columns:minmax(0,1fr)}}
+.kn-met{appearance:none;font:inherit;text-align:left;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:12px;display:grid;grid-template-columns:76px minmax(0,1fr);gap:4px 12px;align-items:center;cursor:pointer}
+.kn-met:hover{background:var(--surface-2)}
+.kn-met[aria-pressed="true"]{border-color:var(--mdl);background:color-mix(in srgb,var(--mdl) 7%,var(--surface))}
+.kn-met:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.kn-met svg{grid-row:span 3;width:76px;height:76px}
+.kn-met b{font-size:15px}
+.kn-met .fm{font-family:var(--mono);font-size:12.5px;color:var(--text)}
+.kn-met .ds{font-size:12.5px;color:var(--muted)}
+
+/* SVG 차트 */
+.kn-chart{width:100%;min-width:0}
+.kn-chart svg{display:block;width:100%;height:auto}
+.kn-chart .gl{stroke:var(--line);stroke-width:1}
+.kn-chart .gl0{stroke:var(--line-strong);stroke-width:1.2}
+.kn-chart .ax{fill:var(--muted);font-size:11px;font-family:var(--mono)}
+.kn-chart .axl{fill:var(--muted);font-size:11.5px;font-family:var(--sans);font-weight:600}
+.kn-chart .lbl{font-size:11.5px;font-family:var(--sans);font-weight:700}
+.kn-chart .click{cursor:pointer}
+
+/* 기여도 막대 */
+.kn-contrib{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 12px;align-items:center;font-size:13px}
+.kn-contrib .nm{color:var(--muted);font-weight:600;white-space:nowrap}
+.kn-contrib .bar{display:flex;height:22px;border-radius:6px;overflow:hidden;background:var(--surface-2);font-family:var(--mono);font-size:11.5px;font-weight:600}
+.kn-contrib .bar span{display:flex;align-items:center;padding:0 6px;color:var(--on-ink);white-space:nowrap;overflow:hidden;min-width:0}
+.kn-contrib .bar .a{background:var(--mdl)} .kn-contrib .bar .b{background:var(--val)}
+.kn-chips{display:flex;flex-wrap:wrap;gap:4px}
+.kn-chip{font-family:var(--mono);font-size:12px;font-weight:600;border-radius:6px;padding:1px 6px;border:1.5px solid currentColor;line-height:1.5}
+.kn-chip.new{background:color-mix(in srgb,currentColor 14%,var(--surface))}
+
+/* 작은 그림 4개 */
+.kn-minis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:900px){.kn-minis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kn-mini{display:flex;flex-direction:column;gap:6px;min-width:0}
+.kn-mini .cap{font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.4}
+.kn-mini .cap b{color:var(--ink);font-family:var(--mono)}
+.kn-mini canvas{cursor:pointer}
+
+/* 비교표 */
+.kn-cmp td,.kn-cmp th{white-space:normal;min-width:84px}
+.kn-cmp td.n{white-space:nowrap}
+.kn-cmp .kn-chips{min-width:140px}
+.kn-cmp td b{white-space:nowrap}
+.kn-cmp td.hi{color:var(--lim);font-weight:700}
+.kn-cmp td.lo{color:var(--ok);font-weight:700}
+
+/* 코드 */
+.kn-code{position:relative}
+.kn-code pre{margin:0;font-family:var(--mono);font-size:12.5px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow:auto;color:var(--ink);max-height:680px}
+.kn-code pre .cm{color:var(--muted)}
+.kn-code pre .kw{color:var(--sk-accent);font-weight:600}
+.kn-code pre .st{color:var(--val)}
+.kn-copy{position:absolute;top:8px;right:8px}
+.sk-stat.kn-hl{border-color:var(--sk-accent)}
+.sk-stat.kn-ok{border-color:var(--ok)}
+@media (max-width:520px){
+  .sk-slider{min-width:0;width:100%}
+  .sk-controls{gap:10px 12px}
+  .sk-stat{min-width:0;flex:1 1 30%}
+  .sk-seg button{padding:6px 8px}
+  .kn-result .big{font-size:20px}
+}
+@media (prefers-reduced-motion: reduce){ .kn-votes .fl{transition:none} }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)" aria-current="page">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">KNN (k-최근접 이웃) 시뮬레이터</h1>
+      <p class="ds-hero__lede">새 환자와 가장 가까운 기존 환자 k명을 찾아 다수결로 진단을 예측하는 k-최근접 이웃(KNN)을 혈당·BMI 검진 데이터로 직접 조작합니다. 거리의 종류와 가중치, k에 따른 결정 경계와 과적합, 스케일링이 필요한 이유, 회귀, 계산 비용과 차원의 저주까지 따라갑니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button type="button" class="sk-tab" role="tab" id="tab-predict" aria-controls="pane-predict" aria-selected="true"><span class="sk-num">1</span>한 점 예측하기</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-boundary" aria-controls="pane-boundary" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>결정 경계와 k</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-scale" aria-controls="pane-scale" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>스케일링이 필요한 이유</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-reg" aria-controls="pane-reg" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>KNN 회귀</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-cost" aria-controls="pane-cost" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>계산 비용과 차원의 저주</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>코드</button>
+  </nav>
+
+  <!-- ================= 1. 한 점 예측하기 ================= -->
+  <section id="pane-predict" role="tabpanel" aria-labelledby="tab-predict">
+    <div class="kn-main">
+      <div class="sk-card">
+        <div class="sk-head"><h2>새 환자(별)를 끌어 보세요</h2>
+          <div class="sk-legend" id="p1leg"></div>
+        </div>
+        <div class="sk-controls">
+          <div class="sk-slider" style="min-width:200px"><div class="sk-sl-head"><label for="p1k">이웃 수 k</label><b id="p1kv">5</b></div><input type="range" id="p1k" min="1" max="25" step="1" value="5"></div>
+          <div class="sk-group"><span class="sk-label">거리</span>
+            <div class="sk-seg" id="p1met" role="group" aria-label="거리 종류">
+              <button type="button" data-v="euclid" aria-pressed="true">유클리드</button><button type="button" data-v="manhattan" aria-pressed="false">맨해튼</button><button type="button" data-v="cheby" aria-pressed="false">체비쇼프</button>
+            </div></div>
+          <div class="sk-group"><span class="sk-label">가중치</span>
+            <div class="sk-seg" id="p1w" role="group" aria-label="투표 가중치">
+              <button type="button" data-v="uniform" aria-pressed="true">uniform (1표씩)</button><button type="button" data-v="distance" aria-pressed="false">distance (1/d)</button>
+            </div></div>
+        </div>
+        <p class="kn-sub" id="p1khint"></p>
+        <canvas id="cv1" class="kn-cv kn-cv--2d" tabindex="0" aria-label="공복혈당(가로)과 BMI(세로) 산점도. 별은 새 환자이며 화살표 키로도 움직일 수 있습니다. 빈 곳을 누르면 점 추가, 점을 누르면 삭제."></canvas>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">클래스</span>
+            <div class="sk-seg" id="p1nc" role="group" aria-label="클래스 수">
+              <button type="button" data-v="2" aria-pressed="true">2개 (정상·당뇨)</button><button type="button" data-v="3" aria-pressed="false">3개 (+전단계)</button>
+            </div></div>
+          <div class="sk-group"><span class="sk-label">클릭해 추가할 점</span><div class="sk-seg" id="p1add" role="group" aria-label="추가할 점의 클래스"></div></div>
+        </div>
+        <div class="sk-controls">
+          <button type="button" class="sk-btn sk-btn--sm" id="p1seed">다른 환자들 (seed +1)</button>
+          <button type="button" class="sk-btn sk-btn--sm" id="p1reset">점 되돌리기</button>
+          <label class="sk-check"><input type="checkbox" id="p1bg">예측 영역 배경 보기</label>
+          <span class="sk-hint" id="p1info"></span>
+        </div>
+        <p class="kn-sub">별을 끌면 새 환자가 움직입니다(키보드: 그림을 선택하고 <span class="kn-kbd">←</span><span class="kn-kbd">↑</span><span class="kn-kbd">→</span><span class="kn-kbd">↓</span>, Shift는 5배). 빈 곳을 누르면 점 추가, 기존 점을 누르면 삭제됩니다. 두 특성은 표준화(z 점수)한 뒤 거리를 잽니다 — 이유는 3번 화면.</p>
+      </div>
+      <div class="kn-stack">
+        <div class="sk-card">
+          <div class="sk-head"><h2>예측 결과</h2><span class="sk-hint" id="p1rhint"></span></div>
+          <div class="kn-result" id="p1res" aria-live="polite"></div>
+          <div class="kn-votes" id="p1votes"></div>
+          <div class="sk-formula kn-f" id="p1vf"></div>
+        </div>
+        <div class="sk-card">
+          <div class="sk-head"><h2>거리 계산</h2><span class="sk-hint">표준화 → 거리</span></div>
+          <div class="sk-formula kn-f" id="p1f"></div>
+        </div>
+      </div>
+    </div>
+    <div class="sk-card kn-mt">
+      <div class="sk-head"><h2>가까운 순서대로 줄 세우기</h2><span class="sk-hint" id="p1thint"></span></div>
+      <div class="kn-tblwrap sk-scroll"><table class="sk-table kn-tbl" id="p1tab"></table></div>
+      <p class="kn-sub">Δ = 새 환자의 z − 기존 환자의 z. 보라 점선 위쪽 k명이 투표에 참여합니다. 거리가 같은 이웃은 인덱스가 작은 점을 먼저 둡니다.</p>
+    </div>
+    <div class="sk-card kn-mt">
+      <div class="sk-head"><h2>'가깝다'를 재는 세 가지 방법</h2><span class="sk-hint">눌러서 선택 · 같은 거리 1인 점들이 이루는 모양</span></div>
+      <div class="kn-metrics" id="p1mets">
+        <button type="button" class="kn-met" data-v="euclid" aria-pressed="true"><svg viewBox="-42 -42 84 84" aria-hidden="true"></svg><b>유클리드 (p = 2)</b><span class="fm">d = √(Δ₁² + Δ₂²)</span><span class="ds">직선 거리. 같은 거리 = 원</span></button>
+        <button type="button" class="kn-met" data-v="manhattan" aria-pressed="false"><svg viewBox="-42 -42 84 84" aria-hidden="true"></svg><b>맨해튼 (p = 1)</b><span class="fm">d = |Δ₁| + |Δ₂|</span><span class="ds">바둑판 길 거리. 같은 거리 = 마름모</span></button>
+        <button type="button" class="kn-met" data-v="cheby" aria-pressed="false"><svg viewBox="-42 -42 84 84" aria-hidden="true"></svg><b>체비쇼프 (p = ∞)</b><span class="fm">d = max(|Δ₁|, |Δ₂|)</span><span class="ds">가장 큰 차이 하나. 같은 거리 = 정사각형</span></button>
+      </div>
+      <div class="sk-formula kn-f">민코프스키 거리  d = ( |Δ₁|<sup>p</sup> + |Δ₂|<sup>p</sup> )<sup>1/p</sup>      p = 1 맨해튼 · p = 2 유클리드 · p → ∞ 체비쇼프
+<span class="c">uniform  :</span> 이웃 k명이 1표씩 → 가장 많은 클래스          <span class="c">확률 = 그 클래스 표 수 / k</span>
+<span class="c">distance :</span> 이웃마다 1/d 표 → 가까운 이웃의 목소리가 큼   <span class="c">확률 = 그 클래스의 1/d 합 / 전체 1/d 합</span></div>
+    </div>
+  </section>
+
+  <!-- ================= 2. 결정 경계와 k ================= -->
+  <section id="pane-boundary" role="tabpanel" aria-labelledby="tab-boundary" hidden>
+    <div class="kn-main">
+      <div class="sk-card">
+        <div class="sk-head"><h2>배경 = 그 자리에 새 환자가 오면 내릴 예측</h2><div class="sk-legend" id="b2leg"></div></div>
+        <div class="sk-controls">
+          <div class="sk-slider" style="min-width:240px"><div class="sk-sl-head"><label for="b2k">이웃 수 k</label><b id="b2kv">7</b></div><input type="range" id="b2k" min="1" max="30" step="1" value="7"></div>
+          <button type="button" class="sk-btn sk-btn--sm" id="b2best">최적 k로</button>
+          <label class="sk-check"><input type="checkbox" id="b2err" checked>학습 데이터 오분류 표시</label>
+        </div>
+        <canvas id="cv2" class="kn-cv kn-cv--2d" aria-label="k에 따른 KNN 결정 경계. 배경색은 예측 클래스, 진하기는 투표 확신 정도."></canvas>
+        <p class="kn-sub" id="b2sub"></p>
+      </div>
+      <div class="kn-stack">
+        <div class="sk-card">
+          <div class="sk-head"><h2>k = 1 ~ 30 정확도</h2><span class="sk-hint">그래프를 누르면 그 k로</span></div>
+          <div class="sk-group"><span class="sk-label">검증 방법</span>
+            <div class="sk-seg" id="b2cv" role="group" aria-label="검증 방법">
+              <button type="button" data-v="k5" aria-pressed="true">5겹 교차검증</button><button type="button" data-v="k10" aria-pressed="false">10겹 교차검증</button><button type="button" data-v="ho" aria-pressed="false">홀드아웃 30%</button>
+            </div></div>
+          <div class="sk-legend"><span><i class="kn-ln" style="background:var(--trn)"></i>학습 정확도</span><span><i class="kn-ln" style="background:var(--val)"></i>검증 정확도</span><span style="color:var(--ok)"><i class="kn-ln dash"></i>최적 k</span></div>
+          <div class="kn-chart" id="b2chart" role="img" aria-label="k(가로)에 따른 학습 정확도와 검증 정확도 곡선"></div>
+          <div class="sk-stats" id="b2stats"></div>
+        </div>
+        <div class="sk-card">
+          <h2>k는 모델의 '복잡도 손잡이'</h2>
+          <div class="sk-formula kn-f" id="b2f"></div>
+          <p class="sk-note" id="b2note"></p>
+        </div>
+      </div>
+    </div>
+    <div class="sk-card kn-mt">
+      <div class="sk-head"><h2>k를 나란히 비교</h2><span class="sk-hint">그림을 누르면 위 그림의 k가 바뀝니다</span></div>
+      <div class="kn-minis" id="b2minis"></div>
+      <p class="kn-sub">작은 k: 점 하나하나에 맞춰 경계가 들쭉날쭉(과적합, 분산 큼) · 큰 k: 넓은 동네의 평균이라 경계가 매끄럽지만 세부를 놓침(과소적합, 편향 큼). 데이터 수와 같은 k는 늘 다수 클래스만 예측합니다.</p>
+    </div>
+  </section>
+
+  <!-- ================= 3. 스케일링 ================= -->
+  <section id="pane-scale" role="tabpanel" aria-labelledby="tab-scale" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>단위가 큰 특성이 거리를 독차지한다</h2><span class="sk-hint">두 그림 어디든 눌러서 별(새 환자)을 옮기기</span></div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">데이터</span>
+          <div class="sk-seg" id="s3ds" role="group" aria-label="데이터">
+            <button type="button" data-v="B" aria-pressed="true">BMI · 연봉</button><button type="button" data-v="A" aria-pressed="false">나이 · 콜레스테롤</button>
+          </div></div>
+        <div class="sk-group"><span class="sk-label">오른쪽 그림</span>
+          <div class="sk-seg" id="s3sc" role="group" aria-label="스케일러">
+            <button type="button" data-v="std" aria-pressed="true">StandardScaler</button><button type="button" data-v="mm" aria-pressed="false">MinMaxScaler</button>
+          </div></div>
+        <div class="sk-slider" style="min-width:180px"><div class="sk-sl-head"><label for="s3k">k</label><b id="s3kv">5</b></div><input type="range" id="s3k" min="1" max="25" step="1" value="5"></div>
+        <button type="button" class="sk-btn sk-btn--sm" id="s3seed">다른 표본</button>
+      </div>
+      <div class="sk-legend" id="s3leg"></div>
+      <div class="sk-grid2">
+        <div class="kn-mini"><div class="cap" id="s3capL"></div><canvas id="cv3a" class="kn-cv kn-cv--43" aria-label="스케일링 없이 잰 거리로 고른 이웃"></canvas></div>
+        <div class="kn-mini"><div class="cap" id="s3capR"></div><canvas id="cv3b" class="kn-cv kn-cv--43" aria-label="스케일링 후 잰 거리로 고른 이웃"></canvas></div>
+      </div>
+      <p class="kn-sub">두 그림 모두 '보통 그래프'처럼 축을 따로 늘려 그렸습니다. 보라 점선 = k번째 이웃까지의 같은 거리 경계. 왼쪽은 위아래로 길쭉한 띠가 되어, 가로축(단위 큰 특성) 값만 비슷하면 이웃이 됩니다.</p>
+    </div>
+    <div class="sk-grid2 kn-mt">
+      <div class="sk-card">
+        <div class="sk-head"><h2>축을 실제 비율(가로 1 = 세로 1)로 그리면</h2></div>
+        <div class="kn-mini"><div class="cap" id="s3capR1"></div><canvas id="cv3c" class="kn-cv kn-cv--strip" aria-label="원래 단위 그대로 같은 비율로 그린 산점도"></canvas></div>
+        <div class="kn-mini"><div class="cap" id="s3capR2"></div><canvas id="cv3d" class="kn-cv kn-cv--strip" aria-label="스케일링 후 같은 비율로 그린 산점도"></canvas></div>
+        <p class="kn-sub">거리 계산은 바로 이 '실제 비율' 공간에서 일어납니다. 원래 단위에서는 세로 방향 차이가 거의 0이라 거리에 보태는 것이 없습니다.</p>
+      </div>
+      <div class="kn-stack">
+        <div class="sk-card">
+          <div class="sk-head"><h2>거리² 에서 각 특성이 차지하는 몫</h2><div class="sk-legend" id="s3cleg"></div></div>
+          <div class="kn-contrib" id="s3contrib"></div>
+          <div class="sk-formula kn-f" id="s3f"></div>
+        </div>
+        <div class="sk-card">
+          <div class="sk-head"><h2>이웃과 정확도가 어떻게 바뀌나</h2><span class="sk-hint">5겹 교차검증 · 스케일러는 학습 폴드에서만 fit</span></div>
+          <div class="sk-scroll"><table class="sk-table kn-cmp" id="s3tab"></table></div>
+          <div class="kn-chart" id="s3chart" role="img" aria-label="k에 따른 세 가지 스케일링의 교차검증 정확도"></div>
+          <p class="sk-note" id="s3note"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 4. KNN 회귀 ================= -->
+  <section id="pane-reg" role="tabpanel" aria-labelledby="tab-reg" hidden>
+    <div class="kn-main">
+      <div class="sk-card">
+        <div class="sk-head"><h2>나이로 수축기 혈압 예측하기</h2>
+          <div class="sk-legend"><span><i class="kn-dot" style="background:var(--trn)"></i>학습 40명</span><span id="r4vleg"><i class="kn-dot" style="border:2px solid var(--val)"></i>검증 40명</span><span><i class="kn-ln" style="background:var(--mdl)"></i>KNN 예측 ŷ(x)</span></div>
+        </div>
+        <div class="sk-controls">
+          <div class="sk-slider" style="min-width:200px"><div class="sk-sl-head"><label for="r4k">이웃 수 k</label><b id="r4kv">5</b></div><input type="range" id="r4k" min="1" max="30" step="1" value="5"></div>
+          <div class="sk-group"><span class="sk-label">가중치</span>
+            <div class="sk-seg" id="r4w" role="group" aria-label="가중치">
+              <button type="button" data-v="uniform" aria-pressed="true">uniform (평균)</button><button type="button" data-v="distance" aria-pressed="false">distance (1/d 가중 평균)</button>
+            </div></div>
+        </div>
+        <canvas id="cv4" class="kn-cv kn-cv--reg" tabindex="0" aria-label="나이(가로)와 수축기 혈압(세로) 산점도와 KNN 회귀 예측선. 누르거나 끌어서 살펴볼 나이를 고릅니다."></canvas>
+        <div class="sk-controls">
+          <div class="sk-slider" style="min-width:220px"><div class="sk-sl-head"><label for="r4q">살펴볼 나이 x</label><b id="r4qv">50.0</b></div><input type="range" id="r4q" min="20" max="80" step="0.1" value="50"></div>
+          <label class="sk-check"><input type="checkbox" id="r4val" checked>검증 데이터 보기</label>
+          <button type="button" class="sk-btn sk-btn--sm" id="r4seed">다른 표본</button>
+          <span class="sk-hint" id="r4seedv"></span>
+        </div>
+      </div>
+      <div class="kn-stack">
+        <div class="sk-card">
+          <div class="sk-head"><h2>이웃의 평균이 예측값</h2><span class="sk-hint" id="r4hint"></span></div>
+          <div class="sk-formula kn-f" id="r4f" aria-live="polite"></div>
+          <div class="sk-scroll" style="max-height:220px;overflow:auto"><table class="sk-table kn-tbl" id="r4tab"></table></div>
+        </div>
+        <div class="sk-card">
+          <div class="sk-head"><h2>k에 따른 MSE</h2><span class="sk-hint">그래프를 누르면 그 k로</span></div>
+          <div class="sk-legend"><span><i class="kn-ln" style="background:var(--trn)"></i>학습 MSE</span><span><i class="kn-ln" style="background:var(--val)"></i>검증 MSE</span><span style="color:var(--ok)"><i class="kn-ln dash"></i>최적 k</span></div>
+          <div class="kn-chart" id="r4chart" role="img" aria-label="k(가로)에 따른 학습 MSE와 검증 MSE"></div>
+          <div class="sk-stats" id="r4stats"></div>
+        </div>
+      </div>
+    </div>
+    <p class="sk-note kn-mt" id="r4note"></p>
+  </section>
+
+  <!-- ================= 5. 계산 비용과 차원의 저주 ================= -->
+  <section id="pane-cost" role="tabpanel" aria-labelledby="tab-cost" hidden>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>게으른 학습(lazy learning)</h2><span class="sk-hint">학습은 저장뿐, 계산은 예측 때</span></div>
+        <div class="sk-controls">
+          <div class="sk-slider" style="min-width:200px"><div class="sk-sl-head"><label for="c5n">저장된 환자 수 n</label><b id="c5nv">10,000</b></div><input type="range" id="c5n" min="0" max="6" step="1" value="2"></div>
+          <div class="sk-slider" style="min-width:200px"><div class="sk-sl-head"><label for="c5d">특성 수 d</label><b id="c5dv">10</b></div><input type="range" id="c5d" min="1" max="100" step="1" value="10"></div>
+          <div class="sk-slider" style="min-width:200px"><div class="sk-sl-head"><label for="c5m">예측할 새 환자 수 m</label><b id="c5mv">100</b></div><input type="range" id="c5m" min="0" max="4" step="1" value="2"></div>
+        </div>
+        <div class="sk-scroll"><table class="sk-table kn-cmp" id="c5tab"></table></div>
+        <div class="sk-formula kn-f" id="c5f"></div>
+        <div class="kn-row"><button type="button" class="sk-btn sk-btn--sm sk-btn--primary" id="c5run">이 브라우저에서 실제로 재 보기</button><span class="sk-hint" id="c5out" aria-live="polite"></span></div>
+        <p class="sk-note"><b>KD-tree · Ball tree</b>: 공간을 상자·공 모양으로 미리 나눠 두고 멀리 있는 덩어리는 통째로 건너뛰어, 저차원(대략 d ≤ 20)에서는 예측이 빨라집니다. 차원이 높으면 건너뛸 덩어리가 거의 없어 결국 모든 점과 거리를 재는 brute force와 비슷해집니다. scikit-learn은 <span class="sk-mono">algorithm="auto"</span>로 알아서 고릅니다.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>차원의 저주: '가장 가까운'이 의미를 잃는다</h2></div>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">무작위 점 수</span>
+            <div class="sk-seg" id="c5cn" role="group" aria-label="무작위 점 수">
+              <button type="button" data-v="100" aria-pressed="false">100</button><button type="button" data-v="500" aria-pressed="true">500</button><button type="button" data-v="2000" aria-pressed="false">2000</button>
+            </div></div>
+          <button type="button" class="sk-btn sk-btn--sm" id="c5re">다시 뽑기</button>
+          <span class="sk-hint" id="c5cinfo"></span>
+        </div>
+        <div class="sk-legend"><span><i class="kn-ln" style="background:var(--lim)"></i>가장 가까운 거리 ÷ 가장 먼 거리 (질의 20개 평균)</span><span><i class="kn-dot" style="background:var(--ink)"></i>선택한 d</span></div>
+        <div class="kn-chart" id="c5chart" role="img" aria-label="차원 d(가로)에 따른 최근접 거리와 최원 거리의 비율"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><label for="c5dd">아래 분포를 볼 차원 d</label><b id="c5ddv">2</b></div><input type="range" id="c5dd" min="1" max="100" step="1" value="2"></div>
+        <canvas id="cv5" class="kn-cv kn-cv--hist" aria-label="선택한 차원에서 한 질의점으로부터 모든 점까지의 거리 분포 (가장 먼 거리로 나눈 값)"></canvas>
+        <div class="sk-formula kn-f" id="c5cf"></div>
+      </div>
+    </div>
+    <p class="sk-note kn-mt">0~1 사이 균일한 무작위 점에서 차원 d가 커지면 모든 점까지의 거리가 비슷해집니다(거리 집중). 가장 가까운 점도 가장 먼 점과 별로 다르지 않으니 '가까운 이웃의 다수결'이라는 KNN의 전제가 약해집니다. 대책: 쓸모없는 특성 빼기(특성 선택), PCA 같은 차원 축소, 그리고 데이터 더 모으기.</p>
+  </section>
+
+  <!-- ================= 6. 코드 ================= -->
+  <section id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>scikit-learn 코드 (현재 설정 반영)</h2><span class="sk-hint">화면에서 바꾼 값이 바로 들어갑니다</span></div>
+      <div class="sk-controls">
+        <div class="sk-seg" id="k6kind" role="group" aria-label="코드 종류">
+          <button type="button" data-v="cls" aria-pressed="true">분류 · k 고르기 (1·2번)</button>
+          <button type="button" data-v="scale" aria-pressed="false">스케일링 비교 (3번)</button>
+          <button type="button" data-v="reg" aria-pressed="false">KNN 회귀 (4번)</button>
+          <button type="button" data-v="curse" aria-pressed="false">차원의 저주 (5번)</button>
+        </div>
+      </div>
+      <p class="sk-lead" id="k6lead"></p>
+      <div class="kn-code"><pre id="k6code" tabindex="0" aria-label="파이썬 코드"></pre><button type="button" class="sk-btn sk-btn--sm kn-copy" id="k6copy">복사</button></div>
+      <p class="sk-note" id="k6note">맨 아래 주석은 이 페이지가 같은 데이터로 계산한 값입니다. 코드를 실행하면 같은 숫자가 나와야 합니다. 교차검증은 이 페이지와 똑같이 나누도록 <span class="sk-mono">PredefinedSplit</span>에 폴드 번호를 그대로 넣었습니다.</p>
+    </div>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20260930c"></script>
+<script>
+(function () {
+"use strict";
+const $ = id => document.getElementById(id);
+
+/* ================= 공통 도구 ================= */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function gauss(r){let u=0;while(!u)u=r();const v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const sig=z=>1/(1+Math.exp(-z));
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function f(v,d=2){ if(!isFinite(v))return v>0?"∞":"−∞"; const s=Math.abs(v).toFixed(d); return (v<0&&Number(s)!==0?"−":"")+s; }
+const fp=(v,d)=>{const s=f(v,d);return s.startsWith("−")?"("+s+")":s;};
+const pct=v=>isFinite(v)?(v*100).toFixed(1)+"%":"—";
+const comma=v=>Math.round(v).toLocaleString("en-US");
+const SUP={"0":"⁰","1":"¹","2":"²","3":"³","4":"⁴","5":"⁵","6":"⁶","7":"⁷","8":"⁸","9":"⁹"};
+function sci(v){if(v<1e5)return comma(v);const e=Math.floor(Math.log10(v)),m=v/Math.pow(10,e);return f(m,1)+" × 10"+String(e).split("").map(c=>SUP[c]).join("");}
+const py=(v,d)=>{const s=v.toFixed(d);return Number(s)===0?(0).toFixed(d):s;};
+const pyr=(v,d)=>String(Number(v.toFixed(d)));
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+function hexRgb(h){h=h.replace("#","");if(h.length===3)h=h.split("").map(c=>c+c).join("");const n=parseInt(h,16);return[(n>>16)&255,(n>>8)&255,n&255];}
+function fitCanvas(cv){const dpr=window.devicePixelRatio||1;const w=Math.max(40,cv.clientWidth),h=Math.max(40,cv.clientHeight||w*0.6);cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);const ctx=cv.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);return{ctx,w,h,dpr};}
+function segInit(el,onChange){el.addEventListener("click",e=>{const b=e.target.closest("button");if(!b||!el.contains(b))return;segSet(el,b.dataset.v);onChange(b.dataset.v);});}
+function segSet(el,v){el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x.dataset.v===String(v)?"true":"false"));}
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+function ticks(a,b,maxN){const raw=(b-a)/maxN,mag=Math.pow(10,Math.floor(Math.log10(raw))),st=[1,2,5,10].map(k=>k*mag).find(k=>k>=raw);const out=[];for(let v=Math.ceil(a/st-1e-9)*st;v<=b+1e-9;v+=st)out.push(+v.toFixed(10));return out;}
+function shuffle(arr,r){for(let i=arr.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}return arr;}
+
+/* 캔버스 좌표계 (축을 따로 늘린 보통 그래프) */
+function frame(w,h,o){const mL=o.mL??46,mR=o.mR??12,mT=o.mT??10,mB=o.mB??36;const pw=w-mL-mR,ph=h-mT-mB;
+  return{mL,mR,mT,mB,pw,ph,w,h,o,
+    X:v=>mL+(v-o.x0)/(o.x1-o.x0)*pw, Y:v=>mT+(1-(v-o.y0)/(o.y1-o.y0))*ph,
+    IX:px=>o.x0+(px-mL)/pw*(o.x1-o.x0), IY:py=>o.y0+(1-(py-mT)/ph)*(o.y1-o.y0)};}
+function axes(ctx,F,o){
+  const ln=css("--line"),mu=css("--muted"),mono=css("--mono"),sans=css("--sans");
+  ctx.save();ctx.lineWidth=1;ctx.strokeStyle=ln;ctx.fillStyle=mu;ctx.font=`11px ${mono}`;
+  (o.yt||[]).forEach(v=>{const y=Math.round(F.Y(v))+.5;ctx.beginPath();ctx.moveTo(F.mL,y);ctx.lineTo(F.mL+F.pw,y);ctx.stroke();ctx.textAlign="right";ctx.textBaseline="middle";ctx.fillText(o.yf?o.yf(v):String(v),F.mL-6,y);});
+  (o.xt||[]).forEach(v=>{const x=Math.round(F.X(v))+.5;if(o.xgrid!==false){ctx.beginPath();ctx.moveTo(x,F.mT);ctx.lineTo(x,F.mT+F.ph);ctx.stroke();}ctx.textAlign="center";ctx.textBaseline="top";ctx.fillText(o.xf?o.xf(v):String(v),x,F.mT+F.ph+5);});
+  ctx.strokeStyle=css("--line-strong");ctx.beginPath();ctx.moveTo(F.mL,F.mT);ctx.lineTo(F.mL,F.mT+F.ph);ctx.lineTo(F.mL+F.pw,F.mT+F.ph);ctx.stroke();
+  ctx.font=`600 11.5px ${sans}`;ctx.textAlign="center";ctx.textBaseline="alphabetic";
+  if(o.xl)ctx.fillText(o.xl,F.mL+F.pw/2,F.h-4);
+  if(o.yl){ctx.translate(12,F.mT+F.ph/2);ctx.rotate(-Math.PI/2);ctx.fillText(o.yl,0,0);}
+  ctx.restore();
+}
+/* 같은 비율 좌표계: z 공간에서 가로 1 = 세로 1 */
+function eqView(w,h,m,x0,x1,y0,y1){
+  const pw=w-m.l-m.r,ph=h-m.t-m.b,s=Math.max((x1-x0)/pw,(y1-y0)/ph),cx=(x0+x1)/2,cy=(y0+y1)/2;
+  const X0=cx-s*pw/2,Y0=cy-s*ph/2;
+  return{mL:m.l,mT:m.t,pw,ph,w,h,s,x0:X0,x1:X0+s*pw,y0:Y0,y1:Y0+s*ph,
+    X:z=>m.l+(z-X0)/s, Y:z=>m.t+ph-(z-Y0)/s, IX:px=>X0+(px-m.l)*s, IY:py=>Y0+(m.t+ph-py)*s};
+}
+/* SVG 차트 틀 */
+function svgFrame(host,o){
+  const W=Math.max(260,Math.round(host.clientWidth||520)),H=o.h||Math.round(W*(o.ratio||0.6));
+  const mL=o.mL??(o.yl?56:46),mR=o.mR??14,mT=o.mT??12,mB=o.mB??40,pw=W-mL-mR,ph=H-mT-mB;
+  const X=v=>mL+(v-o.x0)/(o.x1-o.x0)*pw, Y=v=>mT+(1-(Math.max(o.y0,Math.min(o.y1,v))-o.y0)/(o.y1-o.y0))*ph;
+  let s="";
+  (o.yt||[]).forEach(v=>{const y=Y(v).toFixed(1);s+=`<line class="gl" x1="${mL}" x2="${mL+pw}" y1="${y}" y2="${y}"/><text class="ax" x="${mL-6}" y="${+y+4}" text-anchor="end">${o.yf?o.yf(v):v}</text>`;});
+  (o.xt||[]).forEach(v=>{const x=X(v).toFixed(1);if(o.xgrid)s+=`<line class="gl" x1="${x}" x2="${x}" y1="${mT}" y2="${mT+ph}"/>`;s+=`<text class="ax" x="${x}" y="${mT+ph+15}" text-anchor="middle">${o.xf?o.xf(v):v}</text>`;});
+  s+=`<path class="gl0" fill="none" d="M${mL},${mT}V${mT+ph}H${mL+pw}"/>`;
+  if(o.xl)s+=`<text class="axl" x="${mL+pw/2}" y="${H-5}" text-anchor="middle">${o.xl}</text>`;
+  if(o.yl)s+=`<text class="axl" transform="translate(12,${mT+ph/2}) rotate(-90)" text-anchor="middle">${o.yl}</text>`;
+  return{W,H,mL,mT,pw,ph,X,Y,s};
+}
+function svgPut(host,F,body,cls){host.innerHTML=`<svg viewBox="0 0 ${F.W} ${F.H}" class="${cls||""}" aria-hidden="true">${F.s}${body}</svg>`;return host.firstChild;}
+function svgPoint(svg,F,e){const r=svg.getBoundingClientRect();return[(e.clientX-r.left)*F.W/r.width,(e.clientY-r.top)*F.H/r.height];}
+const path=(pts)=>pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+","+p[1].toFixed(1)).join("");
+
+/* 표식 (클래스별 모양: 원 · 네모 · 세모) */
+function mark(ctx,x,y,r,shape){ctx.beginPath();
+  if(shape===1){ctx.rect(x-r*0.88,y-r*0.88,r*1.76,r*1.76);}
+  else if(shape===2){ctx.moveTo(x,y-r*1.15);ctx.lineTo(x+r*1.05,y+r*0.75);ctx.lineTo(x-r*1.05,y+r*0.75);ctx.closePath();}
+  else ctx.arc(x,y,r,0,Math.PI*2);}
+function star(ctx,x,y,R,fill,stroke){ctx.beginPath();for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,r=i%2?R*0.45:R;ctx.lineTo(x+r*Math.cos(a),y+r*Math.sin(a));}ctx.closePath();ctx.fillStyle=fill;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=stroke;ctx.stroke();}
+function ball(ctx,x,y,R,metric){ctx.beginPath();
+  if(metric==="manhattan"){ctx.moveTo(x,y-R);ctx.lineTo(x+R,y);ctx.lineTo(x,y+R);ctx.lineTo(x-R,y);ctx.closePath();}
+  else if(metric==="cheby")ctx.rect(x-R,y-R,2*R,2*R);
+  else ctx.arc(x,y,R,0,Math.PI*2);}
+function label(ctx,txt,x,y,color,align){const sf=css("--surface");ctx.save();ctx.font=`700 11.5px ${css("--sans")}`;const tw=ctx.measureText(txt).width;let lx=align==="right"?x-tw:align==="center"?x-tw/2:x;
+  ctx.fillStyle=sf;ctx.globalAlpha=.85;ctx.fillRect(lx-3,y-12,tw+6,16);ctx.globalAlpha=1;ctx.fillStyle=color;ctx.textAlign="left";ctx.textBaseline="alphabetic";ctx.fillText(txt,lx,y);ctx.restore();}
+
+/* ================= KNN 핵심 ================= */
+const MET={euclid:{nm:"유클리드",i:0,sk:'metric="minkowski", p=2'},manhattan:{nm:"맨해튼",i:1,sk:'metric="minkowski", p=1'},cheby:{nm:"체비쇼프",i:2,sk:'metric="chebyshev"'}};
+function dfun(m){return m==="euclid"?(a,b)=>Math.sqrt(a*a+b*b):m==="manhattan"?(a,b)=>Math.abs(a)+Math.abs(b):(a,b)=>Math.max(Math.abs(a),Math.abs(b));}
+/* 모든 점을 거리순으로 (같으면 인덱스 작은 쪽 먼저) */
+function nbSort(zx,zy,qx,qy,m,idx){const D=dfun(m),ids=idx||zx.map((_,i)=>i),o=ids.map(i=>({i,d:D(qx-zx[i],qy-zy[i])}));o.sort((a,b)=>a.d-b.d||a.i-b.i);return o;}
+/* 투표: 동점이면 클래스 번호가 작은 쪽 (scikit-learn과 같은 규칙) */
+function vote(top,lab,nc,w){const s=new Array(nc).fill(0);const zero=w==="distance"&&top.some(o=>o.d===0);
+  top.forEach(o=>{s[lab[o.i]]+=w==="uniform"?1:zero?(o.d===0?1:0):1/o.d;});
+  const tot=s.reduce((a,b)=>a+b,0);let best=0;for(let c=1;c<nc;c++)if(s[c]>s[best]*(1+1e-12)+1e-15)best=c;
+  const tie=s.filter(v=>Math.abs(v-s[best])<=1e-12*Math.max(1,s[best])).length>1;
+  return{s,p:s.map(v=>v/tot),pred:best,tie,zero,tot};}
+/* 격자 한 칸 예측 (빠른 버전) */
+function gridPred(zx,zy,lab,nc,k,mi,wd,qx,qy,bd,bi,sc,out){
+  const n=zx.length;let cnt=0;
+  for(let i=0;i<n;i++){const dx=qx-zx[i],dy=qy-zy[i];let d;
+    if(mi===0)d=dx*dx+dy*dy;else if(mi===1)d=(dx<0?-dx:dx)+(dy<0?-dy:dy);else{const ax=dx<0?-dx:dx,ay=dy<0?-dy:dy;d=ax>ay?ax:ay;}
+    if(cnt<k){let j=cnt++;while(j>0&&bd[j-1]>d){bd[j]=bd[j-1];bi[j]=bi[j-1];j--;}bd[j]=d;bi[j]=i;}
+    else if(d<bd[k-1]){let j=k-1;while(j>0&&bd[j-1]>d){bd[j]=bd[j-1];bi[j]=bi[j-1];j--;}bd[j]=d;bi[j]=i;}}
+  for(let c=0;c<nc;c++)sc[c]=0;
+  if(!wd){for(let j=0;j<cnt;j++)sc[lab[bi[j]]]+=1;}
+  else{const z=cnt&&bd[0]===0;for(let j=0;j<cnt;j++){const dd=mi===0?Math.sqrt(bd[j]):bd[j];sc[lab[bi[j]]]+=z?(dd===0?1:0):1/dd;}}
+  let b=0,t=sc[0];for(let c=1;c<nc;c++){t+=sc[c];if(sc[c]>sc[b])b=c;}out[0]=t>0?sc[b]/t:1;return b;}
+
+/* 스케일러: 학습 인덱스로 fit → 변환 함수 */
+function fitScaler(vals,idx,kind){
+  if(kind==="none")return{a:0,s:1,t:v=>v};
+  const xs=idx.map(i=>vals[i]);
+  if(kind==="mm"){const mn=Math.min(...xs),mx=Math.max(...xs),r=mx-mn||1;return{a:mn,s:r,t:v=>(v-mn)/r,mn,mx};}
+  const mu=xs.reduce((a,b)=>a+b,0)/xs.length;const sd=Math.sqrt(xs.reduce((a,b)=>a+(b-mu)*(b-mu),0)/xs.length)||1;return{a:mu,s:sd,t:v=>(v-mu)/sd,mu,sd};
+}
+/* 한 번 나눈 학습/검증에서 k = 1..kmax 맞힌 개수 */
+function evalSplit(X,Y,lab,nc,tr,te,scaler,m,w,kmax){
+  const sx=fitScaler(X,tr,scaler),sy=fitScaler(Y,tr,scaler);
+  const zx=X.map(sx.t),zy=Y.map(sy.t),correct=new Array(kmax+1).fill(0);
+  te.forEach(t=>{const nb=nbSort(zx,zy,zx[t],zy[t],m,tr);const s=new Array(nc).fill(0),s0=new Array(nc).fill(0);let anyZero=false;
+    for(let k=1;k<=kmax;k++){const o=nb[k-1];if(w==="uniform")s[lab[o.i]]+=1;else{if(o.d===0){anyZero=true;s0[lab[o.i]]+=1;}else s[lab[o.i]]+=1/o.d;}
+      const sc=w==="distance"&&anyZero?s0:s;let b=0;for(let c=1;c<nc;c++)if(sc[c]>sc[b]*(1+1e-12)+1e-15)b=c;if(b===lab[t])correct[k]++;}});
+  return correct;
+}
+/* 계층적 폴드 번호 (PredefinedSplit 용) */
+function stratFolds(lab,nc,K,seed){const r=mulberry32(seed);const fold=new Array(lab.length).fill(0);let ctr=0;
+  for(let c=0;c<nc;c++){const idx=shuffle(lab.map((v,i)=>v===c?i:-1).filter(i=>i>=0),r);idx.forEach(i=>{fold[i]=ctr%K;ctr++;});}return fold;}
+function holdFolds(lab,nc,frac,seed){const r=mulberry32(seed);const fold=new Array(lab.length).fill(-1);
+  for(let c=0;c<nc;c++){const idx=shuffle(lab.map((v,i)=>v===c?i:-1).filter(i=>i>=0),r);const m=Math.round(idx.length*frac);idx.slice(0,m).forEach(i=>fold[i]=0);}return fold;}
+function splitsOf(fold){const ids=[...new Set(fold.filter(v=>v>=0))].sort((a,b)=>a-b);return ids.map(fv=>({tr:fold.map((v,i)=>v===fv?-1:i).filter(i=>i>=0),te:fold.map((v,i)=>v===fv?i:-1).filter(i=>i>=0)}));}
+/* 교차검증 + 전체 학습 정확도 곡선 */
+function curves(X,Y,lab,nc,fold,scaler,m,w,kcap){
+  const sp=splitsOf(fold);const minTr=Math.min(...sp.map(s=>s.tr.length));const kmax=Math.max(1,Math.min(kcap,minTr,X.length));
+  const val=new Array(kmax+1).fill(0);
+  sp.forEach(s=>{const c=evalSplit(X,Y,lab,nc,s.tr,s.te,scaler,m,w,kmax);for(let k=1;k<=kmax;k++)val[k]+=c[k]/s.te.length/sp.length;});
+  const all=X.map((_,i)=>i);const ct=evalSplit(X,Y,lab,nc,all,all,scaler,m,w,kmax);const trn=ct.map(v=>v/X.length);
+  let best=1;for(let k=2;k<=kmax;k++)if(val[k]>val[best]+1e-12)best=k;
+  return{kmax,val,trn,best};
+}
+
+/* ================= 탭 ================= */
+const TABS=["predict","boundary","scale","reg","cost","code"];let curTab="predict";
+const onShow={};
+function showTab(k,focus){
+  if(!TABS.includes(k))k="predict";
+  TABS.forEach(t=>{const b=$("tab-"+t),p=$("pane-"+t),on=t===k;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;p.hidden=!on;});
+  curTab=k;if(focus)$("tab-"+k).focus();
+  if(location.hash!=="#"+k)history.replaceState(null,"","#"+k);
+  onShow[k]&&onShow[k]();
+}
+TABS.forEach(t=>$("tab-"+t).addEventListener("click",()=>showTab(t)));
+document.querySelector(".sk-tabs").addEventListener("keydown",e=>{
+  if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;e.preventDefault();e.stopPropagation();
+  const i=TABS.indexOf(curTab),n=(i+(e.key==="ArrowRight"?1:-1)+TABS.length)%TABS.length;showTab(TABS[n],true);
+});
+window.addEventListener("hashchange",()=>{const k=location.hash.slice(1);if(TABS.includes(k)&&k!==curTab)showTab(k);});
+
+/* ================= 데이터 A: 공복혈당 · BMI (1·2번 화면) ================= */
+const A={seed:1,nc:2,pts:[],ver:0};
+const CLS={2:[{n:"정상",v:"--c0",s:0},{n:"당뇨",v:"--c1",s:1}],3:[{n:"정상",v:"--c0",s:0},{n:"전단계",v:"--c2",s:2},{n:"당뇨",v:"--c1",s:1}]};
+const G_DOM=[62,208],B_DOM=[15,41];
+function genA(seed,nc){
+  const r=mulberry32(seed*9973+nc*131+7);
+  const spec=nc===2?[[0,44,98,13,23.4,3.0],[1,36,134,22,28.2,3.8]]:[[0,30,92,8,22.6,2.6],[1,26,114,9,26.0,3.0],[2,24,150,21,29.2,3.6]];
+  const out=[];
+  spec.forEach(([c,n,gm,gs,bm,bs])=>{for(let i=0;i<n;i++){const z1=gauss(r),z2=gauss(r);
+    out.push({g:Math.round(clamp(gm+gs*z1,66,212)),b:Math.round(clamp(bm+bs*(0.3*z1+0.95*z2),16,41)*10)/10,c});}});
+  return shuffle(out,r);
+}
+function prepA(){
+  const P=A.pts;A.n=P.length;A.G=P.map(p=>p.g);A.B=P.map(p=>p.b);A.lab=P.map(p=>p.c);
+  const all=P.map((_,i)=>i);A.sg=fitScaler(A.G,all,"std");A.sb=fitScaler(A.B,all,"std");
+  A.zx=A.G.map(A.sg.t);A.zy=A.B.map(A.sb.t);A.ver++;
+}
+function resetA(){A.pts=genA(A.seed,A.nc);prepA();}
+function cls(c){return CLS[A.nc][c];}
+function clsColor(c){return css(cls(c).v);}
+function legendHTML(nc,extra){return CLS[nc].map(c=>`<span>${c.s===0?`<i class="kn-dot" style="background:var(${c.v})"></i>`:c.s===1?`<i class="kn-sq" style="background:var(${c.v})"></i>`:`<i class="kn-tri" style="color:var(${c.v})"></i>`}${c.n}</span>`).join("")+(extra||"");}
+function viewA(w,h,m){const zg=G_DOM.map(A.sg.t),zb=B_DOM.map(A.sb.t);return eqView(w,h,m,zg[0],zg[1],zb[0],zb[1]);}
+function axesEq(ctx,V,narrow,showLabels){
+  const ln=css("--line"),mu=css("--muted"),mono=css("--mono"),sans=css("--sans");
+  const g0=V.x0*A.sg.s+A.sg.a,g1=V.x1*A.sg.s+A.sg.a,b0=V.y0*A.sb.s+A.sb.a,b1=V.y1*A.sb.s+A.sb.a;
+  ctx.save();ctx.lineWidth=1;ctx.strokeStyle=ln;ctx.fillStyle=mu;ctx.font=`11px ${mono}`;
+  ticks(g0,g1,narrow?4:8).forEach(v=>{const x=Math.round(V.X(A.sg.t(v)))+.5;ctx.beginPath();ctx.moveTo(x,V.mT);ctx.lineTo(x,V.mT+V.ph);ctx.stroke();if(showLabels){ctx.textAlign="center";ctx.textBaseline="top";ctx.fillText(String(v),x,V.mT+V.ph+5);}});
+  ticks(b0,b1,narrow?4:7).forEach(v=>{const y=Math.round(V.Y(A.sb.t(v)))+.5;ctx.beginPath();ctx.moveTo(V.mL,y);ctx.lineTo(V.mL+V.pw,y);ctx.stroke();if(showLabels){ctx.textAlign="right";ctx.textBaseline="middle";ctx.fillText(String(v),V.mL-6,y);}});
+  ctx.strokeStyle=css("--line-strong");ctx.strokeRect(V.mL+.5,V.mT+.5,V.pw-1,V.ph-1);
+  if(showLabels){ctx.font=`600 11.5px ${sans}`;ctx.textAlign="center";ctx.textBaseline="alphabetic";ctx.fillText("공복혈당 (mg/dL)",V.mL+V.pw/2,V.h-4);
+    ctx.translate(12,V.mT+V.ph/2);ctx.rotate(-Math.PI/2);ctx.fillText("BMI (kg/m²)",0,0);}
+  ctx.restore();
+}
+/* 결정 경계 배경 */
+function paintBoundary(ctx,V,k,metric,w,cell,alphaMax,dpr){
+  const cols=Math.ceil(V.pw/cell),rows=Math.ceil(V.ph/cell),nc=A.nc;
+  const kk=Math.min(k,A.n);if(!kk)return null;
+  const bd=new Float64Array(kk),bi=new Int32Array(kk),sc=new Float64Array(nc),out=[0];
+  const zx=Float64Array.from(A.zx),zy=Float64Array.from(A.zy),lab=Int32Array.from(A.lab);
+  const sf=hexRgb(css("--surface")),cc=[...Array(nc)].map((_,c)=>hexRgb(clsColor(c)));
+  const pred=new Int8Array(cols*rows),conf=new Float32Array(cols*rows),mi=MET[metric].i,wd=w==="distance"?1:0;
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const qx=V.IX(V.mL+(c+.5)*cell),qy=V.IY(V.mT+(r+.5)*cell);
+    pred[r*cols+c]=gridPred(zx,zy,lab,nc,kk,mi,wd,qx,qy,bd,bi,sc,out);conf[r*cols+c]=out[0];}
+  const img=new ImageData(cols,rows);
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const i=r*cols+c,p=pred[i];
+    const edge=(c+1<cols&&pred[i+1]!==p)||(r+1<rows&&pred[i+cols]!==p)||(c>0&&pred[i-1]!==p)||(r>0&&pred[i-cols]!==p);
+    const t=edge?alphaMax+0.22:0.06+(alphaMax-0.06)*clamp((conf[i]-1/nc)/(1-1/nc),0,1);
+    const col=cc[p];img.data[i*4]=sf[0]+(col[0]-sf[0])*t;img.data[i*4+1]=sf[1]+(col[1]-sf[1])*t;img.data[i*4+2]=sf[2]+(col[2]-sf[2])*t;img.data[i*4+3]=255;}
+  const off=document.createElement("canvas");off.width=cols;off.height=rows;off.getContext("2d").putImageData(img,0,0);
+  ctx.save();ctx.imageSmoothingEnabled=false;ctx.beginPath();ctx.rect(V.mL,V.mT,V.pw,V.ph);ctx.clip();ctx.drawImage(off,V.mL,V.mT,cols*cell,rows*cell);ctx.restore();
+  return pred;
+}
+function drawPoints(ctx,V,r,opts){
+  const sf=css("--surface");opts=opts||{};
+  ctx.save();ctx.beginPath();ctx.rect(V.mL,V.mT,V.pw,V.ph);ctx.clip();
+  A.pts.forEach((p,i)=>{const x=V.X(A.zx[i]),y=V.Y(A.zy[i]);mark(ctx,x,y,r,cls(p.c).s);ctx.fillStyle=clsColor(p.c);ctx.globalAlpha=opts.alpha??.9;ctx.fill();ctx.globalAlpha=1;ctx.lineWidth=1.2;ctx.strokeStyle=sf;ctx.stroke();
+    if(opts.err&&opts.err[i]){mark(ctx,x,y,r+3.5,0);ctx.lineWidth=2;ctx.strokeStyle=css("--lim");ctx.stroke();}});
+  ctx.restore();
+}
+
+/* ================= 1. 한 점 예측하기 ================= */
+const S1={k:5,metric:"euclid",w:"uniform",q:{g:131,b:25.5},add:1,bg:false};
+let V1=null;
+function q1z(){return{x:A.sg.t(S1.q.g),y:A.sb.t(S1.q.b)};}
+function kEff(k){return Math.min(k,A.n);}
+function compute1(){const qz=q1z(),nb=nbSort(A.zx,A.zy,qz.x,qz.y,S1.metric);const k=kEff(S1.k);const top=nb.slice(0,k);return{qz,nb,k,top,v:vote(top,A.lab,A.nc,S1.w)};}
+function draw1(R){
+  const cv=$("cv1");if(!cv.clientWidth)return;const {ctx,w,h,dpr}=fitCanvas(cv);const narrow=w<520;
+  const V=viewA(w,h,{l:narrow?40:46,r:10,t:10,b:36});V1=V;
+  if(S1.bg)paintBoundary(ctx,V,S1.k,S1.metric,S1.w,narrow?4:3,0.28,dpr);
+  axesEq(ctx,V,narrow,true);
+  const ink=css("--ink"),mdl=css("--mdl"),sf=css("--surface");
+  const qx=V.X(R.qz.x),qy=V.Y(R.qz.y);
+  ctx.save();ctx.beginPath();ctx.rect(V.mL,V.mT,V.pw,V.ph);ctx.clip();
+  if(R.k){const rk=R.top[R.k-1].d/V.s;ball(ctx,qx,qy,rk,S1.metric);ctx.fillStyle=mdl;ctx.globalAlpha=.07;ctx.fill();ctx.globalAlpha=1;ctx.setLineDash([6,4]);ctx.lineWidth=1.8;ctx.strokeStyle=mdl;ctx.stroke();ctx.setLineDash([]);}
+  // 이웃 연결선
+  const wmax=S1.w==="distance"?Math.max(...R.top.map(o=>o.d>0?1/o.d:0),1e-9):1;
+  R.top.forEach(o=>{const x=V.X(A.zx[o.i]),y=V.Y(A.zy[o.i]);ctx.beginPath();ctx.moveTo(qx,qy);ctx.lineTo(x,y);ctx.strokeStyle=ink;ctx.globalAlpha=.55;
+    ctx.lineWidth=S1.w==="distance"?(o.d===0?4:0.8+3.2*(1/o.d)/wmax):1.4;ctx.stroke();ctx.globalAlpha=1;});
+  ctx.restore();
+  drawPoints(ctx,V,narrow?4.5:5.2);
+  ctx.save();ctx.beginPath();ctx.rect(V.mL,V.mT,V.pw,V.ph);ctx.clip();
+  const showNum=R.k<=12;
+  R.top.forEach((o,r)=>{const x=V.X(A.zx[o.i]),y=V.Y(A.zy[o.i]);mark(ctx,x,y,(narrow?4.5:5.2)+3,0);ctx.lineWidth=2;ctx.strokeStyle=ink;ctx.stroke();
+    if(showNum){ctx.font=`700 10.5px ${css("--mono")}`;ctx.fillStyle=ink;ctx.textAlign="left";ctx.textBaseline="bottom";ctx.fillText(String(r+1),x+7,y-5);}});
+  star(ctx,qx,qy,narrow?11:13,R.k?clsColor(R.v.pred):sf,ink);
+  ctx.restore();
+  if(R.k){const rk=R.top[R.k-1].d;label(ctx,`r = ${f(rk,3)} (${R.k}번째 이웃)`,clamp(qx+16,V.mL+4,V.mL+V.pw-150),clamp(qy-16,V.mT+16,V.mT+V.ph-6),mdl);}
+}
+function render1(){
+  if(A.n<1){$("p1res").textContent="점이 없습니다. 그림을 눌러 점을 추가하세요.";}
+  const R=compute1(),nc=A.nc,k=R.k;
+  $("p1kv").textContent=S1.k;$("p1k").value=S1.k;
+  const even=S1.k%2===0;
+  $("p1khint").innerHTML=(nc===2?(even?`<span class="kn-warn">k = ${S1.k}은 짝수 → 2클래스에서 동점이 날 수 있습니다. 홀수 권장.</span>`:`k = ${S1.k} (홀수): 2클래스 다수결에서 동점이 생기지 않습니다.`)
+    :`3클래스는 홀수 k여도 동점(예: 2:2:1)이 날 수 있습니다.`)+(S1.k>A.n?` <span class="kn-warn">점이 ${A.n}개뿐이라 k = ${A.n}로 계산합니다.</span>`:"");
+  $("p1info").textContent=`seed ${A.seed} · 환자 ${A.n}명 (${CLS[nc].map((c,i)=>c.n+" "+A.lab.filter(v=>v===i).length).join(", ")})`;
+  draw1(R);
+  if(!k)return;
+  const v=R.v,pc=cls(v.pred);
+  $("p1res").innerHTML=`<span class="big"><i style="background:var(${pc.v})"></i>예측: ${pc.n}</span><span class="sk-mono">predict_proba = [${v.p.map(x=>f(x,3)).join(", ")}]</span>`+(v.tie?`<span class="kn-warn">동점 → 클래스 번호가 작은 '${pc.n}'</span>`:"");
+  $("p1rhint").textContent=`k = ${k} · ${MET[S1.metric].nm} · ${S1.w}`;
+  const mx=Math.max(...v.s);
+  $("p1votes").innerHTML=CLS[nc].map((c,i)=>`<div class="nm${i===v.pred?" win":""}" style="${i===v.pred?"":""}">${c.n}</div><div class="tr"><div class="fl" style="width:${(v.s[i]/(v.tot||1)*100).toFixed(1)}%;background:var(${c.v})"></div></div><div class="vv">${S1.w==="uniform"?v.s[i]+"표":f(v.s[i],2)} · ${pct(v.p[i])}</div>`).join("");
+  let vf;
+  if(S1.w==="uniform"){vf=`<span class="c">이웃 ${k}명이 1표씩</span>\n`+CLS[nc].map((c,i)=>`${c.n} ${v.s[i]}표 → 확률 ${v.s[i]}/${k} = <b>${f(v.p[i],3)}</b>`).join("\n");}
+  else if(v.zero){vf=`<span class="c">거리 0인 이웃이 있으면 그 이웃만 1표 (나머지 0표)</span>\n`+CLS[nc].map((c,i)=>`${c.n} ${f(v.s[i],0)}표 → 확률 <b>${f(v.p[i],3)}</b>`).join("\n");}
+  else{vf=`<span class="c">이웃마다 1/d 표</span>\n`+CLS[nc].map((c,i)=>{const ts=R.top.filter(o=>A.lab[o.i]===i).map(o=>f(1/o.d,2));return `${c.n}: ${ts.length?(ts.length>4?ts.slice(0,4).join(" + ")+" + …":ts.join(" + ")):"0"} = <b>${f(v.s[i],3)}</b>`;}).join("\n")+`\n확률 = 각 합 / ${f(v.tot,3)} = [${v.p.map(x=>f(x,3)).join(", ")}]`;}
+  $("p1vf").innerHTML=vf;
+  // 거리 계산
+  const o1=R.top[0],p1=A.pts[o1.i];const zx1=A.zx[o1.i],zy1=A.zy[o1.i];const dx=R.qz.x-zx1,dy=R.qz.y-zy1;
+  const calc=S1.metric==="euclid"?`√(${fp(R.qz.x,3)} − ${fp(zx1,3)})² + (${fp(R.qz.y,3)} − ${fp(zy1,3)})²) → √(${fp(dx,3)}² + ${fp(dy,3)}²)`
+    :S1.metric==="manhattan"?`|${fp(R.qz.x,3)} − ${fp(zx1,3)}| + |${fp(R.qz.y,3)} − ${fp(zy1,3)}| = |${f(dx,3)}| + |${f(dy,3)}|`
+    :`max(|${fp(R.qz.x,3)} − ${fp(zx1,3)}|, |${fp(R.qz.y,3)} − ${fp(zy1,3)}|) = max(|${f(dx,3)}|, |${f(dy,3)}|)`;
+  $("p1f").innerHTML=`<span class="c">① 새 환자: 혈당 ${S1.q.g}, BMI ${f(S1.q.b,1)} → 표준화 z = (x − 평균) / 표준편차</span>
+z₁ = (${S1.q.g} − ${f(A.sg.mu,2)}) / ${f(A.sg.sd,2)} = <b>${f(R.qz.x,3)}</b>
+z₂ = (${f(S1.q.b,1)} − ${f(A.sb.mu,2)}) / ${f(A.sb.sd,2)} = <b>${f(R.qz.y,3)}</b>
+<span class="c">② 1위 이웃 #${o1.i} (혈당 ${p1.g}, BMI ${f(p1.b,1)} → z = ${f(zx1,3)}, ${f(zy1,3)})와의 ${MET[S1.metric].nm} 거리</span>
+d = ${calc.startsWith("√")?"√((":""}${calc.startsWith("√")?calc.slice(2):calc} = <b class="m">${f(o1.d,3)}</b>
+<span class="c">③ ${A.n}명 모두와 거리를 재서 가까운 순으로 ${k}명 → 투표</span>`;
+  // 순위 표
+  const W=S1.w==="distance";const show=Math.min(A.n,k+3);
+  let th=`<thead><tr><th>순위</th><th>인덱스</th><th>클래스</th><th>혈당</th><th>BMI</th><th>Δz₁</th><th>Δz₂</th><th>거리 계산</th><th>거리 d</th>${W?"<th>가중치 1/d</th>":""}</tr></thead><tbody>`;
+  R.nb.slice(0,show).forEach((o,r)=>{const p=A.pts[o.i],ddx=R.qz.x-A.zx[o.i],ddy=R.qz.y-A.zy[o.i],c=cls(p.c);
+    const cs=S1.metric==="euclid"?`√(${fp(ddx,2)}² + ${fp(ddy,2)}²)`:S1.metric==="manhattan"?`|${f(ddx,2)}| + |${f(ddy,2)}|`:`max(|${f(ddx,2)}|, |${f(ddy,2)}|)`;
+    th+=`<tr class="${r<k?"in":"out"}${r===k?" cut":""}"><td class="n">${r+1}</td><td class="n">#${o.i}</td><td class="cls"><i class="kn-dot" style="background:var(${c.v})"></i>${c.n}</td><td class="n">${p.g}</td><td class="n">${f(p.b,1)}</td><td class="n">${f(ddx,3)}</td><td class="n">${f(ddy,3)}</td><td class="calc">${cs}</td><td class="n d">${f(o.d,3)}</td>${W?`<td class="n">${r<k?(o.d===0?"∞ (거리 0)":f(1/o.d,3)):"—"}</td>`:""}</tr>`;});
+  $("p1tab").innerHTML=th+"</tbody>";
+  $("p1thint").textContent=`${A.n}명 중 가까운 ${show}명 표시 · 투표 ${k}명`;
+}
+function setAddSeg(){const el=$("p1add");if(S1.add>=A.nc)S1.add=A.nc-1;
+  el.innerHTML=CLS[A.nc].map((c,i)=>`<button type="button" data-v="${i}" aria-pressed="${i===S1.add}">${c.n}</button>`).join("");
+  $("p1leg").innerHTML=legendHTML(A.nc,`<span><svg width="13" height="13" viewBox="-7 -7 14 14" style="vertical-align:-2px;margin-right:4px"><path d="M0,-6L1.6,-2.2L5.7,-1.9L2.6,0.8L3.5,4.9L0,2.7L-3.5,4.9L-2.6,0.8L-5.7,-1.9L-1.6,-2.2Z" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>새 환자</span>`);
+}
+segInit($("p1add"),v=>{S1.add=+v;});
+$("p1k").addEventListener("input",e=>{S1.k=+e.target.value;render1();});
+segInit($("p1met"),v=>{S1.metric=v;syncMet();render1();});
+function syncMet(){segSet($("p1met"),S1.metric);document.querySelectorAll("#p1mets .kn-met").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===S1.metric?"true":"false"));}
+document.querySelectorAll("#p1mets .kn-met").forEach(b=>b.addEventListener("click",()=>{S1.metric=b.dataset.v;syncMet();render1();}));
+segInit($("p1w"),v=>{S1.w=v;render1();});
+segInit($("p1nc"),v=>{A.nc=+v;resetA();setAddSeg();render1();});
+$("p1seed").onclick=()=>{A.seed++;resetA();render1();};
+$("p1reset").onclick=()=>{resetA();render1();};
+$("p1bg").addEventListener("change",e=>{S1.bg=e.target.checked;render1();});
+function drawMetIcons(){document.querySelectorAll("#p1mets .kn-met svg").forEach(svg=>{const m=svg.parentNode.dataset.v;
+  const shape=m==="euclid"?`<circle r="30"/>`:m==="manhattan"?`<path d="M0,-30L30,0L0,30L-30,0Z"/>`:`<rect x="-30" y="-30" width="60" height="60"/>`;
+  svg.innerHTML=`<line x1="-40" x2="40" y1="0" y2="0" stroke="var(--line-strong)"/><line y1="-40" y2="40" x1="0" x2="0" stroke="var(--line-strong)"/><g fill="color-mix(in srgb, var(--mdl) 12%, transparent)" stroke="var(--mdl)" stroke-width="2" stroke-dasharray="5 3">${shape}</g><path d="M0,-6L1.6,-2.2L5.7,-1.9L2.6,0.8L3.5,4.9L0,2.7L-3.5,4.9L-2.6,0.8L-5.7,-1.9L-1.6,-2.2Z" fill="var(--ink)"/>`;});}
+/* 캔버스 조작: 별 끌기 · 빈 곳 클릭 = 추가 · 점 클릭 = 삭제 */
+(function(){const cv=$("cv1");let drag=false,down=null;
+  function pos(e){const r=cv.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top];}
+  function setStar(px,py){if(!V1)return;const zx=clamp(V1.IX(px),V1.x0,V1.x1),zy=clamp(V1.IY(py),V1.y0,V1.y1);
+    S1.q.g=clamp(Math.round(zx*A.sg.s+A.sg.a),40,260);S1.q.b=clamp(Math.round((zy*A.sb.s+A.sb.a)*10)/10,10,50);render1();}
+  cv.addEventListener("pointerdown",e=>{if(!V1)return;const [x,y]=pos(e);const R=q1z();const sx=V1.X(R.x),sy=V1.Y(R.y);
+    if(Math.hypot(x-sx,y-sy)<18){drag=true;cv.setPointerCapture(e.pointerId);e.preventDefault();}else down=[x,y];});
+  cv.addEventListener("pointermove",e=>{if(!drag)return;const [x,y]=pos(e);setStar(x,y);});
+  cv.addEventListener("pointerup",e=>{if(drag){drag=false;return;}if(!down||!V1)return;const [x,y]=pos(e);if(Math.hypot(x-down[0],y-down[1])>6){down=null;return;}down=null;
+    let hit=-1,hd=11;A.pts.forEach((p,i)=>{const d=Math.hypot(V1.X(A.zx[i])-x,V1.Y(A.zy[i])-y);if(d<hd){hd=d;hit=i;}});
+    if(hit>=0){if(A.n>1){A.pts.splice(hit,1);}}
+    else{if(x<V1.mL||x>V1.mL+V1.pw||y<V1.mT||y>V1.mT+V1.ph)return;const g=Math.round(V1.IX(x)*A.sg.s+A.sg.a),b=Math.round((V1.IY(y)*A.sb.s+A.sb.a)*10)/10;A.pts.push({g,b,c:S1.add});}
+    prepA();render1();});
+  cv.addEventListener("pointercancel",()=>{drag=false;down=null;});
+  cv.addEventListener("keydown",e=>{const m=e.shiftKey?5:1;let used=true;
+    if(e.key==="ArrowLeft")S1.q.g-=m;else if(e.key==="ArrowRight")S1.q.g+=m;else if(e.key==="ArrowUp")S1.q.b=Math.round((S1.q.b+0.1*m)*10)/10;else if(e.key==="ArrowDown")S1.q.b=Math.round((S1.q.b-0.1*m)*10)/10;else used=false;
+    if(used){e.preventDefault();S1.q.g=clamp(S1.q.g,40,260);S1.q.b=clamp(S1.q.b,10,50);render1();}});
+})();
+onShow.predict=render1;
+
+/* ================= 2. 결정 경계와 k ================= */
+const S2={k:7,cv:"k5",cache:null,key:""};
+function fold2(){return S2.cv==="ho"?holdFolds(A.lab,A.nc,0.3,A.seed*101+5):stratFolds(A.lab,A.nc,S2.cv==="k5"?5:10,A.seed*101+5);}
+function curves2(){const key=[A.ver,S1.metric,S1.w,S2.cv].join("|");if(S2.key!==key){S2.fold=fold2();S2.cache=curves(A.G,A.B,A.lab,A.nc,S2.fold,"std",S1.metric,S1.w,30);S2.key=key;}return S2.cache;}
+function trainErr(k){const out=[0],kk=Math.min(k,A.n),bd=new Float64Array(kk),bi=new Int32Array(kk),sc=new Float64Array(A.nc);
+  const zx=Float64Array.from(A.zx),zy=Float64Array.from(A.zy),lab=Int32Array.from(A.lab);
+  return A.pts.map((p,i)=>{const pr=gridPred(zx,zy,lab,A.nc,kk,MET[S1.metric].i,S1.w==="distance"?1:0,A.zx[i],A.zy[i],bd,bi,sc,out);return pr!==p.c;});}
+function draw2(){
+  const cv=$("cv2");if(!cv.clientWidth)return;const {ctx,w,h,dpr}=fitCanvas(cv);const narrow=w<520;
+  const V=viewA(w,h,{l:narrow?40:46,r:10,t:10,b:36});
+  paintBoundary(ctx,V,S2.k,S1.metric,S1.w,narrow?3:2,0.34,dpr);
+  axesEq(ctx,V,narrow,true);
+  drawPoints(ctx,V,narrow?4.2:5,{err:$("b2err").checked?trainErr(S2.k):null});
+}
+function drawMinis(C){
+  const host=$("b2minis");const ks=[1,5,15,Math.min(30,C.kmax)].filter((v,i,a)=>v<=A.n&&a.indexOf(v)===i);
+  if(host.dataset.ks!==ks.join(",")){host.dataset.ks=ks.join(",");host.innerHTML=ks.map(k=>`<div class="kn-mini"><div class="cap" id="b2cap${k}"></div><canvas class="kn-cv kn-cv--sq" data-k="${k}" aria-label="k = ${k} 결정 경계"></canvas></div>`).join("");
+    host.querySelectorAll("canvas").forEach(c=>c.addEventListener("click",()=>{S2.k=+c.dataset.k;render2();}));}
+  host.querySelectorAll("canvas").forEach(cv=>{const k=+cv.dataset.k;if(!cv.clientWidth)return;const {ctx,w,h,dpr}=fitCanvas(cv);
+    const V=viewA(w,h,{l:2,r:2,t:2,b:2});paintBoundary(ctx,V,k,S1.metric,S1.w,3,0.34,dpr);
+    ctx.save();ctx.strokeStyle=css(k===S2.k?"--ink":"--line-strong");ctx.lineWidth=k===S2.k?2.5:1;ctx.strokeRect(V.mL+1,V.mT+1,V.pw-2,V.ph-2);ctx.restore();
+    drawPoints(ctx,V,2.6);
+    const cap=$("b2cap"+k);if(cap)cap.innerHTML=`<b>k = ${k}</b> · 학습 ${pct(C.trn[k])} · 검증 ${pct(C.val[k])}${k===1?" · 들쭉날쭉":k>=15?" · 매끄러움":""}`;});
+}
+function chart2(C){
+  const host=$("b2chart");const narrow=(host.clientWidth||400)<420;
+  const lo=Math.max(0,Math.floor(Math.min(...C.val.slice(1),...C.trn.slice(1))*10)/10-0.05);
+  const F=svgFrame(host,{x0:0.5,x1:C.kmax+0.5,y0:lo,y1:1.02,ratio:narrow?0.72:0.6,xt:ticks(1,C.kmax,narrow?6:10).filter(v=>v>=1),yt:ticks(lo,1,5),yf:v=>(v*100).toFixed(0)+"%",xl:"이웃 수 k",yl:"정확도",mB:40});
+  const ks=[...Array(C.kmax)].map((_,i)=>i+1);
+  let b=`<rect class="click" x="${F.mL}" y="${F.mT}" width="${F.pw}" height="${F.ph}" fill="transparent"/>`;
+  b+=`<text class="lbl" x="${F.mL+6}" y="${F.mT+F.ph-8}" fill="var(--lim)">← 과적합</text><text class="lbl" x="${F.mL+F.pw-6}" y="${F.mT+F.ph-8}" fill="var(--c1)" text-anchor="end">과소적합 →</text>`;
+  b+=`<line x1="${F.X(C.best)}" x2="${F.X(C.best)}" y1="${F.mT}" y2="${F.mT+F.ph}" stroke="var(--ok)" stroke-width="1.6" stroke-dasharray="5 4"/>`;
+  b+=`<line x1="${F.X(S2.k)}" x2="${F.X(S2.k)}" y1="${F.mT}" y2="${F.mT+F.ph}" stroke="var(--ink)" stroke-width="1.2"/>`;
+  b+=`<path d="${path(ks.map(k=>[F.X(k),F.Y(C.trn[k])]))}" fill="none" stroke="var(--trn)" stroke-width="2.4"/>`;
+  b+=`<path d="${path(ks.map(k=>[F.X(k),F.Y(C.val[k])]))}" fill="none" stroke="var(--val)" stroke-width="2.4"/>`;
+  ks.forEach(k=>{b+=`<circle cx="${F.X(k).toFixed(1)}" cy="${F.Y(C.val[k]).toFixed(1)}" r="${k===S2.k?4.5:2.4}" fill="var(--val)"/>`;});
+  b+=`<circle cx="${F.X(S2.k)}" cy="${F.Y(C.trn[S2.k])}" r="4.5" fill="var(--trn)"/>`;
+  b+=`<text class="lbl" x="${Math.min(F.X(C.best)+5,F.mL+F.pw-70)}" y="${F.mT+12}" fill="var(--ok)">최적 k = ${C.best}</text>`;
+  const svg=svgPut(host,F,b);
+  svg.querySelector(".click").addEventListener("click",e=>{const [x]=svgPoint(svg,F,e);S2.k=clamp(Math.round(0.5+(x-F.mL)/F.pw*C.kmax),1,C.kmax);render2();});
+}
+function render2(){
+  const C=curves2();S2.k=clamp(S2.k,1,C.kmax);$("b2k").max=C.kmax;$("b2k").value=S2.k;$("b2kv").textContent=S2.k;
+  $("b2leg").innerHTML=legendHTML(A.nc,`<span><i class="kn-dot" style="border:2px solid var(--lim)"></i>학습 데이터 오분류</span>`);
+  draw2();chart2(C);drawMinis(C);
+  const errs=trainErr(S2.k).filter(Boolean).length;
+  $("b2stats").innerHTML=`<div class="sk-stat kn-hl"><b>${S2.k}</b><span>현재 k</span></div><div class="sk-stat"><b style="color:var(--trn)">${pct(C.trn[S2.k])}</b><span>학습 정확도</span></div><div class="sk-stat"><b style="color:var(--val)">${pct(C.val[S2.k])}</b><span>검증 정확도</span></div><div class="sk-stat kn-ok"><b style="color:var(--ok)">${C.best}</b><span>최적 k (${pct(C.val[C.best])})</span></div>`;
+  const cvName=S2.cv==="k5"?"5겹 교차검증":S2.cv==="k10"?"10겹 교차검증":"홀드아웃(30% 검증)";
+  $("b2sub").innerHTML=`데이터 ${A.n}명 · ${MET[S1.metric].nm} 거리 · ${S1.w} (1번 화면 설정) · 학습 데이터 오분류 ${errs}명`;
+  $("b2f").innerHTML=`<span class="c">${cvName}: 폴드마다 StandardScaler를 학습 부분에만 fit → KNN → 검증 부분 정확도</span>
+검증 정확도(k) = (1/폴드 수) × Σ 폴드별 정확도
+k = ${S2.k}:  학습 <b class="m">${pct(C.trn[S2.k])}</b>  ·  검증 <b class="v">${pct(C.val[S2.k])}</b>  ·  차이 ${f((C.trn[S2.k]-C.val[S2.k])*100,1)}%p
+<span class="c">최적 k = argmax 검증 정확도 (같으면 작은 k)</span> = <b class="g">${C.best}</b>`;
+  const gap=C.trn[S2.k]-C.val[S2.k];
+  $("b2note").innerHTML=S2.k===1?`<b>k = 1</b>: 학습 데이터에서는 각 점의 가장 가까운 이웃이 자기 자신이라 학습 정확도가 ${pct(C.trn[1])}입니다. 하지만 검증 정확도는 ${pct(C.val[1])} — 잡음까지 외운 <b>과적합</b>입니다.`
+    :S1.w==="distance"?`<b>distance 가중치</b>에서는 학습 점의 자기 자신(거리 0)이 모든 표를 가져가므로 k와 무관하게 학습 정확도가 거의 100%입니다. 그래서 k 선택은 반드시 <b>검증 정확도</b>로 합니다.`
+    :S2.k>=Math.min(25,C.kmax)?`<b>k = ${S2.k}</b>: 넓은 동네의 평균이라 경계가 너무 매끄러워 경계 근처 환자를 놓칩니다(<b>과소적합</b>). 학습·검증 정확도가 함께 낮아집니다.`
+    :`학습-검증 차이 ${f(gap*100,1)}%p. k가 작을수록 차이(분산)가 커지고, 너무 크면 둘 다 낮아집니다(편향). 검증 정확도가 가장 높은 <b>k = ${C.best}</b>가 이 데이터의 균형점입니다.`;
+}
+$("b2k").addEventListener("input",e=>{S2.k=+e.target.value;render2();});
+$("b2best").onclick=()=>{S2.k=curves2().best;render2();};
+$("b2err").addEventListener("change",render2);
+segInit($("b2cv"),v=>{S2.cv=v;render2();});
+onShow.boundary=render2;
+
+/* ================= 3. 스케일링 ================= */
+const DS3={
+  A:{xl:"총콜레스테롤 (mg/dL)",yl:"나이 (세)",xn:"콜레스테롤",yn:"나이",xu:"mg/dL",yu:"세",xd:[120,310],yd:[20,86],cls:["위험 낮음","위험 높음"],title:"심혈관 질환 위험",q:{x:200,y:64},xdec:0,ydec:0},
+  B:{xl:"연봉 (만원)",yl:"BMI (kg/m²)",xn:"연봉",yn:"BMI",xu:"만원",yu:"",xd:[1500,10000],yd:[14,42],cls:["고혈압 없음","고혈압"],title:"고혈압 여부",q:{x:5200,y:30.0},xdec:0,ydec:1}};
+const S3={ds:"B",sc:"std",k:5,seed:1,q:{x:5200,y:30.0}};
+function gen3(ds,seed){const r=mulberry32(seed*31337+(ds==="A"?11:23));const X=[],Y=[],L=[];
+  for(let i=0;i<80;i++){if(ds==="A"){const age=Math.round(28+52*r()),ch=Math.round(clamp(205+38*gauss(r),130,300));X.push(ch);Y.push(age);L.push(r()<sig(0.17*(age-55)+0.006*(ch-205))?1:0);}
+    else{const bmi=Math.round(clamp(26+4.6*gauss(r),16,40)*10)/10,inc=Math.round(clamp(5200+1500*gauss(r),2000,9800));X.push(inc);Y.push(bmi);L.push(r()<sig(0.95*(bmi-27))?1:0);}}
+  return{X,Y,L};}
+let D3=null;
+function prep3(){D3=gen3(S3.ds,S3.seed);D3.n=D3.X.length;D3.all=D3.X.map((_,i)=>i);D3.fold=stratFolds(D3.L,2,5,S3.seed*77+3);D3.cache={};}
+function trans3(kind){const sx=fitScaler(D3.X,D3.all,kind),sy=fitScaler(D3.Y,D3.all,kind);return{sx,sy,zx:D3.X.map(sx.t),zy:D3.Y.map(sy.t)};}
+function nb3(kind){const T=trans3(kind);const qx=T.sx.t(S3.q.x),qy=T.sy.t(S3.q.y);const nb=nbSort(T.zx,T.zy,qx,qy,"euclid");const k=Math.min(S3.k,D3.n);return{T,qx,qy,top:nb.slice(0,k),k,v:vote(nb.slice(0,k),D3.L,2,"uniform")};}
+function curves3(kind){if(!D3.cache[kind])D3.cache[kind]=curves(D3.X,D3.Y,D3.L,2,D3.fold,kind,"euclid","uniform",30);return D3.cache[kind];}
+let F3=[null,null];
+function draw3(cvId,kind,R,which,others){
+  const cv=$(cvId);if(!cv.clientWidth)return;const {ctx,w,h}=fitCanvas(cv);const narrow=w<420;const M=DS3[S3.ds];
+  const F=frame(w,h,{x0:M.xd[0],x1:M.xd[1],y0:M.yd[0],y1:M.yd[1],mL:narrow?40:46,mB:34,mT:8,mR:narrow?24:26});F3[which]=F;
+  axes(ctx,F,{xt:ticks(M.xd[0],M.xd[1],narrow?3:5),yt:ticks(M.yd[0],M.yd[1],5),xl:M.xl,yl:M.yl,xf:v=>S3.ds==="B"?comma(v):String(v)});
+  const c0=css("--c0"),c1=css("--c1"),ink=css("--ink"),mdl=css("--mdl"),sf=css("--surface");
+  const qx=F.X(S3.q.x),qy=F.Y(S3.q.y);
+  ctx.save();ctx.beginPath();ctx.rect(F.mL,F.mT,F.pw,F.ph);ctx.clip();
+  // 같은 거리 경계: 변환 공간의 원 → 원래 단위에서 타원
+  const rk=R.top[R.k-1].d;const rxu=rk*R.T.sx.s,ryu=rk*R.T.sy.s;const rx=rxu/(F.o.x1-F.o.x0)*F.pw,ry=ryu/(F.o.y1-F.o.y0)*F.ph;
+  ctx.beginPath();ctx.ellipse(qx,qy,Math.max(rx,0.5),Math.max(ry,0.5),0,0,Math.PI*2);ctx.fillStyle=mdl;ctx.globalAlpha=.08;ctx.fill();ctx.globalAlpha=1;ctx.setLineDash([6,4]);ctx.lineWidth=1.8;ctx.strokeStyle=mdl;ctx.stroke();ctx.setLineDash([]);
+  R.top.forEach(o=>{ctx.beginPath();ctx.moveTo(qx,qy);ctx.lineTo(F.X(D3.X[o.i]),F.Y(D3.Y[o.i]));ctx.strokeStyle=ink;ctx.globalAlpha=.5;ctx.lineWidth=1.3;ctx.stroke();ctx.globalAlpha=1;});
+  for(let i=0;i<D3.n;i++){const x=F.X(D3.X[i]),y=F.Y(D3.Y[i]);mark(ctx,x,y,narrow?3.6:4.4,D3.L[i]);ctx.fillStyle=D3.L[i]?c1:c0;ctx.globalAlpha=.85;ctx.fill();ctx.globalAlpha=1;ctx.lineWidth=1;ctx.strokeStyle=sf;ctx.stroke();}
+  const inOther=new Set(others.map(o=>o.i));
+  R.top.forEach(o=>{const x=F.X(D3.X[o.i]),y=F.Y(D3.Y[o.i]);mark(ctx,x,y,(narrow?3.6:4.4)+3,0);ctx.lineWidth=2;ctx.strokeStyle=inOther.has(o.i)?ink:css("--lim");ctx.stroke();});
+  star(ctx,qx,qy,narrow?10:12,D3.L.length?(R.v.pred?c1:c0):sf,ink);
+  ctx.restore();
+  label(ctx,`예측: ${M.cls[R.v.pred]} (${R.v.s[1]}/${R.k})`,F.mL+6,F.mT+16,ink);
+}
+function drawEqual(cvId,kind,R){
+  const cv=$(cvId);if(!cv.clientWidth)return;const {ctx,w,h}=fitCanvas(cv);const T=R.T,M=DS3[S3.ds];
+  const xs=T.zx,ys=T.zy,x0=Math.min(...xs,R.qx),x1=Math.max(...xs,R.qx),y0=Math.min(...ys,R.qy),y1=Math.max(...ys,R.qy);
+  const pad=10,s=Math.max((x1-x0)/(w-2*pad),(y1-y0)/(h-2*pad)),cx=(x0+x1)/2,cy=(y0+y1)/2;
+  const X=v=>w/2+(v-cx)/s,Y=v=>h/2-(v-cy)/s;
+  const ln=css("--line-strong"),c0=css("--c0"),c1=css("--c1"),ink=css("--ink"),mdl=css("--mdl");
+  ctx.strokeStyle=ln;ctx.lineWidth=1;ctx.strokeRect(.5,.5,w-1,h-1);
+  ctx.save();ctx.beginPath();ctx.rect(1,1,w-2,h-2);ctx.clip();
+  ctx.beginPath();ctx.arc(X(R.qx),Y(R.qy),Math.max(R.top[R.k-1].d/s,0.6),0,Math.PI*2);ctx.setLineDash([5,3]);ctx.strokeStyle=mdl;ctx.lineWidth=1.6;ctx.stroke();ctx.setLineDash([]);
+  for(let i=0;i<xs.length;i++){ctx.beginPath();ctx.arc(X(xs[i]),Y(ys[i]),2.6,0,Math.PI*2);ctx.fillStyle=D3.L[i]?c1:c0;ctx.globalAlpha=.8;ctx.fill();ctx.globalAlpha=1;}
+  star(ctx,X(R.qx),Y(R.qy),8,R.v.pred?c1:c0,ink);ctx.restore();
+  const hpx=(y1-y0)/s,wpx=(x1-x0)/s;
+  return{hpx,wpx};
+}
+function contrib(T,pairs){let a=0,b=0;pairs.forEach(([i,j])=>{const dx=(i<0?T.qx:T.zx[i])-T.zx[j],dy=(i<0?T.qy:T.zy[i])-T.zy[j];a+=dx*dx;b+=dy*dy;});const t=a+b||1;return[a/t,b/t];}
+function render3(){
+  const M=DS3[S3.ds];$("s3kv").textContent=S3.k;$("s3k").value=S3.k;
+  const R0=nb3("none"),R1=nb3(S3.sc);const scN=S3.sc==="std"?"StandardScaler":"MinMaxScaler";
+  $("s3leg").innerHTML=`<span><i class="kn-dot" style="background:var(--c0)"></i>${M.cls[0]}</span><span><i class="kn-sq" style="background:var(--c1)"></i>${M.cls[1]}</span><span><i class="kn-dot" style="border:2px solid var(--ink)"></i>양쪽 모두 이웃</span><span><i class="kn-dot" style="border:2px solid var(--lim)"></i>한쪽에서만 이웃</span><span style="color:var(--mdl)"><i class="kn-ln dash"></i>k번째 이웃까지 같은 거리</span>`;
+  const same=R0.top.filter(o=>R1.top.some(p=>p.i===o.i)).length;
+  $("s3capL").innerHTML=`<b>스케일링 없음</b> — 원래 단위로 거리`;
+  $("s3capR").innerHTML=`<b>${scN}</b> 적용 후 거리 · 이웃 ${R1.k}명 중 <b>${R1.k-same}명</b> 바뀜`;
+  draw3("cv3a","none",R0,0,R1.top);draw3("cv3b",S3.sc,R1,1,R0.top);
+  const e0=drawEqual("cv3c","none",R0)||{},e1=drawEqual("cv3d",S3.sc,R1)||{};
+  $("s3capR1").innerHTML=`<b>원래 단위</b> (가로 ${M.xn}, 세로 ${M.yn}) · 세로 폭이 가로의 <b>${f((Math.max(...D3.Y)-Math.min(...D3.Y))/(Math.max(...D3.X)-Math.min(...D3.X))*100,2)}%</b>`;
+  $("s3capR2").innerHTML=`<b>${scN} 후</b> · 두 특성이 비슷한 폭`;
+  // 기여도
+  const pairsAll=[];for(let i=0;i<D3.n;i++)for(let j=i+1;j<D3.n;j++)pairsAll.push([i,j]);
+  const rows=[["none","스케일링 없음",R0],["std","StandardScaler",S3.sc==="std"?R1:nb3("std")],["mm","MinMaxScaler",S3.sc==="mm"?R1:nb3("mm")]];
+  $("s3cleg").innerHTML=`<span><i class="kn-sq" style="background:var(--mdl)"></i>${M.xn} 차이²</span><span><i class="kn-sq" style="background:var(--val)"></i>${M.yn} 차이²</span>`;
+  let ch="";rows.forEach(([kind,nm,R])=>{const T={zx:R.T.zx,zy:R.T.zy,qx:R.qx,qy:R.qy};const all=contrib(T,pairsAll),nbc=contrib(T,R.top.map(o=>[-1,o.i]));
+    const bar=c=>`<div class="bar"><span class="a" style="width:${(c[0]*100).toFixed(2)}%">${c[0]>0.2?pct(c[0]):""}</span><span class="b" style="width:${(c[1]*100).toFixed(2)}%">${c[1]>0.2?pct(c[1]):""}</span></div>`;
+    ch+=`<div class="nm">${nm}<br><span class="sk-hint">모든 점 쌍</span></div>${bar(all)}<div class="nm"><span class="sk-hint">별 ↔ 이웃 ${R.k}명</span></div>${bar(nbc)}`;});
+  $("s3contrib").innerHTML=ch;
+  const sx=fitScaler(D3.X,D3.all,"std"),sy=fitScaler(D3.Y,D3.all,"std");
+  const o=R0.top[0],dX=S3.q.x-D3.X[o.i],dY=S3.q.y-D3.Y[o.i];
+  $("s3f").innerHTML=`<span class="c">스케일링 없이 1위 이웃 #${o.i}까지</span>
+d = √(${M.xn} 차이² + ${M.yn} 차이²) = √(${fp(dX,M.xdec)}² + ${fp(dY,1)}²) = √(${f(dX*dX,1)} + ${f(dY*dY,2)}) = <b>${f(Math.sqrt(dX*dX+dY*dY),2)}</b>
+<span class="c">표준편차: ${M.xn} ${f(sx.sd,1)} ${M.xu} vs ${M.yn} ${f(sy.sd,2)}${M.yu?" "+M.yu:""} → 분산 비 ${f(sx.sd*sx.sd/(sy.sd*sy.sd),0)} : 1</span>
+<span class="c">StandardScaler  z = (x − 평균) / 표준편차   ·   MinMaxScaler  x' = (x − 최솟값) / (최댓값 − 최솟값)</span>`;
+  // 정확도 표
+  const Cs={none:curves3("none"),std:curves3("std"),mm:curves3("mm")};const k=Math.min(S3.k,Cs.none.kmax);
+  const accs=["none","std","mm"].map(kd=>Cs[kd].val[k]);const mx=Math.max(...accs),mn=Math.min(...accs);
+  let t=`<thead><tr><th>스케일링</th><th>이웃 (인덱스)</th><th>별 예측</th><th>검증 정확도 (k = ${k})</th><th>최적 k · 정확도</th></tr></thead><tbody>`;
+  rows.forEach(([kind,nm,R],ri)=>{const C=Cs[kind];const chips=R.top.map(o=>`<span class="kn-chip${kind!=="none"&&!R0.top.some(p=>p.i===o.i)?" new":""}" style="color:var(${D3.L[o.i]?"--c1":"--c0"})">${o.i}</span>`).join("");
+    t+=`<tr><td><b>${nm}</b></td><td><div class="kn-chips">${chips}</div></td><td>${M.cls[R.v.pred]}</td><td class="n ${C.val[k]===mn&&mx>mn?"hi":C.val[k]===mx&&mx>mn?"lo":""}">${pct(C.val[k])}</td><td class="n">${C.best} · ${pct(C.val[C.best])}</td></tr>`;});
+  $("s3tab").innerHTML=t+"</tbody>";
+  // k 곡선
+  const host=$("s3chart"),narrow=(host.clientWidth||400)<420,km=Cs.none.kmax;
+  const lo=Math.max(0,Math.floor(Math.min(...["none","std","mm"].flatMap(kd=>Cs[kd].val.slice(1)))*10)/10-0.05);
+  const F=svgFrame(host,{x0:0.5,x1:km+0.5,y0:lo,y1:1,ratio:narrow?0.62:0.45,xt:ticks(1,km,narrow?6:10).filter(v=>v>=1),yt:ticks(lo,1,4),yf:v=>(v*100).toFixed(0)+"%",xl:"k",yl:"검증 정확도",mB:38});
+  const ks=[...Array(km)].map((_,i)=>i+1);const colr={none:"var(--lim)",std:"var(--mdl)",mm:"var(--val)"};
+  let b=`<line x1="${F.X(k)}" x2="${F.X(k)}" y1="${F.mT}" y2="${F.mT+F.ph}" stroke="var(--ink)" stroke-width="1.2"/>`;
+  ["none","std","mm"].forEach(kd=>{b+=`<path d="${path(ks.map(kk=>[F.X(kk),F.Y(Cs[kd].val[kk])]))}" fill="none" stroke="${colr[kd]}" stroke-width="2.2"${kd==="mm"?' stroke-dasharray="6 3"':""}/>`;});
+  b+=`<text class="lbl" x="${F.mL+F.pw-4}" y="${F.Y(Cs.none.val[km])-8}" text-anchor="end" fill="var(--lim)">스케일링 없음</text>`;
+  b+=`<text class="lbl" x="${F.mL+F.pw-4}" y="${Math.min(F.Y(Math.max(Cs.std.val[km],Cs.mm.val[km]))-8,F.mT+F.ph-4)}" text-anchor="end" fill="var(--mdl)">Standard · MinMax</text>`;
+  svgPut(host,F,b);
+  const gain=Cs[S3.sc].val[k]-Cs.none.val[k];
+  $("s3note").innerHTML=S3.ds==="B"
+    ?`연봉은 표준편차가 약 ${comma(sx.sd)}만원, BMI는 약 ${f(sy.sd,1)}라 스케일링 없이는 거리²의 ${pct(contrib({zx:D3.X,zy:D3.Y,qx:0,qy:0},pairsAll)[0])}가 연봉 차이입니다. 고혈압과 상관없는 연봉으로 이웃을 고르니 정확도가 ${pct(Cs.none.val[k])}에 머물고, ${scN}를 쓰면 <b>${pct(Cs[S3.sc].val[k])}</b> (${gain>=0?"+":""}${f(gain*100,1)}%p).`
+    :`콜레스테롤의 분산이 나이보다 커서 거리 대부분을 차지합니다. 위험은 나이가 주로 좌우하므로 스케일링 없이 ${pct(Cs.none.val[k])}, ${scN} 후 <b>${pct(Cs[S3.sc].val[k])}</b> (${gain>=0?"+":""}${f(gain*100,1)}%p). 단위 차이가 작아도 영향이 있습니다.`;
+}
+$("s3k").addEventListener("input",e=>{S3.k=+e.target.value;render3();});
+segInit($("s3ds"),v=>{S3.ds=v;S3.q={...DS3[v].q};prep3();render3();});
+segInit($("s3sc"),v=>{S3.sc=v;render3();});
+$("s3seed").onclick=()=>{S3.seed++;prep3();render3();};
+["cv3a","cv3b"].forEach((id,w)=>{const cv=$(id);let drag=false;
+  function set(e){const F=F3[w];if(!F)return;const r=cv.getBoundingClientRect(),M=DS3[S3.ds];const x=clamp(F.IX(e.clientX-r.left),M.xd[0],M.xd[1]),y=clamp(F.IY(e.clientY-r.top),M.yd[0],M.yd[1]);
+    S3.q.x=Math.round(x);S3.q.y=M.ydec?Math.round(y*10)/10:Math.round(y);render3();}
+  cv.addEventListener("pointerdown",e=>{drag=true;cv.setPointerCapture(e.pointerId);set(e);});
+  cv.addEventListener("pointermove",e=>{if(drag)set(e);});
+  cv.addEventListener("pointerup",()=>drag=false);cv.addEventListener("pointercancel",()=>drag=false);});
+onShow.scale=render3;
+
+/* ================= 4. KNN 회귀 ================= */
+const S4={seed:1,k:5,w:"uniform",q:50,showVal:true};
+let D4=null;
+const sbpTrue=a=>98+0.62*(a-20)+6*Math.sin((a-20)/7.5);
+function gen4(seed){const r=mulberry32(seed*4241+9);const tr=[],tv=[];
+  const distinctFrom=(a,set)=>{const ds=new Set();for(const p of set){const d=Math.abs(a-p);if(ds.has(d))return false;ds.add(d);}return true;};
+  const okTrain=a=>{if(tr.includes(a))return false;if(!distinctFrom(a,tr))return false;for(const p of tr){const d=Math.abs(a-p);for(const q of tr)if(q!==p&&Math.abs(q-p)===d)return false;}return true;};
+  let guard=0;while(tr.length<40&&guard++<20000){const a=Math.round((20+60*r())*10);if(okTrain(a))tr.push(a);}
+  guard=0;while(tv.length<40&&guard++<20000){const a=Math.round((20+60*r())*10);if(!tv.includes(a)&&!tr.includes(a)&&distinctFrom(a,tr))tv.push(a);}
+  const y=a=>Math.round(clamp(sbpTrue(a/10)+7*gauss(r),85,190));
+  return{tx:tr.map(a=>a/10),ty:tr.map(y),vx:tv.map(a=>a/10),vy:tv.map(y)};}
+function prep4(){D4=gen4(S4.seed);D4.cache={};}
+function regPred(x,k,w){const nb=D4.tx.map((t,i)=>({i,d:Math.abs(x-t)})).sort((a,b)=>a.d-b.d||a.i-b.i).slice(0,k);
+  let num=0,den=0;const zero=w==="distance"&&nb.some(o=>o.d===0);
+  nb.forEach(o=>{const wt=w==="uniform"?1:zero?(o.d===0?1:0):1/o.d;num+=wt*D4.ty[o.i];den+=wt;});return{y:num/den,nb,zero,den};}
+function mse4(w){if(D4.cache[w])return D4.cache[w];const trn=[0],val=[0];
+  for(let k=1;k<=30;k++){let a=0,b=0;D4.tx.forEach((x,i)=>{const e=regPred(x,k,w).y-D4.ty[i];a+=e*e;});D4.vx.forEach((x,i)=>{const e=regPred(x,k,w).y-D4.vy[i];b+=e*e;});trn.push(a/D4.tx.length);val.push(b/D4.vx.length);}
+  let best=1;for(let k=2;k<=30;k++)if(val[k]<val[best]-1e-12)best=k;return D4.cache[w]={trn,val,best};}
+let F4=null;
+function draw4(P){
+  const cv=$("cv4");if(!cv.clientWidth)return;const {ctx,w,h}=fitCanvas(cv);const narrow=w<520;
+  const F=frame(w,h,{x0:18,x1:82,y0:80,y1:195,mL:narrow?40:48,mB:36,mT:10,mR:12});F4=F;
+  axes(ctx,F,{xt:ticks(20,80,narrow?6:12),yt:ticks(80,190,6),xl:"나이 (세)",yl:"수축기 혈압 (mmHg)"});
+  const trn=css("--trn"),val=css("--val"),mdl=css("--mdl"),ink=css("--ink"),sf=css("--surface");
+  ctx.save();ctx.beginPath();ctx.rect(F.mL,F.mT,F.pw,F.ph);ctx.clip();
+  // 이웃 구간
+  const xs=P.nb.map(o=>D4.tx[o.i]),lo=Math.min(...xs,S4.q),hi=Math.max(...xs,S4.q);
+  ctx.fillStyle=mdl;ctx.globalAlpha=.08;ctx.fillRect(F.X(lo),F.mT,F.X(hi)-F.X(lo),F.ph);ctx.globalAlpha=1;
+  // 예측선
+  ctx.strokeStyle=mdl;ctx.lineWidth=2.6;ctx.lineJoin="round";ctx.beginPath();
+  const N=Math.max(300,Math.round(F.pw*1.5));for(let j=0;j<=N;j++){const x=18+64*j/N,y=regPred(x,S4.k,S4.w).y;j?ctx.lineTo(F.X(x),F.Y(y)):ctx.moveTo(F.X(x),F.Y(y));}ctx.stroke();
+  if(S4.showVal)D4.vx.forEach((x,i)=>{ctx.beginPath();ctx.arc(F.X(x),F.Y(D4.vy[i]),4,0,Math.PI*2);ctx.lineWidth=1.8;ctx.strokeStyle=val;ctx.stroke();});
+  D4.tx.forEach((x,i)=>{ctx.beginPath();ctx.arc(F.X(x),F.Y(D4.ty[i]),4.6,0,Math.PI*2);ctx.fillStyle=trn;ctx.globalAlpha=.88;ctx.fill();ctx.globalAlpha=1;ctx.lineWidth=1.2;ctx.strokeStyle=sf;ctx.stroke();});
+  P.nb.forEach(o=>{const x=F.X(D4.tx[o.i]),y=F.Y(D4.ty[o.i]);ctx.beginPath();ctx.arc(x,y,8,0,Math.PI*2);ctx.lineWidth=2;ctx.strokeStyle=ink;ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(F.X(S4.q),F.Y(P.y));ctx.globalAlpha=.35;ctx.lineWidth=1;ctx.stroke();ctx.globalAlpha=1;});
+  const qx=F.X(S4.q);ctx.setLineDash([4,4]);ctx.strokeStyle=ink;ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(qx,F.mT);ctx.lineTo(qx,F.mT+F.ph);ctx.stroke();ctx.setLineDash([]);
+  ctx.beginPath();ctx.moveTo(qx,F.Y(P.y)-8);ctx.lineTo(qx+8,F.Y(P.y));ctx.lineTo(qx,F.Y(P.y)+8);ctx.lineTo(qx-8,F.Y(P.y));ctx.closePath();ctx.fillStyle=mdl;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=sf;ctx.stroke();
+  ctx.restore();
+  label(ctx,`ŷ(${f(S4.q,1)}) = ${f(P.y,2)}`,qx+12>F.mL+F.pw-120?qx-12:qx+12,clamp(F.Y(P.y)-12,F.mT+16,F.mT+F.ph-6),mdl,qx+12>F.mL+F.pw-120?"right":"left");
+}
+function chart4(Mm){
+  const host=$("r4chart"),narrow=(host.clientWidth||400)<420;const hi=Math.max(...Mm.val.slice(1),...Mm.trn.slice(1));const top=Math.ceil(hi/20)*20;
+  const F=svgFrame(host,{x0:0.5,x1:30.5,y0:0,y1:top,ratio:narrow?0.68:0.55,xt:ticks(1,30,narrow?6:10).filter(v=>v>=1),yt:ticks(0,top,5),xl:"이웃 수 k",yl:"MSE",mB:40});
+  const ks=[...Array(30)].map((_,i)=>i+1);
+  let b=`<rect class="click" x="${F.mL}" y="${F.mT}" width="${F.pw}" height="${F.ph}" fill="transparent"/>`;
+  b+=`<line x1="${F.X(Mm.best)}" x2="${F.X(Mm.best)}" y1="${F.mT}" y2="${F.mT+F.ph}" stroke="var(--ok)" stroke-width="1.6" stroke-dasharray="5 4"/>`;
+  b+=`<line x1="${F.X(S4.k)}" x2="${F.X(S4.k)}" y1="${F.mT}" y2="${F.mT+F.ph}" stroke="var(--ink)" stroke-width="1.2"/>`;
+  b+=`<path d="${path(ks.map(k=>[F.X(k),F.Y(Mm.trn[k])]))}" fill="none" stroke="var(--trn)" stroke-width="2.4"/>`;
+  b+=`<path d="${path(ks.map(k=>[F.X(k),F.Y(Mm.val[k])]))}" fill="none" stroke="var(--val)" stroke-width="2.4"/>`;
+  b+=`<circle cx="${F.X(S4.k)}" cy="${F.Y(Mm.val[S4.k])}" r="4.5" fill="var(--val)"/><circle cx="${F.X(S4.k)}" cy="${F.Y(Mm.trn[S4.k])}" r="4.5" fill="var(--trn)"/>`;
+  b+=`<text class="lbl" x="${Math.min(F.X(Mm.best)+5,F.mL+F.pw-70)}" y="${F.mT+12}" fill="var(--ok)">최적 k = ${Mm.best}</text>`;
+  const svg=svgPut(host,F,b);
+  svg.querySelector(".click").addEventListener("click",e=>{const [x]=svgPoint(svg,F,e);S4.k=clamp(Math.round(0.5+(x-F.mL)/F.pw*30),1,30);render4();});
+}
+function render4(){
+  $("r4k").value=S4.k;$("r4kv").textContent=S4.k;$("r4q").value=S4.q;$("r4qv").textContent=f(S4.q,1);$("r4seedv").textContent=`seed ${S4.seed}`;
+  $("r4vleg").style.display=S4.showVal?"":"none";
+  const P=regPred(S4.q,S4.k,S4.w),Mm=mse4(S4.w);
+  draw4(P);chart4(Mm);
+  const ys=P.nb.map(o=>D4.ty[o.i]);
+  let fx;
+  if(S4.w==="uniform"){const sum=ys.reduce((a,b)=>a+b,0);const terms=ys.length>8?ys.slice(0,8).join(" + ")+" + …":ys.join(" + ");
+    fx=`<span class="c">나이 ${f(S4.q,1)}세와 가장 가까운 ${S4.k}명의 혈압 평균</span>
+ŷ = (y₁ + … + y<sub>${S4.k}</sub>) / k = (${terms}) / ${S4.k}
+  = ${sum} / ${S4.k} = <b class="m">${f(P.y,2)}</b> mmHg`;}
+  else if(P.zero){fx=`<span class="c">거리 0인 학습 점이 있으면 그 점의 값을 그대로 씁니다</span>\nŷ = <b class="m">${f(P.y,2)}</b> mmHg`;}
+  else{const terms=P.nb.slice(0,5).map(o=>`${D4.ty[o.i]}/${f(o.d,1)}`).join(" + ")+(P.nb.length>5?" + …":"");const num=P.nb.reduce((a,o)=>a+D4.ty[o.i]/o.d,0);
+    fx=`<span class="c">가까운 이웃일수록 큰 가중치 w = 1/d</span>
+ŷ = Σ(yᵢ / dᵢ) / Σ(1 / dᵢ) = (${terms}) / Σ(1/dᵢ)
+  = ${f(num,3)} / ${f(P.den,4)} = <b class="m">${f(P.y,2)}</b> mmHg`;}
+  $("r4f").innerHTML=fx;
+  $("r4hint").textContent=`k = ${S4.k} · ${S4.w}`;
+  $("r4tab").innerHTML=`<thead><tr><th>순위</th><th>인덱스</th><th>나이</th><th>거리 |x − xᵢ|</th><th>혈압 yᵢ</th>${S4.w==="distance"?"<th>가중치 1/d</th>":""}</tr></thead><tbody>`+
+    P.nb.map((o,r)=>`<tr class="in"><td class="n">${r+1}</td><td class="n">#${o.i}</td><td class="n">${f(D4.tx[o.i],1)}</td><td class="n d">${f(o.d,1)}</td><td class="n">${D4.ty[o.i]}</td>${S4.w==="distance"?`<td class="n">${o.d===0?"∞":f(1/o.d,3)}</td>`:""}</tr>`).join("")+"</tbody>";
+  $("r4stats").innerHTML=`<div class="sk-stat"><b style="color:var(--trn)">${f(Mm.trn[S4.k],1)}</b><span>학습 MSE (k = ${S4.k})</span></div><div class="sk-stat"><b style="color:var(--val)">${f(Mm.val[S4.k],1)}</b><span>검증 MSE (k = ${S4.k})</span></div><div class="sk-stat kn-ok"><b style="color:var(--ok)">${Mm.best}</b><span>최적 k (검증 ${f(Mm.val[Mm.best],1)})</span></div>`;
+  $("r4note").innerHTML=S4.w==="uniform"
+    ?`<b>uniform</b>: 이웃 집합이 바뀌는 지점(두 학습 점의 한가운데)에서만 예측이 바뀌므로 <b>계단 모양</b>입니다. k = 1은 점마다 계단을 만들어 학습 MSE ${f(Mm.trn[1],1)}로 작지만 검증 MSE ${f(Mm.val[1],1)}(과적합). k가 커지면 계단이 넓어지며 매끄러워지고, 너무 크면 양 끝에서 평평해져 추세를 놓칩니다(과소적합). 특성이 하나뿐이라 스케일링은 이웃 순서를 바꾸지 않습니다.`
+    :`<b>distance</b>: 학습 점 위에서는 거리 0이라 그 점의 값을 그대로 지나가므로 학습 MSE가 항상 0입니다. 곡선은 학습 점마다 뾰족하게 붙고, 사이에서는 부드럽게 이어집니다. 그래서 k 선택은 검증 MSE(${f(Mm.val[Mm.best],1)}, k = ${Mm.best})로 판단합니다.`;
+}
+$("r4k").addEventListener("input",e=>{S4.k=+e.target.value;render4();});
+$("r4q").addEventListener("input",e=>{S4.q=+e.target.value;render4();});
+segInit($("r4w"),v=>{S4.w=v;render4();});
+$("r4val").addEventListener("change",e=>{S4.showVal=e.target.checked;render4();});
+$("r4seed").onclick=()=>{S4.seed++;prep4();render4();};
+(function(){const cv=$("cv4");let drag=false;
+  function set(e){if(!F4)return;const r=cv.getBoundingClientRect();S4.q=clamp(Math.round(F4.IX(e.clientX-r.left)*10)/10,20,80);render4();}
+  cv.addEventListener("pointerdown",e=>{drag=true;cv.setPointerCapture(e.pointerId);set(e);});
+  cv.addEventListener("pointermove",e=>{if(drag)set(e);});
+  cv.addEventListener("pointerup",()=>drag=false);cv.addEventListener("pointercancel",()=>drag=false);
+  cv.addEventListener("keydown",e=>{const m=e.shiftKey?5:0.5;if(e.key==="ArrowLeft"||e.key==="ArrowRight"){e.preventDefault();S4.q=clamp(Math.round((S4.q+(e.key==="ArrowRight"?m:-m))*10)/10,20,80);render4();}});
+})();
+onShow.reg=render4;
+
+/* ================= 5. 계산 비용과 차원의 저주 ================= */
+const NS=[1000,3000,10000,30000,100000,300000,1000000],MS=[1,10,100,1000,10000];
+const S5={ni:2,d:10,mi:2,cn:500,cseed:1,dd:2,ratios:null,busy:false};
+function render5a(){
+  const n=NS[S5.ni],d=S5.d,m=MS[S5.mi];$("c5nv").textContent=comma(n);$("c5dv").textContent=d;$("c5mv").textContent=comma(m);
+  const knnOps=m*n*d,lrOps=m*d;
+  $("c5tab").innerHTML=`<thead><tr><th></th><th>학습 (fit)</th><th>예측 m = ${comma(m)}명</th><th>저장해 둘 것</th></tr></thead><tbody>
+<tr><td><b>KNN</b> (게으른 학습)</td><td class="lo">데이터 저장뿐</td><td class="hi">${comma(m)} × ${comma(n)} × ${d} = <b>${sci(knnOps)}</b> 번 뺄셈·곱셈</td><td>학습 데이터 전체 ${comma(n)} × ${d} = ${comma(n*d)}개 숫자</td></tr>
+<tr><td><b>로지스틱 회귀</b> (열심 학습)</td><td>경사하강법·뉴턴법으로 계수 계산</td><td class="lo">${comma(m)} × ${d} = ${comma(lrOps)} 번 곱셈</td><td>계수 ${d + 1}개</td></tr></tbody>`;
+  $("c5f").innerHTML=`<span class="c">질의 1건 = n개 점과 d차원 거리 계산 + k개 고르기</span>
+예측 비용 ∝ m × n × d   →   KNN / 로지스틱 = n = <b>${comma(n)}배</b>
+<span class="c">데이터가 10배 늘면 KNN 예측도 10배 느려짐 (학습은 그대로)</span>`;
+}
+function measure(){
+  if(S5.busy)return;S5.busy=true;$("c5out").textContent="재는 중…";$("c5run").disabled=true;
+  setTimeout(()=>{const n=NS[S5.ni],d=S5.d,m=MS[S5.mi];const cap=2e6,nE=Math.min(n,Math.floor(cap/d));const r=mulberry32(99);
+    const X=new Float64Array(nE*d);for(let i=0;i<X.length;i++)X[i]=r();const q=new Float64Array(d);
+    const reps=Math.max(1,Math.min(40,Math.floor(4e7/(nE*d))));let sink=0;const t0=performance.now();
+    for(let rp=0;rp<reps;rp++){for(let j=0;j<d;j++)q[j]=r();let best=Infinity;for(let i=0;i<nE;i++){let s=0;const o=i*d;for(let j=0;j<d;j++){const t=X[o+j]-q[j];s+=t*t;}if(s<best)best=s;}sink+=best;}
+    const per=(performance.now()-t0)/reps*(n/nE);
+    $("c5out").innerHTML=`질의 1건 ≈ <b>${per<1?f(per,3):f(per,1)} ms</b> → ${comma(m)}건 ≈ <b>${per*m<1000?f(per*m,1)+" ms":f(per*m/1000,1)+" 초"}</b>${nE<n?` (점 ${comma(nE)}개로 재서 ${comma(n)}개로 환산)`:""}`+(sink<0?"":"");
+    S5.busy=false;$("c5run").disabled=false;},30);
+}
+function computeCurse(){const n=S5.cn,Q=20,ratios=[0];
+  for(let d=1;d<=100;d++){const r=mulberry32(S5.cseed*100003+d*977+n);const P=new Float64Array(n*d);for(let i=0;i<P.length;i++)P[i]=r();
+    let acc=0;for(let qi=0;qi<Q;qi++){const q=new Float64Array(d);for(let j=0;j<d;j++)q[j]=r();let mn=Infinity,mx=0;
+      for(let i=0;i<n;i++){let s=0;const o=i*d;for(let j=0;j<d;j++){const t=P[o+j]-q[j];s+=t*t;}if(s<mn)mn=s;if(s>mx)mx=s;}acc+=Math.sqrt(mn/mx);}
+    ratios.push(acc/Q);}
+  S5.ratios=ratios;}
+function distsAt(d){const n=S5.cn;const r=mulberry32(S5.cseed*100003+d*977+n);const P=new Float64Array(n*d);for(let i=0;i<P.length;i++)P[i]=r();
+  const q=new Float64Array(d);for(let j=0;j<d;j++)q[j]=r();const ds=new Float64Array(n);for(let i=0;i<n;i++){let s=0;const o=i*d;for(let j=0;j<d;j++){const t=P[o+j]-q[j];s+=t*t;}ds[i]=Math.sqrt(s);}return ds;}
+function render5b(){
+  if(!S5.ratios)computeCurse();const R=S5.ratios;
+  $("c5ddv").textContent=S5.dd;$("c5dd").value=S5.dd;
+  const host=$("c5chart"),narrow=(host.clientWidth||400)<420;
+  const F=svgFrame(host,{x0:1,x1:100,y0:0,y1:1,ratio:narrow?0.62:0.48,xt:[1,10,20,30,40,50,60,70,80,90,100],yt:[0,0.25,0.5,0.75,1],yf:v=>v.toFixed(2),xl:"차원 d",yl:"최근접 ÷ 최원",mB:40,xgrid:false});
+  const ds=[...Array(100)].map((_,i)=>i+1);
+  let b=`<rect class="click" x="${F.mL}" y="${F.mT}" width="${F.pw}" height="${F.ph}" fill="transparent"/>`;
+  b+=`<line x1="${F.mL}" x2="${F.mL+F.pw}" y1="${F.Y(1)}" y2="${F.Y(1)}" stroke="var(--faint)" stroke-dasharray="4 4"/>`;
+  b+=`<path d="${path(ds.map(d=>[F.X(d),F.Y(R[d])]))}" fill="none" stroke="var(--lim)" stroke-width="2.4"/>`;
+  b+=`<circle cx="${F.X(S5.dd)}" cy="${F.Y(R[S5.dd])}" r="5" fill="var(--ink)"/>`;
+  const tx=F.X(S5.dd)>F.mL+F.pw-150;
+  b+=`<text class="lbl" x="${F.X(S5.dd)+(tx?-8:8)}" y="${F.Y(R[S5.dd])+(R[S5.dd]>0.85?18:-8)}" text-anchor="${tx?"end":"start"}" fill="var(--ink)">d = ${S5.dd}: ${R[S5.dd].toFixed(3)}</text>`;
+  const svg=svgPut(host,F,b);
+  svg.querySelector(".click").addEventListener("click",e=>{const [x]=svgPoint(svg,F,e);S5.dd=clamp(Math.round(1+(x-F.mL)/F.pw*99),1,100);render5b();});
+  $("c5cinfo").textContent=`점 ${comma(S5.cn)}개 · 질의 20개 · seed ${S5.cseed}`;
+  // 분포
+  const cv=$("cv5");if(cv.clientWidth){const {ctx,w,h}=fitCanvas(cv);const dsv=distsAt(S5.dd);let mx=0,mn=Infinity;dsv.forEach(v=>{if(v>mx)mx=v;if(v<mn)mn=v;});
+    const B=40,cnt=new Array(B).fill(0);dsv.forEach(v=>{cnt[Math.min(B-1,Math.floor(v/mx*B))]++;});const top=Math.max(...cnt);
+    const G=frame(w,h,{x0:0,x1:1,y0:0,y1:top*1.15,mL:40,mB:34,mT:8,mR:12});
+    axes(ctx,G,{xt:[0,0.2,0.4,0.6,0.8,1],yt:ticks(0,top*1.15,4),xl:"거리 ÷ 가장 먼 거리",yl:"점 수",xgrid:false});
+    const val=css("--val"),lim=css("--lim"),ink=css("--ink");
+    cnt.forEach((c,i)=>{const x0=G.X(i/B),x1=G.X((i+1)/B);ctx.fillStyle=val;ctx.globalAlpha=.75;ctx.fillRect(x0+0.5,G.Y(c),x1-x0-1,G.Y(0)-G.Y(c));ctx.globalAlpha=1;});
+    const xm=G.X(mn/mx);ctx.strokeStyle=lim;ctx.lineWidth=2;ctx.setLineDash([5,3]);ctx.beginPath();ctx.moveTo(xm,G.mT);ctx.lineTo(xm,G.mT+G.ph);ctx.stroke();ctx.setLineDash([]);
+    label(ctx,`가장 가까운 점 ${f(mn/mx,3)}`,xm+6>G.mL+G.pw-150?xm-6:xm+6,G.mT+16,lim,xm+6>G.mL+G.pw-150?"right":"left");
+    const mean=dsv.reduce((a,b)=>a+b,0)/dsv.length,sd=Math.sqrt(dsv.reduce((a,b)=>a+(b-mean)*(b-mean),0)/dsv.length);
+    $("c5cf").innerHTML=`<span class="c">d = ${S5.dd}, 질의점 하나에서 ${comma(S5.cn)}개 점까지 거리</span>
+가장 가까운 ${f(mn,3)} · 가장 먼 ${f(mx,3)} → 비율 <b>${f(mn/mx,3)}</b>   (상대 대비 (최원 − 최근접)/최근접 = ${f((mx-mn)/mn,2)})
+평균 ${f(mean,3)} · 표준편차 ${f(sd,3)} → 변동계수 ${f(sd/mean,3)}   <span class="c">(d가 커지면 0에 가까워짐)</span>
+<span class="c">20개 질의 평균 비율: d = 1 → ${R[1].toFixed(3)}, d = 2 → ${R[2].toFixed(3)}, d = 10 → ${R[10].toFixed(3)}, d = 100 → ${R[100].toFixed(3)}</span>`;}
+}
+$("c5n").addEventListener("input",e=>{S5.ni=+e.target.value;render5a();});
+$("c5d").addEventListener("input",e=>{S5.d=+e.target.value;render5a();});
+$("c5m").addEventListener("input",e=>{S5.mi=+e.target.value;render5a();});
+$("c5run").onclick=measure;
+$("c5dd").addEventListener("input",e=>{S5.dd=+e.target.value;render5b();});
+segInit($("c5cn"),v=>{S5.cn=+v;S5.ratios=null;render5b();});
+$("c5re").onclick=()=>{S5.cseed++;S5.ratios=null;render5b();};
+onShow.cost=()=>{render5a();render5b();};
+
+/* ================= 6. 코드 ================= */
+const S6={kind:"cls",code:""};
+function hl(code){return code.split("\n").map(line=>{const i=line.indexOf("#");let a=i>=0?line.slice(0,i):line,b=i>=0?line.slice(i):"";
+  a=esc(a).replace(/("[^"]*"|'[^']*')/g,'<span class="st">$1</span>').replace(/\b(import|from|as|for|in|print|def|return|range|if|else|None)\b/g,'<span class="kw">$1</span>');
+  return a+(b?`<span class="cm">${esc(b)}</span>`:"");}).join("\n");}
+function wrapNums(arr,per,indent){const out=[];for(let i=0;i<arr.length;i+=per)out.push(indent+arr.slice(i,i+per).join(", ")+(i+per<arr.length?",":""));return out.join("\n");}
+const pyList=(a,d)=>"["+a.map(v=>pyr(v,d)).join(", ")+"]";
+function knnArgs(k,w,m){return `n_neighbors=${k}, weights="${w}", ${MET[m].sk}`;}
+function codeCls(){
+  const R=compute1(),C=curves2(),k=R.k,L=[];const names=CLS[A.nc].map((c,i)=>`${i} ${c.n}`).join(", ");
+  L.push("import numpy as np");
+  L.push("from sklearn.pipeline import Pipeline");
+  L.push("from sklearn.preprocessing import StandardScaler");
+  L.push("from sklearn.neighbors import KNeighborsClassifier");
+  L.push("from sklearn.model_selection import GridSearchCV, PredefinedSplit");
+  L.push("");
+  L.push(`# 1·2번 화면의 데이터 (seed ${A.seed}): [공복혈당(mg/dL), BMI] ${A.n}명`);
+  L.push("X = np.array([");L.push(wrapNums(A.pts.map(p=>`[${p.g}, ${p.b.toFixed(1)}]`),6,"    "));L.push("])");
+  L.push(`y = np.array([`);L.push(wrapNums(A.lab.map(String),30,"    "));L.push(`])   # ${names}`);
+  L.push("");
+  L.push("# 표준화 → KNN (거리를 재기 전에 두 특성의 단위를 맞춘다)");
+  L.push("model = Pipeline([");
+  L.push('    ("scaler", StandardScaler()),');
+  L.push(`    ("knn", KNeighborsClassifier(${knnArgs(S1.k>A.n?A.n:S1.k,S1.w,S1.metric)})),`);
+  L.push("])");
+  L.push("model.fit(X, y)                       # 게으른 학습: 표준화 값과 데이터를 저장할 뿐");
+  L.push("");
+  L.push(`new = np.array([[${S1.q.g}, ${S1.q.b.toFixed(1)}]])          # 새 환자 (별)`);
+  L.push('z_new = model["scaler"].transform(new)');
+  L.push('dist, idx = model["knn"].kneighbors(z_new)');
+  L.push('print("z:", np.round(z_new[0], 3).tolist())');
+  L.push('print("이웃 인덱스:", idx[0].tolist())');
+  L.push('print("거리:", np.round(dist[0], 3).tolist())');
+  L.push('print("예측:", int(model.predict(new)[0]), "확률:", np.round(model.predict_proba(new)[0], 3).tolist())');
+  L.push("");
+  const cvName=S2.cv==="k5"?"5겹":S2.cv==="k10"?"10겹":"홀드아웃 30%";
+  L.push(`# 2번 화면: k = 1~${C.kmax} 중 검증 정확도가 가장 높은 k (${cvName}, 이 페이지와 같은 나누기)`);
+  L.push("test_fold = np.array([");L.push(wrapNums(S2.fold.map(String),30,"    "));L.push("])");
+  L.push("cv = PredefinedSplit(test_fold)" + (S2.cv==="ho"?"         # -1 = 항상 학습, 0 = 검증":""));
+  L.push(`grid = GridSearchCV(model, {"knn__n_neighbors": list(range(1, ${C.kmax+1}))}, cv=cv, scoring="accuracy")`);
+  L.push("grid.fit(X, y)");
+  L.push('print("최적 k:", grid.best_params_["knn__n_neighbors"], "검증 정확도:", round(grid.best_score_, 3))');
+  L.push(`k2 = ${S2.k}`);
+  L.push('train_acc = model.set_params(knn__n_neighbors=k2).fit(X, y).score(X, y)');
+  L.push('print("k =", k2, "학습 정확도:", round(train_acc, 3), "검증 정확도:", round(grid.cv_results_["mean_test_score"][k2 - 1], 3))');
+  L.push("");
+  L.push("# 수업에서 흔히 쓰는 방식 (무작위 계층 5겹이라 숫자는 조금 다를 수 있음)");
+  L.push("# from sklearn.model_selection import StratifiedKFold");
+  L.push("# cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)");
+  L.push("");
+  L.push("# ---- 이 페이지의 계산 결과 (비교용) ----");
+  L.push(`# z: ${pyList([R.qz.x,R.qz.y],3)}`);
+  L.push(`# 이웃 인덱스: [${R.top.map(o=>o.i).join(", ")}]`);
+  L.push(`# 거리: ${pyList(R.top.map(o=>o.d),3)}`);
+  L.push(`# 예측: ${R.v.pred} 확률: ${pyList(R.v.p,3)}`);
+  L.push(`# 최적 k: ${C.best} 검증 정확도: ${pyr(C.val[C.best],3)}`);
+  L.push(`# k = ${S2.k} 학습 정확도: ${pyr(C.trn[S2.k],3)} 검증 정확도: ${pyr(C.val[S2.k],3)}`);
+  return{lead:`1번 화면의 ${A.n}명, k = ${k}, ${MET[S1.metric].nm}, ${S1.w}, 새 환자 (혈당 ${S1.q.g}, BMI ${f(S1.q.b,1)}) · 2번 화면 ${cvName} 검증, k = ${S2.k} 설정입니다.`,code:L.join("\n")};
+}
+function codeScale(){
+  const M=DS3[S3.ds],L=[],k=Math.min(S3.k,30);const nm={none:"없음",std:"StandardScaler",mm:"MinMaxScaler"};
+  L.push("import numpy as np");
+  L.push("from sklearn.pipeline import Pipeline");
+  L.push("from sklearn.preprocessing import StandardScaler, MinMaxScaler");
+  L.push("from sklearn.neighbors import KNeighborsClassifier");
+  L.push("from sklearn.model_selection import cross_val_score, PredefinedSplit");
+  L.push("");
+  L.push(`# 3번 화면의 데이터 (seed ${S3.seed}): [${M.xn}(${M.xu}), ${M.yn}${M.yu?"("+M.yu+")":""}] 80명, y = ${M.title} (0 ${M.cls[0]}, 1 ${M.cls[1]})`);
+  L.push("X = np.array([");L.push(wrapNums(D3.X.map((x,i)=>`[${x}, ${M.ydec?D3.Y[i].toFixed(1):D3.Y[i]}]`),6,"    "));L.push("])");
+  L.push("y = np.array([");L.push(wrapNums(D3.L.map(String),30,"    "));L.push("])");
+  L.push("test_fold = np.array([");L.push(wrapNums(D3.fold.map(String),30,"    "));L.push("])");
+  L.push("cv = PredefinedSplit(test_fold)      # 이 페이지와 같은 계층 5겹");
+  L.push(`new = np.array([[${S3.q.x}, ${M.ydec?S3.q.y.toFixed(1):S3.q.y}]])   # 새 환자 (별)`);
+  L.push("");
+  L.push('print("표준편차:", np.round(X.std(axis=0), 2).tolist())   # 단위 차이 확인');
+  L.push("");
+  L.push('scalers = {"없음": "passthrough", "StandardScaler": StandardScaler(), "MinMaxScaler": MinMaxScaler()}');
+  L.push("for name, sc in scalers.items():");
+  L.push(`    model = Pipeline([("scaler", sc), ("knn", KNeighborsClassifier(n_neighbors=${k}))])`);
+  L.push("    acc = cross_val_score(model, X, y, cv=cv, scoring=\"accuracy\").mean()   # 폴드마다 스케일러를 학습 부분에만 fit");
+  L.push("    model.fit(X, y)");
+  L.push('    z = new if name == "없음" else model["scaler"].transform(new)');
+  L.push('    idx = model["knn"].kneighbors(z, return_distance=False)[0]');
+  L.push('    print(name, "검증 정확도:", round(acc, 3), "이웃:", sorted(idx.tolist()))');
+  L.push("");
+  L.push("# ---- 이 페이지의 계산 결과 (비교용) ----");
+  const sx=fitScaler(D3.X,D3.all,"std"),sy=fitScaler(D3.Y,D3.all,"std");
+  L.push(`# 표준편차: ${pyList([sx.sd,sy.sd],2)}`);
+  ["none","std","mm"].forEach(kd=>{const R=nb3(kd),C=curves3(kd);L.push(`# ${nm[kd]} 검증 정확도: ${pyr(C.val[k],3)} 이웃: [${R.top.map(o=>o.i).sort((a,b)=>a-b).join(", ")}]`);});
+  return{lead:`3번 화면의 ${S3.ds==="B"?"BMI·연봉":"나이·콜레스테롤"} 데이터 80명, k = ${k}, 새 환자 (${M.xn} ${S3.q.x}, ${M.yn} ${S3.q.y}) 설정입니다.`,code:L.join("\n")};
+}
+function codeReg(){
+  const L=[],Mm=mse4(S4.w),P=regPred(S4.q,S4.k,S4.w);
+  L.push("import numpy as np");
+  L.push("from sklearn.neighbors import KNeighborsRegressor");
+  L.push("from sklearn.metrics import mean_squared_error");
+  L.push("");
+  L.push(`# 4번 화면의 데이터 (seed ${S4.seed}): 나이(세) → 수축기 혈압(mmHg)`);
+  L.push("X_tr = np.array([");L.push(wrapNums(D4.tx.map(v=>v.toFixed(1)),12,"    "));L.push("]).reshape(-1, 1)");
+  L.push("y_tr = np.array([");L.push(wrapNums(D4.ty.map(String),20,"    "));L.push("])");
+  L.push("X_va = np.array([");L.push(wrapNums(D4.vx.map(v=>v.toFixed(1)),12,"    "));L.push("]).reshape(-1, 1)");
+  L.push("y_va = np.array([");L.push(wrapNums(D4.vy.map(String),20,"    "));L.push("])");
+  L.push("");
+  L.push("# 특성이 하나뿐이라 스케일링해도 이웃 순서는 같다 → 생략");
+  L.push("tr, va = [], []");
+  L.push("for k in range(1, 31):");
+  L.push(`    m = KNeighborsRegressor(n_neighbors=k, weights="${S4.w}").fit(X_tr, y_tr)`);
+  L.push("    tr.append(mean_squared_error(y_tr, m.predict(X_tr)))");
+  L.push("    va.append(mean_squared_error(y_va, m.predict(X_va)))");
+  L.push("best = int(np.argmin(va)) + 1");
+  L.push('print("최적 k:", best, "검증 MSE:", round(min(va), 2))');
+  L.push(`k = ${S4.k}`);
+  L.push('print("k =", k, "학습 MSE:", round(tr[k - 1], 2), "검증 MSE:", round(va[k - 1], 2))');
+  L.push("");
+  L.push(`model = KNeighborsRegressor(n_neighbors=${S4.k}, weights="${S4.w}").fit(X_tr, y_tr)`);
+  L.push(`x = ${S4.q.toFixed(1)}`);
+  L.push("dist, idx = model.kneighbors([[x]])");
+  L.push('print("이웃 인덱스:", sorted(idx[0].tolist()))');
+  L.push('print("예측:", round(model.predict([[x]])[0], 2))');
+  L.push("");
+  L.push("# ---- 이 페이지의 계산 결과 (비교용) ----");
+  L.push(`# 최적 k: ${Mm.best} 검증 MSE: ${pyr(Mm.val[Mm.best],2)}`);
+  L.push(`# k = ${S4.k} 학습 MSE: ${pyr(Mm.trn[S4.k],2)} 검증 MSE: ${pyr(Mm.val[S4.k],2)}`);
+  L.push(`# 이웃 인덱스: [${P.nb.map(o=>o.i).sort((a,b)=>a-b).join(", ")}]`);
+  L.push(`# 예측: ${pyr(P.y,2)}`);
+  return{lead:`4번 화면의 학습 40명 · 검증 40명, k = ${S4.k}, ${S4.w}, 살펴볼 나이 ${f(S4.q,1)}세 설정입니다.`,code:L.join("\n")};
+}
+function codeCurse(){
+  const L=[];
+  L.push("import numpy as np");
+  L.push("from sklearn.metrics import pairwise_distances");
+  L.push("");
+  L.push(`rng = np.random.default_rng(${S5.cseed})`);
+  L.push(`n, n_query = ${S5.cn}, 20`);
+  L.push("for d in [1, 2, 5, 10, 20, 50, 100]:");
+  L.push("    X = rng.random((n, d))            # 0~1 균일한 무작위 점");
+  L.push("    Q = rng.random((n_query, d))      # 질의점");
+  L.push("    D = pairwise_distances(Q, X)      # (n_query, n) 유클리드 거리");
+  L.push("    ratio = (D.min(axis=1) / D.max(axis=1)).mean()");
+  L.push('    print(f"d = {d:3d}  가장 가까운 / 가장 먼 = {ratio:.3f}")');
+  L.push("");
+  L.push("# 이 페이지의 결과 (난수가 달라 소수 둘째 자리쯤 차이 남)");
+  [1,2,5,10,20,50,100].forEach(d=>L.push(`# d = ${String(d).padStart(3," ")}  가장 가까운 / 가장 먼 = ${S5.ratios?S5.ratios[d].toFixed(3):"(5번 화면을 먼저 여세요)"}`));
+  L.push("");
+  L.push("# 예측 비용 직접 재 보기: brute force vs KD-tree");
+  L.push("import time");
+  L.push("from sklearn.neighbors import KNeighborsClassifier");
+  L.push("for algo in [\"brute\", \"kd_tree\", \"ball_tree\"]:");
+  L.push(`    X = rng.random((${comma(NS[S5.ni]).replace(/,/g,"_")}, ${S5.d})); y = (X[:, 0] > 0.5).astype(int)`);
+  L.push("    t0 = time.perf_counter(); knn = KNeighborsClassifier(n_neighbors=5, algorithm=algo).fit(X, y); t1 = time.perf_counter()");
+  L.push(`    knn.predict(rng.random((${MS[S5.mi]}, ${S5.d}))); t2 = time.perf_counter()`);
+  L.push('    print(f"{algo:9s} 학습 {t1 - t0:.4f}초  예측 {t2 - t1:.4f}초")');
+  return{lead:`5번 화면의 차원의 저주 실험(점 ${comma(S5.cn)}개)과 계산 비용 설정(n = ${comma(NS[S5.ni])}, d = ${S5.d}, m = ${comma(MS[S5.mi])})입니다.`,code:L.join("\n")};
+}
+function render6(){if(S6.kind==="curse"&&!S5.ratios)computeCurse();const r=S6.kind==="cls"?codeCls():S6.kind==="scale"?codeScale():S6.kind==="reg"?codeReg():codeCurse();
+  S6.code=r.code;$("k6lead").textContent=r.lead;$("k6code").innerHTML=hl(r.code);
+  $("k6note").style.display=S6.kind==="curse"?"none":"";}
+segInit($("k6kind"),v=>{S6.kind=v;render6();});
+$("k6copy").onclick=async()=>{const b=$("k6copy");try{await navigator.clipboard.writeText(S6.code);b.textContent="복사됨";}catch(e){const r=document.createRange();r.selectNodeContents($("k6code"));const s=getSelection();s.removeAllRanges();s.addRange(r);b.textContent="선택됨";}setTimeout(()=>b.textContent="복사",1400);};
+onShow.code=render6;
+
+/* ================= 시작 ================= */
+resetA();setAddSeg();drawMetIcons();prep3();prep4();
+function redraw(){onShow[curTab]&&onShow[curTab]();}
+new MutationObserver(redraw).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+if(window.matchMedia)matchMedia("(prefers-color-scheme: dark)").addEventListener("change",redraw);
+let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(redraw,150);});
+const startK=location.hash.slice(1);showTab(TABS.includes(startK)?startK:"predict");
+})();
+</script>
+</body>
+</html>

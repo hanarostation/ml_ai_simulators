@@ -1,0 +1,1899 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SVM 시뮬레이터 (분류 · 회귀) | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20260930c">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20260930c">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 클래스 0 정상 파랑 · 클래스 1 질환 주황 · 클래스 2 보라 · 검증 청록 · 최소제곱 보라 · 마진 안/오분류 빨강 · 마진 위 초록 · SVR 회귀선 주황 */
+:root{ --sk-accent: var(--cat-ml);
+  --c0:#2563EB; --c1:#EA580C; --c2:#7C3AED; --va:#0D9488; --pur:#7C3AED; --bad:#DC2626; --ok:#16A34A; --pred:#EA580C; --tube:#EA580C; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --c0:#6AA5FF; --c1:#FF914D; --c2:#B294FF; --va:#33D1BD; --pur:#B294FF; --bad:#F87171; --ok:#4ADE80; --pred:#FF914D; --tube:#FF914D; } }
+:root[data-theme="dark"]{ --c0:#6AA5FF; --c1:#FF914D; --c2:#B294FF; --va:#33D1BD; --pur:#B294FF; --bad:#F87171; --ok:#4ADE80; --pred:#FF914D; --tube:#FF914D; }
+
+/* 파트 선택 (분류 / 회귀) */
+.sv-partbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px}
+.sv-part.sk-seg{border-width:1.5px;border-radius:12px}
+.sv-part.sk-seg button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:10px 22px;font-size:17px;white-space:normal;text-align:left;min-width:210px}
+.sv-part.sk-seg button b{font-weight:700;color:inherit}
+.sv-part.sk-seg button small{font-size:12.5px;font-weight:600;opacity:.8}
+.sv-partnote{margin:0;font-size:14px;color:var(--muted);max-width:62ch}
+.sv-part-wrap,.sv-pane{display:flex;flex-direction:column;gap:16px}
+
+/* 역할 색 글자 · 범례 */
+.t-c0{color:var(--c0)} .t-c1{color:var(--c1)} .t-c2{color:var(--c2)} .t-va{color:var(--va)} .t-ok{color:var(--ok)} .t-bad{color:var(--bad)} .t-pur{color:var(--pur)} .t-pred{color:var(--pred)} .t-faint{color:var(--faint)} .t-muted{color:var(--muted)}
+.sv-sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.sv-sw.ln{height:3px;border-radius:2px;vertical-align:3px;width:16px}
+.sv-sw.dash{height:0;border-top:2.5px dashed currentColor;background:none!important;width:16px;vertical-align:3px;border-radius:0}
+.sv-sw.ring{background:none!important;border:2px solid currentColor;border-radius:50%}
+.sv-sw.dia{transform:rotate(45deg) scale(.85);border-radius:1px}
+.sv-sw.circ{border-radius:50%}
+.sv-sw.hollow{background:none!important;border:2px solid currentColor;border-radius:50%}
+.sv-sw.band{height:9px;width:18px;border-radius:2px;opacity:.35}
+
+/* 레이아웃 */
+.sv-two{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:900px){.sv-two{grid-template-columns:minmax(0,1fr)}}
+.sv-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.sv-cv{width:100%;aspect-ratio:4/3;display:block;border:1px solid var(--line);border-radius:10px;touch-action:manipulation}
+.sv-cv.wide{aspect-ratio:16/9}
+.sv-cv.sq{aspect-ratio:1/1;max-width:560px}
+.sv-cv.edit{cursor:crosshair;touch-action:none} .sv-cv.pick{cursor:pointer}
+.sv-cv.drag{cursor:grabbing}
+.sv-sub{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:13px;color:var(--muted)}
+.sv-sub .sk-slider{min-width:150px}
+.sv-ctl{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px 18px;align-items:end}
+.sv-msg{min-height:1.55em}
+
+/* 차트 (SVG) */
+.sv-chart{width:100%;min-width:0}
+.sv-chart svg{display:block;width:100%;height:auto}
+.sv-chart svg.click{cursor:pointer}
+.sv-chart .gl{stroke:var(--line);stroke-width:1}
+.sv-chart .fr{fill:none;stroke:var(--line-strong);stroke-width:1}
+.sv-chart .ax{fill:var(--muted);font-size:11px;font-family:var(--mono)}
+.sv-chart .axl{fill:var(--muted);font-size:12px;font-family:var(--sans);font-weight:600}
+.sv-chart .lb{font-size:11.5px;font-family:var(--sans);font-weight:700;paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round}
+.sv-chart .bl{font-size:10.5px;font-family:var(--mono);fill:var(--muted)}
+.sv-chart .bl.on{fill:var(--ink);font-weight:700}
+
+/* 히트맵 */
+.sv-heat{display:grid;gap:3px;font-family:var(--mono);font-variant-numeric:tabular-nums;min-width:420px}
+.sv-heat .h{font-size:12px;color:var(--muted);font-weight:600;display:grid;place-items:center;padding:2px}
+.sv-heat button{appearance:none;font:inherit;font-size:13px;font-weight:600;border:2px solid transparent;border-radius:6px;height:40px;cursor:pointer;color:var(--ink)}
+.sv-heat button.cur{border-color:var(--ink)}
+.sv-heat button.best{box-shadow:inset 0 0 0 2px var(--ok)}
+.sv-heat button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+/* α 표 · 대입 식 */
+.sv-terms{font-family:var(--mono);font-size:12.5px;line-height:1.7;overflow-x:auto;white-space:nowrap}
+.sv-terms .z{color:var(--faint)}
+.sv-step{font-family:var(--mono);font-size:13.5px;color:var(--ink);font-weight:600}
+.sv-kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--ink)}
+.sv-cmp th:first-child,.sv-cmp td:first-child{color:var(--muted);font-weight:700}
+.sv-cmp td{white-space:normal;min-width:150px;vertical-align:top}
+.sv-cmp td.on,.sv-cmp th.on{background:color-mix(in srgb,var(--sk-accent) 9%,var(--surface))}
+.sv-cmp code{font-family:var(--mono);font-size:12.5px}
+.sv-code{margin:0;white-space:pre;max-height:480px;overflow:auto;font-size:12.5px;line-height:1.6}
+.sk-note.sv-warn{border-left-color:var(--bad);background:color-mix(in srgb,var(--bad) 7%,var(--surface))}
+.sk-note.sv-ok{border-left-color:var(--ok);background:color-mix(in srgb,var(--ok) 7%,var(--surface))}
+.sv-tbl td.n{font-family:var(--mono)}
+.sv-tbl tr.sel td{background:color-mix(in srgb,var(--sk-accent) 10%,var(--surface));white-space:normal}
+.sv-mini{font-size:12.5px;color:var(--muted);margin:0}
+.sv-scale{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:760px){
+  .sv-part{width:100%} .sv-part.sk-seg button{flex:1 1 0;min-width:0;padding:9px 12px;font-size:15.5px}
+  .sv-scale{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:520px){
+  .sk-slider{min-width:0;width:100%} .sv-sub .sk-slider{min-width:0;width:100%}
+  .sv-ctl{grid-template-columns:minmax(0,1fr)}
+  .sk-stat{min-width:84px;padding:7px 10px} .sk-stat b{font-size:17px}
+}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)" aria-current="page">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">SVM 시뮬레이터 (분류 · 회귀)</h1>
+      <p class="ds-hero__lede">서포트 벡터 머신은 두 클래스 사이의 <b>마진을 가장 넓게</b> 하는 경계를 찾고(SVC), 같은 생각을 회귀에 옮겨 <b>±ε 튜브</b> 밖 오차만 벌합니다(SVR). 점을 옮기며 서포트 벡터만 경계를 정한다는 것을 확인하고, C · 커널 · γ · ε를 바꿔 보고, 쌍대 문제를 SMO로 한 쌍씩 푸는 과정을 따라갑니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <div class="sv-partbar">
+    <div class="sk-seg sv-part" id="partSeg" role="group" aria-label="파트 선택">
+      <button type="button" data-part="svc" aria-pressed="true"><b>SVM 분류 (SVC)</b><small>질환 여부를 가르는 초평면</small></button>
+      <button type="button" data-part="svr" aria-pressed="false"><b>SVM 회귀 (SVR)</b><small>혈압 숫자를 맞히는 ε-튜브</small></button>
+    </div>
+    <p class="sv-partnote" id="partNote"></p>
+  </div>
+
+  <!-- ================================ SVM 분류 ================================ -->
+  <div class="sv-part-wrap" id="part-svc">
+    <nav class="sk-tabs" role="tablist" aria-label="SVM 분류 실험 화면">
+      <button type="button" class="sk-tab" role="tab" id="tab-svc-margin" aria-controls="pane-svc-margin" aria-selected="true"><span class="sk-num">1</span>최대 마진 초평면</button>
+      <button type="button" class="sk-tab" role="tab" id="tab-svc-soft" aria-controls="pane-svc-soft" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>소프트 마진과 C</button>
+      <button type="button" class="sk-tab" role="tab" id="tab-svc-kernel" aria-controls="pane-svc-kernel" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>커널 트릭</button>
+      <button type="button" class="sk-tab" role="tab" id="tab-svc-smo" aria-controls="pane-svc-smo" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>쌍대 문제와 SMO</button>
+      <button type="button" class="sk-tab" role="tab" id="tab-svc-multi" aria-controls="pane-svc-multi" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>확률 · 다중 클래스</button>
+    </nav>
+
+    <!-- ---------- 분류 1. 최대 마진 ---------- -->
+    <section class="sv-pane" id="pane-svc-margin" role="tabpanel" aria-labelledby="tab-svc-margin">
+      <div class="sk-card">
+        <div class="sk-head"><h2>두 클래스 사이에 가장 넓은 길 내기</h2>
+          <div class="sk-legend"><span><i class="sv-sw circ" style="background:var(--c0)"></i>정상 (−1)</span><span><i class="sv-sw dia" style="background:var(--c1)"></i>질환 (+1)</span><span><i class="sv-sw ring" style="color:var(--ink)"></i>서포트 벡터</span><span><i class="sv-sw ln" style="background:var(--ink)"></i>w·x + b = 0</span><span class="t-muted"><i class="sv-sw dash"></i>w·x + b = ±1</span></div>
+        </div>
+        <p class="sk-lead">선형 분리 가능한 데이터에서 SVM은 두 클래스를 가르는 직선 중 <b>마진(가장 가까운 점까지의 거리)이 가장 넓은</b> 직선을 고릅니다. 경계는 마진 경계선 위의 몇 점, 곧 <b>서포트 벡터</b>만으로 정해집니다. 점을 끌어 옮겨 보세요. 서포트 벡터가 아닌 점은 마진 밖에 있는 한 경계를 바꾸지 못합니다.</p>
+        <div class="sv-two">
+          <div class="sv-col">
+            <canvas class="sv-cv edit" id="m1Cv" aria-label="혈당과 BMI 산점도. 결정 경계, 마진 경계, 서포트 벡터가 표시됩니다. 점을 끌어 옮기거나 빈 곳을 눌러 점을 추가합니다"></canvas>
+            <div class="sv-sub">
+              <div class="sk-group"><span class="sk-label">빈 곳 누르면 추가</span>
+                <div class="sk-seg" id="m1Add" role="group" aria-label="추가할 점의 클래스">
+                  <button type="button" data-v="0" aria-pressed="false">정상</button>
+                  <button type="button" data-v="1" aria-pressed="true">질환</button>
+                </div>
+              </div>
+              <div class="sk-group"><span class="sk-label">점 누르기</span>
+                <div class="sk-seg" id="m1Act" role="group" aria-label="점을 눌렀을 때 동작">
+                  <button type="button" data-v="move" aria-pressed="true">끌어 옮기기</button>
+                  <button type="button" data-v="del" aria-pressed="false">삭제</button>
+                </div>
+              </div>
+              <button type="button" class="sk-btn sk-btn--sm" id="m1Reset">처음 데이터</button>
+            </div>
+            <p class="sk-note sv-msg" id="m1Msg" aria-live="polite"></p>
+          </div>
+          <div class="sv-col">
+            <div class="sk-group"><span class="sk-label">직선</span>
+              <div class="sk-seg" id="m1Mode" role="group" aria-label="직선 고르는 방법">
+                <button type="button" data-v="opt" aria-pressed="true">SVM 최적 초평면</button>
+                <button type="button" data-v="man" aria-pressed="false">직접 돌려 보기</button>
+              </div>
+            </div>
+            <div class="sv-ctl" id="m1Man">
+              <div class="sk-slider"><div class="sk-sl-head"><label for="m1Th">법선 각도 θ</label><b id="m1ThV">0°</b></div><input type="range" id="m1Th" min="0" max="359" step="1" value="0"></div>
+              <div class="sk-slider"><div class="sk-sl-head"><label for="m1Off">위치 (절편 b)</label><b id="m1OffV">0</b></div><input type="range" id="m1Off" min="-3" max="3" step="0.01" value="0"></div>
+              <div class="sk-group"><button type="button" class="sk-btn sk-btn--sm" id="m1Best">이 각도에서 가장 좋은 위치</button><button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="m1Opt">최적 초평면</button></div>
+            </div>
+            <div class="sk-stats" id="m1Stats"></div>
+            <div class="sk-formula" id="m1Formula"></div>
+            <div class="sk-scroll"><table class="sk-table sv-tbl" id="m1Table"></table></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- 분류 2. 소프트 마진 ---------- -->
+    <section class="sv-pane" id="pane-svc-soft" role="tabpanel" aria-labelledby="tab-svc-soft" hidden>
+      <div class="sk-card">
+        <div class="sk-head"><h2>겹치는 데이터: 마진 위반을 얼마나 봐줄까 (C)</h2>
+          <div class="sk-legend"><span><i class="sv-sw circ" style="background:var(--c0)"></i>정상</span><span><i class="sv-sw dia" style="background:var(--c1)"></i>질환</span><span class="t-ok"><i class="sv-sw ring"></i>마진 위 SV (0&lt;α&lt;C)</span><span class="t-bad"><i class="sv-sw ring"></i>마진 안 · 오분류 SV (α=C)</span><span class="t-bad"><i class="sv-sw ln" style="background:var(--bad)"></i>여유 변수 ξ</span></div>
+        </div>
+        <p class="sk-lead">완벽히 가를 수 없으면 점마다 <b>여유 변수 ξᵢ = max(0, 1 − yᵢ·f(xᵢ))</b>를 허용합니다(힌지 손실). <b>C</b>는 마진을 넓게 두는 것(½‖w‖²)과 위반을 줄이는 것(Σξᵢ) 사이의 저울입니다. C가 작으면 넓은 마진·많은 서포트 벡터, 크면 좁은 마진·위반 최소화(과적합 쪽)입니다.</p>
+        <div class="sk-controls">
+          <div class="sk-slider" style="min-width:260px"><div class="sk-sl-head"><label for="m2C">C (로그 눈금)</label><b id="m2CV">1</b></div><input type="range" id="m2C" min="-2" max="3" step="0.05" value="0"></div>
+          <label class="sk-check"><input type="checkbox" id="m2Xi" checked>ξ 선분 보기</label>
+          <label class="sk-check"><input type="checkbox" id="m2Va">검증 데이터 보기</label>
+          <button type="button" class="sk-btn sk-btn--sm" id="m2New">다른 데이터</button>
+          <span class="sk-mono sk-hint" id="m2Seed">seed 1</span>
+        </div>
+        <div class="sv-two">
+          <div class="sv-col">
+            <canvas class="sv-cv" id="m2Cv" aria-label="겹치는 두 클래스 데이터와 소프트 마진 SVM의 결정 경계, 마진, 여유 변수"></canvas>
+            <div class="sk-stats" id="m2Stats"></div>
+          </div>
+          <div class="sv-col">
+            <div class="sk-formula" id="m2Formula"></div>
+            <h3>점별 힌지 손실 max(0, 1 − y·f(x)) <span class="sk-hint">큰 순서</span></h3>
+            <div class="sv-chart" id="m2Hinge"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>C를 바꾸면: 마진 폭과 서포트 벡터 수</h2><span class="sk-hint">그래프를 누르면 그 C로 이동</span></div>
+        <div class="sk-grid2">
+          <div class="sv-chart" id="m2SweepW"></div>
+          <div class="sv-chart" id="m2SweepN"></div>
+        </div>
+        <p class="sk-note" id="m2Note"></p>
+      </div>
+    </section>
+
+    <!-- ---------- 분류 3. 커널 트릭 ---------- -->
+    <section class="sv-pane" id="pane-svc-kernel" role="tabpanel" aria-labelledby="tab-svc-kernel" hidden>
+      <div class="sk-card">
+        <div class="sk-head"><h2>직선으로 안 되면 커널로 휘게</h2>
+          <div class="sk-legend"><span><i class="sv-sw circ" style="background:var(--c0)"></i>클래스 −1</span><span><i class="sv-sw dia" style="background:var(--c1)"></i>클래스 +1</span><span><i class="sv-sw ring" style="color:var(--ink)"></i>서포트 벡터</span><span class="t-va"><i class="sv-sw hollow"></i>검증 데이터</span></div>
+        </div>
+        <p class="sk-lead">커널 K(x, z)는 높은 차원으로 옮긴 특성끼리의 내적을 <b>옮기지 않고</b> 계산합니다. 배경 색은 결정 함수 f(x) = Σαᵢyᵢ·K(xᵢ, x) + b의 값(진할수록 |f|가 큼), 실선은 f = 0, 점선은 f = ±1입니다.</p>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">데이터</span>
+            <div class="sk-seg" id="m3Ds" role="group" aria-label="데이터 모양">
+              <button type="button" data-v="circle" aria-pressed="true">원형</button>
+              <button type="button" data-v="xor" aria-pressed="false">XOR</button>
+              <button type="button" data-v="moons" aria-pressed="false">달 모양</button>
+            </div>
+          </div>
+          <div class="sk-group"><span class="sk-label">커널</span>
+            <div class="sk-seg" id="m3K" role="group" aria-label="커널">
+              <button type="button" data-v="linear" aria-pressed="false">선형</button>
+              <button type="button" data-v="poly" aria-pressed="false">다항</button>
+              <button type="button" data-v="rbf" aria-pressed="true">RBF</button>
+            </div>
+          </div>
+          <label class="sk-check"><input type="checkbox" id="m3Va" checked>검증 데이터 보기</label>
+        </div>
+        <div class="sv-ctl">
+          <div class="sk-slider"><div class="sk-sl-head"><label for="m3C">C (로그)</label><b id="m3CV">1</b></div><input type="range" id="m3C" min="-2" max="3" step="0.05" value="0"></div>
+          <div class="sk-slider" id="m3GBox"><div class="sk-sl-head"><label for="m3G">γ (로그)</label><b id="m3GV">1</b></div><input type="range" id="m3G" min="-2" max="2" step="0.05" value="0"></div>
+          <div class="sk-slider" id="m3DBox"><div class="sk-sl-head"><label for="m3D">차수 degree</label><b id="m3DV">2</b></div><input type="range" id="m3D" min="1" max="5" step="1" value="2"></div>
+          <div class="sk-slider" id="m3RBox"><div class="sk-sl-head"><label for="m3R">coef0 (r)</label><b id="m3RV">1</b></div><input type="range" id="m3R" min="0" max="2" step="0.1" value="1"></div>
+        </div>
+        <div class="sv-two">
+          <div class="sv-col">
+            <canvas class="sv-cv" id="m3Cv" aria-label="2차원 데이터와 커널 SVM의 결정 함수 등고선, 결정 경계, 마진"></canvas>
+          </div>
+          <div class="sv-col">
+            <div class="sk-stats" id="m3Stats"></div>
+            <div class="sk-formula" id="m3Formula"></div>
+            <p class="sk-note" id="m3Note"></p>
+          </div>
+        </div>
+      </div>
+      <div class="sv-two">
+        <div class="sk-card">
+          <div class="sk-head"><h2>특성 사상: 2D 원형 → 3D 평면</h2><span class="sk-hint">원형 데이터 기준</span></div>
+          <p class="sk-lead">(x₁, x₂)에 세 번째 축 <b>x₁² + x₂²</b>(원점까지 거리의 제곱)를 더하면, 안쪽 원의 점은 낮게, 바깥 고리의 점은 높게 뜹니다. 그러면 <b>평면 하나</b>로 가를 수 있고, 그 평면을 바닥으로 내리면 원 모양 경계가 됩니다. 다항 커널(degree 2)이 바로 이런 제곱 항을 품고 있습니다.</p>
+          <div class="sk-controls">
+            <button type="button" class="sk-btn sk-btn--sm sk-btn--primary" id="m3Play">재생</button>
+            <div class="sk-slider" style="min-width:200px"><div class="sk-sl-head"><label for="m3Ang">회전 각</label><b id="m3AngV">35°</b></div><input type="range" id="m3Ang" min="0" max="359" step="1" value="35"></div>
+            <div class="sk-slider" style="min-width:160px"><div class="sk-sl-head"><label for="m3Lift">올리기</label><b id="m3LiftV">100%</b></div><input type="range" id="m3Lift" min="0" max="100" step="5" value="100"></div>
+          </div>
+          <canvas class="sv-cv" id="m3Cv3" aria-label="원형 데이터를 x1, x2, x1제곱 더하기 x2제곱 3차원으로 올린 모습과 분리 평면"></canvas>
+          <p class="sk-mini" id="m3Plane"></p>
+        </div>
+        <div class="sk-card">
+          <div class="sk-head"><h2>γ × C 격자 탐색 (GridSearch 축소판)</h2><span class="sk-hint">RBF · 칸을 누르면 그 설정으로</span></div>
+          <p class="sk-lead">RBF 커널의 γ와 C를 격자로 바꿔 가며 <b>검증 정확도</b>를 잽니다. γ가 크면 점 하나하나에 섬이 생기는 과적합, 작으면 거의 직선 같은 과소적합입니다. 초록 테두리가 최고 칸, 검은 테두리가 현재 설정입니다.</p>
+          <div class="sk-scroll"><div class="sv-heat" id="m3Heat"></div></div>
+          <p class="sk-note" id="m3HeatNote"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- 분류 4. 쌍대와 SMO ---------- -->
+    <section class="sv-pane" id="pane-svc-smo" role="tabpanel" aria-labelledby="tab-svc-smo" hidden>
+      <div class="sk-card">
+        <div class="sk-head"><h2>쌍대 문제를 SMO로 한 쌍씩 풀기</h2><span class="sk-hint">키보드 <span class="sv-kbd">→</span> 다음 단계 · <span class="sv-kbd">←</span> 이전</span></div>
+        <p class="sk-lead">SVM은 실제로 <b>쌍대 문제</b> max Σαᵢ − ½ΣΣαᵢαⱼyᵢyⱼK(xᵢ, xⱼ) (조건 0 ≤ αᵢ ≤ C, Σαᵢyᵢ = 0)를 풉니다. SMO는 매 단계 KKT 조건을 가장 크게 어기는 <b>두 α를 골라</b> 둘만 해석적으로 갱신합니다(조건 Σαᵢyᵢ = 0을 지키려면 최소 두 개). scikit-learn(libsvm)과 같은 선택 규칙입니다.</p>
+        <div class="sk-controls">
+          <div class="sk-group">
+            <button type="button" class="sk-btn sk-btn--sm" id="m4First">처음</button>
+            <button type="button" class="sk-btn sk-btn--sm" id="m4Prev">이전</button>
+            <button type="button" class="sk-btn sk-btn--sm" id="m4Next">다음 SMO 단계</button>
+            <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="m4Play">재생</button>
+            <button type="button" class="sk-btn sk-btn--sm" id="m4Last">끝까지</button>
+            <span class="sv-step" id="m4Prog">단계 0 / 0</span>
+          </div>
+          <div class="sk-slider" style="min-width:130px"><div class="sk-sl-head"><label for="m4Speed">속도</label><b id="m4SpeedV">1×</b></div><input type="range" id="m4Speed" min="0" max="3" step="1" value="1"></div>
+        </div>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">커널</span>
+            <div class="sk-seg" id="m4K" role="group" aria-label="커널">
+              <button type="button" data-v="linear" aria-pressed="true">선형</button>
+              <button type="button" data-v="rbf" aria-pressed="false">RBF (γ=1)</button>
+            </div>
+          </div>
+          <div class="sk-slider" style="min-width:220px"><div class="sk-sl-head"><label for="m4C">C (로그)</label><b id="m4CV">1</b></div><input type="range" id="m4C" min="-1" max="2" step="0.05" value="0"></div>
+          <button type="button" class="sk-btn sk-btn--sm" id="m4New">다른 데이터</button>
+        </div>
+        <div class="sv-two">
+          <div class="sv-col">
+            <canvas class="sv-cv pick" id="m4Cv" aria-label="SMO 진행 중의 결정 경계. 이번 단계에 고른 두 점이 표시됩니다. 그림을 누르면 그 위치에서 f(x) 대입 식을 봅니다"></canvas>
+            <p class="sk-note sv-msg" id="m4Msg" aria-live="polite"></p>
+          </div>
+          <div class="sv-col">
+            <h3>라그랑주 승수 αᵢ</h3>
+            <div class="sk-legend"><span class="t-faint"><i class="sv-sw" style="background:var(--faint)"></i>α = 0 비서포트</span><span class="t-ok"><i class="sv-sw" style="background:var(--ok)"></i>0 &lt; α &lt; C 마진 위 SV</span><span class="t-bad"><i class="sv-sw" style="background:var(--bad)"></i>α = C 마진 안 · 오분류 SV</span></div>
+            <div class="sv-chart" id="m4Alpha"></div>
+            <h3>쌍대 목적 함수 W(α) <span class="sk-hint">단계마다 커집니다</span></h3>
+            <div class="sv-chart" id="m4Obj"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>f(x) = Σ αᵢyᵢ K(xᵢ, x) + b 에 대입하기</h2><span class="sk-hint">왼쪽 그림을 눌러 x를 고르세요 (α = 0인 항은 사라집니다)</span></div>
+        <div class="sk-formula sv-terms" id="m4Terms"></div>
+      </div>
+    </section>
+
+    <!-- ---------- 분류 5. 확률 · 다중 클래스 ---------- -->
+    <section class="sv-pane" id="pane-svc-multi" role="tabpanel" aria-labelledby="tab-svc-multi" hidden>
+      <div class="sk-card">
+        <div class="sk-head"><h2>세 클래스: 일대일(OvO) 투표 vs 일대다(OvR)</h2>
+          <div class="sk-legend"><span><i class="sv-sw circ" style="background:var(--c0)"></i>정상</span><span><i class="sv-sw dia" style="background:var(--c1)"></i>당뇨 전단계</span><span><i class="sv-sw" style="background:var(--c2)"></i>당뇨</span></div>
+        </div>
+        <p class="sk-lead">SVM은 원래 두 클래스용입니다. scikit-learn <code>SVC</code>는 클래스 쌍마다 이진 SVM을 만드는 <b>OvO</b>(K(K−1)/2개)로 학습하고 다수결로 정합니다. <b>OvR</b>은 클래스마다 “이 클래스 vs 나머지” SVM을 만들어 f 값이 가장 큰 클래스를 고릅니다. 그림을 누르면 그 위치의 계산을 봅니다.</p>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">방식</span>
+            <div class="sk-seg" id="m5Mode" role="group" aria-label="다중 클래스 방식">
+              <button type="button" data-v="ovo" aria-pressed="true">OvO 투표</button>
+              <button type="button" data-v="ovr" aria-pressed="false">OvR</button>
+            </div>
+          </div>
+          <div class="sk-group"><span class="sk-label">커널</span>
+            <div class="sk-seg" id="m5K" role="group" aria-label="커널">
+              <button type="button" data-v="linear" aria-pressed="true">선형</button>
+              <button type="button" data-v="rbf" aria-pressed="false">RBF</button>
+            </div>
+          </div>
+          <div class="sk-slider"><div class="sk-sl-head"><label for="m5C">C (로그)</label><b id="m5CV">1</b></div><input type="range" id="m5C" min="-2" max="3" step="0.05" value="0"></div>
+          <div class="sk-slider" id="m5GBox"><div class="sk-sl-head"><label for="m5G">γ (로그)</label><b id="m5GV">1</b></div><input type="range" id="m5G" min="-2" max="2" step="0.05" value="0"></div>
+        </div>
+        <div class="sv-two">
+          <div class="sv-col">
+            <canvas class="sv-cv pick" id="m5Cv" aria-label="세 클래스 데이터와 다중 클래스 SVM의 영역, 이진 분류기 경계. 그림을 누르면 그 위치의 결정값을 봅니다"></canvas>
+          </div>
+          <div class="sv-col">
+            <div class="sk-stats" id="m5Stats"></div>
+            <div class="sk-scroll"><table class="sk-table sv-tbl" id="m5Table"></table></div>
+            <p class="sk-note" id="m5Note"></p>
+          </div>
+        </div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>결정 함수 값 → 확률 (Platt scaling)</h2><span class="sk-hint">2번 화면의 데이터와 C 사용</span></div>
+        <p class="sk-lead">SVM의 f(x)는 경계까지의 (부호 있는) 거리 비슷한 값이지 확률이 아닙니다. <code>probability=True</code>면 f에 시그모이드 <b>P(y=1 | x) = 1 / (1 + exp(A·f + B))</b>를 맞춰 확률로 바꿉니다(Platt scaling).</p>
+        <div class="sv-chart" id="m5Platt"></div>
+        <p class="sk-note" id="m5PlattNote"></p>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================================ SVM 회귀 ================================ -->
+  <div class="sv-part-wrap" id="part-svr" hidden>
+    <nav class="sk-tabs" role="tablist" aria-label="SVM 회귀 실험 화면">
+      <button type="button" class="sk-tab" role="tab" id="tab-svr-tube" aria-controls="pane-svr-tube" aria-selected="true"><span class="sk-num">1</span>ε-튜브</button>
+      <button type="button" class="sk-tab" role="tab" id="tab-svr-kernel" aria-controls="pane-svr-kernel" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>C와 커널</button>
+      <button type="button" class="sk-tab" role="tab" id="tab-svr-loss" aria-controls="pane-svr-loss" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>손실 비교 · 이상값</button>
+      <button type="button" class="sk-tab" role="tab" id="tab-svr-dual" aria-controls="pane-svr-dual" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>쌍대와 서포트 벡터</button>
+    </nav>
+
+    <!-- ---------- 회귀 1. ε-튜브 ---------- -->
+    <section class="sv-pane" id="pane-svr-tube" role="tabpanel" aria-labelledby="tab-svr-tube">
+      <div class="sk-card">
+        <div class="sk-head"><h2>±ε 안의 오차는 봐주는 회귀</h2>
+          <div class="sk-legend"><span><i class="sv-sw circ" style="background:var(--c0)"></i>환자</span><span class="t-ok"><i class="sv-sw ring"></i>튜브 경계 위 SV</span><span class="t-bad"><i class="sv-sw ring"></i>튜브 밖 SV</span><span class="t-pred"><i class="sv-sw ln" style="background:var(--pred)"></i>f(x)</span><span class="t-pred"><i class="sv-sw band" style="background:var(--tube)"></i>±ε 튜브</span><span class="t-bad"><i class="sv-sw ln" style="background:var(--bad)"></i>ε-무감 손실</span></div>
+        </div>
+        <p class="sk-lead">SVR은 회귀선 f(x) 둘레에 폭 ±ε의 <b>튜브</b>를 두고, 튜브 안 점의 오차는 0으로 칩니다. 튜브 밖 점만 <b>max(0, |y − f(x)| − ε)</b>만큼 손실을 내고, 이 점들과 튜브 경계 위의 점이 서포트 벡터입니다. ε을 키우면 튜브가 넓어져 서포트 벡터가 줄고 선이 평평해집니다.</p>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">데이터</span>
+            <div class="sk-seg" id="r1Shape" role="group" aria-label="데이터 모양">
+              <button type="button" data-v="lin" aria-pressed="true">직선형</button>
+              <button type="button" data-v="nl" aria-pressed="false">비선형</button>
+            </div>
+          </div>
+          <div class="sk-group"><span class="sk-label">커널</span>
+            <div class="sk-seg" id="r1K" role="group" aria-label="커널">
+              <button type="button" data-v="linear" aria-pressed="true">선형</button>
+              <button type="button" data-v="rbf" aria-pressed="false">RBF (γ=1)</button>
+            </div>
+          </div>
+        </div>
+        <div class="sv-ctl">
+          <div class="sk-slider"><div class="sk-sl-head"><label for="r1E">ε (mmHg)</label><b id="r1EV">5</b></div><input type="range" id="r1E" min="0" max="20" step="0.5" value="5"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><label for="r1C">C (로그)</label><b id="r1CV">10</b></div><input type="range" id="r1C" min="-1" max="3" step="0.05" value="1"></div>
+        </div>
+        <div class="sv-two">
+          <div class="sv-col">
+            <canvas class="sv-cv edit" id="r1Cv" aria-label="나이와 수축기 혈압 산점도, SVR 회귀선과 ε 튜브. 점을 끌어 옮기거나 빈 곳을 눌러 추가합니다"></canvas>
+            <div class="sv-sub">
+              <span class="sk-label">빈 곳 누르면 추가</span>
+              <div class="sk-group"><span class="sk-label">점 누르기</span>
+                <div class="sk-seg" id="r1Act" role="group" aria-label="점을 눌렀을 때 동작">
+                  <button type="button" data-v="move" aria-pressed="true">끌어 옮기기</button>
+                  <button type="button" data-v="del" aria-pressed="false">삭제</button>
+                </div>
+              </div>
+              <button type="button" class="sk-btn sk-btn--sm" id="r1Reset">처음 데이터</button>
+            </div>
+          </div>
+          <div class="sv-col">
+            <div class="sk-stats" id="r1Stats"></div>
+            <div class="sk-formula" id="r1Formula"></div>
+            <h3>ε을 바꾸면</h3>
+            <div class="sv-chart" id="r1Sweep"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- 회귀 2. C와 커널 ---------- -->
+    <section class="sv-pane" id="pane-svr-kernel" role="tabpanel" aria-labelledby="tab-svr-kernel" hidden>
+      <div class="sk-card">
+        <div class="sk-head"><h2>C와 커널로 곡선 맞추기</h2>
+          <div class="sk-legend"><span><i class="sv-sw circ" style="background:var(--c0)"></i>학습</span><span class="t-va"><i class="sv-sw hollow"></i>검증</span><span><i class="sv-sw ring" style="color:var(--ink)"></i>서포트 벡터</span><span class="t-pred"><i class="sv-sw ln" style="background:var(--pred)"></i>f(x) ± ε</span></div>
+        </div>
+        <p class="sk-lead">C는 <b>평평함(½‖w‖²) vs 튜브 밖 오차 허용</b>의 저울입니다. C가 작으면 선이 평평해지고, 크면 튜브 밖 점을 줄이려 휩니다. RBF의 γ가 크면 점마다 국소적으로 반응해 학습 MSE는 줄지만 검증 MSE가 커집니다.</p>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">커널</span>
+            <div class="sk-seg" id="r2K" role="group" aria-label="커널">
+              <button type="button" data-v="linear" aria-pressed="false">선형</button>
+              <button type="button" data-v="poly" aria-pressed="false">다항</button>
+              <button type="button" data-v="rbf" aria-pressed="true">RBF</button>
+            </div>
+          </div>
+          <label class="sk-check"><input type="checkbox" id="r2Va" checked>검증 데이터 보기</label>
+          <button type="button" class="sk-btn sk-btn--sm" id="r2New">다른 데이터</button>
+        </div>
+        <div class="sv-ctl">
+          <div class="sk-slider"><div class="sk-sl-head"><label for="r2C">C (로그)</label><b id="r2CV">100</b></div><input type="range" id="r2C" min="-1" max="3" step="0.05" value="2"></div>
+          <div class="sk-slider" id="r2GBox"><div class="sk-sl-head"><label for="r2G">γ (로그)</label><b id="r2GV">1</b></div><input type="range" id="r2G" min="-2" max="2" step="0.05" value="0"></div>
+          <div class="sk-slider" id="r2DBox"><div class="sk-sl-head"><label for="r2D">차수 degree</label><b id="r2DV">3</b></div><input type="range" id="r2D" min="1" max="5" step="1" value="3"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><label for="r2E">ε (mmHg)</label><b id="r2EV">3</b></div><input type="range" id="r2E" min="0" max="15" step="0.5" value="3"></div>
+        </div>
+        <div class="sv-two">
+          <div class="sv-col">
+            <canvas class="sv-cv" id="r2Cv" aria-label="나이와 수축기 혈압 학습·검증 데이터와 커널 SVR 회귀 곡선"></canvas>
+          </div>
+          <div class="sv-col">
+            <div class="sk-stats" id="r2Stats"></div>
+            <div class="sk-formula" id="r2Formula"></div>
+            <div class="sk-group"><span class="sk-label">가로축</span>
+              <div class="sk-seg" id="r2Sw" role="group" aria-label="바꿔 볼 하이퍼파라미터">
+                <button type="button" data-v="gamma" aria-pressed="true">γ</button>
+                <button type="button" data-v="C" aria-pressed="false">C</button>
+              </div>
+            </div>
+            <div class="sv-chart" id="r2Sweep"></div>
+            <p class="sk-note" id="r2Note"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- 회귀 3. 손실 비교 ---------- -->
+    <section class="sv-pane" id="pane-svr-loss" role="tabpanel" aria-labelledby="tab-svr-loss" hidden>
+      <div class="sv-two">
+        <div class="sk-card">
+          <div class="sk-head"><h2>세 가지 손실 함수</h2><span class="sk-hint">잔차 r = y − f(x)</span></div>
+          <div class="sk-legend"><span class="t-pred"><i class="sv-sw ln" style="background:var(--pred)"></i>ε-무감 max(0, |r| − ε)</span><span class="t-pur"><i class="sv-sw ln" style="background:var(--pur)"></i>제곱 r²</span><span class="t-va"><i class="sv-sw ln" style="background:var(--va)"></i>절대 |r|</span></div>
+          <div class="sk-slider" style="max-width:320px"><div class="sk-sl-head"><label for="r3E">ε (mmHg)</label><b id="r3EV">4</b></div><input type="range" id="r3E" min="0" max="10" step="0.5" value="4"></div>
+          <div class="sv-chart" id="r3Loss"></div>
+          <p class="sk-note">제곱 손실은 큰 잔차를 <b>제곱으로</b> 벌하므로 이상값 하나가 전체 선을 크게 끌어당깁니다. ε-무감 손실은 튜브 밖에서 <b>직선으로</b>만 커지고, 한 점의 영향력(쌍대 변수 α)이 C로 묶여 있어 덜 끌려갑니다.</p>
+        </div>
+        <div class="sk-card">
+          <div class="sk-head"><h2>이상값 하나를 넣으면</h2>
+            <div class="sk-legend"><span class="t-pred"><i class="sv-sw ln" style="background:var(--pred)"></i>SVR</span><span class="t-pur"><i class="sv-sw ln" style="background:var(--pur)"></i>최소제곱</span><span class="t-muted"><i class="sv-sw dash"></i>이상값 없을 때</span></div>
+          </div>
+          <div class="sk-controls">
+            <label class="sk-check"><input type="checkbox" id="r3On" checked>이상값 추가</label>
+            <div class="sk-slider"><div class="sk-sl-head"><label for="r3Oy">이상값 혈압</label><b id="r3OyV">230</b></div><input type="range" id="r3Oy" min="100" max="260" step="1" value="230"></div>
+            <div class="sk-slider"><div class="sk-sl-head"><label for="r3Ox">이상값 나이</label><b id="r3OxV">30</b></div><input type="range" id="r3Ox" min="20" max="80" step="1" value="30"></div>
+            <div class="sk-slider"><div class="sk-sl-head"><label for="r3C">SVR C (로그)</label><b id="r3CV">1</b></div><input type="range" id="r3C" min="-1" max="3" step="0.05" value="1"></div>
+          </div>
+          <canvas class="sv-cv" id="r3Cv" aria-label="이상값이 있을 때 SVR 회귀선과 최소제곱 회귀선 비교"></canvas>
+          <div class="sk-scroll"><table class="sk-table sv-tbl" id="r3Table"></table></div>
+          <p class="sv-mini" id="r3Cap"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- 회귀 4. 쌍대 ---------- -->
+    <section class="sv-pane" id="pane-svr-dual" role="tabpanel" aria-labelledby="tab-svr-dual" hidden>
+      <div class="sk-card">
+        <div class="sk-head"><h2>쌍대 변수 α, α*와 서포트 벡터</h2><span class="sk-hint">그림을 누르면 그 나이에서 f(x) 대입 식</span></div>
+        <p class="sk-lead">점마다 두 쌍대 변수가 있습니다. <b>α</b>는 튜브 <b>위</b>로 벗어난 쪽, <b>α*</b>는 <b>아래</b>로 벗어난 쪽의 힘입니다. 튜브 안 점은 α = α* = 0, 튜브 경계 위 점은 0 &lt; α(또는 α*) &lt; C, 튜브 밖 점은 C입니다. 한 점에서 둘이 동시에 0이 아닐 수는 없습니다(αᵢ·αᵢ* = 0).</p>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">커널</span>
+            <div class="sk-seg" id="r4K" role="group" aria-label="커널">
+              <button type="button" data-v="linear" aria-pressed="true">선형</button>
+              <button type="button" data-v="rbf" aria-pressed="false">RBF (γ=1)</button>
+            </div>
+          </div>
+          <div class="sk-slider"><div class="sk-sl-head"><label for="r4C">C (로그)</label><b id="r4CV">2</b></div><input type="range" id="r4C" min="-1" max="2" step="0.05" value="0.3"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><label for="r4E">ε (mmHg)</label><b id="r4EV">4</b></div><input type="range" id="r4E" min="0" max="15" step="0.5" value="4"></div>
+          <button type="button" class="sk-btn sk-btn--sm" id="r4New">다른 데이터</button>
+        </div>
+        <div class="sv-two">
+          <div class="sv-col">
+            <canvas class="sv-cv pick" id="r4Cv" aria-label="작은 회귀 데이터와 SVR 튜브. 점 번호가 표시됩니다"></canvas>
+          </div>
+          <div class="sv-col">
+            <h3>α (위쪽) · α* (아래쪽)</h3>
+            <div class="sk-legend"><span class="t-c1"><i class="sv-sw" style="background:var(--c1)"></i>α (y가 튜브 위)</span><span class="t-c0"><i class="sv-sw" style="background:var(--c0)"></i>α* (y가 튜브 아래)</span><span class="t-muted"><i class="sv-sw dash"></i>±C</span></div>
+            <div class="sv-chart" id="r4Alpha"></div>
+            <div class="sk-stats" id="r4Stats"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>f(x) = Σ (αᵢ − αᵢ*) K(xᵢ, x) + b 에 대입하기</h2><span class="sk-hint">scikit-learn의 dual_coef_ = αᵢ − αᵢ*</span></div>
+        <div class="sk-formula sv-terms" id="r4Terms"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================================ 공통 ================================ -->
+  <div class="sk-card">
+    <div class="sk-head"><h2>스케일링이 왜 필요할까: StandardScaler 전후</h2><span class="sk-hint">RBF 커널 SVC · γ = 0.5, C = 1 같게</span></div>
+    <p class="sk-lead">RBF 커널은 거리 ‖x − z‖²로 계산합니다. 혈당(mg/dL)은 수십 단위로, BMI는 몇 단위로 움직이므로 원 단위 그대로면 거리가 <b>혈당 차이로만</b> 정해지고, γ도 지나치게 커서 점마다 섬이 생깁니다. 표준화(평균 0, 표준편차 1)하면 두 특성이 같은 무게로 들어갑니다. SVR도 같고, ε은 y 단위라는 점까지 기억하세요.</p>
+    <div class="sv-scale">
+      <div class="sv-col">
+        <h3>스케일링 없이 (원 단위)</h3>
+        <canvas class="sv-cv" id="scRaw" aria-label="스케일링 없이 학습한 RBF SVM의 결정 영역"></canvas>
+        <div class="sk-stats" id="scRawStats"></div>
+      </div>
+      <div class="sv-col">
+        <h3>StandardScaler 후</h3>
+        <canvas class="sv-cv" id="scStd" aria-label="표준화 후 학습한 RBF SVM의 결정 영역"></canvas>
+        <div class="sk-stats" id="scStdStats"></div>
+      </div>
+    </div>
+    <div class="sk-formula" id="scFormula"></div>
+  </div>
+
+  <div class="sk-card">
+    <div class="sk-head"><h2>SVM 분류 vs SVM 회귀</h2><span class="sk-hint">같은 뼈대(마진 · 쌍대 · 커널 · 서포트 벡터), 다른 손실</span></div>
+    <div class="sk-scroll">
+      <table class="sk-table sv-cmp" id="cmpTable">
+        <thead><tr><th>구분</th><th data-col="svc">SVM 분류 (SVC)</th><th data-col="svr">SVM 회귀 (SVR)</th></tr></thead>
+        <tbody>
+          <tr><td>맞히는 값</td><td data-col="svc">범주 (질환 여부 y ∈ {−1, +1})</td><td data-col="svr">숫자 (수축기 혈압)</td></tr>
+          <tr><td>손실</td><td data-col="svc">힌지 <code>max(0, 1 − y·f(x))</code></td><td data-col="svr">ε-무감 <code>max(0, |y − f(x)| − ε)</code></td></tr>
+          <tr><td>원 문제</td><td data-col="svc"><code>min ½‖w‖² + C·Σξᵢ</code>, <code>yᵢ(w·xᵢ + b) ≥ 1 − ξᵢ</code></td><td data-col="svr"><code>min ½‖w‖² + C·Σ(ξᵢ + ξᵢ*)</code>, <code>|yᵢ − f(xᵢ)| ≤ ε + ξ</code></td></tr>
+          <tr><td>마진의 뜻</td><td data-col="svc">경계 양쪽 폭 2/‖w‖의 빈 길 (넓을수록 좋음)</td><td data-col="svr">폭 ±ε의 튜브 (안쪽 오차는 무시)</td></tr>
+          <tr><td>쌍대 변수</td><td data-col="svc">αᵢ (0 ≤ αᵢ ≤ C, Σαᵢyᵢ = 0)</td><td data-col="svr">αᵢ, αᵢ* (0 ≤ · ≤ C, Σ(αᵢ − αᵢ*) = 0)</td></tr>
+          <tr><td>예측식</td><td data-col="svc"><code>sign(Σ αᵢyᵢ K(xᵢ, x) + b)</code></td><td data-col="svr"><code>Σ (αᵢ − αᵢ*) K(xᵢ, x) + b</code></td></tr>
+          <tr><td>서포트 벡터</td><td data-col="svc">마진 위 · 마진 안 · 오분류 점</td><td data-col="svr">튜브 경계 위 · 튜브 밖 점</td></tr>
+          <tr><td>주요 하이퍼파라미터</td><td data-col="svc">C, kernel, γ, degree, coef0</td><td data-col="svr">C, <b>ε</b>, kernel, γ, degree, coef0</td></tr>
+          <tr><td>평가 지표</td><td data-col="svc">정확도 · F1 · ROC-AUC</td><td data-col="svr">MSE · RMSE · MAE · R²</td></tr>
+          <tr><td>scikit-learn</td><td data-col="svc"><code>SVC(kernel, C, gamma, degree, probability)</code></td><td data-col="svr"><code>SVR(kernel, C, epsilon, gamma)</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="sk-card">
+    <div class="sk-head"><h2 id="codeTitle">scikit-learn 코드</h2>
+      <div class="sk-group">
+        <label class="sk-check"><input type="checkbox" id="codeData" checked>현재 데이터 포함</label>
+        <button type="button" class="sk-btn sk-btn--sm" id="codeCopy">복사</button>
+      </div>
+    </div>
+    <p class="sk-lead" id="codeLead">지금 보고 있는 화면의 설정(kernel, C, gamma, degree, coef0, epsilon)을 그대로 반영합니다. 데이터를 포함하면 화면과 같은 숫자가 나옵니다.</p>
+    <pre class="sk-formula sv-code" id="codePre"></pre>
+  </div>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20260930c"></script>
+<script>
+(function () {
+"use strict";
+/* ------------------------------------------------------------------ 공통 도구 */
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function gauss(r){ let u=0; while(!u) u=r(); const v=r(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const r1 = v => Math.round(v*10)/10, r2 = v => Math.round(v*100)/100;
+
+/* ------------------------------------------------------------------ 데이터 */
+/* 혈당·BMI는 고정 기준으로 단위를 맞춘 값(z)으로 학습합니다: z₁ = (혈당 − 120)/25, z₂ = (BMI − 26)/4 */
+const ZG={mu:120,sd:25}, ZB={mu:26,sd:4}, ZA={mu:50,sd:15};
+const toZ = p => [(p[0]-ZG.mu)/ZG.sd, (p[1]-ZB.mu)/ZB.sd];
+const fromZ = z => [ZG.mu+ZG.sd*z[0], ZB.mu+ZB.sd*z[1]];
+const ageZ = a => [(a-ZA.mu)/ZA.sd];
+const U=[0.8,0.6], V=[-0.6,0.8];
+function rawPt(z){ return [Math.round(clamp(ZG.mu+ZG.sd*z[0],60,215)), r1(clamp(ZB.mu+ZB.sd*z[1],16,40))]; }
+/* 선형 분리 가능 (최대 마진용) */
+function genSep(seed,n){
+  const r=mulberry32(seed*7919+13), X=[], y=[];
+  for(let i=0;i<n;i++){
+    const s=i%2?1:-1; let p;
+    for(let t=0;t<50;t++){
+      const a=s*(0.5+Math.abs(gauss(r))*0.6)+0.1, b=gauss(r)*1.05;
+      p=rawPt([a*U[0]+b*V[0],a*U[1]+b*V[1]]);
+      const z=toZ(p), al=z[0]*U[0]+z[1]*U[1]-0.1; if(s*al>=0.42) break;
+    }
+    X.push(p); y.push(s);
+  }
+  return {X,y};
+}
+/* 겹치는 두 클래스 (소프트 마진 · SMO · Platt) */
+function genOver(seed,n,sep,sp){
+  const r=mulberry32(seed*104729+7), X=[], y=[];
+  for(let i=0;i<n;i++){ const s=i%2?1:-1, a=s*sep+gauss(r)*sp, b=gauss(r)*1.05; X.push(rawPt([a*U[0]+b*V[0],a*U[1]+b*V[1]])); y.push(s); }
+  return {X,y};
+}
+/* 커널용 2차원 데이터 (표준화 단위) */
+function genShape(kind,seed,n){
+  const r=mulberry32(seed*15485863+(kind==="circle"?1:kind==="xor"?2:3)), X=[], y=[];
+  for(let i=0;i<n;i++){
+    let p, s;
+    if(kind==="circle"){ s=i%2?1:-1; const ang=r()*2*Math.PI, rad=s>0?1.75+gauss(r)*0.22:Math.abs(0.72+gauss(r)*0.32); p=[rad*Math.cos(ang),rad*Math.sin(ang)]; }
+    else if(kind==="xor"){ p=[r()*4-2,r()*4-2]; s=p[0]*p[1]>0?1:-1; if(r()<0.06) s=-s; }
+    else { s=i%2?1:-1; const t=r()*Math.PI; let a=s<0?[Math.cos(t),Math.sin(t)]:[1-Math.cos(t),0.5-Math.sin(t)]; p=[(a[0]+gauss(r)*0.16-0.5)*1.3,(a[1]+gauss(r)*0.16-0.25)*1.7]; }
+    X.push([r2(p[0]),r2(p[1])]); y.push(s);
+  }
+  return {X,y};
+}
+/* 세 클래스: 0 정상 · 1 당뇨 전단계 · 2 당뇨 */
+const C3=[[-1.2,-0.45],[0.05,0.75],[1.25,-0.4]];
+function gen3(seed,n){
+  const r=mulberry32(seed*31337+5), X=[], y=[];
+  for(let i=0;i<n;i++){ const c=i%3; X.push(rawPt([C3[c][0]+gauss(r)*0.52,C3[c][1]+gauss(r)*0.52])); y.push(c); }
+  return {X,y};
+}
+/* 나이 → 수축기 혈압 */
+function sbpTrue(age,shape){ return shape==="lin"?105+0.62*(age-20):114+30/(1+Math.exp(-(age-52)/6)); }
+function genSBP(seed,n,shape,noise){
+  const r=mulberry32(seed*7907+(shape==="lin"?11:29)), X=[], y=[];
+  for(let i=0;i<n;i++){ const a=Math.round(21+r()*58); X.push(a); y.push(r1(sbpTrue(a,shape)+gauss(r)*noise)); }
+  return {X,y};
+}
+/* 스케일링 비교: 원 단위 혈당·BMI */
+function genScale(seed,n){
+  const r=mulberry32(seed*92821+3), X=[], y=[];
+  for(let i=0;i<n;i++){
+    const g=Math.round(clamp(122+gauss(r)*28,65,215)), b=r1(clamp(26.5+gauss(r)*4.2,16,40));
+    const z=(g-122)/28+(b-26.5)/4.2+0.35*Math.sin((b-26.5)*0.9); let s=z>0.1?1:-1; if(r()<0.06) s=-s;
+    X.push([g,b]); y.push(s);
+  }
+  return {X,y};
+}
+function stdFit(X){ const d=X[0].length, n=X.length, mu=new Array(d).fill(0), sd=new Array(d).fill(0);
+  X.forEach(x=>x.forEach((v,j)=>mu[j]+=v/n)); X.forEach(x=>x.forEach((v,j)=>sd[j]+=(v-mu[j])**2/n)); return {mu,sd:sd.map(Math.sqrt)}; }
+const stdApply = (s,X) => X.map(x=>x.map((v,j)=>(v-s.mu[j])/s.sd[j]));
+
+/* ------------------------------------------------------------------ SVM 계산 (libsvm 방식 SMO) */
+function kfun(k){
+  if(k.type==="linear") return (a,b)=>{ let s=0; for(let i=0;i<a.length;i++) s+=a[i]*b[i]; return s; };
+  if(k.type==="poly") return (a,b)=>{ let s=0; for(let i=0;i<a.length;i++) s+=a[i]*b[i]; return Math.pow(k.gamma*s+k.coef0,k.degree); };
+  return (a,b)=>{ let s=0; for(let i=0;i<a.length;i++){ const d=a[i]-b[i]; s+=d*d; } return Math.exp(-k.gamma*s); };
+}
+function gram(X,k){ const n=X.length, K=new Float64Array(n*n), f=kfun(k);
+  for(let i=0;i<n;i++) for(let j=i;j<n;j++){ const v=f(X[i],X[j]); K[i*n+j]=v; K[j*n+i]=v; } return K; }
+/* 일반형 쌍대 문제: min ½αᵀQα + pᵀα,  yᵀα = 0,  0 ≤ α ≤ C   (Q_ij = y_i y_j K_ij) */
+function smoSolve(Q,p,y,C,o){
+  o=o||{}; const n=p.length, eps=o.tol||1e-3, TAU=1e-12, maxIter=o.maxIter||10000000;
+  const A=new Float64Array(n), G=Float64Array.from(p), QD=new Float64Array(n);
+  for(let i=0;i<n;i++) QD[i]=Q[i*n+i];
+  const up=i=>A[i]>=C, low=i=>A[i]<=0;
+  const rec=o.record?[]:null;
+  const rho=()=>{ let nf=0,sf=0,ub=Infinity,lb=-Infinity;
+    for(let i=0;i<n;i++){ const yG=y[i]*G[i];
+      if(up(i)){ if(y[i]===-1) ub=Math.min(ub,yG); else lb=Math.max(lb,yG); }
+      else if(low(i)){ if(y[i]===1) ub=Math.min(ub,yG); else lb=Math.max(lb,yG); }
+      else { nf++; sf+=yG; } }
+    return nf>0?sf/nf:(ub+lb)/2; };
+  const obj=()=>{ let v=0; for(let i=0;i<n;i++) v+=A[i]*(G[i]+p[i]); return v/2; };
+  let iter=0, gap=Infinity;
+  if(rec) rec.push({i:-1,j:-1,A:Array.from(A),rho:rho(),obj:obj(),gap:NaN});
+  while(iter<maxIter){
+    let Gmax=-Infinity,Gmax2=-Infinity,gi=-1,gj=-1,odm=Infinity;
+    for(let t=0;t<n;t++){
+      if(y[t]===1){ if(!up(t)&&-G[t]>=Gmax){ Gmax=-G[t]; gi=t; } }
+      else { if(!low(t)&&G[t]>=Gmax){ Gmax=G[t]; gi=t; } }
+    }
+    const i=gi;
+    for(let j=0;j<n;j++){
+      if(y[j]===1){ if(!low(j)){ const gd=Gmax+G[j]; if(G[j]>=Gmax2) Gmax2=G[j];
+          if(gd>0&&i>=0){ const qc=QD[i]+QD[j]-2*y[i]*Q[i*n+j]; const od=qc>0?-(gd*gd)/qc:-(gd*gd)/TAU; if(od<=odm){ gj=j; odm=od; } } } }
+      else { if(!up(j)){ const gd=Gmax-G[j]; if(-G[j]>=Gmax2) Gmax2=-G[j];
+          if(gd>0&&i>=0){ const qc=QD[i]+QD[j]+2*y[i]*Q[i*n+j]; const od=qc>0?-(gd*gd)/qc:-(gd*gd)/TAU; if(od<=odm){ gj=j; odm=od; } } } }
+    }
+    gap=Gmax+Gmax2;
+    if(gap<eps||gj===-1) break;
+    iter++;
+    const j=gj, oi=A[i], oj=A[j];
+    if(y[i]!==y[j]){
+      let qc=QD[i]+QD[j]+2*Q[i*n+j]; if(qc<=0) qc=TAU;
+      const d=(-G[i]-G[j])/qc, diff=A[i]-A[j]; A[i]+=d; A[j]+=d;
+      if(diff>0){ if(A[j]<0){ A[j]=0; A[i]=diff; } } else { if(A[i]<0){ A[i]=0; A[j]=-diff; } }
+      if(diff>0){ if(A[i]>C){ A[i]=C; A[j]=C-diff; } } else { if(A[j]>C){ A[j]=C; A[i]=C+diff; } }
+    } else {
+      let qc=QD[i]+QD[j]-2*Q[i*n+j]; if(qc<=0) qc=TAU;
+      const d=(G[i]-G[j])/qc, sum=A[i]+A[j]; A[i]-=d; A[j]+=d;
+      if(sum>C){ if(A[i]>C){ A[i]=C; A[j]=sum-C; } } else { if(A[j]<0){ A[j]=0; A[i]=sum; } }
+      if(sum>C){ if(A[j]>C){ A[j]=C; A[i]=sum-C; } } else { if(A[i]<0){ A[i]=0; A[j]=sum; } }
+    }
+    const di=A[i]-oi, dj=A[j]-oj;
+    for(let k=0;k<n;k++) G[k]+=Q[i*n+k]*di+Q[j*n+k]*dj;
+    if(rec) rec.push({i,j,A:Array.from(A),rho:rho(),obj:obj(),gap});
+  }
+  const rh=rho(), ob=obj();
+  /* 부동소수 잔여값(α ≈ 1e−16) 정리: 0과 C에 아주 가까운 값은 경계값으로 */
+  for(let i=0;i<n;i++){ if(A[i]<1e-12*C) A[i]=0; else if(A[i]>C*(1-1e-12)) A[i]=C; }
+  return {A,G,rho:rh,obj:ob,iter,gap,rec,capped:iter>=maxIter};
+}
+/* C-SVC: y ∈ {−1, +1}.  f(x) = Σ αᵢyᵢK(xᵢ,x) + b */
+function trainSVC(X,y,C,k,o){
+  o=o||{}; const n=X.length, K=o.K||gram(X,k), Q=new Float64Array(n*n), p=new Float64Array(n).fill(-1);
+  for(let i=0;i<n;i++) for(let j=0;j<n;j++) Q[i*n+j]=y[i]*y[j]*K[i*n+j];
+  const r=smoSolve(Q,p,y,C,o), coef=Array.from(r.A,(a,i)=>a*y[i]);
+  const m={kind:"svc",X,y,C,k,alpha:Array.from(r.A),coef,b:-r.rho,obj:r.obj,iter:r.iter,gap:r.gap,capped:r.capped,rec:r.rec,f:kfun(k)};
+  m.sv=[]; coef.forEach((c,i)=>{ if(r.A[i]>0) m.sv.push(i); });
+  if(k.type==="linear"){ const d=X[0].length; m.w=new Array(d).fill(0); m.sv.forEach(i=>{ for(let t=0;t<d;t++) m.w[t]+=coef[i]*X[i][t]; }); }
+  return m;
+}
+/* ε-SVR: 2n 변수 (α: 위쪽, α*: 아래쪽).  f(x) = Σ (αᵢ − αᵢ*) K(xᵢ,x) + b */
+function trainSVR(X,t,C,epsl,k,o){
+  o=o||{}; const n=X.length, K=o.K||gram(X,k), N=2*n, Q=new Float64Array(N*N), p=new Float64Array(N), y=new Int8Array(N);
+  for(let i=0;i<n;i++){ p[i]=epsl-t[i]; y[i]=1; p[i+n]=epsl+t[i]; y[i+n]=-1; }
+  for(let i=0;i<N;i++) for(let j=0;j<N;j++) Q[i*N+j]=y[i]*y[j]*K[(i%n)*n+(j%n)];
+  const r=smoSolve(Q,p,y,C,o);
+  const a=Array.from(r.A.slice(0,n)), as=Array.from(r.A.slice(n)), coef=a.map((v,i)=>v-as[i]);
+  const m={kind:"svr",X,t,C,eps:epsl,k,alpha:a,alphaS:as,coef,b:-r.rho,obj:r.obj,iter:r.iter,gap:r.gap,capped:r.capped,f:kfun(k)};
+  m.sv=[]; coef.forEach((c,i)=>{ if(c!==0) m.sv.push(i); });
+  if(k.type==="linear"){ const d=X[0].length; m.w=new Array(d).fill(0); m.sv.forEach(i=>{ for(let s=0;s<d;s++) m.w[s]+=coef[i]*X[i][s]; }); }
+  return m;
+}
+function dec(m,x){ if(m.w){ let s=m.b; for(let t=0;t<x.length;t++) s+=m.w[t]*x[t]; return s; }
+  let s=m.b; for(const i of m.sv) s+=m.coef[i]*m.f(m.X[i],x); return s; }
+/* ½‖w‖² = ½ Σ cᵢcⱼ K(xᵢ,xⱼ) */
+function halfW2(m){ let s=0; for(const i of m.sv) for(const j of m.sv) s+=m.coef[i]*m.coef[j]*m.f(m.X[i],m.X[j]); return s/2; }
+/* Platt scaling (Lin·Lin·Weng 2007, libsvm sigmoid_train) */
+function plattFit(f,lab){
+  const n=f.length; let p1=0; lab.forEach(v=>{ if(v>0) p1++; }); const p0=n-p1;
+  const hi=(p1+1)/(p1+2), lo=1/(p0+2), t=lab.map(v=>v>0?hi:lo);
+  let A=0, B=Math.log((p0+1)/(p1+1)), fv=0;
+  for(let i=0;i<n;i++){ const fA=f[i]*A+B; fv+=fA>=0?t[i]*fA+Math.log(1+Math.exp(-fA)):(t[i]-1)*fA+Math.log(1+Math.exp(fA)); }
+  const sigma=1e-12, minStep=1e-10;
+  for(let it=0;it<100;it++){
+    let h11=sigma,h22=sigma,h21=0,g1=0,g2=0;
+    for(let i=0;i<n;i++){ const fA=f[i]*A+B; let p,q; if(fA>=0){ p=Math.exp(-fA)/(1+Math.exp(-fA)); q=1/(1+Math.exp(-fA)); } else { p=1/(1+Math.exp(fA)); q=Math.exp(fA)/(1+Math.exp(fA)); }
+      const d2=p*q; h11+=f[i]*f[i]*d2; h22+=d2; h21+=f[i]*d2; const d1=t[i]-p; g1+=f[i]*d1; g2+=d1; }
+    if(Math.abs(g1)<1e-5&&Math.abs(g2)<1e-5) break;
+    const det=h11*h22-h21*h21, dA=-(h22*g1-h21*g2)/det, dB=-(-h21*g1+h11*g2)/det, gd=g1*dA+g2*dB;
+    let step=1;
+    while(step>=minStep){ const nA=A+step*dA, nB=B+step*dB; let nf=0;
+      for(let i=0;i<n;i++){ const fA=f[i]*nA+nB; nf+=fA>=0?t[i]*fA+Math.log(1+Math.exp(-fA)):(t[i]-1)*fA+Math.log(1+Math.exp(fA)); }
+      if(nf<fv+0.0001*step*gd){ A=nA; B=nB; fv=nf; break; } step/=2; }
+    if(step<minStep) break;
+  }
+  return {A,B};
+}
+/* 다중 클래스: OvO (scikit-learn SVC 기본) */
+function trainOvO(X,lab,K,C,k){
+  const ms=[];
+  for(let a=0;a<K;a++) for(let b=a+1;b<K;b++){
+    const idx=[]; lab.forEach((v,i)=>{ if(v===a||v===b) idx.push(i); });
+    const m=trainSVC(idx.map(i=>X[i]),idx.map(i=>lab[i]===a?1:-1),C,k); m.a=a; m.bb=b; m.idx=idx; ms.push(m);
+  }
+  return ms;
+}
+function predOvO(ms,K,x){ const v=new Array(K).fill(0), d=ms.map(m=>{ const f=dec(m,x); v[f>0?m.a:m.bb]++; return f; });
+  let best=0; for(let c=1;c<K;c++) if(v[c]>v[best]) best=c; return {votes:v,d,pred:best}; }
+function trainOvR(X,lab,K,C,k){ const ms=[]; for(let c=0;c<K;c++){ const m=trainSVC(X,lab.map(v=>v===c?1:-1),C,k); m.c=c; ms.push(m); } return ms; }
+function predOvR(ms,x){ const d=ms.map(m=>dec(m,x)); let best=0; d.forEach((v,i)=>{ if(v>d[best]) best=i; }); return {d,pred:best}; }
+/* ------------------------------------------------------------------ 계산 끝 */
+
+/* ------------------------------------------------------------------ 표시 도구 */
+const $ = id => document.getElementById(id);
+const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+function css(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function colors(){
+  const C = {};
+  [["surface","--surface"],["surface2","--surface-2"],["ink","--ink"],["text","--text"],["muted","--muted"],["faint","--faint"],
+   ["line","--line"],["lineStrong","--line-strong"],["c0","--c0"],["c1","--c1"],["c2","--c2"],["va","--va"],["pur","--pur"],["bad","--bad"],
+   ["ok","--ok"],["pred","--pred"],["tube","--tube"],["accent","--cat-ml"]].forEach(([k,v]) => C[k] = css(v));
+  C.mono = css("--mono"); C.sans = css("--sans");
+  return C;
+}
+function fx(v,d){ if(!Number.isFinite(v)) return "–"; let s=v.toFixed(d); if(/^-0\.?0*$/.test(s)) s=s.slice(1); return s.replace("-","−"); }
+const f1=v=>fx(v,1), f2=v=>fx(v,2), f3=v=>fx(v,3), f4=v=>fx(v,4);
+const sg = (v,d) => (v>=0?"+":"−")+fx(Math.abs(v),d);
+const pct = v => (v*100).toFixed(1)+"%";
+const p3 = v => +(+v).toPrecision(3);            /* 화면과 코드가 같은 값을 쓰도록 유효숫자 3자리로 맞춤 */
+const pS = v => String(p3(v));
+const logV = v => p3(Math.pow(10,v));
+const pyN = v => String(+(+v).toPrecision(6));
+const SUB = "₀₁₂₃₄₅₆₇₈₉";
+const sub = n => String(n).split("").map(c=>SUB[+c]).join("");
+function niceTicks(lo,hi,n){
+  const span=hi-lo; if(span<=0) return [lo];
+  const s0=span/n, mag=Math.pow(10,Math.floor(Math.log10(s0))), e=s0/mag;
+  const step=(e<1.5?1:e<3?2:e<7?5:10)*mag, out=[];
+  for(let v=Math.ceil(lo/step-1e-9)*step; v<=hi+1e-9; v+=step) out.push(+v.toFixed(10));
+  return out;
+}
+const tickTxt = v => Math.abs(v) >= 1000 ? String(Math.round(v)) : String(+v.toFixed(3)).replace("-","−");
+function fitCanvas(cv){
+  const dpr=window.devicePixelRatio||1, w=Math.max(40,cv.clientWidth), h=Math.max(40,cv.clientHeight||w*0.75);
+  cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr);
+  const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); return {ctx,w,h};
+}
+const LIN={type:"linear"};
+function kOf(type,g,d,r){ return type==="linear"?LIN:type==="poly"?{type:"poly",gamma:g,degree:d,coef0:r}:{type:"rbf",gamma:g}; }
+function kTxt(k){ return k.type==="linear"?"K(x, z) = x·z":k.type==="poly"?`K(x, z) = (${pS(k.gamma)}·x·z + ${pS(k.coef0)})^${k.degree}`:`K(x, z) = exp(−${pS(k.gamma)}·‖x − z‖²)`; }
+const kName = t => t==="linear"?"선형":t==="poly"?"다항":"RBF";
+const UI_MAX = 150000;   /* 화면이 멈추지 않도록 한 번 학습의 SMO 반복 상한 (scikit-learn은 상한 없음) */
+
+/* ------------------------------------------------------------------ 캔버스 좌표 */
+/* 같은 비율(등방) 좌표: 마진의 직각·거리가 그대로 보이도록 */
+function isoView(cv,box){
+  const {ctx,w,h}=fitCanvas(cv), pad={l:w<420?40:48,r:12,t:12,b:38}, pw=w-pad.l-pad.r, ph=h-pad.t-pad.b;
+  const s=Math.min(pw/(box[0][1]-box[0][0]), ph/(box[1][1]-box[1][0]));
+  const cx=(box[0][0]+box[0][1])/2, cy=(box[1][0]+box[1][1])/2;
+  return mkView(cv,ctx,w,h,pad,[cx-pw/2/s,cx+pw/2/s],[cy-ph/2/s,cy+ph/2/s]);
+}
+function plainView(cv,xr,yr){
+  const {ctx,w,h}=fitCanvas(cv), pad={l:w<420?42:50,r:12,t:12,b:38};
+  return mkView(cv,ctx,w,h,pad,xr,yr);
+}
+function mkView(cv,ctx,w,h,pad,xr,yr){
+  const pw=w-pad.l-pad.r, ph=h-pad.t-pad.b;
+  const V={cv,ctx,w,h,pad,pw,ph,xr,yr,
+    px:x=>pad.l+(x-xr[0])/(xr[1]-xr[0])*pw, py:v=>pad.t+(1-(v-yr[0])/(yr[1]-yr[0]))*ph,
+    ix:X=>xr[0]+(X-pad.l)/pw*(xr[1]-xr[0]), iy:Y=>yr[0]+(1-(Y-pad.t)/ph)*(yr[1]-yr[0])};
+  V.inside=(mx,my)=>mx>=pad.l&&mx<=pad.l+pw&&my>=pad.t&&my<=pad.t+ph;
+  cv._view=V; return V;
+}
+/* 눈금: [위치, 글자] 목록 */
+const linTicks = (r,n) => niceTicks(r[0],r[1],n).map(v=>[v,tickTxt(v)]);
+const zTicks = (r,mu,sd,n) => niceTicks(mu+sd*r[0],mu+sd*r[1],n).map(v=>[(v-mu)/sd,tickTxt(v)]);
+function axes(V,C,xl,yl,xt,yt){
+  const {ctx,w,h,pad,pw,ph}=V;
+  ctx.fillStyle=C.surface; ctx.fillRect(0,0,w,h);
+  ctx.lineWidth=1; ctx.strokeStyle=C.line; ctx.font="11px "+C.mono; ctx.fillStyle=C.muted;
+  xt.forEach(([v,t])=>{ const x=Math.round(V.px(v))+.5; if(x<pad.l-1||x>pad.l+pw+1) return; ctx.beginPath(); ctx.moveTo(x,pad.t); ctx.lineTo(x,pad.t+ph); ctx.stroke(); ctx.textAlign="center"; ctx.textBaseline="top"; ctx.fillText(t,x,pad.t+ph+5); });
+  yt.forEach(([v,t])=>{ const y=Math.round(V.py(v))+.5; if(y<pad.t-1||y>pad.t+ph+1) return; ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+pw,y); ctx.stroke(); ctx.textAlign="right"; ctx.textBaseline="middle"; ctx.fillText(t,pad.l-5,y); });
+  ctx.font="600 12px "+C.sans; ctx.fillStyle=C.muted; ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+  ctx.fillText(xl,pad.l+pw/2,h-5);
+  ctx.save(); ctx.translate(12,pad.t+ph/2); ctx.rotate(-Math.PI/2); ctx.textBaseline="middle"; ctx.fillText(yl,0,0); ctx.restore();
+}
+function frame(V,C){ V.ctx.strokeStyle=C.lineStrong; V.ctx.lineWidth=1; V.ctx.setLineDash([]); V.ctx.strokeRect(V.pad.l+.5,V.pad.t+.5,V.pw-1,V.ph-1); }
+function clip(V){ V.ctx.save(); V.ctx.beginPath(); V.ctx.rect(V.pad.l,V.pad.t,V.pw,V.ph); V.ctx.clip(); }
+const unclip = V => V.ctx.restore();
+
+/* 결정 함수 격자 · 배경 · 등고선 (marching squares) */
+function field(V,fn,cell){
+  cell=cell||5; const nx=Math.max(8,Math.round(V.pw/cell)), ny=Math.max(8,Math.round(V.ph/cell));
+  const sx=V.pw/nx, sy=V.ph/ny, vals=new Float64Array((nx+1)*(ny+1));
+  for(let j=0;j<=ny;j++){ const y=V.iy(V.pad.t+j*sy); for(let i=0;i<=nx;i++) vals[j*(nx+1)+i]=fn([V.ix(V.pad.l+i*sx),y]); }
+  return {nx,ny,sx,sy,vals,x0:V.pad.l,y0:V.pad.t};
+}
+function paintField(V,G,colNeg,colPos,amp){
+  const {ctx}=V, {nx,ny,sx,sy,vals}=G, W=nx+1; amp=amp||1;
+  ctx.save();
+  for(let j=0;j<ny;j++) for(let i=0;i<nx;i++){
+    const v=(vals[j*W+i]+vals[j*W+i+1]+vals[(j+1)*W+i]+vals[(j+1)*W+i+1])/4;
+    ctx.globalAlpha=(0.05+0.2*Math.tanh(Math.abs(v)*0.7))*amp; ctx.fillStyle=v>0?colPos:colNeg;
+    ctx.fillRect(G.x0+i*sx,G.y0+j*sy,sx+0.6,sy+0.6);
+  }
+  ctx.restore();
+}
+function contour(G,level){
+  const {nx,ny,sx,sy,vals,x0,y0}=G, W=nx+1, segs=[];
+  for(let j=0;j<ny;j++) for(let i=0;i<nx;i++){
+    const a=vals[j*W+i]-level, b=vals[j*W+i+1]-level, c=vals[(j+1)*W+i+1]-level, d=vals[(j+1)*W+i]-level;
+    const X=x0+i*sx, Y=y0+j*sy, P={};
+    if((a>0)!==(b>0)) P.t=[X+sx*a/(a-b),Y];
+    if((b>0)!==(c>0)) P.r=[X+sx,Y+sy*b/(b-c)];
+    if((d>0)!==(c>0)) P.b=[X+sx*d/(d-c),Y+sy];
+    if((a>0)!==(d>0)) P.l=[X,Y+sy*a/(a-d)];
+    const k=Object.keys(P);
+    if(k.length===2) segs.push([P[k[0]],P[k[1]]]);
+    else if(k.length===4){ const m=(a+b+c+d)/4; if((m>0)===(a>0)){ segs.push([P.t,P.r],[P.b,P.l]); } else { segs.push([P.t,P.l],[P.r,P.b]); } }
+  }
+  return segs;
+}
+function strokeSegs(ctx,segs,color,w,dash){
+  ctx.save(); ctx.strokeStyle=color; ctx.lineWidth=w; ctx.setLineDash(dash||[]); ctx.lineCap="round"; ctx.beginPath();
+  segs.forEach(s=>{ ctx.moveTo(s[0][0],s[0][1]); ctx.lineTo(s[1][0],s[1][1]); }); ctx.stroke(); ctx.restore();
+}
+function decisionLines(V,C,G,showMargin){
+  if(showMargin){ strokeSegs(V.ctx,contour(G,1),C.muted,1.6,[6,5]); strokeSegs(V.ctx,contour(G,-1),C.muted,1.6,[6,5]); }
+  strokeSegs(V.ctx,contour(G,0),C.ink,2.4);
+}
+/* 점: 클래스 0(−1) 원 · 1(+1) 마름모 · 2 네모 */
+function point(ctx,x,y,cls,C,o){
+  o=o||{}; const r=o.r||4.8;
+  ctx.beginPath();
+  if(cls===1){ const q=r*1.25; ctx.moveTo(x,y-q); ctx.lineTo(x+q,y); ctx.lineTo(x,y+q); ctx.lineTo(x-q,y); ctx.closePath(); }
+  else if(cls===2){ ctx.rect(x-r*0.9,y-r*0.9,r*1.8,r*1.8); }
+  else ctx.arc(x,y,r,0,Math.PI*2);
+  const col=o.color||(cls===1?C.c1:cls===2?C.c2:C.c0);
+  if(o.hollow){ ctx.fillStyle=C.surface; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=col; ctx.stroke(); }
+  else { ctx.fillStyle=col; ctx.fill(); ctx.lineWidth=1.2; ctx.strokeStyle=C.surface; ctx.stroke(); }
+}
+function ring(ctx,x,y,col,r,w){ ctx.beginPath(); ctx.arc(x,y,r||10,0,Math.PI*2); ctx.lineWidth=w||2.2; ctx.strokeStyle=col; ctx.setLineDash([]); ctx.stroke(); }
+function label(ctx,C,txt,x,y,color,align,weight,size){
+  ctx.font=(weight||700)+" "+(size||12)+"px "+C.sans; ctx.textAlign=align||"left"; ctx.textBaseline="alphabetic";
+  ctx.lineWidth=4; ctx.lineJoin="round"; ctx.strokeStyle=C.surface; ctx.strokeText(txt,x,y); ctx.fillStyle=color||C.ink; ctx.fillText(txt,x,y);
+}
+function cross(ctx,x,y,C){ ctx.save(); ctx.strokeStyle=C.ink; ctx.lineWidth=2.4; ctx.beginPath(); ctx.moveTo(x-7,y-7); ctx.lineTo(x+7,y+7); ctx.moveTo(x+7,y-7); ctx.lineTo(x-7,y+7); ctx.stroke(); ctx.restore(); }
+function arrow2(ctx,x0,y0,x1,y1,col){
+  const a=Math.atan2(y1-y0,x1-x0), h=7;
+  ctx.save(); ctx.strokeStyle=col; ctx.fillStyle=col; ctx.lineWidth=1.8; ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+  [[x1,y1,a],[x0,y0,a+Math.PI]].forEach(([x,y,t])=>{ ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x-h*Math.cos(t-0.4),y-h*Math.sin(t-0.4)); ctx.lineTo(x-h*Math.cos(t+0.4),y-h*Math.sin(t+0.4)); ctx.closePath(); ctx.fill(); });
+  ctx.restore();
+}
+/* 직선 a·x + b·y + c = 0 을 그림 영역 안에서 */
+function lineSeg(V,a,b,c){
+  const [x0,x1]=V.xr, [y0,y1]=V.yr, pts=[];
+  if(Math.abs(b)>1e-12){ [x0,x1].forEach(x=>{ const y=-(a*x+c)/b; if(y>=y0-1e-9&&y<=y1+1e-9) pts.push([x,y]); }); }
+  if(Math.abs(a)>1e-12){ [y0,y1].forEach(y=>{ const x=-(b*y+c)/a; if(x>=x0-1e-9&&x<=x1+1e-9) pts.push([x,y]); }); }
+  if(pts.length<2) return null;
+  let best=[pts[0],pts[1]], bd=0;
+  for(let i=0;i<pts.length;i++) for(let j=i+1;j<pts.length;j++){ const d=Math.hypot(pts[i][0]-pts[j][0],pts[i][1]-pts[j][1]); if(d>bd){ bd=d; best=[pts[i],pts[j]]; } }
+  return best;
+}
+function drawLine(V,a,b,c,col,w,dash){
+  const s=lineSeg(V,a,b,c); if(!s) return;
+  const ctx=V.ctx; ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=w; ctx.setLineDash(dash||[]); ctx.beginPath();
+  ctx.moveTo(V.px(s[0][0]),V.py(s[0][1])); ctx.lineTo(V.px(s[1][0]),V.py(s[1][1])); ctx.stroke(); ctx.restore();
+}
+function nearest(V,pts,mx,my,rad){ let best=-1,bd=(rad||12)**2; pts.forEach((p,i)=>{ const d=(V.px(p[0])-mx)**2+(V.py(p[1])-my)**2; if(d<bd){ bd=d; best=i; } }); return best; }
+const evXY = (cv,e) => { const r=cv.getBoundingClientRect(); return [e.clientX-r.left,e.clientY-r.top]; };
+
+/* 끌어 옮기기 · 추가 · 삭제 */
+function editor(cv,o){
+  let drag=-1, moved=false, sx=0, sy=0, down=false;
+  cv.addEventListener("pointerdown",e=>{
+    const V=cv._view; if(!V) return; const [mx,my]=evXY(cv,e); if(!V.inside(mx,my)) return;
+    down=true; moved=false; sx=mx; sy=my; drag=o.hit(V,mx,my);
+    if(drag>=0&&o.mode()==="move"){ cv.setPointerCapture(e.pointerId); cv.classList.add("drag"); o.start(drag); }
+    e.preventDefault();
+  });
+  cv.addEventListener("pointermove",e=>{
+    if(!down||drag<0||o.mode()!=="move") return; const V=cv._view, [mx,my]=evXY(cv,e);
+    if(!moved&&Math.hypot(mx-sx,my-sy)<3) return; moved=true;
+    o.move(drag,V.ix(clamp(mx,V.pad.l,V.pad.l+V.pw)),V.iy(clamp(my,V.pad.t,V.pad.t+V.ph)));
+  });
+  const end=e=>{
+    if(!down) return; down=false; cv.classList.remove("drag");
+    const V=cv._view, [mx,my]=evXY(cv,e);
+    if(drag>=0){ if(o.mode()==="del"&&!moved) o.del(drag); else o.end(drag,moved); }
+    else if(Math.hypot(mx-sx,my-sy)<5&&V.inside(mx,my)) o.add(V.ix(mx),V.iy(my));
+    drag=-1;
+  };
+  cv.addEventListener("pointerup",end);
+  cv.addEventListener("pointercancel",()=>{ if(drag>=0) o.end(drag,moved); down=false; drag=-1; cv.classList.remove("drag"); });
+}
+
+/* ------------------------------------------------------------------ SVG 차트 */
+function chart(el,cfg){
+  const W=Math.max(240,Math.floor(el.clientWidth||600)), H=cfg.h||(W<520?220:250);
+  const pad={l:cfg.padL||52,r:14,t:16,b:40}, pw=W-pad.l-pad.r, ph=H-pad.t-pad.b;
+  const X=v=>pad.l+(v-cfg.xr[0])/(cfg.xr[1]-cfg.xr[0])*pw, Y=v=>pad.t+(1-(v-cfg.yr[0])/(cfg.yr[1]-cfg.yr[0]))*ph;
+  const cy=v=>clamp(Y(v),pad.t,pad.t+ph);
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${cfg.aria}">`;
+  (cfg.bands||[]).forEach(b=>{ const x0=X(b.x0),x1=X(b.x1); if(x1<=x0) return; s+=`<rect x="${x0}" y="${pad.t}" width="${x1-x0}" height="${ph}" style="fill:${b.color};opacity:${b.op||0.1}"/>`;
+    if(b.label) s+=`<text class="lb" x="${(x0+x1)/2}" y="${pad.t+14}" text-anchor="middle" style="fill:${b.color}">${b.label}</text>`; });
+  (cfg.yt||niceTicks(cfg.yr[0],cfg.yr[1],5).map(v=>[v,tickTxt(v)])).forEach(([v,t])=>{ const y=Y(v); s+=`<line class="gl" x1="${pad.l}" x2="${pad.l+pw}" y1="${y}" y2="${y}"/><text class="ax" x="${pad.l-6}" y="${y+4}" text-anchor="end">${t}</text>`; });
+  (cfg.xt||niceTicks(cfg.xr[0],cfg.xr[1],W<520?5:9).map(v=>[v,tickTxt(v)])).forEach(([v,t])=>{ const x=X(v); s+=`<line class="gl" x1="${x}" x2="${x}" y1="${pad.t}" y2="${pad.t+ph}"/><text class="ax" x="${x}" y="${pad.t+ph+15}" text-anchor="middle">${t}</text>`; });
+  s+=`<rect class="fr" x="${pad.l}" y="${pad.t}" width="${pw}" height="${ph}"/>`;
+  (cfg.hlines||[]).forEach(l=>{ const y=cy(l.y); s+=`<line x1="${pad.l}" x2="${pad.l+pw}" y1="${y}" y2="${y}" style="stroke:${l.color};stroke-width:${l.w||1.5};stroke-dasharray:${l.dash||"5 4"}"/>`;
+    if(l.label) s+=`<text class="lb" x="${pad.l+pw-6}" y="${y-5}" text-anchor="end" style="fill:${l.color}">${l.label}</text>`; });
+  (cfg.series||[]).forEach(sr=>{ if(!sr.pts.length) return; const d=sr.pts.map((p,i)=>(i?"L":"M")+X(p[0]).toFixed(1)+","+cy(p[1]).toFixed(1)).join("");
+    if(sr.w!==0) s+=`<path d="${d}" style="fill:none;stroke:${sr.color};stroke-width:${sr.w||2.4};stroke-linejoin:round;stroke-linecap:round;${sr.dash?"stroke-dasharray:"+sr.dash:""}"/>`;
+    if(sr.dots) sr.pts.forEach(p=>{ s+=`<circle cx="${X(p[0])}" cy="${cy(p[1])}" r="${sr.dots}" style="fill:${sr.color};stroke:var(--surface);stroke-width:1.2"/>`; }); });
+  (cfg.vlines||[]).forEach(l=>{ const x=X(l.x); s+=`<line x1="${x}" x2="${x}" y1="${pad.t}" y2="${pad.t+ph}" style="stroke:${l.color};stroke-width:${l.w||1.8};${l.dash?"stroke-dasharray:"+l.dash:""}"/>`;
+    if(l.label){ const right=x>pad.l+pw*0.62; s+=`<text class="lb" x="${right?x-5:x+5}" y="${pad.t+ph-7}" text-anchor="${right?"end":"start"}" style="fill:${l.color}">${l.label}</text>`; } });
+  (cfg.points||[]).forEach(p=>{ const x=X(p.x), y=cy(p.y);
+    s+=`<circle cx="${x}" cy="${y}" r="${p.r||5}" style="fill:${p.ring?"var(--surface)":p.color};stroke:${p.ring?p.color:"var(--surface)"};stroke-width:${p.ring?2.5:1.5};${p.op?"opacity:"+p.op:""}"/>`;
+    if(p.label){ const right=x>pad.l+pw*0.62; s+=`<text class="lb" x="${right?x-9:x+9}" y="${p.below?y+17:y-9}" text-anchor="${right?"end":"start"}" style="fill:${p.color}">${p.label}</text>`; } });
+  s+=`<text class="axl" x="${pad.l+pw/2}" y="${H-5}" text-anchor="middle">${cfg.xl}</text>`;
+  s+=`<text class="axl" transform="translate(13 ${pad.t+ph/2}) rotate(-90)" text-anchor="middle">${cfg.yl}</text>`;
+  s+="</svg>";
+  el.innerHTML=s;
+  if(cfg.onX){ const svg=el.querySelector("svg"); svg.classList.add("click");
+    svg.addEventListener("click",e=>{ const r=svg.getBoundingClientRect(), x=(e.clientX-r.left)*W/r.width; cfg.onX(clamp(cfg.xr[0]+(x-pad.l)/pw*(cfg.xr[1]-cfg.xr[0]),cfg.xr[0],cfg.xr[1])); }); }
+}
+const LOGT = (lo,hi) => { const o=[]; for(let e=Math.ceil(lo);e<=hi;e++) o.push([e,pS(Math.pow(10,e))]); return o; };
+/* 막대 차트: bars=[{v, color, lab, on, txt}], 0 기준 위/아래 */
+function bars(el,cfg){
+  const W=Math.max(240,Math.floor(el.clientWidth||600)), H=cfg.h||(W<520?200:220);
+  const pad={l:cfg.padL||46,r:12,t:16,b:cfg.labels===false?14:30}, pw=W-pad.l-pad.r, ph=H-pad.t-pad.b, n=cfg.bars.length;
+  const Y=v=>pad.t+(1-(v-cfg.yr[0])/(cfg.yr[1]-cfg.yr[0]))*ph, bw=pw/Math.max(1,n);
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${cfg.aria}">`;
+  (cfg.yt||niceTicks(cfg.yr[0],cfg.yr[1],4).map(v=>[v,tickTxt(v)])).forEach(([v,t])=>{ const y=Y(v); s+=`<line class="gl" x1="${pad.l}" x2="${pad.l+pw}" y1="${y}" y2="${y}"/><text class="ax" x="${pad.l-6}" y="${y+4}" text-anchor="end">${t}</text>`; });
+  (cfg.hlines||[]).forEach(l=>{ const y=Y(l.y); s+=`<line x1="${pad.l}" x2="${pad.l+pw}" y1="${y}" y2="${y}" style="stroke:${l.color};stroke-width:1.5;stroke-dasharray:${l.dash||"5 4"}"/>`;
+    if(l.label) s+=`<text class="lb" x="${pad.l+pw-4}" y="${y-4}" text-anchor="end" style="fill:${l.color}">${l.label}</text>`; });
+  const y0=Y(0);
+  cfg.bars.forEach((b,i)=>{ const x=pad.l+i*bw+bw*0.14, w=Math.max(1,bw*0.72), y=Y(b.v), top=Math.min(y,y0), hh=Math.max(b.v===0?0:1,Math.abs(y-y0));
+    s+=`<rect x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${hh.toFixed(1)}" rx="2" style="fill:${b.color};${b.on?"stroke:var(--ink);stroke-width:2.2":""}"/>`;
+    if(b.txt&&bw>=26) s+=`<text class="bl${b.on?" on":""}" x="${(x+w/2).toFixed(1)}" y="${(b.v>=0?top-4:top+hh+11).toFixed(1)}" text-anchor="middle">${b.txt}</text>`;
+    if(cfg.labels!==false&&b.lab!=null&&(bw>=14||i%Math.ceil(14/bw)===0)) s+=`<text class="bl${b.on?" on":""}" x="${(x+w/2).toFixed(1)}" y="${H-pad.b+15}" text-anchor="middle">${b.lab}</text>`; });
+  s+=`<line x1="${pad.l}" x2="${pad.l+pw}" y1="${y0}" y2="${y0}" style="stroke:var(--line-strong);stroke-width:1.2"/>`;
+  if(cfg.yl) s+=`<text class="axl" transform="translate(12 ${pad.t+ph/2}) rotate(-90)" text-anchor="middle">${cfg.yl}</text>`;
+  s+="</svg>"; el.innerHTML=s;
+}
+
+/* ------------------------------------------------------------------ 상태 */
+const HARD_C = 1000;
+const M1_DEF = genSep(1,16);
+const S = {
+  part:"svc", tab:{svc:"margin",svr:"tube"},
+  m1:{X:M1_DEF.X.map(p=>p.slice()),y:M1_DEF.y.slice(),mode:"opt",th:0,off:0,add:1,act:"move"},
+  m2:{seed:1,C:1,xi:true,va:false},
+  m3:{ds:"circle",k:"rbf",C:1,g:1,d:2,r:1,va:true,ang:35,lift:1,play:false},
+  m4:{seed:1,k:"linear",C:1,step:0,q:null},
+  m5:{mode:"ovo",k:"linear",C:1,g:1,q:null},
+  r1:{shape:"lin",k:"linear",eps:5,C:10,X:[],y:[],act:"move"},
+  r2:{seed:3,k:"rbf",C:100,g:1,d:3,eps:3,va:true,sw:"gamma"},
+  r3:{eps:4,on:true,oy:230,ox:30,C:10},
+  r4:{seed:1,k:"linear",C:2,eps:4,q:null},
+  codeData:true
+};
+function loadR1(){ const d=genSBP(1,30,S.r1.shape,S.r1.shape==="lin"?6:4); S.r1.X=d.X; S.r1.y=d.y; }
+loadR1();
+/* 간단한 캐시 */
+const memo = new Map();
+function cached(key,fn){ if(memo.has(key)) return memo.get(key); const v=fn(); memo.set(key,v); if(memo.size>400) memo.delete(memo.keys().next().value); return v; }
+const accOf = (m,X,y) => { let ok=0; X.forEach((x,i)=>{ if((dec(m,x)>0?1:-1)===y[i]) ok++; }); return ok/X.length; };
+const mseOf = (m,X,y) => { let s=0; X.forEach((x,i)=>{ s+=(y[i]-dec(m,x))**2; }); return s/X.length; };
+function stat(label,val,cls){ return `<div class="sk-stat"><b${cls?` class="${cls}"`:""}>${val}</b><span>${label}</span></div>`; }
+
+/* ================================================================== 분류 1. 최대 마진 */
+const BOX_GB = [[-2.7,2.7],[-2.3,2.3]];
+const gbTicks = V => [zTicks(V.xr,ZG.mu,ZG.sd,V.w<420?5:8), zTicks(V.yr,ZB.mu,ZB.sd,6)];
+function m1Model(){
+  const d=S.m1, key="m1|"+JSON.stringify(d.X)+d.y.join("");
+  return cached(key,()=>trainSVC(d.X.map(toZ),d.y,HARD_C,LIN,{maxIter:UI_MAX}));
+}
+function m1Thetas(m){ const nw=Math.hypot(m.w[0],m.w[1]); return {th:((Math.atan2(m.w[1],m.w[0])*180/Math.PI)+360)%360, off:m.b/nw, nw}; }
+/* 직접 조절한 직선 g(x) = n·x + b 의 기하 마진 */
+function m1Manual(){
+  const d=S.m1, t=S.m1.th*Math.PI/180, n=[Math.cos(t),Math.sin(t)], Z=d.X.map(toZ);
+  const g=Z.map((z,i)=>d.y[i]*(n[0]*z[0]+n[1]*z[1]+S.m1.off));
+  const mn=Math.min(...g);
+  let pmin=Infinity, nmax=-Infinity; Z.forEach((z,i)=>{ const v=n[0]*z[0]+n[1]*z[1]; if(d.y[i]>0) pmin=Math.min(pmin,v); else nmax=Math.max(nmax,v); });
+  return {n,g,mn,bestOff:-(pmin+nmax)/2,bestM:(pmin-nmax)/2};
+}
+function renderM1(){
+  const C=colors(), d=S.m1, cv=$("m1Cv"), V=isoView(cv,BOX_GB), {ctx}=V, Z=d.X.map(toZ);
+  const [xt,yt]=gbTicks(V); axes(V,C,"혈당 (mg/dL)","BMI (kg/m²)",xt,yt);
+  const m=m1Model(), nw=Math.hypot(m.w[0],m.w[1]), man=d.mode==="man", M=man?m1Manual():null;
+  const viol=Z.filter((z,i)=>d.y[i]*dec(m,z)<1-1e-3).length;
+  clip(V);
+  if(!man){
+    /* 마진 길(띠) */
+    const s1=lineSeg(V,m.w[0],m.w[1],m.b-1), s2=lineSeg(V,m.w[0],m.w[1],m.b+1);
+    if(s1&&s2){ ctx.save(); ctx.globalAlpha=0.09; ctx.fillStyle=C.ink; ctx.beginPath();
+      const A=[s1[0],s1[1]], B=[s2[0],s2[1]]; const dd=(p,q)=>Math.hypot(p[0]-q[0],p[1]-q[1]); if(dd(A[1],B[0])>dd(A[1],B[1])) B.reverse();
+      [A[0],A[1],B[0],B[1]].forEach((p,i)=>ctx[i?"lineTo":"moveTo"](V.px(p[0]),V.py(p[1]))); ctx.closePath(); ctx.fill(); ctx.restore(); }
+    drawLine(V,m.w[0],m.w[1],m.b-1,C.muted,1.7,[6,5]); drawLine(V,m.w[0],m.w[1],m.b+1,C.muted,1.7,[6,5]);
+    drawLine(V,m.w[0],m.w[1],m.b,C.ink,2.6);
+    /* 마진 폭 화살표: 원점에서 가장 가까운 경계 위 점 기준 */
+    const u=[m.w[0]/nw,m.w[1]/nw], p0=[-m.b*u[0]/nw,-m.b*u[1]/nw], a=[p0[0]-u[0]/nw,p0[1]-u[1]/nw], b=[p0[0]+u[0]/nw,p0[1]+u[1]/nw];
+    arrow2(ctx,V.px(a[0]),V.py(a[1]),V.px(b[0]),V.py(b[1]),C.accent);
+    label(ctx,C,"2/‖w‖ = "+f3(2/nw),V.px(b[0])+8,V.py(b[1])-6,C.accent);
+  } else {
+    const t=M.n, c=d.off;
+    if(M.mn>0){ drawLine(V,t[0],t[1],c-M.mn,C.muted,1.7,[6,5]); drawLine(V,t[0],t[1],c+M.mn,C.muted,1.7,[6,5]); }
+    drawLine(V,t[0],t[1],c,M.mn>0?C.ink:C.bad,2.6);
+    /* 법선 방향 표시 */
+    const p0=[-c*t[0],-c*t[1]]; arrow2(ctx,V.px(p0[0]),V.py(p0[1]),V.px(p0[0]+t[0]*0.6),V.py(p0[1]+t[1]*0.6),C.accent);
+    label(ctx,C,"n",V.px(p0[0]+t[0]*0.6)+6,V.py(p0[1]+t[1]*0.6)-4,C.accent);
+  }
+  unclip(V);
+  Z.forEach((z,i)=>{ const x=V.px(z[0]), y=V.py(z[1]);
+    point(ctx,x,y,d.y[i]>0?1:0,C);
+    if(!man&&m.alpha[i]>0) ring(ctx,x,y,C.ink,10.5);
+    if(man&&M.mn>0&&Math.abs(M.g[i]-M.mn)<1e-6) ring(ctx,x,y,C.ink,10.5);
+    if(man&&M.g[i]<=0) ring(ctx,x,y,C.bad,10.5);
+  });
+  frame(V,C);
+  /* 수치 */
+  const svN=m.sv.length;
+  if(!man){
+    $("m1Stats").innerHTML=stat("마진 폭 2/‖w‖",f3(2/nw))+stat("‖w‖",f3(nw))+stat("서포트 벡터",svN+"개")+stat("점",d.X.length+"개");
+    $("m1Formula").innerHTML=`w = (${f3(m.w[0])}, ${f3(m.w[1])}),  b = ${f3(m.b)}<br>결정 경계: ${f3(m.w[0])}·z₁ ${sg(m.w[1],3)}·z₂ ${sg(m.b,3)} = 0<br><span class="t-muted">z₁ = (혈당 − 120)/25,  z₂ = (BMI − 26)/4  (고정 기준으로 단위 맞춤)</span><br>마진 폭 = 2/‖w‖ = 2/${f3(nw)} = <b>${f3(2/nw)}</b><br>서포트 벡터에서 y·(w·x + b) = 1, 나머지 점은 &gt; 1`;
+  } else {
+    const opt=2/nw, mine=M.mn>0?2*M.mn:NaN;
+    $("m1Stats").innerHTML=stat("내 직선 마진 폭",M.mn>0?f3(mine):"오분류",M.mn>0?"":"t-bad")+stat("SVM 최적 마진 폭",f3(opt),"t-ok")+stat("최적 대비",M.mn>0?pct(mine/opt):"–")+stat("θ",Math.round(d.th)%360+"°");
+    $("m1Formula").innerHTML=`n = (cos θ, sin θ) = (${f3(M.n[0])}, ${f3(M.n[1])}),  g(x) = n·z + b,  b = ${f2(d.off)}<br>가장 가까운 점까지 거리 = min yᵢ·g(xᵢ) = <b>${f3(M.mn)}</b>${M.mn>0?` → 마진 폭 = 2 × ${f3(M.mn)} = <b>${f3(mine)}</b>`:` <span class="t-bad">(음수 = 잘못 분류된 점이 있음)</span>`}<br>이 각도에서 가장 좋은 위치라면 마진 폭 ${M.bestM>0?f3(2*M.bestM):"– (분리 불가)"} · SVM 최적은 ${f3(opt)}`;
+  }
+  /* 표: 서포트 벡터 또는 가장 가까운 점 */
+  const idx=man?Z.map((_,i)=>i).sort((a,b)=>M.g[a]-M.g[b]).slice(0,5):m.sv.slice();
+  $("m1Table").innerHTML=`<thead><tr><th>#</th><th>혈당</th><th>BMI</th><th>y</th>${man?"<th>y·g(x)</th>":"<th>α</th><th>y·f(x)</th>"}</tr></thead><tbody>`+
+    idx.map(i=>`<tr><td class="n">${i+1}</td><td class="n">${d.X[i][0]}</td><td class="n">${f1(d.X[i][1])}</td><td class="n">${d.y[i]>0?"+1":"−1"}</td>${man?`<td class="n">${f3(M.g[i])}</td>`:`<td class="n">${f3(m.alpha[i])}</td><td class="n">${f3(d.y[i]*dec(m,Z[i]))}</td>`}</tr>`).join("")+"</tbody>";
+  if(viol>0&&!man) setMsg("m1Msg",`선형으로 완전히 나눌 수 없는 배치입니다 (마진 위반 ${viol}개, C = ${HARD_C}). 겹치는 데이터는 2번 화면(소프트 마진)에서 다룹니다.`,"warn");
+}
+function setMsg(id,txt,kind){ const el=$(id); el.textContent=txt; el.classList.toggle("sv-warn",kind==="warn"); el.classList.toggle("sv-ok",kind==="ok"); }
+function syncM1Sliders(){ $("m1Th").value=S.m1.th; $("m1ThV").textContent=Math.round(S.m1.th)%360+"°"; $("m1Off").value=S.m1.off; $("m1OffV").textContent=f2(S.m1.off); }
+let m1Before=null;
+function m1Snap(){ const m=m1Model(); return {w:m.w.slice(),b:m.b,sv:m.sv.slice()}; }
+function m1Changed(a,b){ return Math.abs(a.w[0]-b.w[0])+Math.abs(a.w[1]-b.w[1])+Math.abs(a.b-b.b)>1e-4; }
+
+/* ================================================================== 분류 2. 소프트 마진 */
+const M2_SEP=0.9, M2_SP=0.6;
+function m2Data(){ return cached("m2d|"+S.m2.seed,()=>{ const d=genOver(S.m2.seed,40,M2_SEP,M2_SP), v=genOver(S.m2.seed+100,100,M2_SEP,M2_SP);
+  return {X:d.X,y:d.y,Z:d.X.map(toZ),vX:v.X,vy:v.y,vZ:v.X.map(toZ)}; }); }
+function m2Fit(C){ const D=m2Data(); return cached(`m2|${S.m2.seed}|${C}`,()=>trainSVC(D.Z,D.y,C,LIN,{maxIter:UI_MAX})); }
+function m2Sweep(){ return cached("m2s|"+S.m2.seed,()=>{ const D=m2Data(), out=[];
+  for(let e=-2;e<=3.001;e+=0.125){ const C=logV(e), m=m2Fit(C), nw=Math.hypot(...m.w); out.push({e,C,w:2/nw,sv:m.sv.length,tr:accOf(m,D.Z,D.y),va:accOf(m,D.vZ,D.vy)}); } return out; }); }
+function renderM2(){
+  const C=colors(), D=m2Data(), m=m2Fit(S.m2.C), cv=$("m2Cv"), V=isoView(cv,BOX_GB), {ctx}=V;
+  const [xt,yt]=gbTicks(V); axes(V,C,"혈당 (mg/dL)","BMI (kg/m²)",xt,yt);
+  const nw=Math.hypot(m.w[0],m.w[1]), f=D.Z.map(z=>dec(m,z)), xi=f.map((v,i)=>Math.max(0,1-D.y[i]*v));
+  clip(V);
+  const G=field(V,z=>dec(m,z),8); paintField(V,G,C.c0,C.c1,0.7);
+  drawLine(V,m.w[0],m.w[1],m.b-1,C.muted,1.7,[6,5]); drawLine(V,m.w[0],m.w[1],m.b+1,C.muted,1.7,[6,5]); drawLine(V,m.w[0],m.w[1],m.b,C.ink,2.6);
+  if(S.m2.xi) D.Z.forEach((z,i)=>{ if(xi[i]<=1e-9) return; const s=D.y[i]*xi[i]/nw, e=[z[0]+s*m.w[0]/nw,z[1]+s*m.w[1]/nw];
+    ctx.save(); ctx.strokeStyle=C.bad; ctx.lineWidth=2.2; ctx.beginPath(); ctx.moveTo(V.px(z[0]),V.py(z[1])); ctx.lineTo(V.px(e[0]),V.py(e[1])); ctx.stroke(); ctx.restore(); });
+  unclip(V);
+  if(S.m2.va) D.vZ.forEach((z,i)=>point(ctx,V.px(z[0]),V.py(z[1]),D.vy[i]>0?1:0,C,{hollow:true,r:3.6}));
+  D.Z.forEach((z,i)=>{ const x=V.px(z[0]), y=V.py(z[1]); point(ctx,x,y,D.y[i]>0?1:0,C);
+    if(m.alpha[i]>0) ring(ctx,x,y,m.alpha[i]>=S.m2.C-1e-9?C.bad:C.ok,10.5); });
+  frame(V,C);
+  const free=m.sv.filter(i=>m.alpha[i]<S.m2.C-1e-9).length, bound=m.sv.length-free;
+  const sx=xi.reduce((a,b)=>a+b,0), hw=nw*nw/2;
+  $("m2Stats").innerHTML=stat("C",pS(S.m2.C))+stat("마진 폭 2/‖w‖",f3(2/nw))+stat(`서포트 벡터 (마진 위 ${free} · 안 ${bound})`,m.sv.length+"개")+stat("학습 정확도",pct(accOf(m,D.Z,D.y)))+stat("검증 정확도",pct(accOf(m,D.vZ,D.vy)),"t-va");
+  $("m2Formula").innerHTML=`목적식 = ½‖w‖² + C·Σξᵢ<br>= ${f3(hw)} + ${pS(S.m2.C)} × ${f3(sx)} = ${f3(hw)} + ${f3(S.m2.C*sx)} = <b>${f3(hw+S.m2.C*sx)}</b><br><span class="t-muted">ξᵢ = max(0, 1 − yᵢ·f(xᵢ)),  ξ &gt; 0: ${xi.filter(v=>v>1e-9).length}개 · ξ &gt; 1 (오분류): ${xi.filter(v=>v>1).length}개</span><br>w = (${f3(m.w[0])}, ${f3(m.w[1])}),  b = ${f3(m.b)}`;
+  /* 힌지 막대 */
+  const ord=D.y.map((_,i)=>i).sort((a,b)=>xi[b]-xi[a]), top=Math.max(1.2,Math.ceil(Math.max(...xi)*2)/2);
+  bars($("m2Hinge"),{aria:"점별 힌지 손실 막대",yr:[0,top],h:200,yl:"ξ",labels:false,
+    hlines:[{y:1,color:"var(--bad)",label:"ξ = 1 (경계를 넘음)"}],
+    bars:ord.map(i=>({v:xi[i],color:D.y[i]>0?"var(--c1)":"var(--c0)"}))});
+  /* C 스윕 */
+  const sw=m2Sweep(), ce=Math.log10(S.m2.C), go=e=>{ setC2(Math.round(e/0.05)*0.05); };
+  chart($("m2SweepW"),{aria:"C에 따른 마진 폭",xr:[-2,3],yr:[0,Math.ceil(Math.max(...sw.map(s=>s.w)))],xt:LOGT(-2,3),xl:"C (로그 눈금)",yl:"마진 폭",h:220,
+    series:[{pts:sw.map(s=>[s.e,s.w]),color:"var(--c0)",dots:2.5}],vlines:[{x:ce,color:"var(--ink)",label:"현재"}],onX:go});
+  chart($("m2SweepN"),{aria:"C에 따른 서포트 벡터 수",xr:[-2,3],yr:[0,D.y.length],xt:LOGT(-2,3),xl:"C (로그 눈금)",yl:"서포트 벡터 수",h:220,
+    series:[{pts:sw.map(s=>[s.e,s.sv]),color:"var(--sk-accent)",dots:2.5}],vlines:[{x:ce,color:"var(--ink)",label:"현재"}],onX:go});
+  const lo=sw[0], hi=sw[sw.length-1];
+  $("m2Note").innerHTML=`C = ${pS(lo.C)}이면 마진 폭 ${f2(lo.w)}, 서포트 벡터 ${lo.sv}개(거의 전부)로 위반을 크게 봐줍니다. C = ${pS(hi.C)}이면 마진 폭 ${f2(hi.w)}, 서포트 벡터 ${hi.sv}개로 경계 근처 몇 점에 맞춰집니다. 직선 모델이라 정확도 차이는 작지만(검증 ${pct(lo.va)} → ${pct(hi.va)}), C가 크면 몇 점의 위치에 경계가 민감해집니다.`;
+}
+function setC2(e){ $("m2C").value=e; S.m2.C=logV(e); $("m2CV").textContent=pS(S.m2.C); renderM2(); renderCode(); }
+
+/* ================================================================== 분류 3. 커널 트릭 */
+const BOX_Z = [[-2.6,2.6],[-2.3,2.3]];
+function m3Data(){ const ds=S.m3.ds; return cached("m3d|"+ds,()=>{ const t=genShape(ds,1,100), v=genShape(ds,2,80); return {X:t.X,y:t.y,vX:v.X,vy:v.y}; }); }
+const m3K = () => kOf(S.m3.k,S.m3.g,S.m3.d,S.m3.r);
+function m3Fit(k,C){ const D=m3Data(); return cached(`m3|${S.m3.ds}|${JSON.stringify(k)}|${C}`,()=>trainSVC(D.X,D.y,C,k,{maxIter:UI_MAX})); }
+const HG=[0.01,0.1,1,10,100], HC=[0.01,0.1,1,10,100,1000];
+function m3Heat(){ return cached("m3h|"+S.m3.ds,()=>{ const D=m3Data(); return HG.map(g=>HC.map(C=>accOf(m3Fit({type:"rbf",gamma:g},C),D.vX,D.vy))); }); }
+function renderM3(){
+  const C=colors(), D=m3Data(), k=m3K(), m=m3Fit(k,S.m3.C), cv=$("m3Cv"), V=isoView(cv,BOX_Z), {ctx}=V;
+  axes(V,C,"특성 x₁ (표준화)","특성 x₂ (표준화)",linTicks(V.xr,V.w<420?5:8),linTicks(V.yr,6));
+  clip(V); const G=field(V,z=>dec(m,z),V.w<500?6:5); paintField(V,G,C.c0,C.c1); decisionLines(V,C,G,true); unclip(V);
+  if(S.m3.va) D.vX.forEach((z,i)=>point(ctx,V.px(z[0]),V.py(z[1]),D.vy[i]>0?1:0,C,{hollow:true,r:3.6,color:C.va}));
+  D.X.forEach((z,i)=>{ const x=V.px(z[0]), y=V.py(z[1]); point(ctx,x,y,D.y[i]>0?1:0,C,{r:4.2}); if(m.alpha[i]>0) ring(ctx,x,y,C.ink,8.5,1.6); });
+  frame(V,C);
+  const tr=accOf(m,D.X,D.y), va=accOf(m,D.vX,D.vy), np=m.sv.filter(i=>D.y[i]<0).length;
+  $("m3Stats").innerHTML=stat("학습 정확도",pct(tr))+stat("검증 정확도",pct(va),"t-va")+stat("서포트 벡터",`${m.sv.length}개`)+stat("SMO 반복",m.iter+(m.capped?"+":""));
+  $("m3Formula").innerHTML=`${kTxt(k)}<br>f(x) = Σ αᵢyᵢ·K(xᵢ, x) + b,  b = ${f3(m.b)}<br><span class="t-muted">서포트 벡터 ${m.sv.length}개 (클래스 −1: ${np}, +1: ${m.sv.length-np})만 합에 들어갑니다</span>`;
+  let note;
+  if(m.capped) note=`<b>반복 상한(${UI_MAX.toLocaleString()}회)에 도달</b>해 멈췄습니다. 다항 커널은 차수와 C가 크면 수렴이 매우 느립니다.`;
+  else if(k.type==="linear"&&S.m3.ds!=="moons") note=`<b>선형 커널</b>은 직선 하나뿐이라 ${S.m3.ds==="circle"?"원형":"XOR"} 데이터를 가르지 못합니다(검증 ${pct(va)}). 다항이나 RBF로 바꿔 보세요.`;
+  else if(k.type==="rbf"&&S.m3.g>=10&&tr-va>0.05) note=`<b>γ = ${pS(S.m3.g)}</b>: K(x, z)가 아주 가까운 점끼리만 커서 학습 점마다 작은 <b>섬</b>이 생깁니다. 학습 ${pct(tr)} vs 검증 ${pct(va)} — 과적합입니다.`;
+  else if(k.type==="rbf"&&S.m3.g<=0.05) note=`<b>γ = ${pS(S.m3.g)}</b>: K가 멀리 있는 점까지 비슷하게 커서 경계가 거의 직선처럼 완만합니다(과소적합 쪽).`;
+  else if(tr-va>0.08) note=`학습 ${pct(tr)} vs 검증 ${pct(va)}: 학습 데이터에 지나치게 맞춘 모양입니다. C나 γ를 줄여 보세요.`;
+  else note=`학습 ${pct(tr)}, 검증 ${pct(va)}. 서포트 벡터는 경계 근처 점들이고, 나머지 점(α = 0)은 f(x) 계산에 쓰이지 않습니다.`;
+  $("m3Note").innerHTML=note;
+  renderHeat(); render3D();
+}
+function renderHeat(){
+  const H=m3Heat(); let bi=0,bj=0; H.forEach((r,i)=>r.forEach((v,j)=>{ if(v>H[bi][bj]+1e-12){ bi=i; bj=j; } }));
+  const lo=Math.min(...H.flat()), hi=Math.max(...H.flat());
+  let s=`<div class="h" style="grid-column:1/-1;justify-self:start">행 γ · 열 C · 값 = 검증 정확도 (%)</div><div class="h">γ \\ C</div>`+HC.map(c=>`<div class="h">${c}</div>`).join("");
+  H.forEach((row,i)=>{ s+=`<div class="h">${HG[i]}</div>`; row.forEach((v,j)=>{ const p=hi>lo?(v-lo)/(hi-lo):1, cur=S.m3.k==="rbf"&&Math.abs(S.m3.g-HG[i])<1e-9&&Math.abs(S.m3.C-HC[j])<1e-9;
+    s+=`<button type="button" class="${cur?"cur ":""}${i===bi&&j===bj?"best":""}" data-g="${i}" data-c="${j}" style="background:color-mix(in srgb,var(--c0) ${Math.round(8+p*58)}%,var(--surface))" aria-label="γ ${HG[i]}, C ${HC[j]}: 검증 정확도 ${pct(v)}">${(v*100).toFixed(1)}</button>`; }); });
+  const el=$("m3Heat"); el.style.gridTemplateColumns=`64px repeat(${HC.length},minmax(48px,1fr))`; el.innerHTML=s;
+  el.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ const g=HG[+b.dataset.g], c=HC[+b.dataset.c];
+    S.m3.k="rbf"; syncSeg("#m3K","rbf"); S.m3.g=g; S.m3.C=c; $("m3G").value=Math.log10(g); $("m3GV").textContent=pS(g); $("m3C").value=Math.log10(c); $("m3CV").textContent=pS(c); m3Boxes(); renderM3(); renderCode(); }));
+  $("m3HeatNote").innerHTML=`최고: γ = ${HG[bi]}, C = ${HC[bj]} → 검증 정확도 <b>${pct(H[bi][bj])}</b>. 같은 C에서 γ = 100 줄은 점마다 섬이 생겨 떨어지고, γ = 0.01 줄은 C가 아주 커야 겨우 곡선이 됩니다.`;
+}
+function m3Boxes(){ const k=S.m3.k; $("m3GBox").hidden=k==="linear"; $("m3DBox").hidden=k!=="poly"; $("m3RBox").hidden=k!=="poly"; }
+/* 3D 특성 사상 */
+function lift3(){ return cached("lift3",()=>{ const t=genShape("circle",1,100), P=t.X.map(p=>[p[0],p[1],p[0]*p[0]+p[1]*p[1]]); const m=trainSVC(P,t.y,10,LIN); return {X:t.X,y:t.y,P,m}; }); }
+function render3D(){
+  const C=colors(), cv=$("m3Cv3"), {ctx,w,h}=fitCanvas(cv), L=lift3(), a=S.m3.ang*Math.PI/180, el=24*Math.PI/180, lift=S.m3.lift;
+  ctx.fillStyle=C.surface; ctx.fillRect(0,0,w,h);
+  const sc=Math.min(w,h*1.25)/7.2, kz=0.62, cx=w/2, cy=h*0.66;
+  const pr=(x,y,z)=>{ const xr=x*Math.cos(a)-y*Math.sin(a), yr=x*Math.sin(a)+y*Math.cos(a); return [cx+sc*xr, cy-sc*(z*kz*Math.cos(el)+yr*Math.sin(el)), yr*Math.cos(el)-z*kz*Math.sin(el)]; };
+  const R=2.4;
+  /* 바닥 격자 */
+  ctx.lineWidth=1; ctx.strokeStyle=C.line;
+  for(let v=-R; v<=R+1e-9; v+=0.8){ let p=pr(v,-R,0), q=pr(v,R,0); ctx.beginPath(); ctx.moveTo(p[0],p[1]); ctx.lineTo(q[0],q[1]); ctx.stroke(); p=pr(-R,v,0); q=pr(R,v,0); ctx.beginPath(); ctx.moveTo(p[0],p[1]); ctx.lineTo(q[0],q[1]); ctx.stroke(); }
+  /* 세로축 */
+  const o=pr(0,0,0), t=pr(0,0,6.2); ctx.strokeStyle=C.lineStrong; ctx.beginPath(); ctx.moveTo(o[0],o[1]); ctx.lineTo(t[0],t[1]); ctx.stroke();
+  label(ctx,C,"x₁² + x₂²",t[0]+6,t[1]+4,C.muted,"left",600);
+  const ex=pr(R+0.35,0,0), ey=pr(0,R+0.35,0); label(ctx,C,"x₁",ex[0],ex[1]+4,C.muted,"center",600); label(ctx,C,"x₂",ey[0],ey[1]+4,C.muted,"center",600);
+  const m=L.m, w3=m.w[2];
+  /* 바닥으로 내린 경계(원) */
+  const c0=[-m.w[0]/(2*w3),-m.w[1]/(2*w3)], rr=c0[0]*c0[0]+c0[1]*c0[1]-m.b/w3, rad=rr>0?Math.sqrt(rr):NaN;
+  if(rad>0){ ctx.save(); ctx.setLineDash([6,5]); ctx.strokeStyle=C.ink; ctx.lineWidth=2; ctx.beginPath(); for(let i=0;i<=72;i++){ const th=i/72*2*Math.PI, p=pr(c0[0]+rad*Math.cos(th),c0[1]+rad*Math.sin(th),0); ctx[i?"lineTo":"moveTo"](p[0],p[1]); } ctx.stroke(); ctx.restore(); }
+  const zp=(x,y)=>-(m.w[0]*x+m.w[1]*y+m.b)/w3*lift;
+  const pts=L.P.map((p,i)=>({i,p,above:p[2]*lift>zp(p[0],p[1]),pp:pr(p[0],p[1],p[2]*lift)})).sort((u,v)=>v.pp[2]-u.pp[2]);
+  const drawPt=q=>{ const f=pr(q.p[0],q.p[1],0); ctx.strokeStyle=C.line; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(f[0],f[1]); ctx.lineTo(q.pp[0],q.pp[1]); ctx.stroke(); point(ctx,q.pp[0],q.pp[1],L.y[q.i]>0?1:0,C,{r:3.8}); };
+  pts.filter(q=>!q.above).forEach(drawPt);
+  /* 분리 평면 */
+  const cs=[[-R,-R],[R,-R],[R,R],[-R,R]].map(([x,y])=>pr(x,y,zp(x,y)));
+  ctx.save(); ctx.globalAlpha=0.2; ctx.fillStyle=C.accent; ctx.beginPath(); cs.forEach((p,i)=>ctx[i?"lineTo":"moveTo"](p[0],p[1])); ctx.closePath(); ctx.fill();
+  ctx.globalAlpha=0.85; ctx.strokeStyle=C.accent; ctx.lineWidth=1.5; ctx.stroke(); ctx.restore();
+  pts.filter(q=>q.above).forEach(drawPt);
+  $("m3Plane").innerHTML=`분리 평면: ${f2(m.w[0])}·x₁ ${sg(m.w[1],2)}·x₂ ${sg(w3,2)}·(x₁² + x₂²) ${sg(m.b,2)} = 0 → 바닥으로 내리면 ${rad>0?`중심 (${f2(c0[0])}, ${f2(c0[1])}), 반지름 <b>${f2(rad)}</b>인 원`:"원"} (점선). 3차원 선형 SVM(C = 10) 학습 정확도 ${pct(accOf(m,L.P,L.y))}.`;
+}
+let raf3=0, last3=0;
+function loop3(ts){ if(!S.m3.play||S.part!=="svc"||S.tab.svc!=="kernel"){ raf3=0; return; }
+  const dt=last3?Math.min(80,ts-last3):16; last3=ts; S.m3.ang=(S.m3.ang+dt*0.03)%360; $("m3Ang").value=Math.round(S.m3.ang); $("m3AngV").textContent=Math.round(S.m3.ang)+"°"; render3D(); raf3=requestAnimationFrame(loop3); }
+function play3(on){ S.m3.play=on; $("m3Play").textContent=on?"멈춤":"재생"; if(on&&!raf3){ last3=0; raf3=requestAnimationFrame(loop3); } }
+
+/* ================================================================== 분류 4. 쌍대 · SMO */
+function m4Data(){ return cached("m4d|"+S.m4.seed,()=>{ const d=genOver(S.m4.seed+50,12,0.8,0.6); return {X:d.X,y:d.y,Z:d.X.map(toZ)}; }); }
+const m4K = () => S.m4.k==="linear"?LIN:{type:"rbf",gamma:1};
+function m4Fit(){ const D=m4Data(), k=m4K(); return cached(`m4|${S.m4.seed}|${S.m4.k}|${S.m4.C}`,()=>trainSVC(D.Z,D.y,S.m4.C,k,{record:true})); }
+function m4Snap(m,s){ const r=m.rec[s]; return {A:r.A, b:-r.rho, f:m.f, X:m.X, y:m.y}; }
+const decSnap = (sn,x) => { let s=sn.b; sn.A.forEach((a,i)=>{ if(a>0) s+=a*sn.y[i]*sn.f(sn.X[i],x); }); return s; };
+const W_of = r => -r.obj;
+function aCat(a,C){ return a<=0?0:a>=C-1e-9?2:1; }
+function renderM4(){
+  const C=colors(), D=m4Data(), m=m4Fit(), K=m.rec.length-1; S.m4.step=clamp(S.m4.step,0,K);
+  const st=S.m4.step, sn=m4Snap(m,st), r=m.rec[st], cv=$("m4Cv"), xs=D.Z.map(z=>z[0]), ys=D.Z.map(z=>z[1]);
+  const V=isoView(cv,[[Math.min(...xs)-0.7,Math.max(...xs)+0.7],[Math.min(...ys)-0.6,Math.max(...ys)+0.6]]), {ctx}=V;
+  if(!S.m4.q) S.m4.q=D.Z[0].slice();
+  const [xt,yt]=gbTicks(V); axes(V,C,"혈당 (mg/dL)","BMI (kg/m²)",xt,yt);
+  const hasAny=sn.A.some(a=>a>0);
+  clip(V);
+  if(hasAny){ const G=field(V,z=>decSnap(sn,z),6); paintField(V,G,C.c0,C.c1,0.8); decisionLines(V,C,G,true); }
+  if(st>0){ const a=D.Z[r.i], b=D.Z[r.j]; ctx.save(); ctx.strokeStyle=C.accent; ctx.lineWidth=2; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(V.px(a[0]),V.py(a[1])); ctx.lineTo(V.px(b[0]),V.py(b[1])); ctx.stroke(); ctx.restore(); }
+  unclip(V);
+  const catCol=[C.faint,C.ok,C.bad];
+  D.Z.forEach((z,i)=>{ const x=V.px(z[0]), y=V.py(z[1]); point(ctx,x,y,D.y[i]>0?1:0,C);
+    const c=aCat(sn.A[i],S.m4.C); if(c) ring(ctx,x,y,catCol[c],10.5);
+    if(st>0&&(i===r.i||i===r.j)) ring(ctx,x,y,C.accent,15,3);
+    label(ctx,C,String(i+1),x+9,y-9,C.text,"left",700,11.5); });
+  const q=S.m4.q; cross(ctx,V.px(q[0]),V.py(q[1]),C); label(ctx,C,"x",V.px(q[0])+9,V.py(q[1])+16,C.ink);
+  frame(V,C);
+  $("m4Prog").textContent=`단계 ${st} / ${K}`;
+  ["m4First","m4Prev"].forEach(id=>$(id).disabled=st===0); ["m4Next","m4Last"].forEach(id=>$(id).disabled=st===K);
+  /* 단계 설명 */
+  let msg, kind;
+  if(st===0){ msg=`처음: 모든 α = 0이라 경계가 없습니다. 기울기(KKT 위반)가 가장 큰 쌍부터 고칩니다. [다음 SMO 단계]를 누르세요.`; }
+  else { const p=m.rec[st-1], i=r.i, j=r.j;
+    msg=`단계 ${st}: ${i+1}번(y = ${D.y[i]>0?"+1":"−1"})과 ${j+1}번(y = ${D.y[j]>0?"+1":"−1"})을 골랐습니다. α${sub(i+1)}: ${f3(p.A[i])} → ${f3(r.A[i])},  α${sub(j+1)}: ${f3(p.A[j])} → ${f3(r.A[j])}. 고르기 전 KKT 위반 정도 ${f3(r.gap)}`;
+    if(st===K){ msg+=` · 다음 쌍의 위반이 ${f4(m.gap)} &lt; tol 0.001이 되어 멈춥니다 (수렴).`; kind="ok"; } }
+  const sy=sn.A.reduce((s,a,i)=>s+a*D.y[i],0); msg+=`  Σαᵢyᵢ = ${f4(sy)}`;
+  const el=$("m4Msg"); el.innerHTML=msg; el.classList.toggle("sv-ok",kind==="ok");
+  /* α 막대 */
+  const top=S.m4.C*1.15;
+  bars($("m4Alpha"),{aria:"점별 라그랑주 승수 막대",yr:[0,top],h:210,yt:[[0,"0"],[S.m4.C,"C = "+pS(S.m4.C)]],padL:70,
+    hlines:[{y:S.m4.C,color:"var(--bad)"}],
+    bars:sn.A.map((a,i)=>({v:a,color:["var(--faint)","var(--ok)","var(--bad)"][aCat(a,S.m4.C)],lab:i+1,on:st>0&&(i===r.i||i===r.j),txt:a>0?f2(a):""}))});
+  /* 목적 함수 */
+  const Ws=m.rec.map(W_of), wmax=Math.max(...Ws);
+  chart($("m4Obj"),{aria:"SMO 단계별 쌍대 목적 함수 값",xr:[0,Math.max(1,K)],yr:[0,wmax*1.12||1],xl:"SMO 단계",yl:"W(α)",h:190,
+    xt:niceTicks(0,Math.max(1,K),Math.min(K,8)).filter(v=>Number.isInteger(v)).map(v=>[v,String(v)]),
+    series:[{pts:Ws.map((v,i)=>[i,v]),color:"var(--sk-accent)",dots:K<40?2.5:0}],points:[{x:st,y:Ws[st],color:"var(--ink)",r:5.5,label:"W = "+f3(Ws[st])}],
+    onX:x=>{ stopM4(); S.m4.step=Math.round(x); renderM4(); }});
+  /* 대입 식 */
+  const k=m4K(), Kx=D.Z.map(z=>m.f(z,q));
+  let fval=sn.b, rows=[], zeros=0;
+  sn.A.forEach((a,i)=>{ if(a<=0){ zeros++; return; } const t=a*D.y[i]*Kx[i]; fval+=t;
+    rows.push(`α${sub(i+1)}·y${sub(i+1)}·K(x${sub(i+1)}, x) = ${f3(a)} × (${D.y[i]>0?"+1":"−1"}) × ${f3(Kx[i])} = <b>${sg(t,3)}</b>`); });
+  const kd=k.type==="linear"?"K(xᵢ, x) = xᵢ·x (표준화 단위 내적)":"K(xᵢ, x) = exp(−1·‖xᵢ − x‖²)";
+  const qr=fromZ(q);
+  $("m4Terms").innerHTML=`x = (혈당 ${Math.round(qr[0])}, BMI ${f1(qr[1])}) → z = (${f2(q[0])}, ${f2(q[1])}) · ${kd}<br>`+(rows.length?rows.join("<br>"):"(아직 α가 모두 0)")+
+    `<br><span class="z">α = 0인 점 ${zeros}개 → 항이 0이라 계산에서 빠짐</span><br>b = ${f3(sn.b)}<br>f(x) = <b>${f3(fval)}</b> → ${fval>0?'<b class="t-c1">질환 (+1)</b>':'<b class="t-c0">정상 (−1)</b>'}`;
+}
+let m4Timer=null; const SPEEDS=[0.5,1,2,4];
+function stopM4(){ if(m4Timer){ clearInterval(m4Timer); m4Timer=null; } $("m4Play").textContent="재생"; }
+function playM4(){ if(m4Timer){ stopM4(); return; } const m=m4Fit(), K=m.rec.length-1; if(S.m4.step>=K) S.m4.step=0; renderM4(); $("m4Play").textContent="멈춤";
+  m4Timer=setInterval(()=>{ const KK=m4Fit().rec.length-1; if(S.m4.step>=KK){ stopM4(); return; } S.m4.step++; renderM4(); if(S.m4.step>=KK) stopM4(); }, 900/SPEEDS[+$("m4Speed").value]); }
+
+/* ================================================================== 분류 5. 다중 클래스 · Platt */
+const CLS3=["정상","당뇨 전단계","당뇨"];
+function m5Data(){ return cached("m5d",()=>{ const d=gen3(1,60); return {X:d.X,y:d.y,Z:d.X.map(toZ)}; }); }
+const m5K = () => S.m5.k==="linear"?LIN:{type:"rbf",gamma:S.m5.g};
+function m5Fit(){ const D=m5Data(), k=m5K(); return cached(`m5|${S.m5.k}|${S.m5.g}|${S.m5.C}`,()=>({ovo:trainOvO(D.Z,D.y,3,S.m5.C,k),ovr:trainOvR(D.Z,D.y,3,S.m5.C,k)})); }
+function renderM5(){
+  const C=colors(), D=m5Data(), M=m5Fit(), ovo=S.m5.mode==="ovo", cv=$("m5Cv"), V=isoView(cv,BOX_GB), {ctx}=V;
+  const [xt,yt]=gbTicks(V); axes(V,C,"혈당 (mg/dL)","BMI (kg/m²)",xt,yt);
+  const pred=z=>ovo?predOvO(M.ovo,3,z).pred:predOvR(M.ovr,z).pred, cc=[C.c0,C.c1,C.c2];
+  clip(V);
+  const cell=V.w<500?6:5, nx=Math.round(V.pw/cell), ny=Math.round(V.ph/cell), sx=V.pw/nx, sy=V.ph/ny;
+  ctx.save(); ctx.globalAlpha=0.16;
+  for(let j=0;j<ny;j++) for(let i=0;i<nx;i++){ const z=[V.ix(V.pad.l+(i+0.5)*sx),V.iy(V.pad.t+(j+0.5)*sy)]; ctx.fillStyle=cc[pred(z)]; ctx.fillRect(V.pad.l+i*sx,V.pad.t+j*sy,sx+0.6,sy+0.6); }
+  ctx.restore();
+  const models=ovo?M.ovo:M.ovr;
+  models.forEach(m=>{ const G=field(V,z=>dec(m,z),6), segs=contour(G,0);
+    strokeSegs(ctx,segs,ovo?C.ink:cc[m.c],2,ovo?[7,5]:[]); });
+  unclip(V);
+  /* 이진 경계 이름표 */
+  models.forEach((m,t)=>{ const G=field(V,z=>dec(m,z),10), segs=contour(G,0).filter(s=>s[0][0]>V.pad.l+30&&s[0][0]<V.pad.l+V.pw-150&&s[0][1]>V.pad.t+18&&s[0][1]<V.pad.t+V.ph-10); if(!segs.length) return; const s=segs[Math.floor(segs.length*[0.15,0.5,0.85][t])][0];
+    label(ctx,C,ovo?`${CLS3[m.a]} | ${CLS3[m.bb]}`:`${CLS3[m.c]} vs 나머지`,s[0]+4,s[1]-5,ovo?C.ink:cc[m.c],"left",700,11); });
+  D.Z.forEach((z,i)=>point(ctx,V.px(z[0]),V.py(z[1]),D.y[i],C,{r:4.4}));
+  if(!S.m5.q) S.m5.q=[0.5,0.2];
+  const q=S.m5.q; cross(ctx,V.px(q[0]),V.py(q[1]),C);
+  frame(V,C);
+  const acc=D.Z.filter((z,i)=>pred(z)===D.y[i]).length/D.Z.length;
+  const svU=new Set(); if(ovo) M.ovo.forEach(m=>m.sv.forEach(i=>svU.add(m.idx[i]))); else M.ovr.forEach(m=>m.sv.forEach(i=>svU.add(i)));
+  $("m5Stats").innerHTML=stat("학습 정확도",pct(acc))+stat("이진 SVM 수",ovo?"3 (K(K−1)/2)":"3 (K)")+stat("서포트 벡터",svU.size+"개");
+  const qr=fromZ(q);
+  if(ovo){ const P=predOvO(M.ovo,3,q);
+    $("m5Table").innerHTML=`<thead><tr><th>쌍 (a | b)</th><th>f(x)</th><th>투표</th></tr></thead><tbody>`+M.ovo.map((m,t)=>`<tr><td>${CLS3[m.a]} | ${CLS3[m.bb]}</td><td class="n">${f3(P.d[t])}</td><td>${P.d[t]>0?CLS3[m.a]:CLS3[m.bb]}</td></tr>`).join("")+
+      `<tr class="sel"><td>득표</td><td class="n" colspan="2">${P.votes.map((v,c)=>`${CLS3[c]} ${v}`).join(" · ")} → <b>${CLS3[P.pred]}</b></td></tr></tbody>`;
+    $("m5Note").innerHTML=`x = (혈당 ${Math.round(qr[0])}, BMI ${f1(qr[1])}). 쌍마다 f &gt; 0이면 앞 클래스(a), 아니면 뒤 클래스(b)에 한 표. 득표가 같으면 번호가 앞선 클래스가 이깁니다(libsvm). 점선은 쌍별 경계 f = 0입니다.`; }
+  else { const P=predOvR(M.ovr,q);
+    $("m5Table").innerHTML=`<thead><tr><th>분류기</th><th>f(x)</th></tr></thead><tbody>`+M.ovr.map((m,c)=>`<tr${c===P.pred?' class="sel"':""}><td>${CLS3[c]} vs 나머지</td><td class="n">${f3(P.d[c])}</td></tr>`).join("")+`</tbody>`;
+    $("m5Note").innerHTML=`x = (혈당 ${Math.round(qr[0])}, BMI ${f1(qr[1])}). 세 값이 모두 음수일 수도 있지만 그래도 가장 큰 f를 고릅니다 → <b>${CLS3[P.pred]}</b>. 실선은 클래스별 f = 0 경계입니다. scikit-learn의 <code>SVC(decision_function_shape="ovr")</code>는 OvO 결과를 OvR 모양으로 바꿔 보여 줄 뿐이고, 진짜 OvR은 <code>OneVsRestClassifier(SVC())</code>입니다.`; }
+  renderPlatt();
+}
+function plattFitM2(){ const D=m2Data(), m=m2Fit(S.m2.C); const f=D.Z.map(z=>dec(m,z)); return {f,P:plattFit(f,D.y),D,m}; }
+function renderPlatt(){
+  const {f,P,D}=plattFitM2(), lo=Math.floor(Math.min(-3,...f)), hi=Math.ceil(Math.max(3,...f)), pr=v=>1/(1+Math.exp(P.A*v+P.B));
+  const curve=[]; for(let i=0;i<=120;i++){ const v=lo+(hi-lo)*i/120; curve.push([v,pr(v)]); }
+  const r=mulberry32(5);
+  chart($("m5Platt"),{aria:"결정 함수 값과 Platt 확률",xr:[lo,hi],yr:[-0.08,1.08],yt:[[0,"0"],[0.5,"0.5"],[1,"1"]],xl:"결정 함수 값 f(x)",yl:"P(질환 | x)",h:230,
+    vlines:[{x:0,color:"var(--muted)",dash:"4 4"}],hlines:[{y:0.5,color:"var(--faint)"}],
+    series:[{pts:curve,color:"var(--sk-accent)",w:2.8}],
+    points:f.map((v,i)=>({x:v,y:D.y[i]>0?1-r()*0.05:r()*0.05,color:D.y[i]>0?"var(--c1)":"var(--c0)",r:3.6,op:0.85}))});
+  $("m5PlattNote").innerHTML=`A = ${f3(P.A)}, B = ${f3(P.B)} → f = 0이면 P = ${f3(pr(0))}, f = 1이면 P = ${f3(pr(1))}, f = −1이면 P = ${f3(pr(-1))}. scikit-learn은 <code>probability=True</code>일 때 내부 5겹 교차검증으로 A, B를 맞추므로 값이 조금 다르고, 드물게 <code>predict</code>와 <code>predict_proba</code>의 결과가 어긋날 수 있습니다.`;
+}
+
+/* ================================================================== 회귀 공통 그리기 */
+const AGE_XR=[18,82];
+function sbpYR(ys){ const mn=Math.min(...ys), mx=Math.max(...ys); return [Math.min(90,Math.floor((mn-6)/10)*10), Math.max(170,Math.ceil((mx+6)/10)*10)]; }
+function drawTube(V,C,m,eps,o){
+  o=o||{}; const {ctx}=V, xs=[]; for(let i=0;i<=160;i++) xs.push(V.xr[0]+(V.xr[1]-V.xr[0])*i/160);
+  const fv=xs.map(a=>dec(m,ageZ(a)));
+  clip(V);
+  if(eps>0){ ctx.save(); ctx.globalAlpha=0.14; ctx.fillStyle=C.tube; ctx.beginPath();
+    xs.forEach((a,i)=>ctx[i?"lineTo":"moveTo"](V.px(a),V.py(fv[i]+eps))); for(let i=xs.length-1;i>=0;i--) ctx.lineTo(V.px(xs[i]),V.py(fv[i]-eps)); ctx.closePath(); ctx.fill(); ctx.restore();
+    [eps,-eps].forEach(e=>{ ctx.save(); ctx.strokeStyle=C.tube; ctx.globalAlpha=0.7; ctx.lineWidth=1.3; ctx.setLineDash([5,4]); ctx.beginPath(); xs.forEach((a,i)=>ctx[i?"lineTo":"moveTo"](V.px(a),V.py(fv[i]+e))); ctx.stroke(); ctx.restore(); }); }
+  ctx.save(); ctx.strokeStyle=o.color||C.pred; ctx.lineWidth=o.w||2.8; ctx.setLineDash(o.dash||[]); ctx.beginPath(); xs.forEach((a,i)=>ctx[i?"lineTo":"moveTo"](V.px(a),V.py(fv[i]))); ctx.stroke(); ctx.restore();
+  unclip(V);
+}
+function svrPoints(V,C,m,X,y,eps,o){
+  o=o||{}; const {ctx}=V;
+  X.forEach((a,i)=>{ const fv=dec(m,ageZ(a)), r=y[i]-fv, x=V.px(a), yy=V.py(y[i]);
+    if(o.loss&&Math.abs(r)>eps+1e-9){ ctx.save(); ctx.strokeStyle=C.bad; ctx.lineWidth=2.2; ctx.beginPath(); ctx.moveTo(x,V.py(fv+Math.sign(r)*eps)); ctx.lineTo(x,yy); ctx.stroke(); ctx.restore(); }
+    point(ctx,x,yy,0,C,{r:4.6});
+    const c=Math.abs(m.coef[i]); if(c>0) ring(ctx,x,yy,c>=m.C-1e-9?C.bad:C.ok,9.5,2);
+    if(o.num) label(ctx,C,String(i+1),x+8,yy-8,C.text,"left",700,11.5); });
+}
+const ageTicks = V => [linTicks(V.xr,V.w<420?5:8), linTicks(V.yr,6)];
+
+/* ================================================================== 회귀 1. ε-튜브 */
+const r1K = () => S.r1.k==="linear"?LIN:{type:"rbf",gamma:1};
+function r1Fit(eps,C){ const d=S.r1; return cached(`r1|${d.k}|${eps}|${C}|${d.X.join(",")}|${d.y.join(",")}`,()=>trainSVR(d.X.map(ageZ),d.y,C,eps,r1K(),{maxIter:UI_MAX})); }
+function renderR1(){
+  const C=colors(), d=S.r1, m=r1Fit(d.eps,d.C), cv=$("r1Cv"), V=plainView(cv,AGE_XR,sbpYR(d.y));
+  const [xt,yt]=ageTicks(V); axes(V,C,"나이 (세)","수축기 혈압 (mmHg)",xt,yt);
+  drawTube(V,C,m,d.eps); svrPoints(V,C,m,d.X,d.y,d.eps,{loss:true}); frame(V,C);
+  const res=d.X.map((a,i)=>d.y[i]-dec(m,ageZ(a))), loss=res.map(r=>Math.max(0,Math.abs(r)-d.eps)), sl=loss.reduce((a,b)=>a+b,0);
+  const inside=d.X.length-m.sv.length, hw=halfW2(m), free=m.sv.filter(i=>Math.abs(m.coef[i])<d.C-1e-9).length;
+  $("r1Stats").innerHTML=stat("서포트 벡터",`${m.sv.length} / ${d.X.length}`)+stat("튜브 안쪽 (α = 0)",inside+"개")+stat("Σ ε-무감 손실",f1(sl))+(m.w?stat("기울기 (mmHg/세)",f3(m.w[0]/ZA.sd)):stat("½‖w‖²",f1(hw)));
+  $("r1Formula").innerHTML=`L<sub>ε</sub>(y, f) = max(0, |y − f(x)| − ε),  ε = ${pS(d.eps)} mmHg<br>목적식 = ½‖w‖² + C·Σ(ξᵢ + ξᵢ*) = ${f2(hw)} + ${pS(d.C)} × ${f2(sl)} = <b>${f2(hw+d.C*sl)}</b><br>`+
+    (m.w?`f(x) = ${f3(m.w[0])}·(나이 − 50)/15 ${sg(m.b,2)}  → 나이 1세당 ${f3(m.w[0]/ZA.sd)} mmHg`:`f(x) = Σ (αᵢ − αᵢ*)·exp(−1·‖zᵢ − z‖²) ${sg(m.b,2)}`)+
+    `<br><span class="t-muted">튜브 경계 위 SV ${free}개 (0 &lt; α &lt; C) · 튜브 밖 SV ${m.sv.length-free}개 (α = C)</span>`;
+  const sw=cached(`r1s|${d.k}|${d.C}|${d.X.join(",")}|${d.y.join(",")}`,()=>{ const o=[]; for(let e=0;e<=20;e+=1){ const mm=r1Fit(e,d.C); o.push([e,mm.sv.length,halfW2(mm)]); } return o; });
+  const hm=Math.max(...sw.map(s=>s[2]),1);
+  chart($("r1Sweep"),{aria:"ε에 따른 서포트 벡터 수와 평평함",xr:[0,20],yr:[0,d.X.length],xl:"ε (mmHg)",yl:"서포트 벡터 수",h:210,
+    series:[{pts:sw.map(s=>[s[0],s[1]]),color:"var(--sk-accent)",dots:2.6},{pts:sw.map(s=>[s[0],s[2]/hm*d.X.length]),color:"var(--pur)",dash:"5 4",w:2}],
+    vlines:[{x:d.eps,color:"var(--ink)",label:"현재"}],onX:x=>{ const e=Math.round(x*2)/2; S.r1.eps=e; $("r1E").value=e; $("r1EV").textContent=pS(e); renderR1(); renderCode(); }});
+  $("r1Sweep").insertAdjacentHTML("beforeend",`<div class="sk-legend" style="margin-top:6px"><span><i class="sv-sw ln" style="background:var(--sk-accent)"></i>서포트 벡터 수</span><span class="t-pur"><i class="sv-sw dash"></i>½‖w‖² (가파름, 최댓값 ${f1(hm)}을 맞춰 그림)</span></div>`);
+}
+
+/* ================================================================== 회귀 2. C와 커널 */
+function r2Data(){ return cached("r2d|"+S.r2.seed,()=>{ const t=genSBP(S.r2.seed,40,"nl",4), v=genSBP(S.r2.seed+1,60,"nl",4); return {X:t.X,y:t.y,Z:t.X.map(ageZ),vX:v.X,vy:v.y,vZ:v.X.map(ageZ)}; }); }
+const r2K = (g,C) => kOf(S.r2.k,g,S.r2.d,1);
+function r2Fit(g,C,cap){ const D=r2Data(), k=r2K(g); return cached(`r2|${S.r2.seed}|${JSON.stringify(k)}|${C}|${S.r2.eps}`,()=>trainSVR(D.Z,D.y,C,S.r2.eps,k,{maxIter:cap||UI_MAX})); }
+function renderR2(){
+  const C=colors(), D=r2Data(), d=S.r2, m=r2Fit(d.g,d.C), cv=$("r2Cv"), V=plainView(cv,AGE_XR,sbpYR(D.y.concat(D.vy)));
+  const [xt,yt]=ageTicks(V); axes(V,C,"나이 (세)","수축기 혈압 (mmHg)",xt,yt);
+  drawTube(V,C,m,d.eps);
+  if(d.va) D.vX.forEach((a,i)=>point(V.ctx,V.px(a),V.py(D.vy[i]),0,C,{hollow:true,r:3.6,color:C.va}));
+  D.X.forEach((a,i)=>{ const x=V.px(a), y=V.py(D.y[i]); point(V.ctx,x,y,0,C,{r:4.4}); if(m.coef[i]!==0) ring(V.ctx,x,y,C.ink,9,1.6); });
+  frame(V,C);
+  const tr=mseOf(m,D.Z,D.y), va=mseOf(m,D.vZ,D.vy);
+  $("r2Stats").innerHTML=stat("학습 MSE",f1(tr))+stat("검증 MSE",f1(va),"t-va")+stat("서포트 벡터",`${m.sv.length} / ${D.X.length}`)+stat("SMO 반복",m.iter+(m.capped?"+":""));
+  const k=r2K(d.g);
+  $("r2Formula").innerHTML=`${kTxt(k)}<span class="t-muted"> (z = (나이 − 50)/15)</span><br>f(x) = Σ (αᵢ − αᵢ*)·K(zᵢ, z) + b,  b = ${f2(m.b)}<br>C = ${pS(d.C)},  ε = ${pS(d.eps)} mmHg,  ½‖w‖² = ${f1(halfW2(m))}`;
+  const lin=d.k==="linear"; const sw=lin?"C":d.sw;
+  $("r2Sw").querySelector('[data-v="gamma"]').disabled=lin; syncSeg("#r2Sw",sw);
+  const pts=cached(`r2s|${d.seed}|${d.k}|${d.d}|${d.eps}|${sw}|${sw==="C"?d.g:d.C}`,()=>{ const o=[];
+    if(sw==="C") for(let e=-1;e<=3.001;e+=0.25){ const mm=r2Fit(d.g,logV(e),20000); o.push([e,mseOf(mm,D.Z,D.y),mseOf(mm,D.vZ,D.vy)]); }
+    else for(let e=-2;e<=2.001;e+=0.25){ const mm=r2Fit(logV(e),d.C,20000); o.push([e,mseOf(mm,D.Z,D.y),mseOf(mm,D.vZ,D.vy)]); }
+    return o; });
+  const best=pts.reduce((b,p)=>p[2]<b[2]?p:b,pts[0]), ymax=Math.min(Math.max(...pts.map(p=>Math.max(p[1],p[2]))),best[2]*4)*1.08;
+  const cur=Math.log10(sw==="C"?d.C:d.g), xr=sw==="C"?[-1,3]:[-2,2];
+  chart($("r2Sweep"),{aria:"하이퍼파라미터에 따른 학습·검증 MSE",xr,yr:[0,ymax],xt:LOGT(xr[0],xr[1]),xl:(sw==="C"?"C":"γ")+" (로그 눈금)",yl:"MSE",h:220,
+    series:[{pts:pts.map(p=>[p[0],p[1]]),color:"var(--c0)",dots:2.5},{pts:pts.map(p=>[p[0],p[2]]),color:"var(--va)",dots:2.5}],
+    vlines:[{x:cur,color:"var(--ink)",label:"현재"}],points:[{x:best[0],y:best[2],color:"var(--ok)",ring:true,r:6,label:"검증 최소"}],
+    onX:x=>{ const e=Math.round(x/0.05)*0.05; if(sw==="C"){ S.r2.C=logV(e); $("r2C").value=e; $("r2CV").textContent=pS(S.r2.C); } else { S.r2.g=logV(e); $("r2G").value=e; $("r2GV").textContent=pS(S.r2.g); } renderR2(); renderCode(); }});
+  $("r2Sweep").insertAdjacentHTML("beforeend",`<div class="sk-legend" style="margin-top:6px"><span class="t-c0"><i class="sv-sw ln" style="background:var(--c0)"></i>학습 MSE</span><span class="t-va"><i class="sv-sw ln" style="background:var(--va)"></i>검증 MSE</span></div>`);
+  let note;
+  if(m.capped) note=`<b>반복 상한에 도달</b>해 멈췄습니다. 다항 커널은 차수·C가 크면 수렴이 느립니다(scikit-learn도 오래 걸립니다).`;
+  else if(lin) note=`선형 커널은 직선 하나라 S자 모양 혈압 변화를 따라가지 못합니다(검증 MSE ${f1(va)}).`;
+  else if(va>best[2]*1.25&&tr<va*0.7) note=`학습 MSE ${f1(tr)} vs 검증 MSE ${f1(va)}: 학습 점에 지나치게 맞춘 <b>과적합</b>입니다. ${sw==="C"?"C":"γ"} = ${pS(Math.pow(10,best[0]))} 근처에서 검증 MSE가 가장 작습니다(${f1(best[2])}).`;
+  else if(va>best[2]*1.25) note=`검증 MSE ${f1(va)}로 아직 덜 맞았습니다(<b>과소적합</b>). 그래프에서 검증 MSE가 가장 낮은 곳은 ${sw==="C"?"C":"γ"} = ${pS(Math.pow(10,best[0]))} (${f1(best[2])})입니다.`;
+  else note=`학습 MSE ${f1(tr)}, 검증 MSE ${f1(va)}: 적당합니다. γ를 키우면 곡선이 구불구불해지며 검증 MSE가 다시 커집니다.`;
+  $("r2Note").innerHTML=note;
+}
+function r2Boxes(){ const k=S.r2.k; $("r2GBox").hidden=k==="linear"; $("r2DBox").hidden=k!=="poly"; }
+
+/* ================================================================== 회귀 3. 손실 비교 · 이상값 */
+function olsFit(x,y){ const n=x.length, mx=x.reduce((a,b)=>a+b,0)/n, my=y.reduce((a,b)=>a+b,0)/n; let sxy=0,sxx=0; x.forEach((v,i)=>{ sxy+=(v-mx)*(y[i]-my); sxx+=(v-mx)**2; }); const b=sxy/sxx; return {a:my-b*mx,b}; }
+function r3Data(){ return cached("r3d",()=>genSBP(7,25,"lin",5)); }
+function r3Fit(){ const d=r3Data(), s=S.r3, X=s.on?d.X.concat([s.ox]):d.X, y=s.on?d.y.concat([s.oy]):d.y;
+  return cached(`r3|${s.on}|${s.ox}|${s.oy}|${s.C}|${s.eps}`,()=>({X,y,svr:trainSVR(X.map(ageZ),y,s.C,s.eps,LIN,{maxIter:UI_MAX}),svr0:trainSVR(d.X.map(ageZ),d.y,s.C,s.eps,LIN,{maxIter:UI_MAX}),ols:olsFit(X,y),ols0:olsFit(d.X,d.y)})); }
+function renderR3(){
+  const C=colors(), s=S.r3, e=s.eps;
+  const L=[], Q=[], A=[]; for(let i=0;i<=240;i++){ const r=-12+24*i/240; L.push([r,Math.max(0,Math.abs(r)-e)]); Q.push([r,r*r]); A.push([r,Math.abs(r)]); }
+  chart($("r3Loss"),{aria:"잔차에 따른 세 손실 함수",xr:[-12,12],yr:[0,14],xl:"잔차 r = y − f(x) (mmHg)",yl:"손실",h:250,
+    bands:[{x0:-e,x1:e,color:"var(--tube)",op:0.12,label:e>=1.5?"튜브 ±ε":""}],
+    series:[{pts:Q,color:"var(--pur)",w:2.4},{pts:A,color:"var(--va)",w:2.4},{pts:L,color:"var(--pred)",w:3}]});
+  const R=r3Fit(), d=r3Data(), cv=$("r3Cv"), V=plainView(cv,AGE_XR,[90,Math.max(170,Math.ceil((s.oy+8)/10)*10)]), {ctx}=V;
+  const [xt,yt]=ageTicks(V); axes(V,C,"나이 (세)","수축기 혈압 (mmHg)",xt,yt);
+  drawTube(V,C,R.svr0,0,{color:C.pred,w:1.8,dash:[6,5]});
+  clip(V); drawLine(V,R.ols0.b,-1,R.ols0.a,C.pur,1.8,[6,5]); drawLine(V,R.ols.b,-1,R.ols.a,C.pur,2.8); unclip(V);
+  drawTube(V,C,R.svr,e);
+  d.X.forEach((a,i)=>point(ctx,V.px(a),V.py(d.y[i]),0,C,{r:4.4}));
+  if(s.on){ const x=V.px(s.ox), y=V.py(s.oy); point(ctx,x,y,1,C,{r:6,color:C.bad}); label(ctx,C,"이상값",x+10,y+4,C.bad); }
+  frame(V,C);
+  const sv=a=>a.w[0]/ZA.sd, sp=(m,x)=>dec(m,ageZ(x)), op=(o,x)=>o.a+o.b*x, xq=s.ox;
+  const nOut=R.svr.coef.length-1, aOut=s.on?R.svr.coef[nOut]:0;
+  $("r3Table").innerHTML=`<thead><tr><th>모델</th><th>기울기 전 → 후 (mmHg/세)</th><th>${xq}세 예측 전 → 후</th><th>변화</th></tr></thead><tbody>`+
+    `<tr><td class="t-pred"><b>SVR</b> (C = ${pS(s.C)}, ε = ${pS(e)})</td><td class="n">${f3(sv(R.svr0))} → ${f3(sv(R.svr))}</td><td class="n">${f1(sp(R.svr0,xq))} → ${f1(sp(R.svr,xq))}</td><td class="n"><b>${sg(sp(R.svr,xq)-sp(R.svr0,xq),1)}</b></td></tr>`+
+    `<tr><td class="t-pur"><b>최소제곱</b></td><td class="n">${f3(R.ols0.b)} → ${f3(R.ols.b)}</td><td class="n">${f1(op(R.ols0,xq))} → ${f1(op(R.ols,xq))}</td><td class="n"><b>${sg(op(R.ols,xq)-op(R.ols0,xq),1)}</b></td></tr></tbody>`+
+    "";
+  $("r3Cap").innerHTML=s.on?`SVR에서 이상값의 쌍대 계수 αᵢ − αᵢ* = ${f3(aOut)}: 상한 C = ${pS(s.C)}에 묶여 그 이상 끌어당기지 못합니다. 최소제곱은 이런 상한이 없어 잔차²만큼 끌려갑니다.`:"이상값을 넣으면 두 회귀선이 얼마나 움직이는지 비교합니다.";
+}
+
+/* ================================================================== 회귀 4. 쌍대 */
+function r4Data(){ return cached("r4d|"+S.r4.seed,()=>{ const d=genSBP(S.r4.seed+20,10,"lin",7); return {X:d.X,y:d.y,Z:d.X.map(ageZ)}; }); }
+const r4K = () => S.r4.k==="linear"?LIN:{type:"rbf",gamma:1};
+function r4Fit(){ const D=r4Data(); return cached(`r4|${S.r4.seed}|${S.r4.k}|${S.r4.C}|${S.r4.eps}`,()=>trainSVR(D.Z,D.y,S.r4.C,S.r4.eps,r4K(),{maxIter:UI_MAX})); }
+function renderR4(){
+  const C=colors(), D=r4Data(), m=r4Fit(), cv=$("r4Cv"), V=plainView(cv,AGE_XR,sbpYR(D.y)), {ctx}=V;
+  if(S.r4.q==null) S.r4.q=60;
+  const [xt,yt]=ageTicks(V); axes(V,C,"나이 (세)","수축기 혈압 (mmHg)",xt,yt);
+  drawTube(V,C,m,S.r4.eps); svrPoints(V,C,m,D.X,D.y,S.r4.eps,{loss:true,num:true});
+  const q=S.r4.q, fq=dec(m,ageZ(q)); ctx.save(); ctx.strokeStyle=C.ink; ctx.setLineDash([3,4]); ctx.lineWidth=1.3; ctx.beginPath(); ctx.moveTo(V.px(q),V.pad.t); ctx.lineTo(V.px(q),V.pad.t+V.ph); ctx.stroke(); ctx.restore();
+  cross(ctx,V.px(q),V.py(fq),C); frame(V,C);
+  const Cc=S.r4.C;
+  bars($("r4Alpha"),{aria:"점별 쌍대 변수 α와 α* 막대",yr:[-Cc*1.2,Cc*1.2],h:220,padL:64,yt:[[Cc,"+C"],[0,"0"],[-Cc,"−C"]],
+    hlines:[{y:Cc,color:"var(--muted)"},{y:-Cc,color:"var(--muted)"}],
+    bars:D.X.map((_,i)=>{ const a=m.alpha[i], as=m.alphaS[i]; return a>0?{v:a,color:"var(--c1)",lab:i+1,txt:f2(a)}:as>0?{v:-as,color:"var(--c0)",lab:i+1,txt:f2(as)}:{v:0,color:"var(--faint)",lab:i+1}; })});
+  const sumc=m.coef.reduce((a,b)=>a+b,0), prod=Math.max(...m.alpha.map((a,i)=>a*m.alphaS[i]));
+  $("r4Stats").innerHTML=stat("서포트 벡터",`${m.sv.length} / ${D.X.length}`)+stat("Σ(αᵢ − αᵢ*)",f4(sumc))+stat("max αᵢ·αᵢ*",f4(prod))+stat("b",f2(m.b));
+  const zq=ageZ(q), rows=[]; let s=m.b;
+  m.sv.forEach(i=>{ const Kv=m.f(D.Z[i],zq), t=m.coef[i]*Kv; s+=t; rows.push(`(α${sub(i+1)} − α${sub(i+1)}*)·K(x${sub(i+1)}, x) = (${f3(m.alpha[i])} − ${f3(m.alphaS[i])}) × ${f3(Kv)} = <b>${sg(t,2)}</b>`); });
+  const kd=S.r4.k==="linear"?"K(xᵢ, x) = zᵢ·z,  z = (나이 − 50)/15":"K(xᵢ, x) = exp(−1·(zᵢ − z)²),  z = (나이 − 50)/15";
+  $("r4Terms").innerHTML=`x = 나이 ${q}세 → z = ${f3(zq[0])} · ${kd}<br>`+rows.join("<br>")+`<br><span class="z">튜브 안 점 ${D.X.length-m.sv.length}개는 αᵢ = αᵢ* = 0 → 항이 0</span><br>b = ${f2(m.b)}<br>f(x) = <b>${f2(s)} mmHg</b>`;
+}
+
+/* ================================================================== 공통: 스케일링 */
+function scData(){ return cached("scd",()=>{ const t=genScale(1,120), v=genScale(2,120), sc=stdFit(t.X), k={type:"rbf",gamma:0.5};
+  const raw=trainSVC(t.X,t.y,1,k), std=trainSVC(stdApply(sc,t.X),t.y,1,k); return {t,v,sc,raw,std,k}; }); }
+function renderScale(){
+  const C=colors(), D=scData();
+  [["scRaw",D.raw,x=>x],["scStd",D.std,x=>stdApply(D.sc,[x])[0]]].forEach(([id,m,tf])=>{
+    const V=plainView($(id),[60,220],[15,41]), {ctx}=V;
+    axes(V,C,"혈당 (mg/dL)","BMI (kg/m²)",linTicks(V.xr,V.w<380?4:7),linTicks(V.yr,5));
+    clip(V); const G=field(V,x=>dec(m,tf(x)),V.w<420?5:4); paintField(V,G,C.c0,C.c1); strokeSegs(ctx,contour(G,0),C.ink,2); unclip(V);
+    D.t.X.forEach((x,i)=>point(ctx,V.px(x[0]),V.py(x[1]),D.t.y[i]>0?1:0,C,{r:3.4}));
+    frame(V,C);
+  });
+  const vs=stdApply(D.sc,D.v.X), ts=stdApply(D.sc,D.t.X);
+  $("scRawStats").innerHTML=stat("학습 정확도",pct(accOf(D.raw,D.t.X,D.t.y)))+stat("검증 정확도",pct(accOf(D.raw,D.v.X,D.v.y)),"t-va")+stat("서포트 벡터",D.raw.sv.length+"개");
+  $("scStdStats").innerHTML=stat("학습 정확도",pct(accOf(D.std,ts,D.t.y)))+stat("검증 정확도",pct(accOf(D.std,vs,D.v.y)),"t-va")+stat("서포트 벡터",D.std.sv.length+"개");
+  const a=[130,24], b=[140,32], d2=(a[0]-b[0])**2+(a[1]-b[1])**2, za=stdApply(D.sc,[a])[0], zb=stdApply(D.sc,[b])[0], z2=(za[0]-zb[0])**2+(za[1]-zb[1])**2;
+  $("scFormula").innerHTML=`학습 데이터 평균 · 표준편차: 혈당 ${f1(D.sc.mu[0])} ± ${f1(D.sc.sd[0])} mg/dL, BMI ${f2(D.sc.mu[1])} ± ${f2(D.sc.sd[1])}<br>`+
+    `예: 환자 A (혈당 130, BMI 24) vs B (혈당 140, BMI 32) — BMI 차이가 훨씬 큰데도<br>`+
+    `원 단위 ‖Δ‖² = 10² + 8² = ${d2} → K = exp(−0.5 × ${d2}) = ${Math.exp(-0.5*d2).toExponential(1).replace("-","−")} (남남)<br>`+
+    `표준화 후 ‖Δ‖² = ${f2((za[0]-zb[0])**2)} + ${f2((za[1]-zb[1])**2)} = ${f2(z2)} → K = ${f3(Math.exp(-0.5*z2))} (BMI 차이가 거리를 정함)<br>`+
+    `<span class="t-muted">Pipeline([("scaler", StandardScaler()), ("svc", SVC())])로 묶으면 교차검증 때도 학습 폴드로만 평균·표준편차를 구해 누수가 없습니다.</span>`;
+}
+
+/* ================================================================== 코드 */
+const pyArr = rows => "np.array([\n"+chunk(rows.map(r=>Array.isArray(r)?`[${r.map(pyN).join(", ")}]`:pyN(r)),6).map(l=>"    "+l.join(", ")).join(",\n")+",\n])";
+function chunk(a,n){ const o=[]; for(let i=0;i<a.length;i+=n) o.push(a.slice(i,i+n)); return o; }
+function kArgs(k){ if(k.type==="linear") return `kernel="linear"`; if(k.type==="poly") return `kernel="poly", degree=${k.degree}, gamma=${pyN(k.gamma)}, coef0=${pyN(k.coef0)}`; return `kernel="rbf", gamma=${pyN(k.gamma)}`; }
+function genCode(){
+  const inc=S.codeData, t=S.tab[S.part];
+  const head="import numpy as np\n";
+  const GB=(X,y,name)=>inc?`# 혈당(mg/dL), BMI(kg/m²) · y: 질환 +1 / 정상 -1\n${name||"X_raw"} = ${pyArr(X)}\ny = ${pyArr(y)}\n`:`# X_raw: (n, 2) 배열 [혈당, BMI], y: +1 / -1\n`;
+  const ZGB=`# 화면과 같은 고정 기준으로 단위 맞추기: z1 = (혈당-120)/25, z2 = (BMI-26)/4\nX = (X_raw - [120, 26]) / [25, 4]\n`;
+  const AG=(X,y,nx,ny)=>inc?`${nx||"age"} = ${pyArr(X)}\n${ny||"sbp"} = ${pyArr(y)}\n`:"";
+  if(S.part==="svc"){
+    if(t==="margin"){ const d=S.m1, m=m1Model(), nw=Math.hypot(...m.w);
+      return head+"from sklearn.svm import SVC\n\n"+GB(d.X,d.y)+ZGB+`
+model = SVC(kernel="linear", C=${HARD_C})   # C를 아주 크게 = 하드 마진에 가깝게
+model.fit(X, y)
+
+w, b = model.coef_[0], model.intercept_[0]
+print("w:", w.round(3), " b:", round(b, 3))${inc?`          # 화면: w = (${f3(m.w[0])}, ${f3(m.w[1])}), b = ${f3(m.b)}`:""}
+print("마진 폭 2/||w||:", round(2 / np.linalg.norm(w), 3))${inc?`   # 화면: ${f3(2/nw)}`:""}
+print("서포트 벡터 번호:", np.sort(model.support_) + 1)${inc?`   # 화면: ${m.sv.map(i=>i+1).join(" ")}`:""}
+print("α·y (dual_coef_):", model.dual_coef_.round(3))
+`; }
+    if(t==="soft"){ const D=m2Data(), m=m2Fit(S.m2.C), nw=Math.hypot(...m.w), xi=D.Z.map((z,i)=>Math.max(0,1-D.y[i]*dec(m,z))).reduce((a,b)=>a+b,0);
+      return head+"from sklearn.svm import SVC\n\n"+GB(D.X,D.y)+ZGB+`
+model = SVC(kernel="linear", C=${pyN(S.m2.C)})
+model.fit(X, y)
+
+w, b = model.coef_[0], model.intercept_[0]
+f = model.decision_function(X)
+xi = np.maximum(0, 1 - y * f)                 # 여유 변수 = 힌지 손실
+print("마진 폭:", round(2 / np.linalg.norm(w), 3))${inc?`              # 화면: ${f3(2/nw)}`:""}
+print("서포트 벡터 수:", model.n_support_.sum())${inc?`           # 화면: ${m.sv.length}`:""}
+print("목적식 ½||w||² + CΣξ:", round(0.5 * w @ w + ${pyN(S.m2.C)} * xi.sum(), 3))${inc?`   # 화면: ${f3(nw*nw/2+S.m2.C*xi)}`:""}
+
+# C를 바꿔 가며
+for C in [0.01, 0.1, 1, 10, 100, 1000]:
+    m = SVC(kernel="linear", C=C).fit(X, y)
+    print(C, "마진 폭", round(2 / np.linalg.norm(m.coef_[0]), 3), "SV", m.n_support_.sum())
+`; }
+    if(t==="kernel"){ const D=m3Data(), k=m3K(), m=m3Fit(k,S.m3.C);
+      return head+"from sklearn.svm import SVC\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.model_selection import GridSearchCV\n\n"+
+        (inc?`# ${S.m3.ds==="circle"?"원형":S.m3.ds==="xor"?"XOR":"달 모양"} 데이터 (이미 표준화된 단위)\nX_tr = ${pyArr(D.X)}\ny_tr = ${pyArr(D.y)}\nX_va = ${pyArr(D.vX)}\ny_va = ${pyArr(D.vy)}\n`:"# X_tr, y_tr, X_va, y_va: 학습 · 검증 데이터\n")+`
+model = SVC(${kArgs(k)}, C=${pyN(S.m3.C)})
+model.fit(X_tr, y_tr)
+print("학습 정확도:", round(model.score(X_tr, y_tr), 3))${inc?`   # 화면: ${f3(accOf(m,D.X,D.y))}`:""}
+print("검증 정확도:", round(model.score(X_va, y_va), 3))${inc?`   # 화면: ${f3(accOf(m,D.vX,D.vy))}`:""}
+print("서포트 벡터 수:", model.n_support_)${inc?`         # 화면: 합계 ${m.sv.length}`:""}
+
+# 화면의 γ × C 히트맵과 같은 계산 (검증 세트 정확도)
+for g in [0.01, 0.1, 1, 10, 100]:
+    print(g, [round(SVC(kernel="rbf", gamma=g, C=C).fit(X_tr, y_tr).score(X_va, y_va), 2)
+              for C in [0.01, 0.1, 1, 10, 100, 1000]])
+
+# 실무형: 스케일링 + SVC를 파이프라인으로 묶고 5겹 교차검증 격자 탐색
+pipe = Pipeline([("scaler", StandardScaler()), ("svc", SVC(kernel="rbf"))])
+grid = GridSearchCV(pipe, {"svc__C": [0.01, 0.1, 1, 10, 100, 1000],
+                           "svc__gamma": [0.01, 0.1, 1, 10, 100]}, cv=5)
+grid.fit(X_tr, y_tr)
+print(grid.best_params_, round(grid.best_score_, 3))
+`; }
+    if(t==="smo"){ const D=m4Data(), m=m4Fit(), k=m4K();
+      return head+"from sklearn.svm import SVC\n\n"+GB(D.X,D.y)+ZGB+`
+model = SVC(${kArgs(k)}, C=${pyN(S.m4.C)}, tol=1e-3)   # tol: SMO 멈춤 기준 (KKT 위반 < tol)
+model.fit(X, y)
+
+order = np.argsort(model.support_)
+print("서포트 벡터 번호:", model.support_[order] + 1)${inc?`        # 화면: ${m.sv.map(i=>i+1).join(" ")}`:""}
+print("αᵢ·yᵢ (dual_coef_):", model.dual_coef_[0][order].round(3))${inc?`   # 화면(tol 이내 차이 가능): ${m.sv.map(i=>f3(m.coef[i]).replace("−","-")).join(" ")}`:""}
+print("b (intercept_):", model.intercept_.round(3))${inc?`              # 화면: ${f3(m.b)}`:""}
+print("SMO 반복 수:", model.n_iter_)   # shrinking 때문에 화면(${m.iter})과 조금 다를 수 있음
+
+# f(x) = Σ αᵢyᵢ K(xᵢ, x) + b 를 직접 계산
+x = X[0]
+${k.type==="linear"?"K = model.support_vectors_ @ x":"K = np.exp(-1.0 * ((model.support_vectors_ - x) ** 2).sum(axis=1))"}
+print(model.dual_coef_[0] @ K + model.intercept_[0], model.decision_function([x]))
+`; }
+    if(t==="multi"){ const D=m5Data(), k=m5K(), md=m2Data();
+      return head+"from sklearn.svm import SVC\nfrom sklearn.multiclass import OneVsRestClassifier\n\n"+(inc?`# 혈당, BMI · y: 0 정상 / 1 당뇨 전단계 / 2 당뇨\nX_raw = ${pyArr(D.X)}\ny = ${pyArr(D.y)}\n`:"")+ZGB+`
+# OvO (SVC 기본): 쌍마다 이진 SVM → 투표
+ovo = SVC(${kArgs(k)}, C=${pyN(S.m5.C)}, decision_function_shape="ovo").fit(X, y)
+print("OvO 학습 정확도:", round(ovo.score(X, y), 3))
+print("쌍별 f(x) (0|1, 0|2, 1|2):", ovo.decision_function(X[:1]).round(3))
+
+# OvR: 클래스마다 '이 클래스 vs 나머지'
+ovr = OneVsRestClassifier(SVC(${kArgs(k)}, C=${pyN(S.m5.C)})).fit(X, y)
+print("OvR 학습 정확도:", round(ovr.score(X, y), 3))
+print("클래스별 f(x):", ovr.decision_function(X[:1]).round(3))
+
+# 확률: Platt scaling (내부 5겹 교차검증으로 시그모이드를 맞춤)
+clf = SVC(${kArgs(k)}, C=${pyN(S.m5.C)}, probability=True, random_state=0).fit(X, y)
+print(clf.predict_proba(X[:3]).round(3))
+`+(inc?`
+# 2번 화면 데이터로 본 이진 Platt scaling: P = 1 / (1 + exp(A·f + B))
+X2 = (${pyArr(md.X)} - [120, 26]) / [25, 4]
+y2 = ${pyArr(md.y)}
+b2 = SVC(kernel="linear", C=${pyN(S.m2.C)}, probability=True, random_state=0).fit(X2, y2)
+print("A, B:", b2.probA_.round(3), b2.probB_.round(3))   # 화면(학습 데이터 전체로 맞춘 값): ${f3(plattFitM2().P.A)}, ${f3(plattFitM2().P.B)}
+`:""); }
+  } else {
+    const XZ="X = ((age - 50) / 15).reshape(-1, 1)   # 화면과 같은 고정 기준으로 나이 단위 맞추기\n";
+    if(t==="tube"){ const d=S.r1, m=r1Fit(d.eps,d.C), k=r1K();
+      return head+"from sklearn.svm import SVR\n\n"+(inc?"# 나이(세) → 수축기 혈압(mmHg)\n"+AG(d.X,d.y):"# age: 나이(세), sbp: 수축기 혈압(mmHg)\n")+XZ+`
+model = SVR(${kArgs(k)}, C=${pyN(d.C)}, epsilon=${pyN(d.eps)})
+model.fit(X, sbp)
+
+resid = sbp - model.predict(X)
+print("서포트 벡터 수:", len(model.support_))${inc?`                     # 화면: ${m.sv.length}`:""}
+print("튜브 안쪽 점 (α = 0):", len(sbp) - len(model.support_))${inc?`      # 화면: ${d.X.length-m.sv.length}`:""}
+print("Σ ε-무감 손실:", round(np.maximum(0, np.abs(resid) - ${pyN(d.eps)}).sum(), 1))${inc?`     # 화면: ${f1(d.X.reduce((s,a,i)=>s+Math.max(0,Math.abs(d.y[i]-dec(m,ageZ(a)))-d.eps),0))}`:""}
+print("b (intercept_):", model.intercept_.round(2))${inc?`              # 화면: ${f2(m.b)}`:""}
+${k.type==="linear"?`print("나이 1세당:", (model.coef_[0, 0] / 15).round(3), "mmHg")${inc?`   # 화면: ${f3(m.w[0]/ZA.sd)}`:""}\n`:""}`; }
+    if(t==="kernel"){ const D=r2Data(), d=S.r2, k=r2K(d.g), m=r2Fit(d.g,d.C);
+      return head+"from sklearn.svm import SVR\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.model_selection import GridSearchCV\nfrom sklearn.metrics import mean_squared_error\n\n"+
+        (inc?AG(D.X,D.y,"age_tr","y_tr")+AG(D.vX,D.vy,"age_va","y_va"):"# age_tr, y_tr, age_va, y_va: 학습 · 검증 데이터\n")+`X_tr = ((age_tr - 50) / 15).reshape(-1, 1)
+X_va = ((age_va - 50) / 15).reshape(-1, 1)
+
+model = SVR(${kArgs(k)}, C=${pyN(d.C)}, epsilon=${pyN(d.eps)})
+model.fit(X_tr, y_tr)
+print("학습 MSE:", round(mean_squared_error(y_tr, model.predict(X_tr)), 1))${inc?`   # 화면: ${f1(mseOf(m,D.Z,D.y))}`:""}
+print("검증 MSE:", round(mean_squared_error(y_va, model.predict(X_va)), 1))${inc?`   # 화면: ${f1(mseOf(m,D.vZ,D.vy))}`:""}
+print("서포트 벡터 수:", len(model.support_))${inc?`                       # 화면: ${m.sv.length}`:""}
+
+# 실무형: 스케일링 + SVR 파이프라인으로 C, gamma, epsilon 격자 탐색
+pipe = Pipeline([("scaler", StandardScaler()), ("svr", SVR(kernel="rbf"))])
+grid = GridSearchCV(pipe, {"svr__C": [1, 10, 100, 1000],
+                           "svr__gamma": [0.01, 0.1, 1, 10],
+                           "svr__epsilon": [1, 3, 5]},
+                    cv=5, scoring="neg_mean_squared_error")
+grid.fit(age_tr.reshape(-1, 1), y_tr)
+print(grid.best_params_, round(-grid.best_score_, 1))
+`; }
+    if(t==="loss"){ const d=r3Data(), s=S.r3, R=r3Fit();
+      return head+"from sklearn.svm import SVR\nfrom sklearn.linear_model import LinearRegression\n\n"+(inc?AG(d.X,d.y):"")+(s.on?`# 이상값 하나 추가\nage = np.append(age, ${s.ox})\nsbp = np.append(sbp, ${s.oy})\n`:"")+XZ+`
+svr = SVR(kernel="linear", C=${pyN(s.C)}, epsilon=${pyN(s.eps)}).fit(X, sbp)
+ols = LinearRegression().fit(age.reshape(-1, 1), sbp)
+print("SVR 기울기 (mmHg/세):", round(svr.coef_[0, 0] / 15, 3))${inc?`   # 화면: ${f3(R.svr.w[0]/ZA.sd)}`:""}
+print("최소제곱 기울기:", round(ols.coef_[0], 3))${inc?`          # 화면: ${f3(R.ols.b)}`:""}
+${s.on?`print("이상값의 dual_coef (α - α*):", svr.dual_coef_[0][list(svr.support_).index(len(age) - 1)] if len(age) - 1 in svr.support_ else 0)   # 상한 C = ${pyN(s.C)}\n`:""}`; }
+    if(t==="dual"){ const D=r4Data(), m=r4Fit(), k=r4K();
+      return head+"from sklearn.svm import SVR\n\n"+(inc?AG(D.X,D.y):"")+XZ+`
+model = SVR(${kArgs(k)}, C=${pyN(S.r4.C)}, epsilon=${pyN(S.r4.eps)}).fit(X, sbp)
+
+order = np.argsort(model.support_)
+print("서포트 벡터 번호:", model.support_[order] + 1)${inc?`             # 화면: ${m.sv.map(i=>i+1).join(" ")}`:""}
+print("α - α* (dual_coef_):", model.dual_coef_[0][order].round(3))${inc?`   # 화면: ${m.sv.map(i=>f3(m.coef[i]).replace("−","-")).join(" ")}`:""}
+print("b (intercept_):", model.intercept_.round(2))${inc?`                 # 화면: ${f2(m.b)}`:""}
+
+# f(x) = Σ (αᵢ - αᵢ*) K(xᵢ, x) + b 를 직접 계산 (x = 나이 ${S.r4.q}세)
+z = (${S.r4.q} - 50) / 15
+${k.type==="linear"?"K = model.support_vectors_[:, 0] * z":"K = np.exp(-1.0 * (model.support_vectors_[:, 0] - z) ** 2)"}
+print(model.dual_coef_[0] @ K + model.intercept_[0], model.predict([[z]]))${inc?`   # 화면: ${f2(dec(m,ageZ(S.r4.q)))}`:""}
+`; }
+  }
+  return "";
+}
+function renderCode(){
+  const svc=S.part==="svc";
+  $("codeTitle").textContent=svc?"scikit-learn 코드 · SVC":"scikit-learn 코드 · SVR";
+  $("codePre").textContent=genCode();
+  document.querySelectorAll("#cmpTable [data-col]").forEach(td=>td.classList.toggle("on",td.dataset.col===S.part));
+}
+
+/* ================================================================== 파트 · 탭 */
+const TABS={svc:["margin","soft","kernel","smo","multi"], svr:["tube","kernel","loss","dual"]};
+const RENDER={"svc-margin":renderM1,"svc-soft":renderM2,"svc-kernel":renderM3,"svc-smo":renderM4,"svc-multi":renderM5,"svr-tube":renderR1,"svr-kernel":renderR2,"svr-loss":renderR3,"svr-dual":renderR4};
+const NOTES={svc:"범주(질환 여부)를 맞힙니다. 두 클래스 사이 마진을 최대로 하고, 힌지 손실로 위반을 벌합니다.",svr:"숫자(혈압)를 맞힙니다. ±ε 튜브 안 오차는 무시하고, 튜브 밖 오차만 ε-무감 손실로 벌합니다."};
+function writeHash(){ const t=S.tab[S.part]; history.replaceState(null,"","#"+S.part+(t===TABS[S.part][0]?"":"-"+t)); }
+function redraw(){ stopM4(); const key=S.part+"-"+S.tab[S.part]; RENDER[key](); renderCode(); if(S.part==="svc"&&S.tab.svc==="kernel"&&S.m3.play) play3(true); }
+function redrawAll(){ const key=S.part+"-"+S.tab[S.part]; RENDER[key](); renderScale(); renderCode(); }
+function setPart(p,write){
+  S.part=p;
+  document.querySelectorAll("#partSeg button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.part===p));
+  $("part-svc").hidden=p!=="svc"; $("part-svr").hidden=p!=="svr";
+  $("partNote").textContent=NOTES[p];
+  showTab(p,S.tab[p],write);
+}
+function showTab(p,t,write){
+  S.tab[p]=t;
+  TABS[p].forEach(x=>{ const b=$(`tab-${p}-${x}`), on=x===t; b.setAttribute("aria-selected",on); b.tabIndex=on?0:-1; $(`pane-${p}-${x}`).hidden=!on; });
+  if(write!==false) writeHash();
+  if(S.part===p) redraw();
+}
+document.querySelectorAll("#partSeg button").forEach((b,i,arr)=>{
+  b.addEventListener("click",()=>setPart(b.dataset.part));
+  b.addEventListener("keydown",e=>{ const d=e.key==="ArrowRight"?1:e.key==="ArrowLeft"?-1:0; if(!d) return; const n=arr[(i+d+arr.length)%arr.length]; setPart(n.dataset.part); n.focus(); e.preventDefault(); });
+});
+Object.keys(TABS).forEach(p=>{
+  const btns=TABS[p].map(t=>$(`tab-${p}-${t}`));
+  btns.forEach((b,i)=>{
+    b.addEventListener("click",()=>showTab(p,TABS[p][i]));
+    b.addEventListener("keydown",e=>{ const d=e.key==="ArrowRight"?1:e.key==="ArrowLeft"?-1:0; if(!d) return; const j=(i+d+btns.length)%btns.length; showTab(p,TABS[p][j]); btns[j].focus(); e.preventDefault(); });
+  });
+});
+function readHash(){
+  const h=location.hash.slice(1), [p,t]=h.split("-");
+  const part=TABS[p]?p:"svc", tab=(TABS[part].includes(t)?t:TABS[part][0]);
+  S.tab[part]=tab; setPart(part,false);
+}
+window.addEventListener("hashchange",readHash);
+
+/* ================================================================== 조작 연결 */
+function seg(el,cb){ el.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ if(b.disabled) return; el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b)); cb(b.dataset.v); })); }
+function syncSeg(sel,v){ document.querySelectorAll(sel).forEach(el=>el.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===v))); }
+function slider(id,cb,fmt){ const el=$(id), out=$(id+"V"); el.addEventListener("input",()=>{ const v=+el.value; if(out) out.textContent=fmt?fmt(v):v; cb(v); }); }
+const logFmt = v => pS(logV(v));
+const both = fn => v => { fn(v); redraw(); };
+
+/* 분류 1 */
+seg($("m1Add"),v=>{ S.m1.add=+v?1:-1; });
+seg($("m1Act"),v=>{ S.m1.act=v; });
+function m1SetMode(v){ S.m1.mode=v; syncSeg("#m1Mode",v); $("m1Man").querySelectorAll("input,button").forEach(x=>x.disabled=v!=="man");
+  if(v==="man"){ const t=m1Thetas(m1Model());
+    for(const dth of [30,25,20,15,10,-10,-20]){ S.m1.th=Math.round(t.th+dth+360)%360; if(m1Manual().bestM>0) break; }
+    const M=m1Manual(); S.m1.off=Math.round(clamp(M.bestOff,-3,3)*100)/100; syncM1Sliders();
+    setMsg("m1Msg","직선을 직접 돌려 보세요. 가장 가까운 점까지의 거리(마진)가 SVM 최적보다 넓어질 수 있을까요?"); }
+  else setMsg("m1Msg","SVM이 찾은 최대 마진 초평면입니다. 테두리 원이 서포트 벡터입니다. 다른 점을 끌어 보세요.");
+  renderM1(); renderCode(); }
+seg($("m1Mode"),m1SetMode);
+slider("m1Th",v=>{ S.m1.th=v; renderM1(); },v=>v+"°");
+slider("m1Off",v=>{ S.m1.off=v; renderM1(); },f2);
+$("m1Best").onclick=()=>{ const M=m1Manual(); S.m1.off=Math.round(clamp(M.bestOff,-3,3)*100)/100; syncM1Sliders(); renderM1(); };
+let m1Anim=0;
+$("m1Opt").onclick=()=>{ const t=m1Thetas(m1Model()), th0=S.m1.th, o0=S.m1.off; let dth=((t.th-th0+540)%360)-180;
+  const fin=()=>{ S.m1.th=t.th; S.m1.off=t.off; syncM1Sliders(); renderM1();
+    setMsg("m1Msg",`SVM 최적 초평면에 맞췄습니다. 마진 폭이 ${f3(2/t.nw)}로 가장 넓습니다. 어느 쪽으로 돌려도 좁아집니다.`,"ok"); };
+  cancelAnimationFrame(m1Anim); if(reduceMotion){ fin(); return; }
+  const t0=performance.now(), step=ts=>{ const u=Math.min(1,(ts-t0)/600), e=u<0.5?2*u*u:1-2*(1-u)*(1-u);
+    S.m1.th=((th0+dth*e)%360+360)%360; S.m1.off=o0+(t.off-o0)*e; renderM1(); if(u<1) m1Anim=requestAnimationFrame(step); else fin(); };
+  m1Anim=requestAnimationFrame(step); };
+$("m1Reset").onclick=()=>{ S.m1.X=M1_DEF.X.map(p=>p.slice()); S.m1.y=M1_DEF.y.slice(); m1SetMode(S.m1.mode); };
+editor($("m1Cv"),{
+  mode:()=>S.m1.act,
+  hit:(V,mx,my)=>nearest(V,S.m1.X.map(toZ),mx,my,13),
+  start:i=>{ m1Before={...m1Snap(),wasSV:m1Model().alpha[i]>0}; },
+  move:(i,zx,zy)=>{ S.m1.X[i]=rawPt([zx,zy]); renderM1(); },
+  end:(i,moved)=>{ if(!moved){ m1Before=null; return; } const after=m1Snap(), ch=m1Changed(m1Before,after), nowSV=m1Model().alpha[i]>0;
+    if(S.m1.mode==="opt"){
+      if(!m1Before.wasSV&&!ch) setMsg("m1Msg",`${i+1}번 점은 서포트 벡터가 아니어서, 옮겨도 경계와 마진이 그대로입니다.`,"ok");
+      else if(m1Before.wasSV&&ch) setMsg("m1Msg",`${i+1}번 점은 서포트 벡터였습니다. 옮기자 경계가 바뀌었습니다 (마진 폭 ${f3(2/Math.hypot(...after.w))}).`);
+      else if(!m1Before.wasSV&&ch) setMsg("m1Msg",`${i+1}번 점이 마진 안으로 들어와 ${nowSV?"서포트 벡터가 되었고, ":""}경계가 바뀌었습니다.`);
+      else setMsg("m1Msg",`${i+1}번 점은 서포트 벡터지만 마진 경계선을 따라 움직여 경계가 그대로입니다.`);
+    }
+    m1Before=null; renderM1(); renderCode(); },
+  del:i=>{ if(S.m1.X.length<=3) return; S.m1.X.splice(i,1); S.m1.y.splice(i,1); setMsg("m1Msg",`${i+1}번 점을 지웠습니다.`); renderM1(); renderCode(); },
+  add:(zx,zy)=>{ S.m1.X.push(rawPt([zx,zy])); S.m1.y.push(S.m1.add); setMsg("m1Msg",`${S.m1.add>0?"질환":"정상"} 점을 추가했습니다 (${S.m1.X.length}번).`); renderM1(); renderCode(); }
+});
+S.m1.add=1;
+
+/* 분류 2 */
+slider("m2C",v=>{ S.m2.C=logV(v); renderM2(); renderCode(); },logFmt);
+$("m2Xi").addEventListener("change",e=>{ S.m2.xi=e.target.checked; renderM2(); });
+$("m2Va").addEventListener("change",e=>{ S.m2.va=e.target.checked; renderM2(); });
+$("m2New").onclick=()=>{ S.m2.seed++; $("m2Seed").textContent="seed "+S.m2.seed; renderM2(); renderCode(); };
+
+/* 분류 3 */
+seg($("m3Ds"),v=>{ S.m3.ds=v; renderM3(); renderCode(); });
+seg($("m3K"),v=>{ S.m3.k=v; m3Boxes(); renderM3(); renderCode(); });
+slider("m3C",v=>{ S.m3.C=logV(v); renderM3(); renderCode(); },logFmt);
+slider("m3G",v=>{ S.m3.g=logV(v); renderM3(); renderCode(); },logFmt);
+slider("m3D",v=>{ S.m3.d=v; renderM3(); renderCode(); });
+slider("m3R",v=>{ S.m3.r=Math.round(v*10)/10; renderM3(); renderCode(); });
+$("m3Va").addEventListener("change",e=>{ S.m3.va=e.target.checked; renderM3(); });
+$("m3Play").onclick=()=>play3(!S.m3.play);
+slider("m3Ang",v=>{ S.m3.ang=v; render3D(); },v=>v+"°");
+slider("m3Lift",v=>{ S.m3.lift=v/100; render3D(); },v=>v+"%");
+
+/* 분류 4 */
+$("m4First").onclick=()=>{ stopM4(); S.m4.step=0; renderM4(); };
+$("m4Prev").onclick=()=>{ stopM4(); S.m4.step=Math.max(0,S.m4.step-1); renderM4(); };
+$("m4Next").onclick=()=>{ stopM4(); S.m4.step++; renderM4(); };
+$("m4Last").onclick=()=>{ stopM4(); S.m4.step=m4Fit().rec.length-1; renderM4(); };
+$("m4Play").onclick=playM4;
+slider("m4Speed",()=>{},v=>SPEEDS[v]+"×");
+seg($("m4K"),v=>{ stopM4(); S.m4.k=v; S.m4.step=0; renderM4(); renderCode(); });
+slider("m4C",v=>{ stopM4(); S.m4.C=logV(v); S.m4.step=0; renderM4(); renderCode(); },logFmt);
+$("m4New").onclick=()=>{ stopM4(); S.m4.seed++; S.m4.step=0; S.m4.q=null; renderM4(); renderCode(); };
+$("m4Cv").addEventListener("click",e=>{ const cv=$("m4Cv"), V=cv._view; if(!V) return; const [mx,my]=evXY(cv,e); if(!V.inside(mx,my)) return;
+  const D=m4Data(), i=nearest(V,D.Z,mx,my,12); S.m4.q=i>=0?D.Z[i].slice():[V.ix(mx),V.iy(my)]; renderM4(); });
+
+/* 분류 5 */
+seg($("m5Mode"),v=>{ S.m5.mode=v; renderM5(); renderCode(); });
+seg($("m5K"),v=>{ S.m5.k=v; $("m5GBox").hidden=v==="linear"; renderM5(); renderCode(); });
+slider("m5C",v=>{ S.m5.C=logV(v); renderM5(); renderCode(); },logFmt);
+slider("m5G",v=>{ S.m5.g=logV(v); renderM5(); renderCode(); },logFmt);
+$("m5GBox").hidden=true;
+$("m5Cv").addEventListener("click",e=>{ const cv=$("m5Cv"), V=cv._view; if(!V) return; const [mx,my]=evXY(cv,e); if(!V.inside(mx,my)) return; S.m5.q=[V.ix(mx),V.iy(my)]; renderM5(); });
+
+/* 회귀 1 */
+seg($("r1Shape"),v=>{ S.r1.shape=v; loadR1(); if(v==="nl"&&S.r1.k==="linear"){ S.r1.k="rbf"; syncSeg("#r1K","rbf"); } renderR1(); renderCode(); });
+seg($("r1K"),v=>{ S.r1.k=v; renderR1(); renderCode(); });
+seg($("r1Act"),v=>{ S.r1.act=v; });
+slider("r1E",v=>{ S.r1.eps=v; renderR1(); renderCode(); },pS);
+slider("r1C",v=>{ S.r1.C=logV(v); renderR1(); renderCode(); },logFmt);
+$("r1Reset").onclick=()=>{ loadR1(); renderR1(); renderCode(); };
+editor($("r1Cv"),{
+  mode:()=>S.r1.act,
+  hit:(V,mx,my)=>nearest(V,S.r1.X.map((a,i)=>[a,S.r1.y[i]]),mx,my,13),
+  start:()=>{}, move:(i,x,y)=>{ S.r1.X[i]=Math.round(clamp(x,20,80)); S.r1.y[i]=r1(y); renderR1(); },
+  end:()=>{ renderR1(); renderCode(); },
+  del:i=>{ if(S.r1.X.length<=3) return; S.r1.X.splice(i,1); S.r1.y.splice(i,1); renderR1(); renderCode(); },
+  add:(x,y)=>{ S.r1.X.push(Math.round(clamp(x,20,80))); S.r1.y.push(r1(y)); renderR1(); renderCode(); }
+});
+
+/* 회귀 2 */
+seg($("r2K"),v=>{ S.r2.k=v; r2Boxes(); renderR2(); renderCode(); });
+seg($("r2Sw"),v=>{ S.r2.sw=v; renderR2(); });
+slider("r2C",v=>{ S.r2.C=logV(v); renderR2(); renderCode(); },logFmt);
+slider("r2G",v=>{ S.r2.g=logV(v); renderR2(); renderCode(); },logFmt);
+slider("r2D",v=>{ S.r2.d=v; renderR2(); renderCode(); });
+slider("r2E",v=>{ S.r2.eps=v; renderR2(); renderCode(); },pS);
+$("r2Va").addEventListener("change",e=>{ S.r2.va=e.target.checked; renderR2(); });
+$("r2New").onclick=()=>{ S.r2.seed+=2; renderR2(); renderCode(); };
+
+/* 회귀 3 */
+slider("r3E",v=>{ S.r3.eps=v; renderR3(); renderCode(); },pS);
+slider("r3Oy",v=>{ S.r3.oy=v; renderR3(); renderCode(); });
+slider("r3Ox",v=>{ S.r3.ox=v; renderR3(); renderCode(); });
+slider("r3C",v=>{ S.r3.C=logV(v); renderR3(); renderCode(); },logFmt);
+$("r3On").addEventListener("change",e=>{ S.r3.on=e.target.checked; ["r3Oy","r3Ox"].forEach(id=>$(id).disabled=!S.r3.on); renderR3(); renderCode(); });
+
+/* 회귀 4 */
+seg($("r4K"),v=>{ S.r4.k=v; renderR4(); renderCode(); });
+slider("r4C",v=>{ S.r4.C=logV(v); renderR4(); renderCode(); },logFmt);
+slider("r4E",v=>{ S.r4.eps=v; renderR4(); renderCode(); },pS);
+$("r4New").onclick=()=>{ S.r4.seed++; renderR4(); renderCode(); };
+$("r4Cv").addEventListener("click",e=>{ const cv=$("r4Cv"), V=cv._view; if(!V) return; const [mx,my]=evXY(cv,e); if(!V.inside(mx,my)) return; S.r4.q=Math.round(clamp(V.ix(mx),20,80)); renderR4(); renderCode(); });
+
+/* 코드 */
+$("codeData").addEventListener("change",e=>{ S.codeData=e.target.checked; renderCode(); });
+$("codeCopy").onclick=()=>{
+  const txt=$("codePre").textContent, btn=$("codeCopy");
+  const done=()=>{ btn.textContent="복사됨"; setTimeout(()=>btn.textContent="복사",1400); };
+  const fallback=()=>{ const ta=document.createElement("textarea"); ta.value=txt; ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta); ta.select(); try{ document.execCommand("copy"); }catch(_){} ta.remove(); done(); };
+  if(navigator.clipboard&&window.isSecureContext) navigator.clipboard.writeText(txt).then(done,fallback); else fallback();
+};
+
+/* 키보드: SMO 화면에서 → 다음, ← 이전 */
+document.addEventListener("keydown",e=>{
+  if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft") return;
+  if(S.part!=="svc"||S.tab.svc!=="smo") return;
+  if(e.target.closest&&e.target.closest("input,select,textarea,.sk-tabs,.sk-seg,button")) return;
+  if(e.altKey||e.ctrlKey||e.metaKey) return;
+  $(e.key==="ArrowRight"?"m4Next":"m4Prev").click(); e.preventDefault();
+});
+
+/* 테마 · 크기 변화 → 다시 그리기 */
+let rafR=0; const later=()=>{ cancelAnimationFrame(rafR); rafR=requestAnimationFrame(redrawAll); };
+new MutationObserver(later).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+try{ matchMedia("(prefers-color-scheme: dark)").addEventListener("change",later); }catch(_){}
+let lastW=window.innerWidth; window.addEventListener("resize",()=>{ if(window.innerWidth!==lastW){ lastW=window.innerWidth; later(); } });
+
+/* 처음 상태 */
+m1SetMode("opt"); m3Boxes(); r2Boxes();
+["m2C","m3C","m3G","m4C","m5C","m5G","r1C","r2C","r2G","r3C","r4C"].forEach(id=>{ const el=$(id); $(id+"V").textContent=logFmt(+el.value); });
+S.r4.C=logV(+$("r4C").value);
+readHash(); renderScale();
+if(!reduceMotion) play3(true);
+})();
+</script>
+</body>
+</html>

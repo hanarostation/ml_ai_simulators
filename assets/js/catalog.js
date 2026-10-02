@@ -44,6 +44,24 @@ window.DS_SIMULATORS = [
     glyph: "logreg"
   },
   {
+    id: "knn",
+    category: "ml",
+    href: "simulators/ml/knn.html",
+    title: "KNN (k-최근접 이웃)",
+    summary: "새 환자와 가장 가까운 k명의 다수결로 진단을 예측합니다. 거리 종류·가중치, k에 따른 결정 경계와 과적합, 스케일링이 필요한 이유, KNN 회귀, 차원의 저주까지 조작합니다.",
+    tags: ["분류 · 회귀", "거리 기반", "스케일링", "차원의 저주"],
+    glyph: "knn"
+  },
+  {
+    id: "svm",
+    category: "ml",
+    href: "simulators/ml/svm.html",
+    title: "SVM (분류 · 회귀)",
+    summary: "점을 옮기며 서포트 벡터만 경계를 정한다는 것을 확인하고, C·커널·γ·ε를 바꿔 마진과 ε-튜브의 변화를 봅니다. 쌍대 문제를 SMO로 푸는 과정과 다중 클래스까지 다룹니다.",
+    tags: ["서포트 벡터", "커널 트릭", "SMO", "ε-튜브"],
+    glyph: "svm"
+  },
+  {
     id: "decision-tree",
     category: "ml",
     href: "simulators/ml/decision-tree.html",
@@ -62,13 +80,49 @@ window.DS_SIMULATORS = [
     glyph: "forest"
   },
   {
-    id: "gradient-boosting",
+    id: "boosting",
     category: "ml",
-    href: "simulators/ml/gradient-boosting.html",
-    title: "그래디언트 부스팅",
-    summary: "얕은 트리를 한 그루씩 더하며 잔차(음의 기울기)를 이어서 맞추는 과정을 회귀·분류로 따라가고, 학습률·트리 수에 따른 과적합과 조기 종료, 랜덤포레스트와의 차이를 확인합니다.",
-    tags: ["앙상블", "부스팅", "잔차", "조기 종료"],
+    href: "simulators/ml/boosting.html",
+    title: "부스팅 계열 (AdaBoost · GBM · XGBoost · LightGBM)",
+    summary: "같은 데이터로 네 가지 부스팅을 바꿔 가며 라운드마다 약한 학습기가 배우는 것을 따라갑니다. 샘플 가중치 갱신, 잔차, XGBoost의 g·h·Gain과 가지치기, LightGBM의 히스토그램·리프 중심 성장·GOSS를 숫자로 확인합니다.",
+    tags: ["앙상블", "AdaBoost", "XGBoost", "LightGBM"],
     glyph: "boost"
+  },
+  {
+    id: "hierarchical-clustering",
+    category: "ml",
+    href: "simulators/ml/hierarchical-clustering.html",
+    title: "계층형 군집분석",
+    summary: "단일·완전·평균·중심·Ward 연결과 분할적 DIANA로 병합(분할) 과정을 한 단계씩 따라가고, 덴드로그램을 잘라 실루엣·엘보로 군집 수를 정합니다.",
+    tags: ["비지도 학습", "덴드로그램", "연결법 비교", "실루엣"],
+    glyph: "hclust"
+  },
+  {
+    id: "partitional-clustering",
+    category: "ml",
+    href: "simulators/ml/partitional-clustering.html",
+    title: "비계층형 군집분석",
+    summary: "K-means, K-means++, K-medoids, DBSCAN, Mean Shift, GMM(EM)의 반복 과정을 단계별로 따라가고, 엘보·실루엣·BIC로 군집 수를 고르며 같은 데이터에서 비교합니다.",
+    tags: ["비지도 학습", "K-means", "DBSCAN", "GMM"],
+    glyph: "pclust"
+  },
+  {
+    id: "pca",
+    category: "ml",
+    href: "simulators/ml/pca.html",
+    title: "PCA 차원 축소",
+    summary: "축을 직접 돌려 분산 최대와 재구성 오차 최소가 같은 축임을 확인하고, 공분산 행렬의 고유값 분해부터 건강검진 데이터의 축소·복원, PCA의 한계까지 살펴봅니다.",
+    tags: ["PCA", "고유값 분해", "차원 축소", "비지도 학습"],
+    glyph: "pca"
+  },
+  {
+    id: "association-rules",
+    category: "ml",
+    href: "simulators/ml/association-rules.html",
+    title: "연관분석 (Apriori · FP-Growth)",
+    summary: "환자 동반 진단 데이터로 지지도·신뢰도·향상도를 직접 세어 보고, Apriori의 후보 생성·가지치기와 FP-트리 구축·채굴을 한 단계씩 따라갑니다.",
+    tags: ["연관규칙", "Apriori", "FP-Growth", "향상도"],
+    glyph: "assoc"
   },
   {
     id: "imbalanced-sampling",
