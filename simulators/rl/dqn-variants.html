@@ -1,0 +1,933 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DQN 개선판 (Double · Dueling · PER · Rainbow) | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261007a">
+<style>
+/* ===== DQN 개선판 시뮬레이터 전용 스타일 ===== */
+:root{
+  --sk-accent: var(--cat-rl);
+  --r-state:#2563EB; --r-act:#EA580C; --r-rew:#16A34A; --r-val:#7C3AED; --r-tgt:#DB2777; --r-td:#DC2626; --r-exp:#B7791F;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --r-state:#79A6F6; --r-act:#F59A5C; --r-rew:#5CCB82; --r-val:#B597FF; --r-tgt:#F27AA3; --r-td:#F07A7A; --r-exp:#E3B455; } }
+:root[data-theme="dark"]{ --r-state:#79A6F6; --r-act:#F59A5C; --r-rew:#5CCB82; --r-val:#B597FF; --r-tgt:#F27AA3; --r-td:#F07A7A; --r-exp:#E3B455; }
+
+.dv-cv{ display:block; width:100%; max-width:100%; }
+.dv-col{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+.dv-status{ font-size:13px; color:var(--muted); margin:0; min-height:1.4em; }
+.dv-status b{ color:var(--ink); }
+.dv-svg{ width:100%; height:auto; display:block; }
+.dv-svg text{ font-family:var(--sans); fill:var(--ink); }
+.dv-svg .m{ fill:var(--muted); }
+.dv-svg .box{ fill:var(--surface); stroke:var(--line-strong); stroke-width:1.5; }
+.dv-svg .st{ stroke:var(--r-state); } .dv-svg .ac{ stroke:var(--r-act); } .dv-svg .va{ stroke:var(--r-val); } .dv-svg .tg{ stroke:var(--r-tgt); }
+.dv-svg .fst{ fill:var(--r-state); } .dv-svg .fac{ fill:var(--r-act); } .dv-svg .fva{ fill:var(--r-val); } .dv-svg .ftg{ fill:var(--r-tgt); }
+.dv-svg .ln{ fill:none; stroke-width:2; }
+.dv-states{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:14px; }
+.dv-state{ display:flex; flex-direction:column; gap:4px; font-size:12.5px; color:var(--muted); min-width:0; }
+.dv-state canvas{ width:100%; border-radius:8px; }
+.dv-state b{ color:var(--ink); font-size:14px; }
+@media (max-width: 700px){ .dv-states{ grid-template-columns:minmax(0,1fr); } }
+.dv-six{ display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:10px; }
+@media (max-width: 1100px){ .dv-six{ grid-template-columns:repeat(3, minmax(0,1fr)); } }
+@media (max-width: 600px){ .dv-six{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
+.dv-six__c{ position:relative; background:var(--surface-2); border:1px solid var(--line); border-top:3px solid var(--sk-accent); border-radius:10px; padding:10px 12px 12px; display:flex; flex-direction:column; gap:4px; font-size:13px; color:var(--text); }
+.dv-six__c b{ font-size:14.5px; color:var(--ink); }
+.dv-six__c em{ font-style:normal; font-size:12px; font-weight:700; color:var(--r-td); }
+.dv-six__n{ position:absolute; right:10px; top:8px; font-family:var(--mono); font-size:12px; color:var(--faint); }
+.dv-code{ white-space:pre; font-size:12.5px; line-height:1.6; max-height:560px; overflow:auto; }
+.dv-copied{ font-size:12.5px; color:var(--muted); }
+#tgTable td.n{ text-align:left; }
+@media (max-width: 520px){ .sk-slider{ min-width:0; width:100%; } }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+      <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a href="../../index.html#rl" style="--c:var(--cat-rl)" aria-current="page">강화학습</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#rl" style="--c:var(--cat-rl)">강화학습</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">DQN 개선판 (Double · Dueling · PER · Rainbow)</h1>
+      <p class="ds-hero__lede">DQN의 약점을 하나씩 고친 개선판을 숫자로 따라갑니다. 과대추정(Double), 가치·이점 분해(Dueling), 우선순위 재생(PER), 그리고 여섯 가지를 합친 Rainbow — 마지막으로 CartPole에서 직접 학습시켜 비교합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button class="sk-tab" role="tab" id="tab-double" aria-controls="pane-double" aria-selected="true"><span class="sk-num">1</span>Double DQN</button>
+    <button class="sk-tab" role="tab" id="tab-dueling" aria-controls="pane-dueling" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>Dueling</button>
+    <button class="sk-tab" role="tab" id="tab-per" aria-controls="pane-per" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>PER</button>
+    <button class="sk-tab" role="tab" id="tab-rainbow" aria-controls="pane-rainbow" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>Rainbow</button>
+    <button class="sk-tab" role="tab" id="tab-compare" aria-controls="pane-compare" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>CartPole 비교</button>
+    <button class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>코드</button>
+    <button class="sk-tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>알고리즘 구성도</button>
+  </nav>
+
+  <!-- ========== 1. Double ========== -->
+  <section id="pane-double" role="tabpanel" aria-labelledby="tab-double">
+    <div class="sk-card">
+      <div class="sk-head"><h2>잡음 섞인 추정값의 max는 위로 치우친다 — 과대추정(Overestimation)</h2><span class="sk-hint">모든 행동의 참값 Q = 0 · 추정값 = 참값 + 잡음 N(0, σ²)</span></div>
+      <p class="sk-lead">DQN 타깃의 max<sub>a′</sub> Q(s′,a′)는 "가장 좋아 보이는" 행동을 고르고, <b>같은 추정값</b>으로 그 값을 매깁니다. 잡음이 위로 튄 행동이 뽑히기 쉬우므로 평균적으로 참값보다 큽니다. Double은 고르는 추정(A)과 값을 매기는 추정(B)을 나눕니다.</p>
+      <div class="sk-controls">
+        <label class="sk-slider"><span class="sk-sl-head">행동 수 m <b id="dbMV">10</b></span><input type="range" id="dbM" min="2" max="20" step="1" value="10"></label>
+        <label class="sk-slider"><span class="sk-sl-head">잡음 σ <b id="dbSV">1.0</b></span><input type="range" id="dbS" min="0.1" max="2" step="0.1" value="1"></label>
+        <div class="sk-group"><span class="sk-label">시행</span><div class="sk-seg" id="dbN"><button type="button" data-v="1000" aria-pressed="false">1,000</button><button type="button" data-v="10000" aria-pressed="true">10,000</button></div></div>
+        <div class="sk-group"><span class="sk-label">seed</span><input class="sk-input" id="dbSeed" type="number" min="1" max="9999" value="1" style="width:84px" aria-label="seed"></div>
+      </div>
+      <div class="sk-grid2">
+        <div class="dv-col">
+          <div class="sk-head"><h3>추정값 분포 (참값 = 0)</h3></div>
+          <canvas class="dv-cv" id="dbHist" aria-label="단일 추정 max와 Double 추정값의 분포"></canvas>
+          <div class="sk-legend"><span><i style="background:var(--r-td)"></i>max<sub>a</sub> Q̂(a) — DQN 방식</span><span><i style="background:var(--r-state)"></i>Q̂<sub>B</sub>(argmax Q̂<sub>A</sub>) — Double 방식</span></div>
+        </div>
+        <div class="dv-col">
+          <div class="sk-head"><h3>행동 수에 따른 편향</h3></div>
+          <canvas class="dv-cv" id="dbCurve" aria-label="행동 수에 따른 평균 편향"></canvas>
+          <div class="sk-legend"><span><i style="background:var(--r-td)"></i>DQN 방식 평균</span><span><i style="background:var(--muted)"></i>이론값 σ·E[max Z]</span><span><i style="background:var(--r-state)"></i>Double 방식 평균</span></div>
+        </div>
+      </div>
+      <div class="sk-stats" id="dbStats"></div>
+      <div class="sk-formula" id="dbFormula"></div>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>타깃 계산 비교 — 숫자로</h2><button class="sk-btn sk-btn--sm" type="button" id="tgNew">예시 다시 뽑기</button></div>
+        <div class="sk-scroll"><table class="sk-table" id="tgTable"></table></div>
+        <div class="sk-formula" id="tgFormula"></div>
+        <p class="sk-note">Double DQN(van Hasselt et al., 2016)은 새 망을 만들지 않습니다. 이미 있는 <b>온라인 망 θ로 행동을 고르고</b>, <b>타깃망 θ⁻로 값을 매깁니다</b>. 코드로는 한 줄만 바뀝니다.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>최대화 편향 MDP (Sutton &amp; Barto 예제 6.7)</h2><span class="sk-hint">표 기반 · 즉시 계산</span></div>
+        <p class="sk-lead">A에서 →(오른쪽)는 바로 끝(보상 0). ←(왼쪽)은 B로 가고, B의 행동 10개는 모두 보상 N(−0.1, 1)로 끝 → 왼쪽의 참 기댓값은 −0.1이라 오른쪽이 최적. 그런데 Q-learning은 B의 max가 위로 치우쳐 처음에 왼쪽을 자주 고릅니다.</p>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">반복 실행</span><div class="sk-seg" id="mbRuns"><button type="button" data-v="300" aria-pressed="false">300</button><button type="button" data-v="1000" aria-pressed="true">1,000</button></div></div>
+          <button class="sk-btn" type="button" id="mbRun">다시 계산</button>
+        </div>
+        <canvas class="dv-cv" id="mbCv" aria-label="에피소드별로 A에서 왼쪽을 고른 비율"></canvas>
+        <div class="sk-legend"><span><i style="background:var(--r-td)"></i>Q-learning</span><span><i style="background:var(--r-state)"></i>Double Q-learning</span><span>점선 = 5% (ε = 0.1일 때 최적 정책의 왼쪽 비율)</span></div>
+        <p class="sk-hint" id="mbOut"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 2. Dueling ========== -->
+  <section id="pane-dueling" role="tabpanel" aria-labelledby="tab-dueling" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>Q = V(s) + A(s,a) − 평균 A — 상태의 가치와 행동의 이점을 나눠 배우기</h2><span class="sk-hint">Wang et al., 2016</span></div>
+      <div class="sk-scroll"><svg class="dv-svg" id="duSvg" viewBox="0 0 980 200" style="min-width:720px;max-width:1000px;margin:0 auto" role="img" aria-label="Dueling 구조: 공통 층 뒤에 가치 V 줄기와 이점 A 줄기로 나뉘고, Q = V + A − 평균 A 로 합친다"></svg></div>
+      <p class="sk-note">많은 상태에서는 <b>어떤 행동을 하든 결과가 비슷</b>합니다(막대가 안정적으로 서 있을 때). 그런 상태의 가치 V(s)를 행동마다 따로 배우지 않고 한 줄기로 배우면, 어떤 행동의 경험이든 V 학습에 쓰여 효율이 좋아집니다. A는 "이 행동이 평균보다 얼마나 나은가"만 담당합니다.</p>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>예시 상태에서 분해해 보기</h2>
+        <div class="sk-group"><span class="sk-label">값 출처</span><div class="sk-seg" id="duSrc"><button type="button" data-v="ex" aria-pressed="true">예시 숫자</button><button type="button" data-v="net" aria-pressed="false">학습된 Dueling 망</button></div></div></div>
+      <p class="sk-hint" id="duSrcHint"></p>
+      <div class="dv-states" id="duStates"></div>
+      <div class="sk-scroll"><table class="sk-table" id="duTable"></table></div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>왜 평균을 빼나 — 식별 문제(identifiability)</h2><span class="sk-hint">안정 상태의 V, A로 실험</span></div>
+      <div class="sk-controls">
+        <label class="sk-slider"><span class="sk-sl-head">V에 c를 더하고 A에서 c를 빼기 <b id="duCV">0.0</b></span><input type="range" id="duC" min="-20" max="20" step="1" value="0"></label>
+      </div>
+      <div class="sk-grid2">
+        <div class="sk-formula" id="duNaive"></div>
+        <div class="sk-formula" id="duMean"></div>
+      </div>
+      <p class="sk-note">그냥 Q = V + A로 합치면 V를 얼마나 올리든 A를 그만큼 내리면 Q가 똑같아 <b>V와 A가 하나로 정해지지 않습니다</b>. 평균을 빼면 Σ<sub>a</sub>(A − 평균 A) = 0이 되어 V(s) = 평균<sub>a</sub> Q(s,a)로 고정됩니다. (논문에는 max를 빼는 방식도 있지만 평균 방식이 더 안정적이라 기본으로 씁니다.)</p>
+    </div>
+  </section>
+
+  <!-- ========== 3. PER ========== -->
+  <section id="pane-per" role="tabpanel" aria-labelledby="tab-per" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>우선순위 경험 재생(PER) — 많이 틀린 전이를 더 자주</h2><span class="sk-hint">Schaul et al., 2016 · 버퍼 8개 예시</span></div>
+      <div class="sk-controls">
+        <label class="sk-slider"><span class="sk-sl-head">α (우선순위 강도) <b id="peAV">0.6</b></span><input type="range" id="peA" min="0" max="1" step="0.1" value="0.6"></label>
+        <label class="sk-slider"><span class="sk-sl-head">β (중요도 보정) <b id="peBV">0.4</b></span><input type="range" id="peB" min="0" max="1" step="0.1" value="0.4"></label>
+        <div class="sk-group"><span class="sk-label">ε</span><div class="sk-seg" id="peE"><button type="button" data-v="0.01" aria-pressed="true">0.01</button><button type="button" data-v="0.1" aria-pressed="false">0.1</button></div></div>
+        <button class="sk-btn" type="button" id="peNew">TD 오차 다시 뽑기</button>
+        <button class="sk-btn" type="button" id="peDef">기본 예시</button>
+      </div>
+      <div class="sk-formula">p<sub>i</sub> = |δ<sub>i</sub>| + ε   ·   P(i) = p<sub>i</sub><sup>α</sup> / Σ<sub>k</sub> p<sub>k</sub><sup>α</sup>   ·   w<sub>i</sub> = (N · P(i))<sup>−β</sup> / max<sub>j</sub> w<sub>j</sub>   (α = 0이면 균등 추출, β = 1이면 편향 완전 보정)</div>
+      <div class="sk-grid2">
+        <div class="dv-col">
+          <canvas class="dv-cv" id="peCv" aria-label="전이별 추출 확률과 균등 확률 비교"></canvas>
+          <div class="sk-legend"><span><i style="background:var(--r-td)"></i>P(i) 우선순위 추출 확률</span><span><i style="background:var(--muted)"></i>균등 1/N</span><span><i style="background:var(--r-exp)"></i>중요도 가중치 w</span></div>
+        </div>
+        <div class="sk-scroll"><table class="sk-table" id="peTable"></table></div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>합 트리(Sum Tree) — 비례 추출을 O(log N)으로</h2><span class="sk-hint">잎 = p<sup>α</sup>, 안쪽 칸 = 두 자식의 합 · 맨 위 = 전체 합</span></div>
+      <div class="sk-controls">
+        <label class="sk-slider" style="min-width:260px"><span class="sk-sl-head">뽑을 값 u (0 ~ 전체 합) <b id="peUV"></b></span><input type="range" id="peU" min="0" max="1000" step="1" value="420"></label>
+        <button class="sk-btn" type="button" id="peStrat">배치 4개 층화 추출 보기</button>
+      </div>
+      <div class="sk-scroll"><svg class="dv-svg" id="treeSvg" viewBox="0 0 900 290" style="min-width:680px;max-width:960px;margin:0 auto" role="img" aria-label="합 트리: u 값을 따라 루트에서 잎까지 내려가 전이를 고른다"></svg></div>
+      <p class="sk-note" id="treeNote"></p>
+    </div>
+  </section>
+
+  <!-- ========== 4. Rainbow ========== -->
+  <section id="pane-rainbow" role="tabpanel" aria-labelledby="tab-rainbow" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>Rainbow — 여섯 가지 개선을 한 에이전트에</h2><span class="sk-hint">Hessel et al., 2018</span></div>
+      <div class="dv-six" id="rbSix"></div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>논문 보고값 — 57개 Atari 게임</h2><span class="sk-hint">시뮬레이션 아님 · 출처 숫자 그대로</span></div>
+        <canvas class="dv-cv" id="rbCv" aria-label="논문에 보고된 에이전트별 사람 대비 정규화 점수 중앙값"></canvas>
+        <p class="sk-hint">사람 대비 정규화 점수의 중앙값(%), no-op 시작 조건, 각 에이전트의 최고 스냅샷 기준 (Hessel et al., 2018, Table 2). 100% = 사람 테스터 수준.</p>
+        <p class="sk-note">논문의 제거 실험(ablation): 하나씩 뺐을 때 <b>PER과 n-step을 빼면 성능이 가장 크게 떨어지고</b>, 그다음이 분포형(Distributional)이었습니다. Double·Dueling을 빼는 영향은 전체 중앙값 기준으로 작았습니다.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>n-step 타깃</h2><span class="sk-hint">예시 숫자 · γ = 0.9</span></div>
+        <div class="sk-controls"><label class="sk-slider"><span class="sk-sl-head">n <b id="nsV">3</b></span><input type="range" id="nsN" min="1" max="5" step="1" value="3"></label></div>
+        <div class="sk-scroll"><table class="sk-table" id="nsTable"></table></div>
+        <div class="sk-formula" id="nsFormula"></div>
+        <p class="sk-hint">n이 크면 실제 보상을 더 많이 써서 보상이 빨리 앞쪽 상태로 전파되지만, 오래된(다른 정책의) 경험이면 편향이 생깁니다. Rainbow는 n = 3.</p>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>분포형 C51 — 기댓값 대신 수익의 분포를 배운다</h2><span class="sk-hint">예시: 원자 11개, z = 0, 1, …, 10 (C51은 51개, −10 ~ 10)</span></div>
+      <div class="sk-controls">
+        <label class="sk-slider"><span class="sk-sl-head">보상 r <b id="c5RV">1.0</b></span><input type="range" id="c5R" min="-2" max="3" step="0.5" value="1"></label>
+        <label class="sk-slider"><span class="sk-sl-head">할인율 γ <b id="c5GV">0.9</b></span><input type="range" id="c5G" min="0.5" max="1" step="0.05" value="0.9"></label>
+      </div>
+      <div class="sk-grid2">
+        <div class="dv-col">
+          <canvas class="dv-cv" id="c5Cv" aria-label="다음 상태 분포, 이동·축소된 원자 위치, 원래 원자에 투영된 타깃 분포"></canvas>
+          <div class="sk-legend"><span><i style="background:var(--r-val)"></i>다음 상태 분포 p(s′,a*)</span><span><i style="background:var(--r-tgt);border-radius:50%"></i>r + γz<sub>j</sub>로 옮긴 원자 (투영 전)</span><span><i style="background:var(--r-td)"></i>투영된 타깃 m</span></div>
+        </div>
+        <div class="sk-scroll"><table class="sk-table" id="c5Table"></table></div>
+      </div>
+      <div class="sk-formula" id="c5Formula"></div>
+      <p class="sk-hint">손실은 예측 분포와 투영된 타깃 m 사이의 교차 엔트로피 −Σ m<sub>i</sub> log p<sub>i</sub>(s,a). 행동 선택은 기댓값 Σ z<sub>i</sub> p<sub>i</sub>로 합니다.</p>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>Noisy Nets — ε 대신 가중치에 잡음을 넣어 탐험</h2><span class="sk-hint">선형층 4 → 2 예시 · 인수분해 가우시안 잡음</span></div>
+      <div class="sk-controls">
+        <label class="sk-slider"><span class="sk-sl-head">σ 배율 (학습으로 정해지는 잡음 크기) <b id="nzSV">1.0</b></span><input type="range" id="nzS" min="0" max="2" step="0.1" value="1"></label>
+        <button class="sk-btn" type="button" id="nzNew">잡음 다시 뽑기</button>
+      </div>
+      <div class="sk-formula" id="nzFormula"></div>
+      <div class="sk-stats" id="nzStats"></div>
+      <p class="sk-note">σ도 학습되는 파라미터라서 <b>탐험이 필요한 상태에서는 크게, 확실한 상태에서는 작게</b> 스스로 조절됩니다. 그래서 Rainbow에는 ε-greedy가 없습니다(ε = 0).</p>
+    </div>
+  </section>
+
+  <!-- ========== 5. 비교 ========== -->
+  <section id="pane-compare" role="tabpanel" aria-labelledby="tab-compare" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>CartPole에서 직접 비교 — DQN · Double · Dueling · PER</h2><span class="sk-hint">브라우저용 축소 설정 · 네 가지를 번갈아 학습 (약 40초~2분)</span></div>
+      <div class="sk-controls">
+        <button class="sk-btn sk-btn--primary" type="button" id="cmRun">비교 시작</button>
+        <button class="sk-btn" type="button" id="cmReset">초기화</button>
+        <div class="sk-group"><span class="sk-label">seed</span><input class="sk-input" id="cmSeed" type="number" min="1" max="9999" value="1" style="width:84px" aria-label="seed"></div>
+        <div class="sk-group"><span class="sk-label">걸음 수</span><div class="sk-seg" id="cmSteps"><button type="button" data-v="10000" aria-pressed="false">10,000</button><button type="button" data-v="15000" aria-pressed="true">15,000</button></div></div>
+      </div>
+      <p class="dv-status" id="cmStatus" aria-live="polite">[비교 시작]을 누르면 네 에이전트가 같은 초기 가중치·같은 환경 seed로 학습합니다.</p>
+      <div class="sk-grid2">
+        <div class="dv-col"><div class="sk-head"><h3>수익 (최근 10 에피소드 평균) — 가로축 = 환경 걸음</h3></div><canvas class="dv-cv" id="cmRetCv" aria-label="네 에이전트의 수익 곡선"></canvas></div>
+        <div class="dv-col"><div class="sk-head"><h3>Q 예측값 max Q(s₀)</h3></div><canvas class="dv-cv" id="cmQCv" aria-label="네 에이전트의 Q 예측값"></canvas></div>
+      </div>
+      <div class="sk-legend" id="cmLegend"></div>
+      <div class="sk-scroll"><table class="sk-table" id="cmTable"></table></div>
+      <p class="sk-note">공통 설정: 은닉 32·32, Adam 0.001, 배치 64, 버퍼 50,000, 타깃망 복사 1,000걸음, ε 1 → 0.05(6,000걸음), 2걸음마다 갱신, 입력 정규화. PER은 α = 0.6, β 0.4 → 1, ε = 0.01. <b>이렇게 작은 문제·짧은 학습에서는 개선판 사이 차이가 작고 seed에 따라 순위가 바뀝니다</b> — 논문의 개선 폭은 Atari 57개 게임·수천만 프레임에서 잰 값입니다. seed를 바꿔 여러 번 돌려 보세요.</p>
+    </div>
+  </section>
+
+  <!-- ========== 6. 코드 ========== -->
+  <section id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>PyTorch — DQN에서 바뀌는 부분만</h2>
+        <div class="sk-group"><button type="button" class="sk-btn sk-btn--sm" id="cpCopy1">코드 복사</button><span class="dv-copied" id="cpMsg1" aria-live="polite"></span></div></div>
+      <p class="sk-lead">DQN 시뮬레이터의 코드(Gymnasium CartPole-v1, 행동 0 = 왼쪽 · 1 = 오른쪽)에서 이 부분만 바꾸면 됩니다. 아래 설정값은 3번 탭의 α·β와 연동됩니다.</p>
+      <pre class="sk-formula dv-code" id="code1"></pre>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>라이브러리로 쓰기</h2>
+        <div class="sk-group"><button type="button" class="sk-btn sk-btn--sm" id="cpCopy2">코드 복사</button><span class="dv-copied" id="cpMsg2" aria-live="polite"></span></div></div>
+      <p class="sk-lead">stable-baselines3의 DQN은 기본형(리플레이 + 타깃망)만 들어 있고 Double·Dueling·PER 옵션은 없습니다. 분포형 계열은 sb3-contrib의 QR-DQN을, Rainbow 전체는 Dopamine·Tianshou 같은 라이브러리의 구현을 씁니다.</p>
+      <pre class="sk-formula dv-code" id="code2"></pre>
+    </div>
+  </section>
+
+  <!-- ========== 7. 구성도 ========== -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">강의 슬라이드 4장 · Double → Dueling → PER → Rainbow</span></div><div data-ds-diagrams="dqn-variants"></div></section>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20261007a"></script>
+<script src="../../assets/js/rl-kit.js?v=20261007a"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261007a"></script>
+<script src="../../assets/diagrams/dqn-variants.js?v=20261007a"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const fmt = (v, d) => (v < 0 ? "−" : "") + Math.abs(v).toFixed(d == null ? 3 : d);
+  const comma = v => Math.round(v).toLocaleString("en-US");
+  const th = () => RL.theme();
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  /* ---------- 안쪽 탭 (URL 해시 연동, ←/→ 키 이동) ---------- */
+  const tabs = [...document.querySelectorAll(".sk-tab")];
+  const onShow = {};
+  function show(t) {
+    tabs.forEach(b => { const on = b === t; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1;
+      document.getElementById(b.getAttribute("aria-controls")).hidden = !on; });
+    const key = t.id.replace("tab-", "");
+    history.replaceState(null, "", "#" + key);
+    if (onShow[key]) onShow[key]();
+  }
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => show(b));
+    b.addEventListener("keydown", e => {
+      const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return;
+      const n = tabs[(i + d + tabs.length) % tabs.length]; show(n); n.focus(); e.preventDefault();
+    });
+  });
+  function segVal(id) { const b = $(id).querySelector('[aria-pressed="true"]'); return b ? b.getAttribute("data-v") : null; }
+  function segSet(id, v) { $(id).querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x.getAttribute("data-v") === v ? "true" : "false")); }
+  function segInit(id, fn) { $(id).addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; segSet(id, b.getAttribute("data-v")); fn && fn(b.getAttribute("data-v")); }); }
+
+  /* ---------- 그리기 도우미 ---------- */
+  const fitW = (cv, w) => { const p = cv.parentNode; if (!p || !p.clientWidth) return w; const cs = getComputedStyle(p);
+    return Math.min(w, p.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)); };
+  function frame(cv, w, h) { const f = RL.fitCanvas(cv, fitW(cv, w), h); f.g.clearRect(0, 0, f.w, f.h); return f; }
+  function axisY(g, t, pl, pr, pt, H, pb, W, lo, hi, n, f) {
+    g.strokeStyle = t.line; g.lineWidth = 1; g.fillStyle = t.faint; g.font = "11px " + css("--mono"); g.textAlign = "right";
+    for (let k = 0; k <= n; k++) { const v = lo + (hi - lo) * k / n, y = pt + (H - pt - pb) * (1 - k / n); g.beginPath(); g.moveTo(pl, y); g.lineTo(W - pr, y); g.stroke(); g.fillText(f ? f(v) : v.toFixed(1), pl - 6, y + 4); }
+  }
+  /* x–y 선 그래프. series: [{xs, ys, color, width, dash, dots}] */
+  function xyChart(cv, series, o) {
+    const t = th(), f = frame(cv, o.w, o.h), g = f.g, W = f.w, H = f.h, pl = 48, pr = 12, pt = 14, pb = 28;
+    const X = x => pl + (W - pl - pr) * (x - (o.xmin || 0)) / (o.xmax - (o.xmin || 0)), Y = v => pt + (H - pt - pb) * (1 - (v - o.ymin) / (o.ymax - o.ymin));
+    axisY(g, t, pl, pr, pt, H, pb, W, o.ymin, o.ymax, 4, o.yfmt);
+    g.textAlign = "center"; g.fillStyle = t.faint;
+    (o.xticks || [o.xmin || 0, o.xmax]).forEach(v => g.fillText(o.xfmt ? o.xfmt(v) : String(v), X(v), H - 10));
+    if (o.hline != null) { g.strokeStyle = t.faint; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(pl, Y(o.hline)); g.lineTo(W - pr, Y(o.hline)); g.stroke(); g.setLineDash([]); }
+    if (o.vline != null) { g.strokeStyle = t.amber; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(X(o.vline), pt); g.lineTo(X(o.vline), H - pb); g.stroke(); g.setLineDash([]); }
+    series.forEach(s => {
+      if (!s.xs.length) return;
+      if (s.dots) { s.xs.forEach((x, i) => { g.fillStyle = s.color; g.beginPath(); g.arc(X(x), Y(s.ys[i]), s.r || 3.5, 0, Math.PI * 2); g.fill(); }); return; }
+      g.strokeStyle = s.color; g.lineWidth = s.width || 2; if (s.dash) g.setLineDash(s.dash); g.beginPath();
+      s.xs.forEach((x, i) => { const y = Y(Math.max(o.ymin, Math.min(o.ymax, s.ys[i]))); if (i) g.lineTo(X(x), y); else g.moveTo(X(x), y); }); g.stroke(); g.setLineDash([]);
+    });
+    return { X, Y, g, W, H };
+  }
+  function emptyChart(cv, w, h, msg) {
+    const t = th(), f = frame(cv, w, h), g = f.g;
+    g.strokeStyle = t.line; g.setLineDash([4, 4]); g.strokeRect(8.5, 8.5, f.w - 17, f.h - 17); g.setLineDash([]);
+    g.fillStyle = t.faint; g.font = "13px " + css("--sans"); g.textAlign = "center"; g.fillText(msg, f.w / 2, f.h / 2 + 4);
+  }
+
+  /* ================= 1. Double DQN ================= */
+  function erf(x) { const s = x < 0 ? -1 : 1; x = Math.abs(x); const t = 1 / (1 + 0.3275911 * x);
+    return s * (1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x)); }
+  const Phi = x => 0.5 * (1 + erf(x / Math.SQRT2)), phi = x => Math.exp(-x * x / 2) / Math.sqrt(2 * Math.PI);
+  /* E[max Z₁..Zₘ], Z ~ N(0,1) = ∫ x·m·φ(x)·Φ(x)^(m−1) dx (수치 적분) */
+  const emaxCache = {};
+  function emax(m) { if (emaxCache[m] != null) return emaxCache[m]; let s = 0; const h = 0.002; for (let x = -8; x <= 8; x += h) s += x * m * phi(x) * Math.pow(Phi(x), m - 1) * h; return (emaxCache[m] = s); }
+  function simMax(m, sd, N, seed) {
+    const r = RL.rng(seed), single = new Float64Array(N), dbl = new Float64Array(N);
+    for (let n = 0; n < N; n++) {
+      let best = -Infinity, bi = 0;
+      for (let a = 0; a < m; a++) { const v = r.normal(0, sd); if (v > best) { best = v; bi = a; } }
+      let vb = 0; for (let a = 0; a < m; a++) { const v = r.normal(0, sd); if (a === bi) vb = v; }
+      single[n] = best; dbl[n] = vb;
+    }
+    return { single, dbl };
+  }
+  const mean = a => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i]; return s / a.length; };
+  let dbCurveCache = null;
+  function drawDouble() {
+    const m = +$("dbM").value, sd = +$("dbS").value, N = +segVal("dbN"), seed = Math.max(1, +$("dbSeed").value || 1);
+    $("dbMV").textContent = m; $("dbSV").textContent = sd.toFixed(1);
+    const R = simMax(m, sd, N, seed), ms = mean(R.single), md = mean(R.dbl), et = emax(m) * sd;
+    const t = th();
+    /* 히스토그램 */
+    const lo = -3.5 * sd, hi = 4.5 * sd, nb = 40, bw = (hi - lo) / nb, h1 = new Array(nb).fill(0), h2 = new Array(nb).fill(0);
+    for (let i = 0; i < N; i++) { const b1 = Math.floor((R.single[i] - lo) / bw), b2 = Math.floor((R.dbl[i] - lo) / bw); if (b1 >= 0 && b1 < nb) h1[b1]++; if (b2 >= 0 && b2 < nb) h2[b2]++; }
+    const ymax = Math.max(...h1, ...h2) / N * 1.12;
+    const f = frame($("dbHist"), 600, 250), g = f.g, W = f.w, H = f.h, pl = 48, pr = 12, pt = 14, pb = 28;
+    axisY(g, t, pl, pr, pt, H, pb, W, 0, ymax, 4, v => (v * 100).toFixed(1) + "%");
+    const X = x => pl + (W - pl - pr) * (x - lo) / (hi - lo), Y = v => pt + (H - pt - pb) * (1 - v / ymax);
+    [[h2, t.blue], [h1, t.red]].forEach(([h, c]) => { g.fillStyle = c; g.globalAlpha = 0.45; h.forEach((v, i) => { const x0 = X(lo + i * bw), x1 = X(lo + (i + 1) * bw); g.fillRect(x0 + 0.5, Y(v / N), x1 - x0 - 1, Y(0) - Y(v / N)); }); g.globalAlpha = 1; });
+    const vl = (x, c, lab, dy) => { g.strokeStyle = c; g.lineWidth = 2; g.setLineDash(c === t.ink ? [] : [5, 3]); g.beginPath(); g.moveTo(X(x), pt); g.lineTo(X(x), H - pb); g.stroke(); g.setLineDash([]);
+      g.fillStyle = c; g.font = "600 11.5px " + css("--sans"); g.textAlign = "left"; g.fillText(lab, X(x) + 4, pt + 12 + dy); };
+    vl(0, t.ink, "참값 0", 0); vl(ms, t.red, "평균 " + fmt(ms, 3), 16); vl(md, t.blue, "평균 " + fmt(md, 3), 32);
+    g.fillStyle = t.faint; g.font = "11px " + css("--mono"); g.textAlign = "center"; [-3, -2, -1, 0, 1, 2, 3, 4].forEach(k => g.fillText(fmt(k * sd, 1), X(k * sd), H - 10));
+    /* 행동 수 곡선 */
+    if (!dbCurveCache || dbCurveCache.key !== sd + ":" + seed) {
+      const ms2 = [], md2 = [], th2 = [], xs = [];
+      for (let k = 2; k <= 20; k++) { const r = simMax(k, sd, 1500, seed + k); xs.push(k); ms2.push(mean(r.single)); md2.push(mean(r.dbl)); th2.push(emax(k) * sd); }
+      dbCurveCache = { key: sd + ":" + seed, xs, ms2, md2, th2 };
+    }
+    const C = dbCurveCache, ymx = Math.max(...C.th2) * 1.15;
+    xyChart($("dbCurve"), [{ xs: C.xs, ys: C.th2, color: t.muted, width: 2, dash: [5, 4] }, { xs: C.xs, ys: C.ms2, color: t.red, dots: true }, { xs: C.xs, ys: C.md2, color: t.blue, dots: true }],
+      { w: 600, h: 250, xmin: 1, xmax: 21, ymin: -0.3 * sd, ymax: ymx, xticks: [2, 5, 10, 15, 20], vline: m, hline: 0, yfmt: v => fmt(v, 2) });
+    $("dbStats").innerHTML = [["DQN 방식 평균 (모의 " + comma(N) + "회)", fmt(ms, 3)], ["이론값 σ·E[max Z]", fmt(et, 3)], ["Double 방식 평균", fmt(md, 3)], ["타깃 부풀림 γ·편향 (γ = 0.99)", fmt(0.99 * ms, 3)]]
+      .map(x => `<div class="sk-stat"><b>${x[1]}</b><span>${x[0]}</span></div>`).join("");
+    $("dbFormula").innerHTML = `m = ${m}, σ = ${sd.toFixed(1)}: E[max<sub>a</sub> Q̂(a)] = σ · ∫ x·m·φ(x)·Φ(x)<sup>m−1</sup> dx = ${sd.toFixed(1)} × ${emax(m).toFixed(4)} = <b>${et.toFixed(4)}</b>  (참값 0보다 큼)<br>` +
+      `Double: 고르기 a* = argmax Q̂<sub>A</sub>(a), 값 매기기 Q̂<sub>B</sub>(a*) → B의 잡음은 고르는 데 쓰이지 않았으므로 기댓값 = 0 (편향 없음, 대신 약간 과소추정 쪽으로 기울 수 있음)`;
+  }
+  ["dbM", "dbS"].forEach(id => $(id).addEventListener("input", drawDouble));
+  segInit("dbN", drawDouble); $("dbSeed").addEventListener("change", drawDouble);
+
+  /* 타깃 비교 */
+  let TG = { r: 1, g: 0.99, on: [2.1, 2.8, 2.5], tg: [2.6, 2.3, 2.9] }, tgRng = RL.rng(11);
+  function drawTarget() {
+    const am = a => a.indexOf(Math.max(...a)), ao = am(TG.on), at = am(TG.tg);
+    $("tgTable").innerHTML = "<thead><tr><th>행동 a′</th><th>온라인 Q(s′,a′;θ)</th><th>타깃 Q(s′,a′;θ⁻)</th></tr></thead><tbody>" +
+      TG.on.map((v, i) => `<tr><td>a${"₀₁₂"[i]}</td><td class="n" style="${i === ao ? "color:var(--r-state);font-weight:700" : ""}">${v.toFixed(1)}${i === ao ? "  ← argmax (Double이 고름)" : ""}</td><td class="n" style="${i === at ? "color:var(--r-td);font-weight:700" : i === ao ? "color:var(--r-state);font-weight:700" : ""}">${TG.tg[i].toFixed(1)}${i === at ? "  ← max (DQN이 씀)" : ""}</td></tr>`).join("") + "</tbody>";
+    const yD = TG.r + TG.g * TG.tg[at], yDD = TG.r + TG.g * TG.tg[ao];
+    $("tgFormula").innerHTML = `r = ${TG.r}, γ = ${TG.g}<br>DQN:  y = r + γ · max<sub>a′</sub> Q(s′,a′;θ⁻) = ${TG.r} + ${TG.g} × ${TG.tg[at].toFixed(1)} = <b>${yD.toFixed(3)}</b><br>` +
+      `Double: a* = argmax<sub>a′</sub> Q(s′,a′;θ) = a${"₀₁₂"[ao]} → y = r + γ · Q(s′,a*;θ⁻) = ${TG.r} + ${TG.g} × ${TG.tg[ao].toFixed(1)} = <b>${yDD.toFixed(3)}</b>` +
+      (ao === at ? "  (두 망이 같은 행동을 고르면 결과가 같음)" : `  (차이 ${fmt(yD - yDD, 3)})`);
+  }
+  $("tgNew").addEventListener("click", () => { TG = { r: 1, g: 0.99, on: [0, 0, 0].map(() => Math.round(tgRng.uniform(1, 4) * 10) / 10), tg: [0, 0, 0].map(() => Math.round(tgRng.uniform(1, 4) * 10) / 10) }; drawTarget(); });
+
+  /* 최대화 편향 MDP (Sutton & Barto 예제 6.7) */
+  let MB = null;
+  function runMB(runs, seed) {
+    const r = RL.rng(seed), E = 300, eps = 0.1, al = 0.1, nB = 10, lq = new Float64Array(E), ld = new Float64Array(E);
+    const egreedy = q => { if (r.random() < eps) return r.int(q.length); return RL.argmax(q, r); };
+    for (let run = 0; run < runs; run++) {
+      const QA = [0, 0], QB = new Array(nB).fill(0);                     /* 행동 0 = 왼쪽(B로), 1 = 오른쪽(끝) */
+      const A1 = [0, 0], A2 = [0, 0], B1 = new Array(nB).fill(0), B2 = new Array(nB).fill(0);
+      for (let e = 0; e < E; e++) {
+        /* Q-learning */
+        let a = egreedy(QA);
+        if (a === 1) QA[1] += al * (0 - QA[1]);
+        else { lq[e]++; QA[0] += al * (0 + Math.max(...QB) - QA[0]); const b = egreedy(QB); QB[b] += al * (r.normal(-0.1, 1) - QB[b]); }
+        /* Double Q-learning: 두 표를 번갈아(동전 던지기) 갱신, 행동은 합으로 선택 */
+        a = egreedy([A1[0] + A2[0], A1[1] + A2[1]]);
+        if (a === 1) { if (r.random() < 0.5) A1[1] += al * (0 - A1[1]); else A2[1] += al * (0 - A2[1]); }
+        else {
+          ld[e]++;
+          if (r.random() < 0.5) A1[0] += al * (B2[RL.argmax(B1, r)] - A1[0]); else A2[0] += al * (B1[RL.argmax(B2, r)] - A2[0]);
+          const b = egreedy(B1.map((v, i) => v + B2[i])), rew = r.normal(-0.1, 1);
+          if (r.random() < 0.5) B1[b] += al * (rew - B1[b]); else B2[b] += al * (rew - B2[b]);
+        }
+      }
+    }
+    return { q: Array.from(lq, v => v / runs * 100), d: Array.from(ld, v => v / runs * 100) };
+  }
+  function drawMB() {
+    if (!MB) MB = runMB(+segVal("mbRuns"), 3);
+    const t = th(), xs = MB.q.map((_, i) => i + 1);
+    xyChart($("mbCv"), [{ xs, ys: MB.q, color: t.red, width: 2 }, { xs, ys: MB.d, color: t.blue, width: 2 }], { w: 600, h: 230, xmin: 1, xmax: 300, ymin: 0, ymax: 100, hline: 5, xticks: [1, 100, 200, 300], yfmt: v => v.toFixed(0) + "%" });
+    const avg = (a, i, j) => a.slice(i, j).reduce((x, y) => x + y, 0) / (j - i);
+    const pk = MB.q.indexOf(Math.max(...MB.q));
+    $("mbOut").innerHTML = `가로축 = 에피소드, 세로축 = A에서 왼쪽을 고른 비율(${segVal("mbRuns") === "300" ? "300" : "1,000"}번 반복 평균). Q-learning 최고 ${MB.q[pk].toFixed(1)}% (${pk + 1}번째) · 마지막 50회 평균: Q-learning ${avg(MB.q, 250, 300).toFixed(1)}%, Double ${avg(MB.d, 250, 300).toFixed(1)}%. ε = 0.1, α = 0.1, γ = 1.`;
+  }
+  segInit("mbRuns", () => { MB = null; drawMB(); });
+  $("mbRun").addEventListener("click", () => { MB = runMB(+segVal("mbRuns"), 3 + Math.floor(Math.random() * 1000)); drawMB(); });
+  onShow.double = () => { drawDouble(); drawTarget(); drawMB(); };
+
+  /* ================= 2. Dueling ================= */
+  const DU_STATES = [
+    { name: "안정", desc: "막대 수직 · 가운데", s: [0, 0, 0, 0], ex: { V: 62.0, A: [1.2, 0.8] } },
+    { name: "기울어짐", desc: "막대가 오른쪽으로 기울며 넘어가는 중", s: [0, 0.3, 0.1, 0.6], ex: { V: 48.0, A: [-3.1, 2.9] } },
+    { name: "위험", desc: "카트가 오른쪽 경계 근처", s: [2.1, 0.8, 0.05, 0.3], ex: { V: 6.5, A: [0.6, -2.2] } }
+  ];
+  function drawDuSvg() {
+    const s = [];
+    const box = (x, y, w, h, cls, t1, t2) => s.push(`<rect class="box ${cls}" x="${x}" y="${y}" width="${w}" height="${h}" rx="10"/><text x="${x + w / 2}" y="${y + h / 2 - (t2 ? 3 : -5)}" text-anchor="middle" font-size="14.5" font-weight="700">${t1}</text>` + (t2 ? `<text class="m" x="${x + w / 2}" y="${y + h / 2 + 15}" text-anchor="middle" font-size="12">${t2}</text>` : ""));
+    const arr = (d, cls) => s.push(`<path class="ln ${cls}" d="${d}" marker-end="url(#dah-${cls})"/>`);
+    s.push("<defs>" + ["st", "va", "ac", "tg"].map(c => `<marker id="dah-${c}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="f${c}" d="M0 0L10 5L0 10z"/></marker>`).join("") + "</defs>");
+    box(20, 70, 120, 60, "st", "상태 s", "4개 값");
+    box(190, 70, 160, 60, "st", "공통 층", "4 → 32 → 32");
+    box(420, 18, 170, 60, "va", "가치 줄기 V(s)", "출력 1개");
+    box(420, 122, 170, 60, "ac", "이점 줄기 A(s,a)", "출력 = 행동 수");
+    box(660, 70, 160, 60, "tg", "합치기", "V + A − 평균 A");
+    box(870, 70, 90, 60, "va", "Q(s,a)", "행동 수");
+    arr("M140 100 L186 100", "st"); arr("M350 92 C 385 92, 385 48, 416 48", "va"); arr("M350 108 C 385 108, 385 152, 416 152", "ac");
+    arr("M590 48 C 625 48, 625 92, 656 92", "va"); arr("M590 152 C 625 152, 625 108, 656 108", "ac"); arr("M820 100 L866 100", "tg");
+    $("duSvg").innerHTML = s.join("");
+  }
+  function duValues() {
+    const src = segVal("duSrc"), ag = cmAgents && cmAgents[2] && cmAgents[2].steps > 2000 ? cmAgents[2] : null;
+    if (src === "net" && ag) {
+      $("duSrcHint").innerHTML = "5번 탭에서 학습한 Dueling 망(" + comma(ag.steps) + "걸음)의 실제 출력 [V, A(←), A(→)] 입니다.";
+      return DU_STATES.map(st => { const y = ag.net.predict([st.s[0] / 2.4, st.s[1] / 3, st.s[2] / 0.21, st.s[3] / 3.5]); return { V: y[0], A: [y[1], y[2]] }; });
+    }
+    $("duSrcHint").innerHTML = src === "net" ? "아직 학습된 Dueling 망이 없습니다. 5번 탭 [CartPole 비교]에서 학습(2,000걸음 이상)하면 실제 값이 채워집니다. 지금은 <b>예시 숫자</b>를 보여 줍니다." : "<b>예시 숫자</b>입니다(설명용). [학습된 Dueling 망]을 고르면 5번 탭에서 학습한 망의 실제 값을 보여 줍니다.";
+    return DU_STATES.map(st => st.ex);
+  }
+  function drawDueling() {
+    drawDuSvg();
+    const box = $("duStates");
+    if (!box.children.length) box.innerHTML = DU_STATES.map((st, i) => `<div class="dv-state"><canvas id="duCv${i}" aria-label="${st.name} 상태의 CartPole"></canvas><b>${st.name}</b><span>${st.desc}<br>s = (${st.s.join(", ")})</span></div>`).join("");
+    DU_STATES.forEach((st, i) => RL.drawCartPole($("duCv" + i), st.s, { w: 300, h: 130 }));
+    const V = duValues();
+    let h = "<thead><tr><th>상태</th><th>V(s)</th><th>A(s,←)</th><th>A(s,→)</th><th>평균 A</th><th>Q(s,←) = V + A − 평균</th><th>Q(s,→)</th><th>|Q 차이|</th><th>고를 행동</th></tr></thead><tbody>";
+    V.forEach((v, i) => { const m = (v.A[0] + v.A[1]) / 2, q0 = v.V + v.A[0] - m, q1 = v.V + v.A[1] - m;
+      h += `<tr><td><b>${DU_STATES[i].name}</b></td><td class="n" style="color:var(--r-val);font-weight:700">${v.V.toFixed(2)}</td><td class="n">${fmt(v.A[0], 2)}</td><td class="n">${fmt(v.A[1], 2)}</td><td class="n">${fmt(m, 2)}</td>` +
+        `<td class="n">${v.V.toFixed(2)} + (${fmt(v.A[0] - m, 2)}) = <b>${q0.toFixed(2)}</b></td><td class="n">${v.V.toFixed(2)} + (${fmt(v.A[1] - m, 2)}) = <b>${q1.toFixed(2)}</b></td><td class="n">${Math.abs(q0 - q1).toFixed(2)}</td><td style="color:var(--r-act);font-weight:700">${q1 > q0 ? "→ 오른쪽" : "← 왼쪽"}</td></tr>`; });
+    $("duTable").innerHTML = h + "</tbody>";
+    const c = +$("duC").value, v = V[0], m = (v.A[0] + v.A[1]) / 2;
+    $("duCV").textContent = (c > 0 ? "+" : "") + c.toFixed(1);
+    const V2 = v.V + c, A2 = [v.A[0] - c, v.A[1] - c];
+    $("duNaive").innerHTML = `<b>그냥 더하기 Q = V + A</b><br>V = ${V2.toFixed(2)}, A = [${fmt(A2[0], 2)}, ${fmt(A2[1], 2)}]<br>Q = [${(V2 + A2[0]).toFixed(2)}, ${(V2 + A2[1]).toFixed(2)}] — c를 바꿔도 <b>항상 같음</b> → V를 정할 수 없음`;
+    const m2 = (A2[0] + A2[1]) / 2;
+    $("duMean").innerHTML = `<b>평균 빼기 Q = V + A − 평균 A</b><br>V = ${V2.toFixed(2)}, A − 평균 = [${fmt(A2[0] - m2, 2)}, ${fmt(A2[1] - m2, 2)}] (합 = 0)<br>Q = [${(V2 + A2[0] - m2).toFixed(2)}, ${(V2 + A2[1] - m2).toFixed(2)}] — 출력 Q가 정해지면 V = 평균 Q = ${(v.V + 0).toFixed(2)} 하나뿐` + (c ? ` (지금은 c = ${c}만큼 어긋남)` : "");
+    void m;
+  }
+  segInit("duSrc", drawDueling); $("duC").addEventListener("input", drawDueling);
+  onShow.dueling = drawDueling;
+
+  /* ================= 3. PER ================= */
+  const PE_DEF = [2.0, -0.5, 0.1, 1.2, -3.0, 0.05, 0.6, -0.3];
+  let PE = PE_DEF.slice(), peRng = RL.rng(21), peStrat = false;
+  function perCalc() {
+    const al = +$("peA").value, be = +$("peB").value, ep = +segVal("peE"), N = PE.length;
+    const p = PE.map(d => Math.abs(d) + ep), pa = p.map(x => Math.pow(x, al)), S = pa.reduce((a, b) => a + b, 0), P = pa.map(x => x / S);
+    const w0 = P.map(x => Math.pow(N * x, -be)), mw = Math.max(...w0), w = w0.map(x => x / mw);
+    return { al, be, ep, N, p, pa, S, P, w };
+  }
+  function drawPER() {
+    const c = perCalc(), t = th();
+    $("peAV").textContent = c.al.toFixed(1); $("peBV").textContent = c.be.toFixed(1);
+    $("peTable").innerHTML = "<thead><tr><th>#</th><th>δ</th><th>p = |δ| + ε</th><th>p<sup>α</sup></th><th>P(i)</th><th>w (정규화)</th></tr></thead><tbody>" +
+      PE.map((d, i) => `<tr><td>${i}</td><td class="n">${fmt(d, 2)}</td><td class="n">${c.p[i].toFixed(3)}</td><td class="n">${c.pa[i].toFixed(4)}</td><td class="n" style="color:var(--r-td);font-weight:700">${c.P[i].toFixed(4)}</td><td class="n" style="color:var(--r-exp);font-weight:700">${c.w[i].toFixed(3)}</td></tr>`).join("") +
+      `<tr><td colspan="3"><b>합</b></td><td class="n"><b>${c.S.toFixed(4)}</b></td><td class="n">1.0000</td><td></td></tr></tbody>`;
+    const f = frame($("peCv"), 560, 250), g = f.g, W = f.w, H = f.h, pl = 48, pr = 12, pt = 14, pb = 30, ymax = Math.max(0.3, Math.max(...c.P) * 1.15);
+    axisY(g, t, pl, pr, pt, H, pb, W, 0, ymax, 4, v => v.toFixed(2));
+    const bw = (W - pl - pr) / c.N, Y = v => pt + (H - pt - pb) * (1 - v / ymax);
+    c.P.forEach((v, i) => { g.fillStyle = t.red; g.globalAlpha = 0.75; g.fillRect(pl + i * bw + bw * 0.18, Y(v), bw * 0.64, Y(0) - Y(v)); g.globalAlpha = 1;
+      g.fillStyle = t.faint; g.font = "11px " + css("--mono"); g.textAlign = "center"; g.fillText("#" + i, pl + (i + 0.5) * bw, H - 12);
+      /* 중요도 가중치 w (오른쪽 축 0~1을 같은 높이로) */
+      const wy = pt + (H - pt - pb) * (1 - c.w[i]); g.fillStyle = t.amber; g.beginPath(); g.arc(pl + (i + 0.5) * bw, wy, 4.5, 0, Math.PI * 2); g.fill(); });
+    g.strokeStyle = t.muted; g.setLineDash([5, 4]); g.lineWidth = 1.5; g.beginPath(); g.moveTo(pl, Y(1 / c.N)); g.lineTo(W - pr, Y(1 / c.N)); g.stroke(); g.setLineDash([]);
+    g.fillStyle = t.muted; g.textAlign = "right"; g.font = "600 11px " + css("--sans"); g.fillText("균등 1/8 = 0.125", W - pr, Y(1 / c.N) - 5);
+    g.fillStyle = t.amber; g.textAlign = "right"; g.fillText("● w (위 끝 = 1)", W - pr, pt + 10);
+    drawTree(c);
+  }
+  function drawTree(c) {
+    const pa = c.pa, n1 = [pa[0] + pa[1], pa[2] + pa[3], pa[4] + pa[5], pa[6] + pa[7]], n2 = [n1[0] + n1[1], n1[2] + n1[3]], root = n2[0] + n2[1];
+    const T = root, u = +$("peU").value / 1000 * T * 0.9999;
+    $("peUV").textContent = u.toFixed(3);
+    function path(v) { const p = ["r"]; let k = 0; /* 루트 → 잎 */
+      if (v < n2[0]) { p.push("a0"); k = 0; } else { v -= n2[0]; p.push("a1"); k = 1; }
+      if (v < n1[2 * k]) { p.push("b" + 2 * k); k = 2 * k; } else { v -= n1[2 * k]; p.push("b" + (2 * k + 1)); k = 2 * k + 1; }
+      if (v < pa[2 * k]) { p.push("l" + 2 * k); k = 2 * k; } else { v -= pa[2 * k]; p.push("l" + (2 * k + 1)); k = 2 * k + 1; }
+      return { p, leaf: k }; }
+    const us = peStrat ? [0, 1, 2, 3].map(k => T * (k + 0.5) / 4) : [u];
+    const paths = us.map(path), on = {}; paths.forEach(pp => pp.p.forEach(x => { on[x] = true; }));
+    const s = [], W = 900, pos = { r: [W / 2, 34] };
+    [0, 1].forEach(i => { pos["a" + i] = [W / 4 + i * W / 2, 104]; });
+    [0, 1, 2, 3].forEach(i => { pos["b" + i] = [W / 8 + i * W / 4, 174]; });
+    for (let i = 0; i < 8; i++) pos["l" + i] = [W / 16 + i * W / 8, 244];
+    const val = { r: root, a0: n2[0], a1: n2[1], b0: n1[0], b1: n1[1], b2: n1[2], b3: n1[3] }; for (let i = 0; i < 8; i++) val["l" + i] = pa[i];
+    const kids = { r: ["a0", "a1"], a0: ["b0", "b1"], a1: ["b2", "b3"], b0: ["l0", "l1"], b1: ["l2", "l3"], b2: ["l4", "l5"], b3: ["l6", "l7"] };
+    Object.keys(kids).forEach(k => kids[k].forEach(c2 => { const a = pos[k], b = pos[c2], hot = on[k] && on[c2];
+      s.push(`<path class="ln ${hot ? "tg" : ""}" style="${hot ? "stroke-width:3" : "stroke:var(--line-strong)"}" d="M${a[0]} ${a[1] + 18} L${b[0]} ${b[1] - 18}"/>`); }));
+    Object.keys(pos).forEach(k => { const p = pos[k], leaf = k[0] === "l", w = leaf ? 92 : 108, hot = on[k];
+      s.push(`<rect class="box ${hot ? "tg" : ""}" style="${hot ? "stroke-width:2.5" : ""}" x="${p[0] - w / 2}" y="${p[1] - 18}" width="${w}" height="36" rx="8"/>`);
+      s.push(`<text x="${p[0]}" y="${p[1] + 5}" text-anchor="middle" font-size="14" font-weight="700" font-family="var(--mono)">${val[k].toFixed(3)}</text>`);
+      if (leaf) s.push(`<text class="m" x="${p[0]}" y="${p[1] + 34}" text-anchor="middle" font-size="12">#${k.slice(1)} · δ ${fmt(PE[+k.slice(1)], 2)}</text>`); });
+    $("treeSvg").innerHTML = s.join("");
+    if (peStrat) $("treeNote").innerHTML = `<b>층화 추출</b>: 전체 합 ${T.toFixed(3)}을 배치 크기 4개 구간으로 나누고 각 구간에서 하나씩 뽑습니다(여기서는 구간 가운데 값 ${us.map(x => x.toFixed(3)).join(", ")}). 뽑힌 전이: ${paths.map(p => "#" + p.leaf).join(", ")} — 큰 우선순위 전이는 여러 번 뽑힐 수 있습니다.`;
+    else { const pp = paths[0]; $("treeNote").innerHTML = `u = ${u.toFixed(3)}: 루트(${T.toFixed(3)})에서 시작 → 왼쪽 자식 합보다 작으면 왼쪽, 크거나 같으면 그 합을 빼고 오른쪽 → 3번 비교로 잎 <b>#${pp.leaf}</b> 도착. 잎의 폭이 p<sup>α</sup>에 비례하므로 P(i) = p<sub>i</sub><sup>α</sup> / ${T.toFixed(3)} 로 뽑힙니다. 새 전이는 지금까지의 최대 우선순위로 넣고, 학습 뒤 |δ| + ε로 고칩니다(잎 하나 + 조상 3칸만 갱신).`; }
+  }
+  ["peA", "peB"].forEach(id => $(id).addEventListener("input", () => { drawPER(); updateCode(); }));
+  segInit("peE", drawPER);
+  $("peU").addEventListener("input", () => { peStrat = false; drawPER(); });
+  $("peStrat").addEventListener("click", () => { peStrat = !peStrat; $("peStrat").textContent = peStrat ? "u 하나로 돌아가기" : "배치 4개 층화 추출 보기"; drawPER(); });
+  $("peNew").addEventListener("click", () => { PE = PE.map(() => Math.round(peRng.normal(0, 1.4) * 100) / 100); drawPER(); });
+  $("peDef").addEventListener("click", () => { PE = PE_DEF.slice(); drawPER(); });
+  onShow.per = drawPER;
+
+  /* ================= 4. Rainbow ================= */
+  const SIX = [
+    ["Double", "과대추정", "온라인 망으로 고르고 타깃망으로 평가", "#double"],
+    ["Dueling", "표현 효율", "Q = V + A − 평균 A 두 줄기", "#dueling"],
+    ["PER", "표본 효율", "|δ|가 큰 전이를 더 자주 · 가중치로 보정", "#per"],
+    ["n-step", "보상 전파 속도", "n걸음 실제 보상 + γⁿ·max Q", "#rainbow"],
+    ["Distributional (C51)", "수익의 불확실성", "기댓값 대신 원자 51개 위 확률분포", "#rainbow"],
+    ["Noisy Nets", "탐험", "가중치에 학습되는 잡음 · ε 없음", "#rainbow"]
+  ];
+  $("rbSix").innerHTML = SIX.map((x, i) => `<div class="dv-six__c"><span class="dv-six__n">${i + 1}</span><b>${x[0]}</b><em>고치는 것: ${x[1]}</em><span>${x[2]}</span></div>`).join("");
+  const PAPER = [["DQN", 79], ["DDQN (Double)", 117], ["Noisy DQN", 118], ["Prioritized DDQN", 140], ["Dueling DDQN", 151], ["Distributional DQN", 164], ["Rainbow", 223]];
+  function drawPaper() {
+    const t = th(), f = frame($("rbCv"), 600, 270), g = f.g, W = f.w, H = f.h, pl = 140, pr = 50, pt = 8, rowH = (H - pt - 24) / PAPER.length, mx = 240;
+    const X = v => pl + (W - pl - pr) * v / mx;
+    g.strokeStyle = t.line; g.fillStyle = t.faint; g.font = "11px " + css("--mono"); g.textAlign = "center";
+    (W < 480 ? [0, 100, 200] : [0, 50, 100, 150, 200]).forEach(v => { g.beginPath(); g.moveTo(X(v), pt); g.lineTo(X(v), H - 22); g.stroke(); g.fillText(v + "%", X(v), H - 8); });
+    g.strokeStyle = t.muted; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(X(100), pt); g.lineTo(X(100), H - 22); g.stroke(); g.setLineDash([]);
+    PAPER.forEach((p, i) => { const y = pt + i * rowH + rowH * 0.18, h = rowH * 0.64, last = i === PAPER.length - 1;
+      g.fillStyle = last ? t.accent : i === 0 ? t.gray : t.purple; g.globalAlpha = last ? 1 : 0.8; g.fillRect(X(0), y, X(p[1]) - X(0), h); g.globalAlpha = 1;
+      g.fillStyle = t.text; g.font = (last ? "700 " : "600 ") + "12px " + css("--sans"); g.textAlign = "right"; g.fillText(p[0], pl - 8, y + h / 2 + 4);
+      g.textAlign = "left"; g.font = "600 12px " + css("--mono"); g.fillText(p[1] + "%", X(p[1]) + 5, y + h / 2 + 4); });
+  }
+  /* n-step */
+  const NS = { r: [1, 0, 0, 2, 1], boot: [4.0, 3.5, 3.0, 2.5, 2.0], g: 0.9 };
+  function drawNstep() {
+    const n = +$("nsN").value; $("nsV").textContent = n;
+    let G = 0, h = "<thead><tr><th>k</th><th>r<sub>t+k</sub></th><th>γ<sup>k</sup></th><th>γ<sup>k</sup>·r</th></tr></thead><tbody>", terms = [];
+    for (let k = 0; k < n; k++) { const gk = Math.pow(NS.g, k); G += gk * NS.r[k]; terms.push(gk.toFixed(3) + "×" + NS.r[k]); h += `<tr><td>${k}</td><td class="n">${NS.r[k]}</td><td class="n">${gk.toFixed(3)}</td><td class="n">${(gk * NS.r[k]).toFixed(3)}</td></tr>`; }
+    const gn = Math.pow(NS.g, n), b = NS.boot[n - 1];
+    h += `<tr><td>부트스트랩</td><td class="n" colspan="2">max Q(s<sub>t+${n}</sub>) = ${b.toFixed(1)}</td><td class="n">${gn.toFixed(4)} × ${b.toFixed(1)} = ${(gn * b).toFixed(3)}</td></tr></tbody>`;
+    $("nsTable").innerHTML = h;
+    $("nsFormula").innerHTML = `G<sub>t</sub><sup>(${n})</sup> = Σ<sub>k=0</sub><sup>${n - 1}</sup> γ<sup>k</sup> r<sub>t+k</sub> + γ<sup>${n}</sup> max<sub>a</sub> Q(s<sub>t+${n}</sub>, a; θ⁻) = (${terms.join(" + ")}) + ${gn.toFixed(4)} × ${b.toFixed(1)} = <b>${(G + gn * b).toFixed(4)}</b>`;
+  }
+  $("nsN").addEventListener("input", drawNstep);
+  /* C51 투영 */
+  const C5P = [0, 0, 0.05, 0.10, 0.20, 0.30, 0.20, 0.10, 0.05, 0, 0];
+  function c51(r, gm) {
+    const N = 11, m = new Array(N).fill(0), rows = [];
+    for (let j = 0; j < N; j++) {
+      const raw = r + gm * j, Tz = Math.max(0, Math.min(10, raw)), b = Tz, l = Math.floor(b + 1e-9), u = Math.ceil(b - 1e-9);
+      let tl, tu; if (l === u) { tl = C5P[j]; tu = 0; m[l] += tl; } else { tl = C5P[j] * (u - b); tu = C5P[j] * (b - l); m[l] += tl; m[u] += tu; }
+      rows.push({ j, p: C5P[j], raw, Tz, b, l, u, tl, tu });
+    }
+    return { m, rows };
+  }
+  function drawC51() {
+    const r = +$("c5R").value, gm = +$("c5G").value; $("c5RV").textContent = r.toFixed(1); $("c5GV").textContent = gm.toFixed(2);
+    const R = c51(r, gm), t = th();
+    const f = frame($("c5Cv"), 600, 260), g = f.g, W = f.w, H = f.h, pl = 44, pr = 14, pt = 30, pb = 30, ymax = Math.max(0.35, ...R.m) * 1.1;
+    axisY(g, t, pl, pr, pt, H, pb, W, 0, ymax, 4, v => v.toFixed(2));
+    const X = z => pl + (W - pl - pr) * (z + 0.5) / 11, Y = v => pt + (H - pt - pb) * (1 - v / ymax), bw = (W - pl - pr) / 11 * 0.36;
+    for (let j = 0; j < 11; j++) {
+      g.fillStyle = t.purple; g.globalAlpha = 0.7; g.fillRect(X(j) - bw - 1, Y(C5P[j]), bw, Y(0) - Y(C5P[j]));
+      g.fillStyle = t.red; g.globalAlpha = 0.85; g.fillRect(X(j) + 1, Y(R.m[j]), bw, Y(0) - Y(R.m[j])); g.globalAlpha = 1;
+      g.fillStyle = t.faint; g.font = "11px " + css("--mono"); g.textAlign = "center"; g.fillText(String(j), X(j), H - 12);
+    }
+    /* 이동·축소된 원자 위치: 보라 막대 꼭대기(z_j, p_j) → 분홍 점(r + γz_j, p_j). 이 점들을 이웃 원자로 나눠 담은 것이 빨간 막대 */
+    R.rows.forEach(rw => { if (!rw.p) return; const x0 = X(rw.j) - bw / 2 - 1, x1 = X(rw.Tz), y = Y(rw.p);
+      g.strokeStyle = css("--r-tgt"); g.fillStyle = g.strokeStyle; g.lineWidth = 1.4; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke(); g.setLineDash([]);
+      g.beginPath(); g.arc(x1, y, 4, 0, Math.PI * 2); g.fill(); });
+    const show = R.rows.filter(x => x.p > 0);
+    $("c5Table").innerHTML = "<thead><tr><th>j</th><th>z<sub>j</sub></th><th>p<sub>j</sub></th><th>r + γz<sub>j</sub></th><th>l / u</th><th>→ m<sub>l</sub></th><th>→ m<sub>u</sub></th></tr></thead><tbody>" +
+      show.map(x => `<tr><td>${x.j}</td><td class="n">${x.j}</td><td class="n">${x.p.toFixed(2)}</td><td class="n">${x.raw.toFixed(2)}${x.raw !== x.Tz ? " → " + x.Tz.toFixed(2) : ""}</td><td class="n">${x.l} / ${x.u}</td><td class="n">${x.tl.toFixed(3)}</td><td class="n">${x.tu.toFixed(3)}</td></tr>`).join("") + "</tbody>";
+    const EZ = C5P.reduce((s, p, j) => s + p * j, 0), EM = R.m.reduce((s, p, j) => s + p * j, 0), clipped = R.rows.some(x => x.p > 0 && x.raw !== x.Tz);
+    $("c5Formula").innerHTML = `투영: b = (r + γz<sub>j</sub> − V<sub>min</sub>)/Δz, l = ⌊b⌋, u = ⌈b⌉ → m<sub>l</sub> += p<sub>j</sub>(u − b), m<sub>u</sub> += p<sub>j</sub>(b − l)<br>` +
+      `m = [${R.m.map(v => v.toFixed(3)).join(", ")}]<br>E[타깃] = Σ m<sub>i</sub> z<sub>i</sub> = <b>${EM.toFixed(3)}</b>  ·  r + γ·E[Z(s′)] = ${r.toFixed(1)} + ${gm.toFixed(2)} × ${EZ.toFixed(2)} = <b>${(r + gm * EZ).toFixed(3)}</b>` +
+      (clipped ? "  (범위 [0, 10] 밖으로 나간 원자를 잘라서 두 값이 다름)" : "  (투영은 평균을 보존)");
+  }
+  ["c5R", "c5G"].forEach(id => $(id).addEventListener("input", drawC51));
+  /* Noisy Nets */
+  const NZ = { x: [0.2, -0.4, 0.5, 0.3], muW: [[0.5, 0.3], [-0.2, 0.1], [0.6, 0.4], [0.1, 0.2]], muB: [0.1, 0.1], s0: 0.5 / Math.sqrt(4) };
+  let nzRng = RL.rng(31), nzEps = null;
+  const fN = e => Math.sign(e) * Math.sqrt(Math.abs(e));
+  function nzQ(ei, eo, k) { const q = [0, 0]; for (let j = 0; j < 2; j++) { let s = NZ.muB[j] + k * NZ.s0 * fN(eo[j]); for (let i = 0; i < 4; i++) s += (NZ.muW[i][j] + k * NZ.s0 * fN(ei[i]) * fN(eo[j])) * NZ.x[i]; q[j] = s; } return q; }
+  function drawNoisy(resample) {
+    const k = +$("nzS").value; $("nzSV").textContent = k.toFixed(1);
+    if (resample || !nzEps) nzEps = { i: [0, 0, 0, 0].map(() => nzRng.normal()), o: [0, 0].map(() => nzRng.normal()) };
+    const q0 = nzQ([0, 0, 0, 0], [0, 0], 0), q = nzQ(nzEps.i, nzEps.o, k);
+    const r = RL.rng(99); let c0 = 0; const qs = [];
+    for (let n = 0; n < 1000; n++) { const qq = nzQ([0, 0, 0, 0].map(() => r.normal()), [0, 0].map(() => r.normal()), k); if (qq[0] >= qq[1]) c0++; qs.push(qq[0] - qq[1]); }
+    $("nzFormula").innerHTML = `y = (μ<sub>w</sub> + σ<sub>w</sub> ⊙ ε<sub>w</sub>) x + (μ<sub>b</sub> + σ<sub>b</sub> ⊙ ε<sub>b</sub>),  ε<sub>w,ij</sub> = f(ε<sub>i</sub>) f(ε<sub>j</sub>), f(ε) = sgn(ε)√|ε|,  σ 초깃값 = 0.5/√4 = 0.25<br>` +
+      `x = (${NZ.x.join(", ")}) · 잡음 없음(μ만): Q = [${q0[0].toFixed(3)}, ${q0[1].toFixed(3)}] → 항상 ← · 이번 잡음 ε<sub>in</sub> = (${nzEps.i.map(v => fmt(v, 2)).join(", ")}), ε<sub>out</sub> = (${nzEps.o.map(v => fmt(v, 2)).join(", ")})<br>` +
+      `→ Q = [<b>${q[0].toFixed(3)}</b>, <b>${q[1].toFixed(3)}</b>] → 탐욕 행동 = <b>${q[0] >= q[1] ? "← 왼쪽" : "→ 오른쪽"}</b>`;
+    $("nzStats").innerHTML = [["잡음 1,000번 중 ← 선택", (c0 / 10).toFixed(1) + "%"], ["→ 선택 (탐험)", ((1000 - c0) / 10).toFixed(1) + "%"], ["Q(←) − Q(→) 평균", fmt(mean(qs), 3)]]
+      .map(x => `<div class="sk-stat"><b>${x[1]}</b><span>${x[0]}</span></div>`).join("");
+  }
+  $("nzS").addEventListener("input", () => drawNoisy(false));
+  $("nzNew").addEventListener("click", () => drawNoisy(true));
+  onShow.rainbow = () => { drawPaper(); drawNstep(); drawC51(); drawNoisy(false); };
+
+  /* AGENT-BEGIN ===== DQN 개선판 에이전트 (rl-kit 의 CartPole · MLP · Adam 사용) ===== */
+  /* o: seed hidden[] lr gamma batch buf eps0 eps1 epsSteps warmup trainEvery sync double dueling per alpha beta0 betaSteps pEps */
+  const NORM = s => [s[0] / 2.4, s[1] / 3, s[2] / 0.21, s[3] / 3.5];   /* 망 입력 정규화 */
+  /* 합 트리: 잎 = 우선순위 p^α, 안쪽 노드 = 자식 합 → 비례 표본추출 O(log N) */
+  function SumTree(n) { let c = 1; while (c < n) c *= 2; this.cap = c; this.t = new Float64Array(2 * c); }
+  SumTree.prototype.set = function (i, p) { let k = i + this.cap; this.t[k] = p; k >>= 1; while (k >= 1) { this.t[k] = this.t[2 * k] + this.t[2 * k + 1]; k >>= 1; } };
+  SumTree.prototype.total = function () { return this.t[1]; };
+  SumTree.prototype.leaf = function (i) { return this.t[i + this.cap]; };
+  SumTree.prototype.find = function (v) { let k = 1; while (k < this.cap) { const L = this.t[2 * k]; if (v < L || this.t[2 * k + 1] <= 0) k = 2 * k; else { v -= L; k = 2 * k + 1; } } return k - this.cap; };
+  function VAgent(o) {
+    this.o = o;
+    this.rng = RL.rng(o.seed);
+    this.env = new RL.CartPole(RL.rng(o.seed * 7 + 1));
+    this.net = new RL.MLP([4].concat(o.hidden, [o.dueling ? 3 : 2]), { act: "relu", rng: RL.rng(o.seed * 13 + 5) });
+    this.tgt = this.net.clone();
+    this.opt = new RL.Adam(this.net, { lr: o.lr });
+    this.cap = o.buf; this.S = []; this.A = []; this.R = []; this.S2 = []; this.D = [];
+    if (o.per) { this.tree = new SumTree(o.buf); this.maxP = 1; }
+    this.ptr = 0; this.size = 0; this.steps = 0; this.updates = 0;
+    this.s = this.env.reset(); this.epR = 0; this.returns = []; this.epEnd = []; this.qLog = [];
+  }
+  /* 망 출력 → Q. Dueling 은 출력 [V, A₀, A₁] 을 Q = V + A − mean(A) 로 합침 */
+  VAgent.prototype.head = function (y) { if (!this.o.dueling) return y; const m = (y[1] + y[2]) / 2; return [y[0] + y[1] - m, y[0] + y[2] - m]; };
+  VAgent.prototype.Q = function (s, net) { return this.head((net || this.net).predict(NORM(s))); };
+  VAgent.prototype.greedy = function (s) { const q = this.Q(s); return q[1] > q[0] ? 1 : 0; };
+  VAgent.prototype.eps = function () { const o = this.o; return o.eps0 + (o.eps1 - o.eps0) * Math.min(1, this.steps / o.epsSteps); };
+  VAgent.prototype.beta = function () { const o = this.o; return o.beta0 + (1 - o.beta0) * Math.min(1, this.steps / o.betaSteps); };
+  VAgent.prototype.store = function (s, a, r, s2, d) {
+    const i = this.ptr; this.S[i] = s; this.A[i] = a; this.R[i] = r; this.S2[i] = s2; this.D[i] = d;
+    if (this.tree) this.tree.set(i, Math.pow(this.maxP, this.o.alpha));          /* 새 전이 = 지금까지 최대 우선순위 */
+    this.ptr = (i + 1) % this.cap; this.size = Math.min(this.size + 1, this.cap);
+  };
+  /* 타깃 y: DQN = r + γ·max Q(s′;θ⁻) / Double = r + γ·Q(s′, argmax Q(s′;θ); θ⁻) */
+  VAgent.prototype.target = function (j) {
+    const o = this.o; if (this.D[j]) return this.R[j];
+    const qt = this.Q(this.S2[j], this.tgt);
+    let a2;
+    if (o.double) { const qo = this.Q(this.S2[j]); a2 = qo[1] > qo[0] ? 1 : 0; } else a2 = qt[1] > qt[0] ? 1 : 0;
+    return this.R[j] + o.gamma * qt[a2];
+  };
+  VAgent.prototype.train = function () {
+    const o = this.o, B = o.batch, net = this.net, idx = [], w = [];
+    if (this.tree) {                                                            /* 구간을 B개로 나눠 하나씩 비례 추출 */
+      const tot = this.tree.total(), seg = tot / B, beta = this.beta(); let maxw = 0;
+      for (let k = 0; k < B; k++) { let j = this.tree.find(seg * (k + this.rng.random())); if (j >= this.size) j = this.rng.int(this.size);
+        const P = this.tree.leaf(j) / tot, ww = Math.pow(this.size * P, -beta); idx.push(j); w.push(ww); if (ww > maxw) maxw = ww; }
+      for (let k = 0; k < B; k++) w[k] /= maxw;
+    } else for (let k = 0; k < B; k++) { idx.push(this.rng.int(this.size)); w.push(1); }
+    for (let k = 0; k < B; k++) {
+      const j = idx[k], y = this.target(j), f = net.forward(NORM(this.S[j])), q = this.head(f.y), a = this.A[j], td = q[a] - y;
+      const g = Math.max(-1, Math.min(1, td)) * w[k], dq = [0, 0]; dq[a] = g;
+      net.backward(f.cache, o.dueling ? [dq[0] + dq[1], dq[0] - (dq[0] + dq[1]) / 2, dq[1] - (dq[0] + dq[1]) / 2] : dq);
+      if (this.tree) { const p = Math.abs(td) + o.pEps; this.tree.set(j, Math.pow(p, o.alpha)); if (p > this.maxP) this.maxP = p; }
+    }
+    this.opt.step(1 / B); this.updates++;
+  };
+  VAgent.prototype.step = function () {
+    const o = this.o, s = this.s, a = (this.steps < o.warmup || this.rng.random() < this.eps()) ? this.rng.int(2) : this.greedy(s), res = this.env.step(a);
+    this.steps++; this.epR += res.r;
+    this.store(s, a, res.r, res.s, res.done);
+    if (this.steps >= o.warmup && this.steps % o.trainEvery === 0) this.train();
+    if (this.steps % o.sync === 0) this.tgt.copyFrom(this.net);
+    if (this.steps % 250 === 0) { const q = this.Q([0, 0, 0, 0]); this.qLog.push(Math.max(q[0], q[1])); }
+    if (res.done || res.truncated) { this.returns.push(this.epR); this.epEnd.push(this.steps); this.epR = 0; this.s = this.env.reset(); } else this.s = res.s;
+  };
+  /* 탐욕 정책 평가 (탐험 없음, 별도 환경) */
+  VAgent.prototype.evaluate = function (n, seed) {
+    const env = new RL.CartPole(RL.rng(seed)); let tot = 0;
+    for (let e = 0; e < n; e++) { let s = env.reset(); for (;;) { const r = env.step(this.greedy(s)); tot++; if (r.done || r.truncated) break; s = r.s; } }
+    return tot / n;
+  };
+  /* AGENT-END */
+
+  /* ================= 5. CartPole 비교 ================= */
+  const CM = [
+    { key: "dqn", name: "DQN", col: "gray" },
+    { key: "double", name: "Double DQN", col: "blue" },
+    { key: "dueling", name: "Dueling DQN", col: "purple" },
+    { key: "per", name: "DQN + PER", col: "orange" }
+  ];
+  let cmAgents = null, cmRunning = false, cmTotal = 15000, cmSeries = null, cmEval = null;
+  function cmReset() {
+    cmRunning = false; $("cmRun").textContent = "비교 시작"; cmTotal = +segVal("cmSteps"); cmEval = null;
+    const seed = Math.max(1, Math.min(9999, +$("cmSeed").value || 1));
+    cmAgents = CM.map(c => new VAgent({ seed, hidden: [32, 32], lr: 0.001, batch: 64, gamma: 0.99, epsSteps: 6000, sync: 1000, buf: 50000, eps0: 1, eps1: 0.05, warmup: 500, trainEvery: 2,
+      double: c.key === "double", dueling: c.key === "dueling", per: c.key === "per", alpha: 0.6, beta0: 0.4, betaSteps: cmTotal, pEps: 0.01 }));
+    cmSeries = CM.map(() => []);
+    drawCompare();
+  }
+  function cmTick() {
+    const t0 = performance.now(); let alive;
+    do {
+      alive = false;
+      cmAgents.forEach((a, i) => {
+        if (a.steps >= cmTotal) return; alive = true;
+        for (let k = 0; k < 50 && a.steps < cmTotal; k++) { a.step(); if (a.steps % 250 === 0) { const R = a.returns.slice(-10); cmSeries[i].push(R.length ? R.reduce((x, y) => x + y, 0) / R.length : 0); } }
+      });
+    } while (alive && performance.now() - t0 < 24);
+    if (!alive) { cmRunning = false; $("cmRun").textContent = "다시 실행"; cmEval = cmAgents.map(a => a.evaluate(5, 777)); drawCompare(); }
+  }
+  function drawCompare() {
+    const t = th(), cols = CM.map(c => t[c.col]);
+    const xs = n => Array.from({ length: n }, (_, i) => (i + 1) * 250);
+    if (cmSeries && cmSeries.some(s => s.length > 1)) {
+      xyChart($("cmRetCv"), cmSeries.map((s, i) => ({ xs: xs(s.length), ys: s, color: cols[i], width: i ? 2 : 2.6 })), { w: 600, h: 240, xmax: cmTotal, ymin: 0, ymax: 500, xticks: [0, cmTotal / 3, cmTotal * 2 / 3, cmTotal], xfmt: v => (v / 1000).toFixed(0) + "k", yfmt: v => v.toFixed(0) });
+      const qm = Math.max(20, ...cmAgents.map(a => Math.max(0, ...a.qLog))) * 1.1;
+      xyChart($("cmQCv"), cmAgents.map((a, i) => ({ xs: xs(a.qLog.length), ys: a.qLog, color: cols[i], width: i ? 2 : 2.6 })), { w: 600, h: 240, xmax: cmTotal, ymin: 0, ymax: qm, xticks: [0, cmTotal / 3, cmTotal * 2 / 3, cmTotal], xfmt: v => (v / 1000).toFixed(0) + "k", yfmt: v => v.toFixed(0) });
+    } else { emptyChart($("cmRetCv"), 600, 240, "[비교 시작]을 누르세요"); emptyChart($("cmQCv"), 600, 240, "250걸음마다 max Q(s₀) 기록"); }
+    $("cmLegend").innerHTML = CM.map((c, i) => `<span><i style="background:${cols[i]}"></i>${c.name}</span>`).join("");
+    let h = "<thead><tr><th>에이전트</th><th>진행</th><th>에피소드</th><th>후반 1/3 평균 수익</th><th>최고 (10회 평균)</th><th>최종 max Q(s₀)</th><th>탐욕 평가 (5회 평균)</th></tr></thead><tbody>";
+    CM.forEach((c, i) => {
+      const a = cmAgents ? cmAgents[i] : null, s = cmSeries ? cmSeries[i] : [], late = s.slice(Math.floor(s.length * 2 / 3)), la = late.length ? late.reduce((x, y) => x + y, 0) / late.length : 0;
+      const best = a && a.returns.length ? Math.max(...RL.movingAvg(a.returns, 10)) : 0;
+      h += `<tr><td style="color:${cols[i]};font-weight:700">${c.name}</td><td class="n">${a ? Math.round(a.steps / cmTotal * 100) : 0}%</td><td class="n">${a ? a.returns.length : 0}</td><td class="n">${la.toFixed(1)}</td><td class="n">${best.toFixed(1)}</td>` +
+        `<td class="n">${a && a.qLog.length ? a.qLog[a.qLog.length - 1].toFixed(1) : "–"}</td><td class="n">${cmEval ? cmEval[i].toFixed(1) : "–"}</td></tr>`;
+    });
+    $("cmTable").innerHTML = h + "</tbody>";
+    const prog = cmAgents ? Math.round(cmAgents.reduce((x, a) => x + a.steps, 0) / (cmTotal * 4) * 100) : 0;
+    $("cmStatus").innerHTML = !cmAgents || !prog ? "[비교 시작]을 누르면 네 에이전트가 같은 초기 가중치·같은 환경 seed로 학습합니다." :
+      cmEval ? "<b>완료</b> — " + (cmAgents.every(a => Math.max(...RL.movingAvg(a.returns, 10)) >= 100) ? "네 에이전트 모두 처음(약 20)보다 수익이 크게 올랐습니다. " : "일부 에이전트는 이 seed에서 충분히 오르지 못했습니다. ") + "순위는 seed에 따라 달라지니 seed를 바꿔 반복해 보세요. 2번 탭에서 [학습된 Dueling 망]을 고르면 V·A 분해를 볼 수 있습니다." :
+      "<b>학습 중 " + prog + "%</b>" + (cmRunning ? "" : " · 멈춤");
+  }
+  $("cmRun").addEventListener("click", () => {
+    if (!cmAgents || cmEval) cmReset();
+    cmRunning = !cmRunning; $("cmRun").textContent = cmRunning ? "멈춤" : "이어서 실행"; drawCompare();
+  });
+  $("cmReset").addEventListener("click", cmReset);
+  segInit("cmSteps", cmReset); $("cmSeed").addEventListener("change", cmReset);
+  onShow.compare = drawCompare;
+  let lastDraw = 0;
+  function tick(now) {
+    if (cmRunning) { cmTick(); if (now - lastDraw > 200 && !$("pane-compare").hidden) { lastDraw = now; drawCompare(); } }
+    requestAnimationFrame(tick);
+  }
+
+  /* ================= 6. 코드 ================= */
+  function updateCode() {
+    const al = +$("peA").value, be = +$("peB").value;
+    $("code1").textContent =
+`import numpy as np
+import torch, torch.nn as nn, torch.nn.functional as F
+GAMMA = 0.99
+
+# ---- 1) Double DQN: 고르기는 온라인 망, 값 매기기는 타깃망 ----
+with torch.no_grad():
+    a_star = q_net(s2).argmax(dim=1, keepdim=True)                 # argmax_a′ Q(s′,a′;θ)
+    q_next = target_net(s2).gather(1, a_star).squeeze(1)           # Q(s′,a*;θ⁻)
+    # (DQN 이었다면: q_next = target_net(s2).max(1).values)
+    y = r + GAMMA * q_next * (1 - done)
+
+# ---- 2) Dueling: 공통 층 → V 줄기 + A 줄기 → Q = V + A − mean(A) ----
+class DuelingQ(nn.Module):
+    def __init__(self, n_obs=4, n_act=2, h=32):
+        super().__init__()
+        self.body = nn.Sequential(nn.Linear(n_obs, h), nn.ReLU(), nn.Linear(h, h), nn.ReLU())
+        self.V = nn.Linear(h, 1)
+        self.A = nn.Linear(h, n_act)
+    def forward(self, x):
+        z = self.body(x)
+        v, a = self.V(z), self.A(z)
+        return v + a - a.mean(dim=1, keepdim=True)
+
+# ---- 3) PER: 합 트리로 p^α 비례 추출 + 중요도 가중치 ----
+ALPHA, BETA0, EPS = ${al.toFixed(1)}, ${be.toFixed(1)}, 0.01
+class SumTree:
+    def __init__(self, cap):
+        self.cap = 1
+        while self.cap < cap: self.cap *= 2
+        self.t = np.zeros(2 * self.cap)
+    def set(self, i, p):
+        k = i + self.cap; self.t[k] = p; k //= 2
+        while k >= 1:
+            self.t[k] = self.t[2 * k] + self.t[2 * k + 1]; k //= 2
+    def find(self, v):                       # 루트에서 잎까지 내려가기
+        k = 1
+        while k < self.cap:
+            if v < self.t[2 * k]: k = 2 * k
+            else: v -= self.t[2 * k]; k = 2 * k + 1
+        return k - self.cap
+
+def sample(tree, size, batch, beta):
+    total = tree.t[1]; seg = total / batch
+    idx = [tree.find(seg * (k + np.random.rand())) for k in range(batch)]   # 층화 추출
+    P = tree.t[np.array(idx) + tree.cap] / total
+    w = (size * P) ** (-beta); w /= w.max()                                 # 중요도 가중치
+    return idx, torch.tensor(w, dtype=torch.float32)
+
+# 학습 한 걸음
+idx, w = sample(tree, len(buffer), 64, beta)
+td = q - y
+loss = (w * F.smooth_l1_loss(q, y, reduction="none")).mean()
+for i, d in zip(idx, td.abs().detach().numpy()):
+    tree.set(i, (d + EPS) ** ALPHA)                                       # 우선순위 갱신`;
+    $("code2").textContent =
+`import gymnasium as gym
+from stable_baselines3 import DQN          # 기본형 DQN (리플레이 + 타깃망)
+from sb3_contrib import QRDQN              # 분포형 계열: 분위수 회귀 DQN
+
+env = gym.make("CartPole-v1")
+
+dqn = DQN("MlpPolicy", env, policy_kwargs=dict(net_arch=[32, 32]),
+          learning_rate=1e-3, buffer_size=50_000, learning_starts=500,
+          batch_size=64, train_freq=2, target_update_interval=1000,
+          exploration_fraction=0.4, exploration_final_eps=0.05, seed=1)
+dqn.learn(total_timesteps=15_000)
+
+qr = QRDQN("MlpPolicy", env, policy_kwargs=dict(n_quantiles=50, net_arch=[32, 32]),
+           learning_rate=1e-3, buffer_size=50_000, learning_starts=500,
+           batch_size=64, train_freq=2, target_update_interval=1000,
+           exploration_fraction=0.4, exploration_final_eps=0.05, seed=1)
+qr.learn(total_timesteps=15_000)
+
+# Rainbow(Double · Dueling · PER · n-step · C51 · Noisy) 전체 구현 예:
+#   Dopamine 의 rainbow 에이전트, Tianshou 의 RainbowPolicy 등 (버전에 따라 사용법이 다름)`;
+  }
+  function copyText(t, msgEl) {
+    const done = () => { msgEl.textContent = "복사했습니다."; setTimeout(() => { msgEl.textContent = ""; }, 1800); };
+    const fb = () => { const ta = document.createElement("textarea"); ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); done(); } catch (e) { msgEl.textContent = "복사하지 못했습니다. 직접 선택해 복사하세요."; } ta.remove(); };
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(t).then(done, fb); else fb();
+  }
+  $("cpCopy1").addEventListener("click", () => copyText($("code1").textContent, $("cpMsg1")));
+  $("cpCopy2").addEventListener("click", () => copyText($("code2").textContent, $("cpMsg2")));
+  onShow.code = updateCode;
+
+  /* ---------- 테마 · 크기 변경 시 다시 그리기 ---------- */
+  function redrawVisible() {
+    const cur = tabs.find(b => b.getAttribute("aria-selected") === "true"); if (!cur) return;
+    const key = cur.id.replace("tab-", ""); if (onShow[key]) onShow[key]();
+  }
+  RL.onTheme(redrawVisible);
+  let rsT = null; window.addEventListener("resize", () => { clearTimeout(rsT); rsT = setTimeout(redrawVisible, 120); });
+
+  /* ---------- 시작 ---------- */
+  updateCode();
+  const start = document.getElementById("tab-" + location.hash.slice(1));
+  show(start || tabs[0]);
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

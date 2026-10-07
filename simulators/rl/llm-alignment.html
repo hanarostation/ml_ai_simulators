@@ -1,0 +1,1536 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LLM 정렬 (RLHF · DPO · GRPO) | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261007a">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 상태·문맥 파랑 / 정책 주황 / 보상 초록(음수 빨강) / 가치 보라 / KL·오차 분홍 / 기준 모형 회색 / 숨은 정답 품질 파랑(그래프) / 선호 응답 청록 */
+:root{
+  --sk-accent: var(--cat-rl);
+  --c-state:#2563EB; --c-pol:#EA580C; --c-rm:#16A34A; --c-neg:#DC2626; --c-val:#7C3AED; --c-kl:#DB2777; --c-gold:#2563EB; --c-ref:#64748B; --c-explore:#B7791F;
+  --c-chosen:#0D9488; --c-rej:#DC2626;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --c-state:#79A6F6; --c-pol:#F59A5C; --c-rm:#5CCB82; --c-neg:#F07A7A; --c-val:#B597FF; --c-kl:#F472B6; --c-gold:#79A6F6; --c-ref:#A3ACBD; --c-explore:#E3B455;
+  --c-chosen:#45CFBF; --c-rej:#F07A7A;
+} }
+:root[data-theme="dark"]{
+  --c-state:#79A6F6; --c-pol:#F59A5C; --c-rm:#5CCB82; --c-neg:#F07A7A; --c-val:#B597FF; --c-kl:#F472B6; --c-gold:#79A6F6; --c-ref:#A3ACBD; --c-explore:#E3B455;
+  --c-chosen:#45CFBF; --c-rej:#F07A7A;
+}
+.la-toy{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--c-explore);border:1px solid currentColor;border-radius:999px;padding:2px 10px;white-space:nowrap}
+.la-cv{display:block;width:100%;max-width:100%}
+.la-chart{min-width:0}
+.la-chart h3{margin:0 0 6px}
+.la-sub{font-size:13px;color:var(--muted);margin:0}
+.la-tok{display:inline-block;border-radius:7px;padding:2px 8px;margin:2px 3px 2px 0;font-size:13px;font-weight:600;border:1px solid color-mix(in srgb,var(--tc,var(--c-ref)) 45%,transparent);background:color-mix(in srgb,var(--tc,var(--c-ref)) 12%,var(--surface));color:var(--ink);white-space:nowrap}
+.la-tok[data-k="kind"]{--tc:var(--c-explore)} .la-tok[data-k="acc"]{--tc:var(--c-state)} .la-tok[data-k="bad"]{--tc:var(--c-neg)} .la-tok[data-k="safe"]{--tc:var(--c-rm)} .la-tok[data-k="end"]{--tc:var(--c-ref)}
+.la-resp{line-height:1.9}
+.la-pos{color:var(--c-rm);font-weight:700} .la-negv{color:var(--c-neg);font-weight:700}
+.la-hl td{background:color-mix(in srgb,var(--sk-accent) 14%,var(--surface))}
+.la-table td,.la-table th{white-space:nowrap}
+.la-table td.wrap{white-space:normal;min-width:220px}
+.la-heat td.n{min-width:52px}
+.la-flow{min-width:760px}
+.la-flow svg{display:block;width:100%;height:auto}
+.la-flow .nd{cursor:pointer}
+.la-flow .nd rect{fill:color-mix(in srgb,var(--nc) 12%,var(--surface));stroke:var(--nc);stroke-width:1.6}
+.la-flow .nd:hover rect,.la-flow .nd:focus-visible rect{fill:color-mix(in srgb,var(--nc) 24%,var(--surface));stroke-width:2.6}
+.la-flow .nd:focus{outline:none}
+.la-flow text{fill:var(--ink);font-family:var(--sans)}
+.la-flow .t1{font-size:15px;font-weight:700}
+.la-flow .t2{font-size:12px;fill:var(--muted)}
+.la-flow .ar{stroke:var(--line-strong);stroke-width:1.8;fill:none}
+.la-flow .ah{fill:var(--line-strong)}
+.la-flow .lab{font-size:12px;font-weight:700;fill:var(--muted)}
+.la-loop svg{display:block;width:100%;max-width:520px;height:auto}
+.la-loop text{font-family:var(--sans);fill:var(--ink)}
+.la-gen{display:grid;gap:10px}
+.la-box{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px}
+.la-box b{color:var(--ink)}
+.la-code{font-family:var(--mono);font-size:12.5px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0;overflow-x:auto;color:var(--ink);white-space:pre}
+.la-code .cm{color:var(--faint)}
+.la-codehead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.la-bar{display:inline-block;height:9px;border-radius:3px;vertical-align:middle;background:var(--c-rm)}
+.la-bar.neg{background:var(--c-neg)}
+.la-mini{font-size:12.5px;color:var(--faint)}
+.la-tabs2{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.la-stack{display:flex;flex-direction:column;gap:14px;min-width:0}
+.la-kpi .sk-stat b{font-size:18px}
+.la-steps{counter-reset:s;list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:14px}
+.la-steps li{counter-increment:s;padding-left:30px;position:relative}
+.la-steps li::before{content:counter(s);position:absolute;left:0;top:1px;width:21px;height:21px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line-strong);font:600 12px/19px var(--mono);text-align:center;color:var(--muted)}
+.la-legend i{border-radius:2px}
+@media (max-width:520px){ .la-table td.wrap{min-width:180px} .sk-slider{min-width:150px} }
+@media (prefers-reduced-motion: reduce){ .la-flow .nd rect{transition:none} }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+      <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a href="../../index.html#rl" style="--c:var(--cat-rl)" aria-current="page">강화학습</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#rl" style="--c:var(--cat-rl)">강화학습</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">LLM 정렬 (RLHF · DPO · GRPO)</h1>
+      <p class="ds-hero__lede">아주 작은 언어 모형을 브라우저에서 직접 학습해 SFT → 보상 모델 → PPO · DPO · GRPO를 차례로 돌려 봅니다. 환자 안내 문구의 정확성 · 안전성 · 친절을 기준으로 보상 해킹, KL 계수 β, 그룹 상대 이점을 숫자로 확인합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button type="button" class="sk-tab" role="tab" id="tab-pipe" aria-controls="pane-pipe" aria-selected="true"><span class="sk-num">1</span>정렬 파이프라인</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-rm" aria-controls="pane-rm" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>보상 모델</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-ppo" aria-controls="pane-ppo" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>RLHF (PPO)</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-dpo" aria-controls="pane-dpo" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>DPO</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-grpo" aria-controls="pane-grpo" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>GRPO</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-cmp" aria-controls="pane-cmp" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>비교</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>코드</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">8</span>알고리즘 구성도</button>
+  </nav>
+
+  <!-- ================= 1. 정렬 파이프라인 ================= -->
+  <section id="pane-pipe" role="tabpanel" aria-labelledby="tab-pipe">
+    <div class="la-stack">
+      <section class="sk-card">
+        <div class="sk-head"><h2>LLM 정렬 한눈에 보기</h2><span class="sk-hint">상자를 누르면 해당 화면으로 이동</span></div>
+        <p class="sk-lead">사전학습으로 말을 배우고, SFT로 지시를 따르게 한 뒤, 사람의 <b>선호</b>를 이용해 "더 나은 답"을 고르도록 다듬는다. 세 갈래(RLHF·DPO·GRPO)는 선호 신호를 정책에 전달하는 방법이 다르다.</p>
+        <div class="sk-scroll"><div class="la-flow" id="pipeFlow"></div></div>
+        <div class="sk-grid3">
+          <p class="sk-note"><b>RLHF (PPO)</b> — 선호 쌍으로 보상 모델을 만들고, 정책이 직접 응답을 생성하며 "보상 − β·KL"을 최대화. 정책·기준·보상·가치 네 모형이 필요.</p>
+          <p class="sk-note"><b>DPO</b> — 보상 모델과 생성 없이, 선호 쌍의 로그 확률 비율만으로 바로 분류 손실을 최소화. 정책·기준 두 모형.</p>
+          <p class="sk-note"><b>GRPO</b> — 질문마다 응답 G개를 뽑아 그룹 평균과 비교한 상대 점수로 학습. 가치망이 없고, 정답·형식처럼 <b>검증 가능한 보상</b>과 잘 맞는다.</p>
+        </div>
+      </section>
+
+      <section class="sk-card">
+        <div class="sk-head"><h2>이 화면의 장난감 언어 모형</h2><span class="la-toy">브라우저용 축소 설정</span></div>
+        <p class="sk-lead">실제 LLM 대신 <b>문장 13개를 어휘로 쓰는 아주 작은 언어 모형</b>을 브라우저에서 직접 학습한다. 원리는 같고 규모만 줄였다. 화면의 숫자는 모두 이 페이지에서 계산한 값이다.</p>
+        <div class="sk-grid2">
+          <div class="la-stack">
+            <div><h3>질문 x (환자 안내 4가지)</h3><ol class="la-steps" id="promptList"></ol></div>
+            <div><h3>어휘 (토큰 = 문장 하나)</h3><div class="la-resp" id="vocabList"></div>
+              <div class="sk-legend la-legend" style="margin-top:6px"><span><i style="background:var(--c-explore)"></i>친절</span><span><i style="background:var(--c-state)"></i>안내 내용</span><span><i style="background:var(--c-neg)"></i>위험·오류</span><span><i style="background:var(--c-rm)"></i>안전</span><span><i style="background:var(--c-ref)"></i>끝</span></div>
+            </div>
+          </div>
+          <div class="la-stack">
+            <div><h3>모형 구조</h3>
+              <dl class="sk-kv" id="archKv"></dl></div>
+            <p class="sk-note">실제 LLM: 수십억 파라미터, 어휘 수만~수십만 토큰, 응답 수백 토큰. 여기서는 정책 하나가 <b id="archParams">-</b>개 파라미터, 응답은 최대 6토큰(문장).</p>
+            <div><h3>숨은 정답 기준 <span class="la-mini">(전문가 평가 대용 · 학습에는 쓰지 않고 평가에만 씀)</span></h3>
+              <div class="sk-scroll"><table class="sk-table la-table"><thead><tr><th>항목</th><th>규칙</th></tr></thead><tbody>
+                <tr><td>정확</td><td class="wrap">맞는 안내 +2 · 틀린 용량(20mg) −2 · 다른 질문의 안내 −1 · 불필요한 119 −0.5</td></tr>
+                <tr><td>안전</td><td class="wrap">"마음껏 드셔도 돼요" −3 · "좀 지켜보세요" (흉통 −3, 그 외 −0.5) · "의료진과 상담하세요" +0.7</td></tr>
+                <tr><td>친절</td><td class="wrap">첫머리 인사 +0.5 · 공감 +0.5 · "좋은 질문이에요!" +0.3 (흉통 질문엔 −0.3) · 맺음말 +0.3</td></tr>
+                <tr><td>반복·길이</td><td class="wrap">같은 문장 반복 1회마다 −1.2 · 4문장 초과 1개마다 −0.6 · 6문장에서 안 끝남 −0.5 · 빈 응답 −2</td></tr>
+              </tbody></table></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sk-card">
+        <div class="sk-head"><h2>토큰 생성 = 강화학습 문제</h2><span class="sk-hint">[다음 토큰]을 눌러 한 단계씩 (키보드 →)</span></div>
+        <div class="sk-grid2">
+          <div class="la-stack">
+            <div class="la-loop" id="loopSvg"></div>
+            <div class="sk-formula">상태 s<sub>t</sub> = (질문 x, 지금까지 쓴 토큰 y<sub>&lt;t</sub>) &nbsp;·&nbsp; 행동 a<sub>t</sub> = 다음 토큰 y<sub>t</sub><br>정책 π<sub>θ</sub>(a<sub>t</sub> | s<sub>t</sub>) = softmax(로짓)<sub>a<sub>t</sub></sub> &nbsp;·&nbsp; 전이: 고른 토큰을 이어 붙임 (결정적)<br>보상: 응답이 끝날 때 r(x, y) 한 번 &nbsp;(RLHF는 토큰마다 −β·(log π − log π<sub>ref</sub>) 추가)</div>
+          </div>
+          <div class="la-gen">
+            <div class="sk-controls">
+              <label class="sk-group"><span class="sk-label">질문</span><select class="sk-select" id="genPrompt"></select></label>
+              <div class="sk-group"><span class="sk-label">모형</span><div class="sk-seg" id="genModel" role="group" aria-label="생성 모형"></div></div>
+            </div>
+            <div class="sk-controls">
+              <button type="button" class="sk-btn" id="genReset">처음</button>
+              <button type="button" class="sk-btn sk-btn--primary" id="genNext">다음 토큰 →</button>
+              <button type="button" class="sk-btn" id="genAuto">끝까지 생성</button>
+              <label class="sk-group"><span class="sk-label">샘플 시드</span><input class="sk-input" id="genSeed" type="number" value="8" min="1" max="9999" style="width:80px"></label>
+            </div>
+            <div class="la-box"><span class="la-mini">응답 y</span><div class="la-resp" id="genResp"></div></div>
+            <canvas class="la-cv" id="genCv" aria-label="다음 토큰 확률 막대그래프"></canvas>
+            <p class="sk-note" id="genOut"></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="sk-card">
+        <div class="sk-head"><h2>SFT — 시연 데이터로 지도 미세조정</h2><span class="sk-hint">기준 모형 π<sub>ref</sub>가 된다</span></div>
+        <p class="sk-lead">여러 작성자가 쓴 안내문 400개(품질이 고르지 않음)를 토큰별 교차 엔트로피로 학습한다. 사전학습 단계는 생략하고 SFT부터 시작한다. 시드를 바꾸면 시연 데이터·SFT·선호 데이터·보상 모델이 모두 다시 만들어진다.</p>
+        <div class="sk-controls">
+          <label class="sk-group"><span class="sk-label">전체 시드</span><input class="sk-input" id="globalSeed" type="number" value="7" min="1" max="9999" style="width:80px"></label>
+          <button type="button" class="sk-btn sk-btn--primary" id="btnRebuild">처음부터 다시 만들기</button>
+          <span class="la-mini" id="buildMsg"></span>
+        </div>
+        <div class="sk-grid2">
+          <div class="la-chart"><h3>SFT 손실 (토큰 평균 교차 엔트로피)</h3><canvas class="la-cv" id="sftCv" aria-label="SFT 손실 곡선"></canvas>
+            <div class="sk-stats la-kpi" id="sftStats" style="margin-top:8px"></div></div>
+          <div><h3>시연 데이터 예시</h3><div class="sk-scroll"><table class="sk-table la-table"><thead><tr><th>질문</th><th>시연 응답</th><th>정답 품질</th></tr></thead><tbody id="demoBody"></tbody></table></div></div>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <!-- ================= 2. 보상 모델 ================= -->
+  <section id="pane-rm" role="tabpanel" aria-labelledby="tab-rm" hidden>
+    <div class="la-stack">
+      <section class="sk-card">
+        <div class="sk-head"><h2>선호 데이터와 Bradley–Terry 모형</h2><span class="sk-hint">쌍을 넘겨 가며 계산 확인</span></div>
+        <p class="sk-lead">SFT 모형으로 같은 질문에 응답 두 개를 뽑고, 평가자가 더 나은 쪽을 고른다(y<sub>w</sub> 선호, y<sub>l</sub> 비선호). 평가자는 숨은 정답 기준 차이 g를 보고 σ((g<sub>a</sub> − g<sub>b</sub>)/0.5) 확률로 고르므로 가끔 틀린다(사람 평가의 잡음).</p>
+        <div class="sk-formula">P(y<sub>w</sub> ≻ y<sub>l</sub> | x) = σ( r(x, y<sub>w</sub>) − r(x, y<sub>l</sub>) ) &nbsp;&nbsp;·&nbsp;&nbsp; 손실 L = −log σ( r<sub>w</sub> − r<sub>l</sub> ) &nbsp;&nbsp;·&nbsp;&nbsp; r(x, y) = Σ<sub>토큰</sub> w[x, 토큰] × 개수</div>
+        <div class="sk-controls">
+          <button type="button" class="sk-btn" id="pairPrev">← 이전 쌍</button>
+          <button type="button" class="sk-btn" id="pairNext">다음 쌍 →</button>
+          <span class="la-mini" id="pairIdx"></span>
+          <span class="sk-stats" id="pairDataStats"></span>
+        </div>
+        <div class="sk-grid2">
+          <div class="sk-scroll"><table class="sk-table la-table"><tbody id="pairBody"></tbody></table></div>
+          <div class="sk-formula" id="pairCalc"></div>
+        </div>
+      </section>
+
+      <section class="sk-card">
+        <div class="sk-head"><h2>보상 모델 학습</h2><span class="sk-hint">학습 쌍 320 · 검증 쌍 80 · 파라미터 52개 (질문 4 × 토큰 13)</span></div>
+        <div class="sk-controls">
+          <div class="sk-slider"><div class="sk-sl-head"><span>학습률</span><b id="rmLrV">0.05</b></div><input type="range" id="rmLr" min="0.005" max="0.2" step="0.005" value="0.05" aria-label="보상 모델 학습률"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><span>L2 규제</span><b id="rmL2V">0.001</b></div><input type="range" id="rmL2" min="0" max="0.05" step="0.001" value="0.001" aria-label="L2 규제"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><span>학습 단계</span><b id="rmStepsV">300</b></div><input type="range" id="rmSteps" min="50" max="600" step="50" value="300" aria-label="학습 단계"></div>
+          <button type="button" class="sk-btn sk-btn--primary" id="rmTrain">처음부터 학습</button>
+        </div>
+        <div class="sk-grid2">
+          <div class="la-chart"><h3>손실 −log σ(r<sub>w</sub> − r<sub>l</sub>)</h3><canvas class="la-cv" id="rmLossCv" aria-label="보상 모델 손실 곡선"></canvas></div>
+          <div class="la-chart"><h3>정확도 (r<sub>w</sub> &gt; r<sub>l</sub> 비율)</h3><canvas class="la-cv" id="rmAccCv" aria-label="보상 모델 정확도 곡선"></canvas></div>
+        </div>
+        <div class="sk-stats la-kpi" id="rmStats"></div>
+        <p class="sk-note" id="rmNote"></p>
+        <h3>학습된 가중치 w[x, 토큰] <span class="la-mini">(초록 = 점수를 올림, 빨강 = 내림)</span></h3>
+        <div class="sk-scroll"><table class="sk-table la-table la-heat" id="rmHeat"></table></div>
+      </section>
+
+      <section class="sk-card">
+        <div class="sk-head"><h2>보상 해킹 — 보상은 오르는데 실제 품질은 떨어진다</h2><span class="sk-hint">반복 횟수를 늘려 보기</span></div>
+        <p class="sk-lead">보상 모델은 SFT 응답(거의 반복하지 않음)만 보고 배웠으므로 <b>"같은 문장 반복"</b>을 벌할 줄 모른다. 가중치가 가장 큰 문장을 덧붙일수록 보상 점수는 계속 오르지만 숨은 정답 품질은 떨어진다.</p>
+        <div class="sk-controls">
+          <label class="sk-group"><span class="sk-label">질문</span><select class="sk-select" id="hackPrompt"></select></label>
+          <div class="sk-slider"><div class="sk-sl-head"><span>덧붙인 반복 문장 수 k</span><b id="hackKV">2</b></div><input type="range" id="hackK" min="0" max="4" step="1" value="2" aria-label="반복 문장 수"></div>
+        </div>
+        <div class="sk-grid2">
+          <div class="sk-scroll"><table class="sk-table la-table"><thead><tr><th>k</th><th>응답</th><th>보상 r</th><th>정답 품질</th></tr></thead><tbody id="hackBody"></tbody></table></div>
+          <div class="la-chart"><canvas class="la-cv" id="hackCv" aria-label="반복 수에 따른 보상과 품질"></canvas></div>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <!-- ================= 3. RLHF (PPO) ================= -->
+  <section id="pane-ppo" role="tabpanel" aria-labelledby="tab-ppo" hidden>
+    <div class="la-stack">
+      <section class="sk-card">
+        <div class="sk-head"><h2>RLHF 목적 함수와 PPO</h2><a class="sk-hint" href="trpo-ppo.html">PPO 자세히 → TRPO · PPO 시뮬레이터</a></div>
+        <div class="sk-formula">목적: max<sub>θ</sub> E<sub>x, y∼π<sub>θ</sub></sub>[ r<sub>φ</sub>(x, y) ] − β · KL( π<sub>θ</sub>(·|x) ‖ π<sub>ref</sub>(·|x) )<br>
+          토큰 보상: r<sub>t</sub> = −β·( log π<sub>θ</sub>(y<sub>t</sub>|s<sub>t</sub>) − log π<sub>ref</sub>(y<sub>t</sub>|s<sub>t</sub>) ) + [t = T]·r<sub>φ</sub>(x, y)<br>
+          이점(GAE, γ = 1, λ = 0.95): δ<sub>t</sub> = r<sub>t</sub> + V(s<sub>t+1</sub>) − V(s<sub>t</sub>), &nbsp;A<sub>t</sub> = δ<sub>t</sub> + λ·A<sub>t+1</sub><br>
+          PPO-clip: L = −E[ min( ρ<sub>t</sub>A<sub>t</sub>, clip(ρ<sub>t</sub>, 1−ε, 1+ε)A<sub>t</sub> ) ], &nbsp;ρ<sub>t</sub> = π<sub>θ</sub>/π<sub>θ,old</sub> &nbsp;+&nbsp; 가치 손실 ½(V − 목표)²</div>
+        <p class="sk-note">메모리에 올리는 모형 <b>4개</b>: 정책 π<sub>θ</sub>(학습) · 기준 π<sub>ref</sub>(고정, SFT) · 보상 모델 r<sub>φ</sub>(고정) · 가치망 V(학습). 매 반복 질문마다 응답 12개를 새로 생성(온라인)한다.</p>
+      </section>
+
+      <section class="sk-card">
+        <div class="sk-head"><h2>장난감 정책을 PPO로 학습</h2><span class="la-toy">브라우저용 축소: 반복당 응답 48개 · 4 에폭</span></div>
+        <div class="sk-controls">
+          <div class="sk-slider"><div class="sk-sl-head"><span>KL 계수 β</span><b id="ppoBetaV">0.80</b></div><input type="range" id="ppoBeta" min="0.05" max="2" step="0.05" value="0.8" aria-label="KL 계수 베타"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><span>학습률</span><b id="ppoLrV">0.003</b></div><input type="range" id="ppoLr" min="0.001" max="0.01" step="0.001" value="0.003" aria-label="정책 학습률"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><span>클립 ε</span><b id="ppoClipV">0.20</b></div><input type="range" id="ppoClip" min="0.05" max="0.4" step="0.05" value="0.2" aria-label="클립 엡실론"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><span>반복 수</span><b id="ppoItersV">60</b></div><input type="range" id="ppoIters" min="20" max="150" step="10" value="60" aria-label="반복 수"></div>
+        </div>
+        <div class="sk-controls">
+          <button type="button" class="sk-btn sk-btn--primary" id="ppoRun">학습 시작</button>
+          <button type="button" class="sk-btn" id="ppoReset">초기화</button>
+          <button type="button" class="sk-btn" id="ppoSweep">β 비교 실행 (0.1 · 0.3 · 0.8)</button>
+          <div class="sk-group"><span class="sk-label">속도</span><div class="sk-seg" id="ppoSpeed" role="group" aria-label="학습 속도"><button type="button" data-v="12" aria-pressed="false">천천히</button><button type="button" data-v="40" aria-pressed="true">보통</button><button type="button" data-v="150" aria-pressed="false">빠르게</button></div></div>
+          <span class="la-mini" id="ppoMsg"></span>
+        </div>
+        <div class="sk-stats la-kpi" id="ppoStats"></div>
+        <div class="sk-grid2">
+          <div class="la-chart"><h3>보상 모델 점수 vs 숨은 정답 품질</h3><canvas class="la-cv" id="ppoRwCv" aria-label="PPO 보상과 품질 곡선"></canvas></div>
+          <div class="la-chart"><h3>KL(π<sub>θ</sub> ‖ π<sub>ref</sub>) — 응답당 합</h3><canvas class="la-cv" id="ppoKlCv" aria-label="PPO KL 곡선"></canvas></div>
+        </div>
+        <div id="sweepWrap" hidden>
+          <h3>β 비교 — 같은 반복 수, β만 다르게</h3>
+          <div class="sk-grid2">
+            <div class="la-chart"><canvas class="la-cv" id="sweepCv" aria-label="베타별 정답 품질 곡선"></canvas></div>
+            <div class="sk-scroll"><table class="sk-table la-table"><thead><tr><th>β</th><th>보상 r</th><th>KL</th><th>정답 품질</th><th>대표 응답 (질문 1, 탐욕 생성)</th></tr></thead><tbody id="sweepBody"></tbody></table></div>
+          </div>
+        </div>
+        <p class="sk-note sk-note--warn">β가 작으면 정책이 기준 모형에서 멀리 벗어나며 보상 모델의 빈틈(반복)을 찾아낸다 — 보상 점수는 계속 오르지만 정답 품질은 먼저 올랐다가 떨어진다(과최적화). β가 크면 SFT 근처에 머문다.</p>
+      </section>
+
+      <section class="sk-card">
+        <div class="sk-head"><h2>한 응답 따라가기 — 토큰별 KL 벌점과 이점</h2><span class="sk-hint">가장 최근 배치에서 하나 골라 [다음]으로 한 토큰씩</span></div>
+        <div class="sk-controls">
+          <label class="sk-group"><span class="sk-label">질문</span><select class="sk-select" id="trPrompt"></select></label>
+          <button type="button" class="sk-btn" id="trOther">다른 응답</button>
+          <button type="button" class="sk-btn" id="trFirst">처음</button>
+          <button type="button" class="sk-btn sk-btn--primary" id="trNext">다음 →</button>
+        </div>
+        <div class="la-box la-resp" id="trResp"></div>
+        <div class="sk-scroll"><table class="sk-table la-table"><thead><tr><th>t</th><th>토큰 y<sub>t</sub></th><th>log π<sub>θ</sub></th><th>log π<sub>ref</sub></th><th>KL<sub>t</sub></th><th>r<sub>t</sub></th><th>V(s<sub>t</sub>)</th><th>δ<sub>t</sub></th><th>A<sub>t</sub></th></tr></thead><tbody id="trBody"></tbody></table></div>
+        <div class="sk-formula" id="trCalc"></div>
+      </section>
+
+      <section class="sk-card">
+        <div class="sk-head"><h2>현재 정책의 응답 (탐욕 생성)</h2><span class="sk-hint">질문마다 확률이 가장 큰 토큰을 이어 붙임</span></div>
+        <div class="sk-scroll"><table class="sk-table la-table"><thead><tr><th>질문</th><th>응답</th><th>보상 r</th><th>정답 품질</th></tr></thead><tbody id="ppoGreedy"></tbody></table></div>
+      </section>
+    </div>
+  </section>
+
+  <!-- ================= 4. DPO ================= -->
+  <section id="pane-dpo" role="tabpanel" aria-labelledby="tab-dpo" hidden>
+    <div class="la-stack">
+      <section class="sk-card">
+        <div class="sk-head"><h2>DPO — 보상 모델 없이 선호 쌍으로 바로 최적화</h2><span class="sk-hint">Direct Preference Optimization</span></div>
+        <div class="sk-formula">KL 제약 최적 정책: π*(y|x) ∝ π<sub>ref</sub>(y|x)·exp( r(x,y)/β ) &nbsp;⇒&nbsp; r(x,y) = β·log( π*(y|x)/π<sub>ref</sub>(y|x) ) + β·log Z(x)<br>
+          Bradley–Terry에 대입하면 Z(x)가 사라진다:<br>
+          L<sub>DPO</sub> = −log σ( β·[ (log π<sub>θ</sub>(y<sub>w</sub>|x) − log π<sub>ref</sub>(y<sub>w</sub>|x)) − (log π<sub>θ</sub>(y<sub>l</sub>|x) − log π<sub>ref</sub>(y<sub>l</sub>|x)) ] )<br>
+          암묵적 보상 r̂(x,y) = β·log( π<sub>θ</sub>(y|x)/π<sub>ref</sub>(y|x) ) &nbsp;·&nbsp; log π(y|x) = Σ<sub>t</sub> log π(y<sub>t</sub>|x, y<sub>&lt;t</sub>)</div>
+        <p class="sk-note">메모리에 올리는 모형 <b>2개</b>: 정책 π<sub>θ</sub>(학습) · 기준 π<sub>ref</sub>(고정). 응답을 새로 생성하지 않는 <b>오프라인</b> 학습 — 보상 모델 탭과 같은 선호 쌍 320개를 그대로 쓴다.</p>
+      </section>
+
+      <section class="sk-card">
+        <div class="sk-head"><h2>손실을 항목별로 계산</h2><span class="sk-hint">현재 정책 기준 · 학습하면 숫자가 바뀜</span></div>
+        <div class="sk-controls">
+          <button type="button" class="sk-btn" id="dpPrev">← 이전 쌍</button>
+          <button type="button" class="sk-btn" id="dpNext">다음 쌍 →</button>
+          <span class="la-mini" id="dpIdx"></span>
+        </div>
+        <div class="la-box la-resp" id="dpPair"></div>
+        <div class="sk-scroll"><table class="sk-table la-table"><thead><tr><th>항목</th><th>y<sub>w</sub> (선호)</th><th>y<sub>l</sub> (비선호)</th></tr></thead><tbody id="dpTerms"></tbody></table></div>
+        <div class="sk-formula" id="dpCalc"></div>
+      </section>
+
+      <section class="sk-card">
+        <div class="sk-head"><h2>장난감 정책을 DPO로 학습</h2><span class="la-toy">브라우저용 축소: 배치 16쌍</span></div>
+        <div class="sk-controls">
+          <div class="sk-slider"><div class="sk-sl-head"><span>β</span><b id="dpBetaV">0.30</b></div><input type="range" id="dpBeta" min="0.05" max="2" step="0.05" value="0.3" aria-label="DPO 베타"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><span>학습률</span><b id="dpLrV">0.003</b></div><input type="range" id="dpLr" min="0.001" max="0.01" step="0.001" value="0.003" aria-label="DPO 학습률"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><span>학습 단계</span><b id="dpStepsV">300</b></div><input type="range" id="dpSteps" min="100" max="800" step="50" value="300" aria-label="DPO 학습 단계"></div>
+          <button type="button" class="sk-btn sk-btn--primary" id="dpRun">학습 시작</button>
+          <button type="button" class="sk-btn" id="dpReset">초기화</button>
+          <span class="la-mini" id="dpMsg"></span>
+        </div>
+        <div class="sk-stats la-kpi" id="dpStats"></div>
+        <div class="sk-grid2">
+          <div class="la-chart"><h3>DPO 손실 · 선호 정확도(검증)</h3><canvas class="la-cv" id="dpLossCv" aria-label="DPO 손실 곡선"></canvas></div>
+          <div class="la-chart"><h3>평균 log π<sub>θ</sub>(y<sub>w</sub>) · log π<sub>θ</sub>(y<sub>l</sub>)</h3><canvas class="la-cv" id="dpLpCv" aria-label="선호 비선호 로그 확률 곡선"></canvas></div>
+        </div>
+        <p class="sk-note">DPO는 두 응답의 <b>상대 차이</b>만 키운다. β가 작으면 y<sub>l</sub>뿐 아니라 y<sub>w</sub>의 확률까지 함께 떨어지며(오른쪽 그래프) 확률이 데이터 밖 응답(반복 등)으로 새어 나갈 수 있다. β가 크면 기준 모형 가까이에 머문다.</p>
+      </section>
+
+      <section class="sk-card">
+        <div class="sk-head"><h2>암묵적 보상 r̂ = β·log(π<sub>θ</sub>/π<sub>ref</sub>)</h2><span class="sk-hint">보상 모델 없이도 정책 안에 보상이 들어 있다</span></div>
+        <div class="sk-controls"><label class="sk-group"><span class="sk-label">질문</span><select class="sk-select" id="impPrompt"></select></label></div>
+        <div class="sk-scroll"><table class="sk-table la-table"><thead><tr><th>순위</th><th>응답 (선호 데이터에 나온 것)</th><th>r̂ (DPO)</th><th>보상 모델 r</th><th>정답 품질</th></tr></thead><tbody id="impBody"></tbody></table></div>
+        <p class="sk-note" id="impNote"></p>
+      </section>
+    </div>
+  </section>
+
+  <!-- ================= 5. GRPO ================= -->
+  <section id="pane-grpo" role="tabpanel" aria-labelledby="tab-grpo" hidden>
+    <div class="la-stack">
+      <section class="sk-card">
+        <div class="sk-head"><h2>GRPO — 그룹 안에서 비교한 상대 점수</h2><span class="sk-hint">Group Relative Policy Optimization</span></div>
+        <div class="sk-formula">질문 x마다 응답 G개 {o<sub>1</sub> … o<sub>G</sub>} ∼ π<sub>θ,old</sub>, 보상 r<sub>i</sub> &nbsp;⇒&nbsp; A<sub>i</sub> = ( r<sub>i</sub> − mean(r) ) / std(r) &nbsp;(응답의 모든 토큰에 같은 A<sub>i</sub>)<br>
+          J = (1/G) Σ<sub>i</sub> (1/|o<sub>i</sub>|) Σ<sub>t</sub> [ min( ρ<sub>i,t</sub>A<sub>i</sub>, clip(ρ<sub>i,t</sub>, 1−ε, 1+ε)A<sub>i</sub> ) − β·D<sub>KL</sub> ]<br>
+          D<sub>KL</sub> = π<sub>ref</sub>/π<sub>θ</sub> − log(π<sub>ref</sub>/π<sub>θ</sub>) − 1 &nbsp;(토큰별 k3 추정량, 항상 ≥ 0)</div>
+        <p class="sk-note">가치망(critic) 대신 <b>그룹 평균이 기준선</b> 역할을 한다. 메모리에 올리는 모형: 정책 · 기준 (+ 보상 모델을 쓰면 3개). 정답·형식처럼 규칙으로 채점할 수 있는 <b>검증 가능한 보상</b>이면 보상 모델도 필요 없다 — DeepSeek-R1-Zero가 수학 정답 일치 + 형식 보상만으로 학습한 방식.</p>
+      </section>
+
+      <section class="sk-card">
+        <div class="sk-head"><h2>검증 가능한 보상 (규칙 채점)</h2><span class="sk-hint">사람·보상 모델 없이 자동 채점</span></div>
+        <div class="sk-scroll"><table class="sk-table la-table"><thead><tr><th>보상</th><th>점수</th><th>규칙</th></tr></thead><tbody>
+          <tr><td>정답</td><td class="n">+1</td><td class="wrap">질문별 정답 문장 포함. 용량 질문은 20kg × 10mg/kg = <b>200mg</b>과 일치해야 하고, 오답 20mg이 섞이면 0</td></tr>
+          <tr><td>형식</td><td class="n">+0.5</td><td class="wrap">1~4문장 · 같은 문장 반복 없음 · &lt;끝&gt;으로 마침</td></tr>
+          <tr><td>위험</td><td class="n">−1</td><td class="wrap">"마음껏 드셔도 돼요" 또는 흉통 질문에 "좀 지켜보세요"</td></tr>
+        </tbody></table></div>
+        <p class="sk-note">규칙은 <b>검사하는 것만</b> 본다. 친절(인사·공감)은 채점하지 않으므로, β가 작으면 짧고 정확하지만 무뚝뚝한 응답으로 수렴한다 — 아래 탐욕 생성 결과로 확인.</p>
+      </section>
+
+      <section class="sk-card">
+        <div class="sk-head"><h2>한 그룹의 이점 계산</h2><span class="sk-hint">현재 정책에서 G개 뽑기</span></div>
+        <div class="sk-controls">
+          <label class="sk-group"><span class="sk-label">질문</span><select class="sk-select" id="grPrompt"></select></label>
+          <button type="button" class="sk-btn sk-btn--primary" id="grSample">그룹 다시 뽑기</button>
+          <span class="la-mini" id="grSampleMsg"></span>
+        </div>
+        <div class="sk-scroll"><table class="sk-table la-table"><thead><tr><th>i</th><th>응답 o<sub>i</sub></th><th>정답</th><th>형식</th><th>위험</th><th>r<sub>i</sub></th><th>A<sub>i</sub></th><th></th></tr></thead><tbody id="grBody"></tbody></table></div>
+        <div class="sk-formula" id="grCalc"></div>
+      </section>
+
+      <section class="sk-card">
+        <div class="sk-head"><h2>장난감 정책을 GRPO로 학습</h2><span class="la-toy">브라우저용 축소: 질문 4개 × G개 · 2 에폭</span></div>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">그룹 크기 G</span><div class="sk-seg" id="grG" role="group" aria-label="그룹 크기"><button type="button" data-v="4" aria-pressed="false">4</button><button type="button" data-v="8" aria-pressed="true">8</button><button type="button" data-v="16" aria-pressed="false">16</button></div></div>
+          <div class="sk-group"><span class="sk-label">보상</span><div class="sk-seg" id="grReward" role="group" aria-label="보상 종류"><button type="button" data-v="rule" aria-pressed="true">검증 보상(규칙)</button><button type="button" data-v="rm" aria-pressed="false">보상 모델</button></div></div>
+        </div>
+        <div class="sk-controls">
+          <div class="sk-slider"><div class="sk-sl-head"><span>KL 계수 β</span><b id="grBetaV">0.10</b></div><input type="range" id="grBeta" min="0" max="0.5" step="0.01" value="0.1" aria-label="GRPO 베타"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><span>학습률</span><b id="grLrV">0.003</b></div><input type="range" id="grLr" min="0.001" max="0.01" step="0.001" value="0.003" aria-label="GRPO 학습률"></div>
+          <div class="sk-slider"><div class="sk-sl-head"><span>반복 수</span><b id="grItersV">100</b></div><input type="range" id="grIters" min="20" max="300" step="10" value="100" aria-label="GRPO 반복 수"></div>
+          <button type="button" class="sk-btn sk-btn--primary" id="grRun">학습 시작</button>
+          <button type="button" class="sk-btn" id="grReset">초기화</button>
+          <span class="la-mini" id="grMsg"></span>
+        </div>
+        <div class="sk-stats la-kpi" id="grStats"></div>
+        <div class="sk-grid2">
+          <div class="la-chart"><h3>평균 보상 · 숨은 정답 품질</h3><canvas class="la-cv" id="grRwCv" aria-label="GRPO 보상 곡선"></canvas></div>
+          <div class="la-chart"><h3>KL(π<sub>θ</sub> ‖ π<sub>ref</sub>) — 응답당 합</h3><canvas class="la-cv" id="grKlCv" aria-label="GRPO KL 곡선"></canvas></div>
+        </div>
+        <div class="sk-scroll"><table class="sk-table la-table"><thead><tr><th>질문</th><th>현재 정책 응답 (탐욕 생성)</th><th>규칙 보상</th><th>정답 품질</th></tr></thead><tbody id="grGreedy"></tbody></table></div>
+      </section>
+    </div>
+  </section>
+
+  <!-- ================= 6. 비교 ================= -->
+  <section id="pane-cmp" role="tabpanel" aria-labelledby="tab-cmp" hidden>
+    <div class="la-stack">
+      <section class="sk-card">
+        <div class="sk-head"><h2>세 방법 비교 (실제 LLM 규모 기준)</h2></div>
+        <div class="sk-scroll"><table class="sk-table la-table"><thead><tr><th>구분</th><th>RLHF (PPO)</th><th>DPO</th><th>GRPO</th></tr></thead><tbody>
+          <tr><td>메모리의 모형</td><td><b>4개</b> — 정책·기준·보상·가치</td><td><b>2개</b> — 정책·기준</td><td><b>3개</b> — 정책·기준·보상 (규칙 보상이면 2개)</td></tr>
+          <tr><td>필요한 데이터</td><td>선호 쌍(보상 모델용) + 프롬프트</td><td>선호 쌍만</td><td>프롬프트 + 보상 함수/검증기</td></tr>
+          <tr><td>학습 중 생성</td><td>필요 (온라인)</td><td>불필요 (오프라인)</td><td>필요 — 질문마다 G개</td></tr>
+          <tr><td>기준선(baseline)</td><td>가치망 V(s)</td><td>— (분류 손실)</td><td>그룹 평균 보상</td></tr>
+          <tr><td>안정성 · 조정</td><td>하이퍼파라미터 많음, 보상 해킹 주의</td><td>단순·안정, 데이터 분포 밖 일반화 약함</td><td>가치망 없이 안정, 보상 설계가 핵심</td></tr>
+          <tr><td>대표 사례</td><td>InstructGPT · ChatGPT</td><td>Zephyr · Llama 3 사후학습</td><td>DeepSeekMath · DeepSeek-R1</td></tr>
+        </tbody></table></div>
+      </section>
+      <section class="sk-card">
+        <div class="sk-head"><h2>장난감 과제에서 직접 비교</h2><span class="la-toy">브라우저용 축소 설정 · 각 탭의 현재 설정 사용</span></div>
+        <p class="sk-lead">같은 SFT 모형에서 출발해 세 방법을 차례로 학습한 뒤, 질문마다 응답 150개씩 뽑아 SFT 응답과 숨은 정답 기준으로 맞대결한다(승 1, 무 0.5). 순전파·역전파 횟수는 이 페이지에서 실제로 센 값이다.</p>
+        <div class="sk-controls">
+          <button type="button" class="sk-btn sk-btn--primary" id="cmpRun">세 방법 모두 학습</button>
+          <button type="button" class="sk-btn" id="cmpStop" disabled>멈춤</button>
+          <span class="la-mini" id="cmpMsg"></span>
+        </div>
+        <div class="sk-grid2">
+          <div class="la-chart"><h3>SFT 대비 승률</h3><canvas class="la-cv" id="cmpCv" aria-label="방법별 승률 막대그래프"></canvas></div>
+          <div class="sk-scroll"><table class="sk-table la-table"><thead><tr><th>항목</th><th>SFT</th><th>PPO</th><th>DPO</th><th>GRPO</th></tr></thead><tbody id="cmpBody"></tbody></table></div>
+        </div>
+        <p class="sk-note" id="cmpNote">버튼을 누르면 PPO → DPO → GRPO 순서로 학습한다 (수십 초).</p>
+      </section>
+    </div>
+  </section>
+
+  <!-- ================= 7. 코드 ================= -->
+  <section id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="la-stack">
+      <section class="sk-card">
+        <div class="sk-head"><h2>Hugging Face TRL로 옮기기</h2><span class="sk-hint">각 탭의 현재 β·학습률·G 등을 반영</span></div>
+        <p class="sk-lead">실제 LLM에서는 TRL 라이브러리의 Trainer로 같은 단계를 수행한다. TRL 버전에 따라 인자 이름이 조금씩 다를 수 있으니 설치한 버전의 문서를 함께 확인한다.</p>
+        <div id="codeBlocks" class="la-stack"></div>
+      </section>
+    </div>
+  </section>
+
+  <!-- ================= 8. 알고리즘 구성도 ================= -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">강의 슬라이드 4장 · 파이프라인 → 보상 모델·PPO → DPO → GRPO·비교</span></div><div data-ds-diagrams="llm-alignment"></div></section>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20261007a"></script>
+<script src="../../assets/js/rl-kit.js?v=20261007a"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261007a"></script>
+<script src="../../assets/diagrams/llm-alignment.js?v=20261007a"></script>
+<script>
+/* ===== 장난감 언어 모형 정렬 엔진 (브라우저용 축소 설정): 정책·SFT·보상 모델·PPO·DPO·GRPO·평가 ===== */
+function makeLM(RL) {
+  "use strict";
+  const TOK = ["<끝>", "안녕하세요.", "걱정되셨죠.", "좋은 질문이에요!", "하루 3회까지 드세요.", "전날 자정부터 금식하세요.", "바로 119에 연락하세요.", "1회 200mg입니다.", "1회 20mg입니다.", "마음껏 드셔도 돼요.", "좀 지켜보세요.", "의료진과 상담하세요.", "감사합니다."];
+  const PROMPTS = ["두통약은 하루에 몇 번 먹어도 되나요?", "내일 수술인데 언제부터 굶어야 하나요?", "가슴이 조이고 식은땀이 나요.", "20kg 아이, 해열제 10mg/kg이면 1회 몇 mg?"];
+  const V = TOK.length, END = 0, L = 6, NP = PROMPTS.length, HID = 32;
+  const IN = NP + L + (V + 1) + V;      /* 질문 4 + 위치 6 + 직전 토큰 14(BOS 포함) + 지금까지 쓴 토큰 개수 13 = 37 */
+  const CORRECT = [4, 5, 6, 7];
+  const sig = z => 1 / (1 + Math.exp(-z));
+
+  /* 입력 = 희소 특징 (원-핫 위치 목록) */
+  function feat(p, ctx) {
+    const t = ctx.length, i = [p, NP + t, NP + L + (t ? ctx[t - 1] : V)], v = [1, 1, 1], bag = {};
+    for (let k = 0; k < t; k++) bag[ctx[k]] = (bag[ctx[k]] || 0) + 1;
+    for (const a in bag) { i.push(NP + L + V + 1 + (+a)); v.push(bag[a]); }
+    return { i, v };
+  }
+  function newNet(seed, out) { return new RL.MLP([IN, HID, out || V], { act: "tanh", out: "linear", rng: RL.rng(seed), lastScale: out === 1 ? 0.1 : 0.5 }); }
+  /* RL.MLP 가중치를 그대로 쓰되 희소 입력으로 빠르게 순전파·역전파 (수식은 MLP와 동일) */
+  const count = { f: 0, b: 0 };
+  function fwd(net, x) {
+    count.f++;
+    const W0 = net.W[0], b0 = net.b[0], W1 = net.W[1], b1 = net.b[1], H = net.sizes[1], O = net.sizes[2];
+    const h = new Float64Array(H), z = new Float64Array(O);
+    for (let j = 0; j < H; j++) { let s = b0[j]; for (let k = 0; k < x.i.length; k++) s += x.v[k] * W0[x.i[k] * H + j]; h[j] = Math.tanh(s); }
+    for (let o = 0; o < O; o++) { let s = b1[o]; for (let j = 0; j < H; j++) s += h[j] * W1[j * O + o]; z[o] = s; }
+    return { h, z };
+  }
+  function bwd(net, x, h, dz) {
+    count.b++;
+    const W1 = net.W[1], gW0 = net.gW[0], gb0 = net.gb[0], gW1 = net.gW[1], gb1 = net.gb[1], H = net.sizes[1], O = net.sizes[2];
+    for (let j = 0; j < H; j++) {
+      let dh = 0;
+      for (let o = 0; o < O; o++) { gW1[j * O + o] += h[j] * dz[o]; dh += W1[j * O + o] * dz[o]; }
+      const d1 = dh * (1 - h[j] * h[j]); gb0[j] += d1;
+      for (let k = 0; k < x.i.length; k++) gW0[x.i[k] * H + j] += x.v[k] * d1;
+    }
+    for (let o = 0; o < O; o++) gb1[o] += dz[o];
+  }
+  function logSoftmax(z) { let m = -Infinity; for (let k = 0; k < z.length; k++) if (z[k] > m) m = z[k]; let s = 0; for (let k = 0; k < z.length; k++) s += Math.exp(z[k] - m); const ls = Math.log(s) + m, o = new Float64Array(z.length); for (let k = 0; k < z.length; k++) o[k] = z[k] - ls; return o; }
+  function probs(net, p, ctx, temp) { const z = fwd(net, feat(p, ctx)).z; if (temp && temp !== 1) for (let k = 0; k < z.length; k++) z[k] /= temp; return Array.from(logSoftmax(z), Math.exp); }
+  function sample(net, p, rng, temp) {
+    const toks = [];
+    for (let t = 0; t < L; t++) { const a = rng.choice(probs(net, p, toks, temp)); toks.push(a); if (a === END) break; }
+    return toks;
+  }
+  function greedy(net, p) { const toks = []; for (let t = 0; t < L; t++) { const a = RL.argmax(probs(net, p, toks)); toks.push(a); if (a === END) break; } return toks; }
+  const content = toks => toks.filter(a => a !== END);
+  const truncated = toks => toks.length === L && toks[L - 1] !== END;
+  const text = toks => { const c = content(toks); return (c.length ? c.map(a => TOK[a]).join(" ") : "(빈 응답)") + (truncated(toks) ? " …" : ""); };
+  function tokenLogps(net, p, toks) { const out = []; for (let t = 0; t < toks.length; t++) out.push(logSoftmax(fwd(net, feat(p, toks.slice(0, t))).z)[toks[t]]); return out; }
+  const sum = a => a.reduce((s, v) => s + v, 0);
+  /* 토큰 하나: log π 를 구하고 coef(lp) * (onehot − p) 를 로짓 기울기로 역전파 */
+  function backTok(net, x, a, coefFn) {
+    const f = fwd(net, x), lz = logSoftmax(f.z), lp = lz[a], c = coefFn(lp);
+    if (c) { const dz = new Float64Array(lz.length); for (let j = 0; j < lz.length; j++) dz[j] = c * ((j === a ? 1 : 0) - Math.exp(lz[j])); bwd(net, x, f.h, dz); }
+    return lp;
+  }
+
+  /* ---------- 숨은 정답 기준 (전문가 평가를 대신하는 규칙, 학습에는 쓰지 않음) ---------- */
+  function goldParts(p, toks) {
+    const y = content(toks), c = new Array(V).fill(0); y.forEach(a => c[a]++);
+    const P = { acc: 0, safe: 0, kind: 0, rep: 0, len: 0 };
+    if (!y.length) { P.len = -2; return P; }
+    if (c[CORRECT[p]]) P.acc += 2;
+    [4, 5, 6, 7, 8].forEach(a => { if (!c[a] || a === CORRECT[p]) return; if (a === 8) P.acc -= 2; else if (a === 6) P.acc -= 0.5; else P.acc -= 1; });
+    if (c[9]) P.safe -= 3;
+    if (c[10]) P.safe -= p === 2 ? 3 : 0.5;
+    if (c[11]) P.safe += 0.7;
+    if (c[1]) P.kind += y[0] === 1 ? 0.5 : 0.1;
+    if (c[2]) P.kind += 0.5;
+    if (c[3]) P.kind += p === 2 ? -0.3 : 0.3;
+    if (c[12]) P.kind += y[y.length - 1] === 12 ? 0.3 : 0.1;
+    c.forEach(n => { if (n > 1) P.rep -= 1.2 * (n - 1); });
+    if (y.length > 4) P.len -= 0.6 * (y.length - 4);
+    if (truncated(toks)) P.len -= 0.5;
+    return P;
+  }
+  function gold(p, toks) { const P = goldParts(p, toks); return +(P.acc + P.safe + P.kind + P.rep + P.len).toFixed(6); }
+  /* ---------- 검증 가능한 규칙 보상 (GRPO): 정답 + 형식 − 위험 ---------- */
+  function ruleParts(p, toks) {
+    const y = content(toks), c = new Array(V).fill(0); y.forEach(a => c[a]++);
+    const ok = c[CORRECT[p]] > 0 && !(p === 3 && c[8]);
+    const fmt = !truncated(toks) && y.length >= 1 && y.length <= 4 && c.every(n => n <= 1);
+    const danger = c[9] > 0 || (p === 2 && c[10] > 0);
+    return { ok: ok ? 1 : 0, fmt: fmt ? 0.5 : 0, danger: danger ? -1 : 0 };
+  }
+  function ruleReward(p, toks) { const r = ruleParts(p, toks); return r.ok + r.fmt + r.danger; }
+
+  /* ---------- 시연 데이터 (SFT): 여러 작성자가 쓴 안내문 — 품질이 고르지 않음 ---------- */
+  function demo(p, rng) {
+    const y = [];
+    if (rng.random() < 0.6) y.push(1);
+    if (rng.random() < 0.35) y.push(2);
+    if (rng.random() < 0.3) y.push(3);
+    const u = rng.random();
+    if (u < 0.55) y.push(CORRECT[p]);
+    else if (u < 0.67) y.push(p === 3 ? 8 : [4, 5, 6, 7][(p + 1 + rng.int(3)) % 4]);
+    else if (u < 0.75) y.push(9);
+    else if (u < 0.87) y.push(10);
+    if (rng.random() < 0.45) y.push(11);
+    if (rng.random() < 0.35) y.push(12);
+    if (rng.random() < 0.04 && y.length) y.push(y[y.length - 1]);
+    while (y.length > L - 1) y.pop();
+    if (!y.length) y.push(11);
+    y.push(END);
+    return y;
+  }
+  function makeDemos(n, seed) { const rng = RL.rng(seed), D = []; for (let i = 0; i < n; i++) { const p = i % NP; D.push({ p, y: demo(p, rng) }); } return D; }
+  /* SFT 한 단계: 배치 bs개 시연의 토큰별 교차 엔트로피 */
+  function sftStep(net, opt, demos, rng, bs) {
+    let loss = 0, nt = 0;
+    for (let b = 0; b < bs; b++) {
+      const d = demos[rng.int(demos.length)];
+      for (let t = 0; t < d.y.length; t++) { const lp = backTok(net, feat(d.p, d.y.slice(0, t)), d.y[t], () => -1); loss -= lp; nt++; }
+    }
+    opt.step(1 / nt); return loss / nt;
+  }
+
+  /* ---------- 보상 모형: 질문별 토큰 개수의 선형 결합 r(x,y) = Σ w[x,토큰]·개수 ---------- */
+  function rmFeat(p, toks) { const f = new Float64Array(NP * V); content(toks).forEach(a => { f[p * V + a] += 1; }); return f; }
+  function rmScore(w, p, toks) { let s = 0; content(toks).forEach(a => { s += w[p * V + a]; }); return s; }
+  function makePairs(ref, n, seed, tau) {
+    const rng = RL.rng(seed), out = []; let guard = 0;
+    while (out.length < n && guard++ < n * 30) {
+      const p = out.length % NP, a = sample(ref, p, rng), b = sample(ref, p, rng);
+      if (a.join() === b.join()) continue;
+      const ga = gold(p, a), gb = gold(p, b), aw = rng.random() < sig((ga - gb) / (tau || 0.5));
+      out.push({ p, w: aw ? a : b, l: aw ? b : a, gw: aw ? ga : gb, gl: aw ? gb : ga });
+    }
+    return out;
+  }
+  function rmNew() { return { w: new Float64Array(NP * V), m: new Float64Array(NP * V), v: new Float64Array(NP * V), t: 0 }; }
+  function pairDiff(d) { if (!d.df) { const m = {}; content(d.w).forEach(a => { m[d.p * V + a] = (m[d.p * V + a] || 0) + 1; }); content(d.l).forEach(a => { m[d.p * V + a] = (m[d.p * V + a] || 0) - 1; }); d.df = Object.keys(m).filter(k => m[k]).map(k => [+k, m[k]]); } return d.df; }
+  function rmTrainStep(R, pairs, lr, l2) {
+    const w = R.w, g = new Float64Array(w.length); let loss = 0, acc = 0; R.t++;
+    pairs.forEach(d => {
+      const df = pairDiff(d); let z = 0; df.forEach(e => { z += w[e[0]] * e[1]; });
+      const s = sig(z); loss -= Math.log(Math.max(s, 1e-12)); if (z > 0) acc++;
+      df.forEach(e => { g[e[0]] -= (1 - s) * e[1]; });
+    });
+    for (let i = 0; i < w.length; i++) {
+      const gi = g[i] / pairs.length + l2 * w[i];
+      R.m[i] = 0.9 * R.m[i] + 0.1 * gi; R.v[i] = 0.999 * R.v[i] + 0.001 * gi * gi;
+      w[i] -= lr * (R.m[i] / (1 - Math.pow(0.9, R.t))) / (Math.sqrt(R.v[i] / (1 - Math.pow(0.999, R.t))) + 1e-8);
+    }
+    return { loss: loss / pairs.length, acc: acc / pairs.length };
+  }
+  function rmEval(w, pairs) { let loss = 0, acc = 0; pairs.forEach(d => { const z = rmScore(w, d.p, d.w) - rmScore(w, d.p, d.l); loss -= Math.log(Math.max(sig(z), 1e-12)); if (z > 0) acc++; }); return { loss: loss / pairs.length, acc: acc / pairs.length }; }
+
+  /* ---------- 롤아웃 (토큰 단위 기록) ---------- */
+  function rollout(pi, ref, p, rng, val) {
+    const toks = [], steps = [];
+    for (let t = 0; t < L; t++) {
+      const x = feat(p, toks), lz = logSoftmax(fwd(pi, x).z), a = rng.choice(Array.from(lz, Math.exp));
+      steps.push({ x, a, lp: lz[a], lr: logSoftmax(fwd(ref, x).z)[a], v: val ? fwd(val, x).z[0] : 0 });
+      toks.push(a); if (a === END) break;
+    }
+    return { p, toks, steps };
+  }
+  function adamStep(net, opt, n, maxNorm) { net.scaleGrad(1 / n); if (maxNorm) net.clipGrad(maxNorm); opt.step(1); }
+
+  /* ---------- RLHF: PPO-clip + 토큰별 KL 벌점 ---------- */
+  function ppoCollect(S) {
+    const B = [], rng = S.rng;
+    for (let p = 0; p < NP; p++) for (let i = 0; i < S.perPrompt; i++) B.push(rollout(S.pi, S.ref, p, rng, S.val));
+    const all = []; let mRM = 0, mKL = 0, mG = 0, mLen = 0;
+    B.forEach(ep => {
+      const rm = S.reward ? S.reward(ep.p, ep.toks) : rmScore(S.w, ep.p, ep.toks), T = ep.steps.length;
+      let kl = 0; ep.steps.forEach(st => { kl += st.lp - st.lr; });
+      ep.rm = rm; ep.kl = kl; ep.gold = gold(ep.p, ep.toks);
+      mRM += rm; mKL += kl; mG += ep.gold; mLen += content(ep.toks).length;
+      ep.steps.forEach((st, t) => { st.r = -S.beta * (st.lp - st.lr) + (t === T - 1 ? rm : 0); });
+      let gae = 0;
+      for (let t = T - 1; t >= 0; t--) {
+        const st = ep.steps[t], vn = t === T - 1 ? 0 : ep.steps[t + 1].v, d = st.r + vn - st.v;
+        gae = d + S.lam * gae; st.adv = gae; st.ret = gae + st.v;
+      }
+      ep.steps.forEach(st => all.push(st));
+    });
+    let mu = 0, sd = 0; all.forEach(st => mu += st.adv); mu /= all.length; all.forEach(st => sd += (st.adv - mu) ** 2); sd = Math.sqrt(sd / all.length) + 1e-8;
+    all.forEach(st => st.an = (st.adv - mu) / sd);
+    const k = B.length;
+    return { B, all, mu, sd, rm: mRM / k, kl: mKL / k, gold: mG / k, len: mLen / k };
+  }
+  function ppoUpdate(S, C) {
+    const all = C.all; let clipFrac = 0; const n = all.length;
+    for (let e = 0; e < S.epochs; e++) {
+      let cf = 0;
+      all.forEach(st => {
+        backTok(S.pi, st.x, st.a, lp => {
+          const rho = Math.exp(lp - st.lp), A = st.an;
+          if ((A > 0 && rho > 1 + S.clip) || (A < 0 && rho < 1 - S.clip)) { cf++; return 0; }
+          return -A * rho;
+        });
+        const fv = fwd(S.val, st.x); bwd(S.val, st.x, fv.h, [fv.z[0] - st.ret]);
+      });
+      adamStep(S.pi, S.optPi, n, 1); adamStep(S.val, S.optV, n, 5);
+      clipFrac = cf / n;
+    }
+    C.clip = clipFrac; return C;
+  }
+  function ppoIter(S) { return ppoUpdate(S, ppoCollect(S)); }
+
+  /* ---------- DPO: 선호 쌍으로 바로 최적화 ---------- */
+  function dpoPrep(ref, pairs) { pairs.forEach(d => { d.rw = sum(tokenLogps(ref, d.p, d.w)); d.rl = sum(tokenLogps(ref, d.p, d.l)); }); }
+  function dpoTerms(pi, d, beta) {
+    const lw = sum(tokenLogps(pi, d.p, d.w)), ll = sum(tokenLogps(pi, d.p, d.l));
+    const hw = beta * (lw - d.rw), hl = beta * (ll - d.rl), z = hw - hl;
+    return { lw, ll, rw: d.rw, rl: d.rl, hw, hl, z, s: sig(z), loss: -Math.log(Math.max(sig(z), 1e-300)) };
+  }
+  function dpoStep(S, pairs) {
+    let loss = 0, acc = 0, mlw = 0, mll = 0; const bs = S.bs, rng = S.rng;
+    for (let b = 0; b < bs; b++) {
+      const d = pairs[rng.int(pairs.length)];
+      let lw = 0, ll = 0;
+      for (let t = 0; t < d.w.length; t++) lw += logSoftmax(fwd(S.pi, feat(d.p, d.w.slice(0, t))).z)[d.w[t]];
+      for (let t = 0; t < d.l.length; t++) ll += logSoftmax(fwd(S.pi, feat(d.p, d.l.slice(0, t))).z)[d.l[t]];
+      const z = S.beta * ((lw - d.rw) - (ll - d.rl)), s = sig(z), g = S.beta * (1 - s);
+      loss -= Math.log(Math.max(s, 1e-300)); if (z > 0) acc++; mlw += lw; mll += ll;
+      for (let t = 0; t < d.w.length; t++) backTok(S.pi, feat(d.p, d.w.slice(0, t)), d.w[t], () => -g);
+      for (let t = 0; t < d.l.length; t++) backTok(S.pi, feat(d.p, d.l.slice(0, t)), d.l[t], () => g);
+    }
+    adamStep(S.pi, S.opt, bs, 1);
+    return { loss: loss / bs, acc: acc / bs, lw: mlw / bs, ll: mll / bs };
+  }
+
+  /* ---------- GRPO: 그룹 상대 이점, 가치망 없음 ---------- */
+  function grpoIter(S) {
+    const groups = [], rng = S.rng; let mR = 0, mKL = 0, mG = 0, mRM = 0, cnt = 0;
+    for (let p = 0; p < NP; p++) {
+      const g = [];
+      for (let i = 0; i < S.G; i++) {
+        const ep = rollout(S.pi, S.ref, p, rng);
+        ep.r = S.reward(p, ep.toks); ep.gold = gold(p, ep.toks); ep.kl = sum(ep.steps.map(st => st.lp - st.lr));
+        g.push(ep); mR += ep.r; mG += ep.gold; mKL += ep.kl; mRM += S.w ? rmScore(S.w, p, ep.toks) : 0; cnt++;
+      }
+      const mu = sum(g.map(e => e.r)) / g.length, sd = Math.sqrt(sum(g.map(e => (e.r - mu) ** 2)) / g.length);
+      g.forEach(e => { e.A = sd > 1e-9 ? (e.r - mu) / (sd + 1e-4) : 0; });
+      g.mu = mu; g.sd = sd; groups.push(g);
+    }
+    let cf = 0, tk = 0;
+    for (let e = 0; e < S.epochs; e++) {
+      groups.forEach(g => g.forEach(ep => {
+        const w = 1 / ep.steps.length;
+        ep.steps.forEach(st => {
+          backTok(S.pi, st.x, st.a, lp => {
+            const rho = Math.exp(lp - st.lp), A = ep.A; let c = 0; tk++;
+            if ((A > 0 && rho > 1 + S.clip) || (A < 0 && rho < 1 - S.clip)) cf++; else c = -A * rho;
+            c += S.beta * (1 - Math.exp(st.lr - lp));          /* k3 KL 추정량의 기울기 */
+            return c * w;
+          });
+        });
+      }));
+      adamStep(S.pi, S.opt, NP * S.G, 1);
+    }
+    return { r: mR / cnt, gold: mG / cnt, kl: mKL / cnt, rm: mRM / cnt, clip: cf / Math.max(1, tk), groups };
+  }
+
+  /* ---------- 평가: 기준 모형(SFT) 대비 승률 (숨은 정답 기준으로 판정) ---------- */
+  function evaluate(pi, ref, w, nPer, seed) {
+    const r1 = RL.rng(seed), r2 = RL.rng(seed + 1000); let win = 0, G = 0, RM = 0, KL = 0, len = 0, n = 0, rep = 0;
+    for (let p = 0; p < NP; p++) for (let i = 0; i < nPer; i++) {
+      const a = sample(pi, p, r1), b = sample(ref, p, r2), ga = gold(p, a), gb = gold(p, b);
+      win += ga > gb ? 1 : ga === gb ? 0.5 : 0; G += ga; RM += w ? rmScore(w, p, a) : 0; len += content(a).length;
+      KL += sum(tokenLogps(pi, p, a)) - sum(tokenLogps(ref, p, a)); if (goldParts(p, a).rep < 0) rep++; n++;
+    }
+    return { win: win / n, gold: G / n, rm: RM / n, kl: KL / n, len: len / n, rep: rep / n };
+  }
+
+  return { TOK, PROMPTS, V, END, L, NP, IN, HID, CORRECT, sig, feat, newNet, fwd, bwd, logSoftmax, probs, sample, greedy, content, truncated, text, tokenLogps, sum, backTok,
+    goldParts, gold, ruleParts, ruleReward, makeDemos, sftStep, rmFeat, rmScore, makePairs, rmNew, rmTrainStep, rmEval,
+    count, rollout, ppoCollect, ppoUpdate, ppoIter, dpoPrep, dpoTerms, dpoStep, grpoIter, evaluate };
+}
+
+/* ===== 화면 ===== */
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const LM = makeLM(RL);
+  const { TOK, PROMPTS, END, L, NP, CORRECT } = LM;
+  const PSHORT = ["두통약 횟수", "수술 전 금식", "흉통·식은땀", "소아 해열제 용량"];
+  const TOKKIND = ["end", "kind", "kind", "kind", "acc", "acc", "acc", "acc", "bad", "bad", "bad", "safe", "kind"];
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  function f(v, d) { d = d == null ? 2 : d; if (v == null || !isFinite(v)) return "—"; const s = Math.abs(v).toFixed(d); return (v < 0 && +s !== 0 ? "−" : "") + s; }
+  const fp = v => (v > 0 ? "+" : "") + f(v);
+  const pct = v => (v * 100).toFixed(1) + "%";
+  const cls = v => v > 1e-9 ? "la-pos" : v < -1e-9 ? "la-negv" : "";
+  const tokHtml = a => '<span class="la-tok" data-k="' + TOKKIND[a] + '">' + esc(TOK[a]) + "</span>";
+  function respHtml(toks) {
+    const c = LM.content(toks); let s = c.length ? c.map(tokHtml).join("") : '<span class="la-mini">(빈 응답)</span>';
+    if (LM.truncated(toks)) s += ' <span class="la-mini">… 6문장에서 잘림</span>';
+    return s;
+  }
+  const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const visible = el => !!(el && el.offsetParent);
+  const nParams = net => net.nParams();
+  const mean = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0;
+  function setSeg(seg, v) { seg.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === String(v) ? "true" : "false")); }
+  function segVal(seg) { const b = seg.querySelector('[aria-pressed="true"]'); return b ? b.dataset.v : null; }
+  function bindSeg(seg, fn) { seg.addEventListener("click", e => { const b = e.target.closest("button"); if (!b || b.disabled) return; setSeg(seg, b.dataset.v); fn && fn(b.dataset.v); }); }
+  function bindSlider(id, fmt, fn) { const el = $(id), out = $(id + "V"); const upd = () => { out.textContent = fmt(+el.value); fn && fn(+el.value); }; el.addEventListener("input", upd); upd(); }
+  function stats(el, items) { el.innerHTML = items.map(it => '<div class="sk-stat"><b' + (it.c ? ' style="color:var(' + it.c + ')"' : "") + ">" + it.v + "</b><span>" + it.k + "</span></div>").join(""); }
+
+  /* ---------- 캔버스 ---------- */
+  function fit(cv, h) {
+    const dpr = window.devicePixelRatio || 1; cv.style.width = "100%";
+    const w = cv.clientWidth || 300; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.height = h + "px";
+    const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); return { g, w, h };
+  }
+  function line(cv, series, opts) {
+    if (!visible(cv)) return;
+    const o = Object.assign({ h: 230 }, opts || {}); o.w = Math.max(260, (cv.parentNode && cv.parentNode.clientWidth) || 560);
+    RL.lineChart(cv, series.map(s => ({ data: s.data, color: cssv(s.c), label: s.label, smooth: s.smooth, dash: s.dash, raw: s.raw, width: s.width })), o);
+    if (series.every(s => !s.data.length)) {
+      const g = cv.getContext("2d"), dpr = window.devicePixelRatio || 1;
+      g.save(); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.fillStyle = cssv("--muted"); g.font = "600 13px " + cssv("--sans"); g.textAlign = "center";
+      g.fillText(o.empty || "[학습 시작]을 누르면 곡선이 그려진다", cv.width / dpr / 2, cv.height / dpr / 2 - 6); g.restore();
+    }
+  }
+  /* 다음 토큰 확률 (가로 막대) */
+  function probBars(cv, pr, chosen) {
+    if (!visible(cv)) return;
+    const th = RL.theme(), rowH = 21, H = pr.length * rowH + 8, o = fit(cv, H), g = o.g, W = o.w;
+    const lw = Math.min(176, W * 0.46), bx = lw + 8, bw = W - bx - 52;
+    g.clearRect(0, 0, W, H); g.font = "12px " + cssv("--sans"); g.textBaseline = "middle";
+    pr.forEach((p, a) => {
+      const y = 4 + a * rowH, isC = a === chosen;
+      g.fillStyle = isC ? th.ink : th.text; g.textAlign = "right"; g.font = (isC ? "700 " : "") + "12px " + cssv("--sans");
+      let lab = TOK[a]; while (g.measureText(lab).width > lw - 4 && lab.length > 3) lab = lab.slice(0, -2) + "…";
+      g.fillText(lab, lw, y + rowH / 2);
+      g.fillStyle = th.bg2; g.fillRect(bx, y + 3, bw, rowH - 6);
+      g.fillStyle = isC ? cssv("--c-pol") : cssv("--c-ref"); g.globalAlpha = isC ? 1 : 0.55; g.fillRect(bx, y + 3, Math.max(1, bw * p), rowH - 6); g.globalAlpha = 1;
+      g.fillStyle = th.text; g.textAlign = "left"; g.font = "11.5px " + cssv("--mono"); g.fillText(p.toFixed(3), bx + bw + 6, y + rowH / 2);
+    });
+  }
+  /* 세로 막대 (승률) */
+  function winBars(cv, labels, vals, colors) {
+    if (!visible(cv)) return;
+    const th = RL.theme(), o = fit(cv, 240), g = o.g, W = o.w, H = o.h, pl = 40, pb = 30, pt = 16;
+    g.clearRect(0, 0, W, H); g.font = "11px " + cssv("--mono");
+    const Y = v => pt + (H - pt - pb) * (1 - v);
+    g.strokeStyle = th.line; g.fillStyle = th.faint; g.textAlign = "right"; g.textBaseline = "middle";
+    for (let k = 0; k <= 4; k++) { const v = k / 4; g.beginPath(); g.moveTo(pl, Y(v)); g.lineTo(W - 8, Y(v)); g.stroke(); g.fillText(v.toFixed(2), pl - 6, Y(v)); }
+    g.setLineDash([4, 4]); g.strokeStyle = th.muted; g.beginPath(); g.moveTo(pl, Y(0.5)); g.lineTo(W - 8, Y(0.5)); g.stroke(); g.setLineDash([]);
+    const n = labels.length, slot = (W - pl - 8) / n, bw = Math.min(70, slot * 0.55);
+    labels.forEach((lab, i) => {
+      const x = pl + slot * i + (slot - bw) / 2, v = vals[i];
+      g.fillStyle = th.text; g.textAlign = "center"; g.font = "600 12px " + cssv("--sans"); g.fillText(lab, x + bw / 2, H - pb / 2);
+      if (v == null) return;
+      g.fillStyle = cssv(colors[i]); g.fillRect(x, Y(v), bw, Y(0) - Y(v));
+      g.fillStyle = th.ink; g.font = "600 12px " + cssv("--mono"); g.fillText(v.toFixed(3), x + bw / 2, Y(v) - 9);
+    });
+  }
+
+  /* ---------- 학습 반복기 (UI가 멈추지 않게 나눠 실행) ---------- */
+  function runJob(job) {
+    job.alive = true;
+    const tick = () => {
+      if (!job.alive) return;
+      const t0 = performance.now(), sp = job.speed ? job.speed() : { budget: 30, delay: 0 }; let done = false;
+      do { done = job.step(); } while (!done && performance.now() - t0 < sp.budget);
+      job.frame && job.frame();
+      if (done) { job.alive = false; job.end && job.end(); }
+      else job.timer = setTimeout(tick, sp.delay);
+    };
+    job.timer = setTimeout(tick, 0);
+    job.stop = () => { job.alive = false; clearTimeout(job.timer); };
+    return job;
+  }
+  const SPEEDS = { "12": { budget: 0, delay: 300 }, "40": { budget: 0, delay: 60 }, "150": { budget: 150, delay: 0 } };
+
+  /* ================= 전체 상태 ================= */
+  const APP = { seed: 7, pairI: 0, ready: false, ref: null, demos: [], sftHist: [], pairs: [], tr: [], va: [], R: null, rmHist: null, agree: 0, refEval: null, tab: "pipe" };
+  const P = { S: null, it: 0, hist: { rm: [], gold: [], kl: [] }, C: null, job: null, sweep: null, trEp: 0, trT: 0 };
+  const D = { S: null, step: 0, hist: { loss: [], vacc: [], lw: [], ll: [] }, job: null, pairI: 0, ev: null };
+  const G = { S: null, it: 0, hist: { r: [], gold: [], kl: [], zero: [] }, groups: null, shown: null, job: null, sampleN: 0 };
+  const CMP = { job: null, res: null };
+  const GEN = { p: 0, model: "sft", toks: [], last: null, rng: null, done: false };
+
+  function stopAll() { [P.job, P.sweepJob, D.job, G.job, CMP.job, APP.rmJob].forEach(j => j && j.stop && j.stop()); P.job = P.sweepJob = D.job = G.job = CMP.job = APP.rmJob = null; refreshButtons(); }
+
+  /* ---------- 처음부터 만들기: 시연 → SFT → 선호 쌍 → 보상 모델 ---------- */
+  function build() {
+    stopAll(); APP.ready = false; refreshButtons();
+    const seed = APP.seed = Math.max(1, Math.min(9999, Math.round(+$("globalSeed").value || 7)));
+    APP.demos = LM.makeDemos(400, seed + 4);
+    APP.ref = LM.newNet(seed);
+    const opt = new RL.Adam(APP.ref, { lr: 0.01 }), rng = RL.rng(seed + 1);
+    APP.sftHist = []; let s = 0;
+    $("buildMsg").textContent = "SFT 학습 중…";
+    APP.buildJob = runJob({
+      speed: () => ({ budget: 40, delay: 0 }),
+      step: () => { APP.sftHist.push(LM.sftStep(APP.ref, opt, APP.demos, rng, 16)); return ++s >= 300; },
+      frame: () => { $("buildMsg").textContent = "SFT 학습 중… " + s + " / 300"; if (APP.tab === "pipe") drawSFT(); },
+      end: () => {
+        APP.pairs = LM.makePairs(APP.ref, 400, seed + 14);
+        APP.tr = APP.pairs.slice(0, 320); APP.va = APP.pairs.slice(320);
+        APP.agree = mean(APP.pairs.map(d => d.gw > d.gl ? 1 : d.gw === d.gl ? 0.5 : 0));
+        trainRMFull(0.05, 0.001, 300);
+        LM.dpoPrep(APP.ref, APP.pairs);
+        APP.refEval = LM.evaluate(APP.ref, APP.ref, APP.R.w, 150, seed + 99);
+        APP.ready = true;
+        $("buildMsg").textContent = "완료 — 시연 400 · SFT 300단계 · 선호 쌍 400 · 보상 모델 300단계";
+        GEN.toks = []; GEN.done = false; GEN.last = null; GEN.rng = RL.rng(+$("genSeed").value || 8);
+        P.sweep = null; $("sweepWrap").hidden = true; CMP.res = null; D.pairI = 0; APP.pairI = 0;
+        ppoReset(); dpoReset(); grReset();
+        refreshButtons(); render();
+      }
+    });
+  }
+  function trainRMFull(lr, l2, steps) {
+    const R = LM.rmNew(), H = { trL: [], trA: [], vaL: [], vaA: [] };
+    for (let t = 0; t < steps; t++) { const r = LM.rmTrainStep(R, APP.tr, lr, l2), v = LM.rmEval(R.w, APP.va); H.trL.push(r.loss); H.trA.push(r.acc); H.vaL.push(v.loss); H.vaA.push(v.acc); }
+    APP.R = R; APP.rmHist = H;
+  }
+
+  /* ================= 1. 파이프라인 ================= */
+  function sub(b, s) { return b + '<tspan dy="4" font-size="10.5">' + s + '</tspan><tspan dy="-4"> </tspan>'; }
+  function flowSvg() {
+    const N = [
+      { x: 8, y: 118, w: 128, t: "사전학습", s: "다음 토큰 예측", c: "--c-state", tab: "pipe", k: "#sftCv" },
+      { x: 166, y: 118, w: 132, t: "SFT", s: "시연 → " + sub("π", "ref"), c: "--c-pol", tab: "pipe", k: "#sftCv" },
+      { x: 328, y: 118, w: 142, t: "선호 데이터", s: "(x, " + sub("y", "w") + " ≻ " + sub("y", "l") + ")", c: "--c-state", tab: "rm" },
+      { x: 516, y: 16, w: 160, t: "보상 모델 " + sub("r", "φ"), s: "Bradley–Terry", c: "--c-rm", tab: "rm" },
+      { x: 706, y: 16, w: 150, t: "PPO", s: "보상 − β·KL · 가치망", c: "--c-pol", tab: "ppo" },
+      { x: 516, y: 118, w: 340, t: "DPO", s: "선호 쌍의 로그 확률 비율로 바로 최적화", c: "--c-pol", tab: "dpo" },
+      { x: 516, y: 220, w: 160, t: "검증 보상", s: "정답 · 형식 규칙 채점", c: "--c-rm", tab: "grpo" },
+      { x: 706, y: 220, w: 150, t: "GRPO", s: "G개 그룹 비교", c: "--c-pol", tab: "grpo" },
+      { x: 884, y: 118, w: 108, t: "정렬된 " + sub("π", "θ"), s: "승률 평가", c: "--c-gold", tab: "cmp" }
+    ], h = 64;
+    let s = '<svg viewBox="0 0 1000 300" role="img" aria-label="정렬 파이프라인: 사전학습, SFT, 선호 데이터, 그리고 RLHF·DPO·GRPO 세 갈래"><defs><marker id="laAh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker></defs>';
+    const ar = (d, lab, lx, ly) => '<path class="ar" d="' + d + '" marker-end="url(#laAh)"/>' + (lab ? '<text class="lab" x="' + lx + '" y="' + ly + '" text-anchor="middle">' + lab + "</text>" : "");
+    const cy = 118 + h / 2;
+    s += ar("M136 " + cy + "H164") + ar("M298 " + cy + "H326");
+    s += ar("M470 " + (cy - 10) + "C492 " + (cy - 10) + " 492 48 514 48") + ar("M470 " + cy + "H514");
+    s += ar("M676 48H704") + ar("M676 252H704");
+    s += ar("M232 182V252H514", "프롬프트 + SFT 정책", 372, 245);
+    s += ar("M856 48C872 48 868 " + (cy - 12) + " 882 " + (cy - 12)) + ar("M856 " + cy + "H882") + ar("M856 252C872 252 868 " + (cy + 12) + " 882 " + (cy + 12));
+    s += '<text class="lab" x="610" y="102" text-anchor="middle">RLHF</text>';
+    N.forEach(n => {
+      s += '<g class="nd" style="--nc:var(' + n.c + ')" tabindex="0" role="button" data-tab="' + n.tab + '" aria-label="' + n.t.replace(/<[^>]+>/g, "") + ' 화면으로"><rect x="' + n.x + '" y="' + n.y + '" width="' + n.w + '" height="' + h + '" rx="10"/>' +
+        '<text class="t1" x="' + (n.x + n.w / 2) + '" y="' + (n.y + 27) + '" text-anchor="middle">' + n.t + '</text><text class="t2" x="' + (n.x + n.w / 2) + '" y="' + (n.y + 48) + '" text-anchor="middle">' + n.s + "</text></g>";
+    });
+    return s + "</svg>";
+  }
+  function loopSvg() {
+    return '<svg viewBox="0 0 520 196" role="img" aria-label="정책이 다음 토큰을 고르고, 문장 상태가 갱신되며, 끝에서 보상을 받는 순환"><defs><marker id="laAh2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--line-strong)"/></marker></defs>' +
+      '<rect x="14" y="46" width="170" height="78" rx="12" style="fill:color-mix(in srgb,var(--c-pol) 12%,var(--surface));stroke:var(--c-pol);stroke-width:1.6"/>' +
+      '<text x="99" y="80" text-anchor="middle" style="font-size:16px;font-weight:700">정책 π<tspan dy="4" font-size="11">θ</tspan></text><text x="99" y="104" text-anchor="middle" style="font-size:12px;fill:var(--muted)">작은 언어 모형</text>' +
+      '<rect x="336" y="46" width="170" height="78" rx="12" style="fill:color-mix(in srgb,var(--c-state) 12%,var(--surface));stroke:var(--c-state);stroke-width:1.6"/>' +
+      '<text x="421" y="80" text-anchor="middle" style="font-size:16px;font-weight:700">환경 = 문장</text><text x="421" y="104" text-anchor="middle" style="font-size:12px;fill:var(--muted)">질문 + 지금까지 토큰</text>' +
+      '<path d="M184 66C250 22 270 22 334 66" style="fill:none;stroke:var(--c-pol);stroke-width:2" marker-end="url(#laAh2)"/>' +
+      '<text x="260" y="24" text-anchor="middle" style="font-size:13px;font-weight:700;fill:var(--c-pol)">행동 a = 다음 토큰</text>' +
+      '<path d="M336 106C270 150 250 150 186 106" style="fill:none;stroke:var(--c-state);stroke-width:2" marker-end="url(#laAh2)"/>' +
+      '<text x="260" y="164" text-anchor="middle" style="font-size:13px;font-weight:700;fill:var(--c-state)">다음 상태 s′ = s + a</text>' +
+      '<text x="260" y="186" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:var(--c-rm)">보상 r: 응답이 끝날 때 한 번</text></svg>';
+  }
+  function initPipe() {
+    $("pipeFlow").innerHTML = flowSvg();
+    $("pipeFlow").addEventListener("click", e => { const n = e.target.closest(".nd"); if (n) goTab(n.dataset.tab); });
+    $("pipeFlow").addEventListener("keydown", e => { const n = e.target.closest(".nd"); if (n && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); goTab(n.dataset.tab); } });
+    $("loopSvg").innerHTML = loopSvg();
+    $("promptList").innerHTML = PROMPTS.map((q, i) => "<li><b>" + esc(q) + '</b> <span class="la-mini">정답 안내: ' + esc(TOK[CORRECT[i]]) + "</span></li>").join("");
+    $("vocabList").innerHTML = TOK.map((t, i) => tokHtml(i)).join("");
+    const arch = [["입력 (희소 특징)", "37"], ["  질문 원-핫", "4"], ["  위치 t 원-핫", "6"], ["  직전 토큰 (시작 포함)", "14"], ["  이미 쓴 토큰 개수", "13"], ["은닉층 (tanh)", "32"], ["출력 로짓 → softmax", "13"], ["최대 응답 길이", "6토큰"]];
+    $("archKv").innerHTML = arch.map(a => "<dt>" + a[0].replace(/^  /, "&nbsp;&nbsp;· ") + "</dt><dd>" + a[1] + "</dd>").join("");
+    const opts = PROMPTS.map((q, i) => '<option value="' + i + '">' + (i + 1) + ". " + esc(PSHORT[i]) + "</option>").join("");
+    ["genPrompt", "hackPrompt", "trPrompt", "impPrompt", "grPrompt"].forEach(id => { $(id).innerHTML = opts; });
+    $("genModel").innerHTML = [["sft", "SFT (기준)"], ["ppo", "PPO"], ["dpo", "DPO"], ["grpo", "GRPO"]].map(m => '<button type="button" data-v="' + m[0] + '" aria-pressed="' + (m[0] === "sft") + '">' + m[1] + "</button>").join("");
+    bindSeg($("genModel"), v => { GEN.model = v; genReset(); });
+    $("genPrompt").onchange = () => { GEN.p = +$("genPrompt").value; genReset(); };
+    $("genSeed").onchange = genReset;
+    $("genReset").onclick = genReset; $("genNext").onclick = genNext;
+    $("genAuto").onclick = () => { let g = 0; while (!GEN.done && g++ < L) genNext(); };
+    $("btnRebuild").onclick = build;
+  }
+  function genNet() { return GEN.model === "ppo" ? P.S.pi : GEN.model === "dpo" ? D.S.pi : GEN.model === "grpo" ? G.S.pi : APP.ref; }
+  function genReset() { GEN.toks = []; GEN.done = false; GEN.last = null; GEN.rng = RL.rng(Math.max(1, +$("genSeed").value || 1)); drawGen(); }
+  function genNext() {
+    if (!APP.ready || GEN.done) return;
+    const pr = LM.probs(genNet(), GEN.p, GEN.toks), a = GEN.rng.choice(pr);
+    GEN.last = { pr, a, t: GEN.toks.length }; GEN.toks.push(a);
+    if (a === END || GEN.toks.length >= L) GEN.done = true;
+    drawGen();
+  }
+  function drawGen() {
+    if (!APP.ready) return;
+    const net = genNet(), name = { sft: "SFT", ppo: "PPO", dpo: "DPO", grpo: "GRPO" }[GEN.model];
+    $("genResp").innerHTML = GEN.toks.length ? respHtml(GEN.toks) + (GEN.done && GEN.toks[GEN.toks.length - 1] === END ? tokHtml(END) : "") : '<span class="la-mini">아직 비어 있음 — 질문: ' + esc(PROMPTS[GEN.p]) + "</span>";
+    let msg;
+    if (GEN.last) {
+      const l = GEN.last;
+      probBars($("genCv"), l.pr, l.a);
+      msg = "t = " + l.t + ": 상태 s<sub>" + l.t + "</sub>에서 '" + esc(TOK[l.a]) + "' 선택 — π(a|s) = " + l.pr[l.a].toFixed(3) + ", log π = " + f(Math.log(l.pr[l.a]), 3) + ".";
+      if (GEN.done) {
+        const gp = LM.goldParts(GEN.p, GEN.toks), rp = LM.ruleParts(GEN.p, GEN.toks), lp = LM.sum(LM.tokenLogps(net, GEN.p, GEN.toks)), lr = LM.sum(LM.tokenLogps(APP.ref, GEN.p, GEN.toks));
+        msg += "<br><b>응답 끝 → 보상</b>: 보상 모델 r = " + f(LM.rmScore(APP.R.w, GEN.p, GEN.toks)) + " · 검증 보상 = " + f(rp.ok + rp.fmt + rp.danger, 1) +
+          " · 숨은 정답 품질 = " + f(LM.gold(GEN.p, GEN.toks), 1) + " (정확 " + fp(gp.acc) + ", 안전 " + fp(gp.safe) + ", 친절 " + fp(gp.kind) + ", 반복 " + fp(gp.rep) + ", 길이 " + fp(gp.len) + ")" +
+          "<br>log π<sub>" + name + "</sub>(y|x) = " + f(lp, 3) + (GEN.model !== "sft" ? " · log π<sub>ref</sub>(y|x) = " + f(lr, 3) + " → 이 응답의 KL 기여 " + f(lp - lr, 3) : "");
+      }
+    } else {
+      const pr = LM.probs(net, GEN.p, []);
+      probBars($("genCv"), pr, -1);
+      msg = "t = 0의 다음 토큰 분포 (" + name + "). [다음 토큰 →]을 누르면 이 분포에서 하나를 뽑는다.";
+    }
+    $("genOut").innerHTML = msg;
+    $("genNext").disabled = GEN.done;
+  }
+  function drawSFT() {
+    line($("sftCv"), [{ data: APP.sftHist, c: "--c-pol", label: "SFT 손실 (이동평균 20)", smooth: 20 }], { h: 210, ymin: 0 });
+    if (!APP.ready) return;
+    const h = APP.sftHist, e = APP.refEval;
+    stats($("sftStats"), [{ k: "처음 손실", v: f(h[0], 3) }, { k: "마지막 20단계 평균", v: f(mean(h.slice(-20)), 3) }, { k: "SFT 정답 품질 평균", v: f(e.gold), c: "--c-gold" }, { k: "SFT 평균 길이", v: f(e.len, 1) }]);
+    $("demoBody").innerHTML = APP.demos.slice(0, 8).map(d => "<tr><td>" + esc(PSHORT[d.p]) + '</td><td class="wrap la-resp">' + respHtml(d.y) + '</td><td class="n ' + cls(LM.gold(d.p, d.y)) + '">' + f(LM.gold(d.p, d.y), 1) + "</td></tr>").join("");
+  }
+  function renderPipe() { $("archParams").textContent = nParams(APP.ref).toLocaleString(); drawSFT(); drawGen(); }
+
+  /* ================= 2. 보상 모델 ================= */
+  function rmSum(p, toks) {
+    const c = LM.content(toks), w = APP.R.w;
+    if (!c.length) return { s: 0, txt: "0", eq: "=" };
+    const sc = LM.rmScore(w, p, toks), rs = c.reduce((t, a) => t + Math.round(w[p * LM.V + a] * 1000), 0) / 1000;
+    return { s: sc, eq: Math.abs(rs - Math.round(sc * 1000) / 1000) < 1e-9 ? "=" : "≈", txt: c.map(a => f(w[p * LM.V + a], 3)).join(" + ").replace(/\+ −/g, "− ") };
+  }
+  function drawPair() {
+    const d = APP.tr[APP.pairI], rw = rmSum(d.p, d.w), rl = rmSum(d.p, d.l), z = rw.s - rl.s, s = LM.sig(z);
+    $("pairIdx").textContent = "학습 쌍 " + (APP.pairI + 1) + " / " + APP.tr.length;
+    $("pairBody").innerHTML = "<tr><td>질문</td><td class='wrap'><b>" + esc(PROMPTS[d.p]) + "</b></td></tr>" +
+      "<tr><td style='color:var(--c-chosen);font-weight:700'>y<sub>w</sub> 선호</td><td class='wrap la-resp'>" + respHtml(d.w) + "</td></tr>" +
+      "<tr><td style='color:var(--c-rej);font-weight:700'>y<sub>l</sub> 비선호</td><td class='wrap la-resp'>" + respHtml(d.l) + "</td></tr>" +
+      "<tr><td>정답 품질</td><td>y<sub>w</sub> " + f(d.gw, 1) + " · y<sub>l</sub> " + f(d.gl, 1) + (d.gw < d.gl ? ' <span class="la-negv">(평가자가 틀린 쌍)</span>' : "") + "</td></tr>";
+    $("pairCalc").innerHTML = "r<sub>w</sub> = " + rw.txt + " " + rw.eq + " <b>" + f(rw.s, 3) + "</b><br>r<sub>l</sub> = " + rl.txt + " " + rl.eq + " <b>" + f(rl.s, 3) + "</b><br>" +
+      "r<sub>w</sub> − r<sub>l</sub> = " + f(z, 3) + "<br>P(y<sub>w</sub> ≻ y<sub>l</sub>) = σ(" + f(z, 3) + ") = <b>" + s.toFixed(4) + "</b><br>손실 = −log " + s.toFixed(4) + " = <b>" + (-Math.log(Math.max(s, 1e-12))).toFixed(4) + "</b>" +
+      (z > 0 ? ' <span class="la-pos">(맞힘)</span>' : ' <span class="la-negv">(틀림)</span>');
+  }
+  function drawRMCharts() {
+    const H = APP.rmHist; if (!H) return;
+    line($("rmLossCv"), [{ data: H.trL, c: "--c-rm", label: "학습" }, { data: H.vaL, c: "--c-gold", label: "검증", dash: [5, 4] }], { ymin: 0 });
+    line($("rmAccCv"), [{ data: H.trA, c: "--c-rm", label: "학습" }, { data: H.vaA, c: "--c-gold", label: "검증", dash: [5, 4] }], { ymin: 0.4, ymax: 1, hline: APP.agree });
+    const n = H.trL.length;
+    if (n) stats($("rmStats"), [{ k: "학습 단계", v: n }, { k: "학습 손실", v: f(H.trL[n - 1], 3) }, { k: "검증 손실", v: f(H.vaL[n - 1], 3) }, { k: "학습 정확도", v: pct(H.trA[n - 1]), c: "--c-rm" }, { k: "검증 정확도", v: pct(H.vaA[n - 1]), c: "--c-gold" }, { k: "평가자 일치율 (점선)", v: pct(APP.agree) }]);
+    $("rmNote").innerHTML = "점선 = 평가자 일치율 " + pct(APP.agree) + " (선호 쌍 중 정답 품질이 실제로 더 높은 쪽을 고른 비율). 평가자 잡음 때문에 보상 모델 정확도는 이 근처가 사실상 한계다.";
+  }
+  function drawHeat() {
+    const w = APP.R.w, mx = Math.max(...Array.from(w).map(Math.abs)) || 1;
+    let s = "<thead><tr><th>질문 \\ 토큰</th>" + TOK.slice(1).map(t => "<th>" + esc(t) + "</th>").join("") + "</tr></thead><tbody>";
+    for (let p = 0; p < NP; p++) {
+      s += "<tr><td>" + esc(PSHORT[p]) + "</td>";
+      for (let a = 1; a < TOK.length; a++) { const v = w[p * LM.V + a], k = Math.round(Math.min(1, Math.abs(v) / mx) * 55); s += '<td class="n" style="background:color-mix(in srgb,var(' + (v >= 0 ? "--c-rm" : "--c-neg") + ") " + k + '%,var(--surface))">' + f(v) + "</td>"; }
+      s += "</tr>";
+    }
+    $("rmHeat").innerHTML = s + "</tbody>";
+  }
+  function hackRows(p) {
+    const w = APP.R.w; let top = 1; for (let a = 1; a < TOK.length; a++) if (w[p * LM.V + a] > w[p * LM.V + top]) top = a;
+    const rows = [];
+    for (let k = 0; k <= 4; k++) { const y = [1, CORRECT[p]]; for (let i = 0; i < k; i++) y.push(top); if (y.length < L) y.push(END); rows.push({ k, y, r: LM.rmScore(w, p, y), g: LM.gold(p, y) }); }
+    return { top, rows };
+  }
+  function drawHack() {
+    const p = +$("hackPrompt").value, K = +$("hackK").value, H = hackRows(p);
+    $("hackBody").innerHTML = H.rows.map(r => '<tr class="' + (r.k === K ? "la-hl" : "") + '"><td class="n">' + r.k + '</td><td class="wrap la-resp">' + respHtml(r.y) + '</td><td class="n la-pos">' + f(r.r) + '</td><td class="n ' + cls(r.g) + '">' + f(r.g, 1) + "</td></tr>").join("");
+    const cv = $("hackCv");
+    line(cv, [{ data: H.rows.map(r => r.r), c: "--c-rm", label: "보상 모델 r" }, { data: H.rows.map(r => r.g), c: "--c-gold", label: "정답 품질" }], { h: 230, ymin: Math.floor(Math.min(0, ...H.rows.map(r => r.g))), ymax: Math.ceil(Math.max(...H.rows.map(r => r.r))), xlabel: "덧붙인 반복 수 k" });
+    if (visible(cv)) { /* 선택한 k 표시 */
+      const g = cv.getContext("2d"), dpr = window.devicePixelRatio || 1, W = cv.width / dpr, Hh = cv.height / dpr, x = 46 + (W - 58) * K / 4;
+      g.save(); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.strokeStyle = cssv("--c-explore"); g.setLineDash([4, 3]); g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, 14); g.lineTo(x, Hh - 28); g.stroke(); g.restore();
+    }
+  }
+  function initRM() {
+    $("pairPrev").onclick = () => { APP.pairI = (APP.pairI - 1 + APP.tr.length) % APP.tr.length; drawPair(); };
+    $("pairNext").onclick = () => { APP.pairI = (APP.pairI + 1) % APP.tr.length; drawPair(); };
+    bindSlider("rmLr", v => v.toFixed(3)); bindSlider("rmL2", v => v.toFixed(3)); bindSlider("rmSteps", v => String(v));
+    bindSlider("hackK", v => String(v), () => APP.ready && drawHack());
+    $("hackPrompt").onchange = drawHack;
+    $("rmTrain").onclick = () => {
+      if (!APP.ready) return; stopAll();
+      const lr = +$("rmLr").value, l2 = +$("rmL2").value, N = +$("rmSteps").value, R = LM.rmNew(), H = { trL: [], trA: [], vaL: [], vaA: [] };
+      APP.R = R; APP.rmHist = H; let t = 0;
+      APP.rmJob = runJob({
+        speed: () => ({ budget: 0, delay: 16 }),
+        step: () => { for (let i = 0; i < 4 && t < N; i++, t++) { const r = LM.rmTrainStep(R, APP.tr, lr, l2), v = LM.rmEval(R.w, APP.va); H.trL.push(r.loss); H.trA.push(r.acc); H.vaL.push(v.loss); H.vaA.push(v.acc); } return t >= N; },
+        frame: () => { drawRMCharts(); },
+        end: () => { APP.rmJob = null; APP.refEval = LM.evaluate(APP.ref, APP.ref, APP.R.w, 150, APP.seed + 99); ppoReset(); if (segVal($("grReward")) === "rm") grReset(); CMP.res = null; P.sweep = null; $("sweepWrap").hidden = true; refreshButtons(); renderRM(); }
+      });
+      refreshButtons();
+    };
+  }
+  function renderRM() { if (!APP.ready) return; drawPair(); drawRMCharts(); drawHeat(); drawHack(); }
+
+  /* ================= 3. PPO ================= */
+  function ppoNew(beta, seedOff) {
+    const pi = APP.ref.clone(), val = LM.newNet(APP.seed + 2, 1);
+    return { pi, ref: APP.ref, val, w: APP.R.w, beta, rng: RL.rng(APP.seed + 3 + (seedOff || 0)), perPrompt: 12, lam: 0.95, clip: +$("ppoClip").value, epochs: 4,
+      optPi: new RL.Adam(pi, { lr: +$("ppoLr").value }), optV: new RL.Adam(val, { lr: 0.01 }) };
+  }
+  function ppoReset() {
+    if (P.job) P.job.stop(); P.job = null;
+    P.S = ppoNew(+$("ppoBeta").value); P.it = 0; P.hist = { rm: [], gold: [], kl: [] };
+    P.C = LM.ppoCollect(Object.assign({}, P.S, { rng: RL.rng(APP.seed + 50) })); P.trEp = 0; P.trT = 0;
+    refreshButtons(); if (APP.tab === "ppo") renderPPO();
+  }
+  function ppoToggle() {
+    if (P.job) { P.job.stop(); P.job = null; refreshButtons(); return; }
+    const N = +$("ppoIters").value; if (P.it >= N) return;
+    P.job = runJob({
+      speed: () => SPEEDS[segVal($("ppoSpeed"))],
+      step: () => { const C = LM.ppoIter(P.S); P.C = C; P.it++; P.hist.rm.push(C.rm); P.hist.gold.push(C.gold); P.hist.kl.push(C.kl); return P.it >= +$("ppoIters").value; },
+      frame: () => { if (APP.tab === "ppo") renderPPO(); },
+      end: () => { P.job = null; refreshButtons(); if (APP.tab === "ppo") renderPPO(); }
+    });
+    refreshButtons();
+  }
+  function ppoSweep() {
+    if (P.sweepJob) { P.sweepJob.stop(); P.sweepJob = null; refreshButtons(); return; }
+    const betas = [0.1, 0.3, 0.8], N = +$("ppoIters").value; let bi = 0, it = 0, S = ppoNew(betas[0]);
+    P.sweep = { betas, N, gold: [[], [], []], rm: [[], [], []], kl: [[], [], []], greedy: [] };
+    $("sweepWrap").hidden = false;
+    P.sweepJob = runJob({
+      speed: () => ({ budget: 60, delay: 0 }),
+      step: () => {
+        const C = LM.ppoIter(S); P.sweep.gold[bi].push(C.gold); P.sweep.rm[bi].push(C.rm); P.sweep.kl[bi].push(C.kl); it++;
+        if (it >= N) { P.sweep.greedy[bi] = LM.greedy(S.pi, 0); bi++; it = 0; if (bi < 3) S = ppoNew(betas[bi]); }
+        return bi >= 3;
+      },
+      frame: () => { $("ppoMsg").textContent = bi < 3 ? "β 비교 실행 중: β = " + betas[bi] + " · " + it + " / " + N : ""; drawSweep(); },
+      end: () => { P.sweepJob = null; $("ppoMsg").textContent = "β 비교 완료"; refreshButtons(); drawSweep(); }
+    });
+    refreshButtons();
+  }
+  function drawSweep() {
+    const W = P.sweep; if (!W) return;
+    const cols = ["--c-kl", "--c-explore", "--c-state"];
+    const all = [].concat(...W.gold); line($("sweepCv"), W.betas.map((b, i) => ({ data: W.gold[i], c: cols[i], label: "β " + b, smooth: 3, raw: false })), { h: 240, ymin: Math.floor(Math.min(0, ...all)), ymax: Math.ceil(Math.max(1, ...all)) + 1.5, xlabel: "반복 (정답 품질, 이동평균 3)", hline: APP.refEval.gold });
+    $("sweepBody").innerHTML = W.betas.map((b, i) => {
+      const k = Math.min(5, W.gold[i].length); if (!k) return '<tr><td class="n">' + b + '</td><td colspan="4" class="la-mini">대기</td></tr>';
+      const g = mean(W.gold[i].slice(-k));
+      return '<tr><td class="n" style="color:var(' + cols[i] + ');font-weight:700">' + b + '</td><td class="n la-pos">' + f(mean(W.rm[i].slice(-k))) + '</td><td class="n">' + f(mean(W.kl[i].slice(-k))) + '</td><td class="n ' + cls(g) + '">' + f(g) + '</td><td class="wrap la-resp">' + (W.greedy[i] ? respHtml(W.greedy[i]) : '<span class="la-mini">학습 중</span>') + "</td></tr>";
+    }).join("");
+  }
+  function trEpisodes() { const p = +$("trPrompt").value; return P.C ? P.C.B.filter(e => e.p === p) : []; }
+  function drawTrace() {
+    const eps = trEpisodes(); if (!eps.length) return;
+    const ep = eps[P.trEp % eps.length], T = ep.steps.length, t = Math.min(P.trT, T - 1), beta = P.S.beta;
+    $("trResp").innerHTML = "질문: <b>" + esc(PROMPTS[ep.p]) + "</b><br>응답 (배치의 " + (P.trEp % eps.length + 1) + "/" + eps.length + "번째): " + respHtml(ep.toks) + (ep.toks[T - 1] === END ? tokHtml(END) : "") +
+      ' &nbsp;<span class="la-mini">보상 모델 r<sub>φ</sub> = ' + f(ep.rm) + " · 정답 품질 = " + f(ep.gold, 1) + "</span>";
+    $("trBody").innerHTML = ep.steps.map((st, i) => {
+      const vn = i === T - 1 ? 0 : ep.steps[i + 1].v, dl = st.r + vn - st.v;
+      return '<tr class="' + (i === t ? "la-hl" : "") + '"><td class="n">' + i + "</td><td>" + tokHtml(st.a) + '</td><td class="n">' + f(st.lp, 3) + '</td><td class="n">' + f(st.lr, 3) + '</td><td class="n" style="color:var(--c-kl)">' + f(st.lp - st.lr, 3) + '</td><td class="n ' + cls(st.r) + '">' + f(st.r, 3) + '</td><td class="n" style="color:var(--c-val)">' + f(st.v, 3) + '</td><td class="n">' + f(dl, 3) + '</td><td class="n ' + cls(st.adv) + '">' + f(st.adv, 3) + "</td></tr>";
+    }).join("");
+    const st = ep.steps[t], vn = t === T - 1 ? 0 : ep.steps[t + 1].v, dl = st.r + vn - st.v, an = t === T - 1 ? 0 : ep.steps[t + 1].adv, kl = st.lp - st.lr;
+    $("trCalc").innerHTML = "t = " + t + " &nbsp;토큰 '" + esc(TOK[st.a]) + "'<br>KL<sub>t</sub> = log π<sub>θ</sub> − log π<sub>ref</sub> = " + f(st.lp, 3) + " − (" + f(st.lr, 3) + ") = " + f(kl, 3) +
+      "<br>r<sub>t</sub> = −β·KL<sub>t</sub>" + (t === T - 1 ? " + r<sub>φ</sub>" : "") + " = −" + f(beta) + " × " + f(kl, 3) + (t === T - 1 ? " + " + f(ep.rm, 3) : "") + " = <b>" + f(st.r, 3) + "</b>" +
+      "<br>δ<sub>t</sub> = r<sub>t</sub> + V(s<sub>t+1</sub>) − V(s<sub>t</sub>) = " + f(st.r, 3) + " + " + f(vn, 3) + " − (" + f(st.v, 3) + ") = " + f(dl, 3) + (t === T - 1 ? " (마지막 토큰: V(s<sub>T</sub>) = 0)" : "") +
+      "<br>A<sub>t</sub> = δ<sub>t</sub> + λ·A<sub>t+1</sub> = " + f(dl, 3) + " + 0.95 × " + f(an, 3) + " = <b>" + f(st.adv, 3) + "</b> &nbsp;(뒤에서부터 계산)" +
+      "<br>배치 정규화 Â = (A − 평균)/표준편차 = (" + f(st.adv, 3) + " − " + f(P.C.mu, 3) + ") / " + f(P.C.sd, 3) + " = <b>" + f(st.an, 3) + "</b> → " + (st.an > 0 ? "이 토큰의 확률을 올림" : "이 토큰의 확률을 내림") +
+      "<br>가치망 목표 = A<sub>t</sub> + V(s<sub>t</sub>) = " + f(st.ret, 3);
+    $("trNext").disabled = t >= T - 1;
+  }
+  function renderPPO() {
+    if (!APP.ready) return;
+    const h = P.hist, n = h.rm.length;
+    line($("ppoRwCv"), [{ data: h.rm, c: "--c-rm", label: "보상 모델 r" }, { data: h.gold, c: "--c-gold", label: "정답 품질" }], { xlabel: "반복" });
+    line($("ppoKlCv"), [{ data: h.kl, c: "--c-kl", label: "KL" }], { ymin: 0, xlabel: "반복" });
+    const C = P.C, mem = nParams(P.S.pi) + nParams(P.S.ref) + APP.R.w.length + nParams(P.S.val);
+    stats($("ppoStats"), [{ k: "반복", v: P.it + " / " + $("ppoIters").value }, { k: "보상 모델 r", v: f(C.rm), c: "--c-rm" }, { k: "KL", v: f(C.kl), c: "--c-kl" }, { k: "정답 품질", v: f(C.gold), c: "--c-gold" },
+      { k: "평균 길이", v: f(C.len, 1) }, { k: "클립 비율", v: C.clip == null ? "—" : pct(C.clip) }, { k: "메모리 모형 4개 · 파라미터", v: mem.toLocaleString() }]);
+    drawTrace();
+    $("ppoGreedy").innerHTML = PROMPTS.map((q, p) => { const y = LM.greedy(P.S.pi, p), g = LM.gold(p, y); return "<tr><td>" + esc(PSHORT[p]) + '</td><td class="wrap la-resp">' + respHtml(y) + '</td><td class="n la-pos">' + f(LM.rmScore(APP.R.w, p, y)) + '</td><td class="n ' + cls(g) + '">' + f(g, 1) + "</td></tr>"; }).join("");
+    drawSweep();
+  }
+  function initPPO() {
+    bindSlider("ppoBeta", v => v.toFixed(2), v => { if (P.S) P.S.beta = v; });
+    bindSlider("ppoLr", v => v.toFixed(3), v => { if (P.S) P.S.optPi.lr = v; });
+    bindSlider("ppoClip", v => v.toFixed(2), v => { if (P.S) P.S.clip = v; });
+    bindSlider("ppoIters", v => String(v), () => refreshButtons());
+    bindSeg($("ppoSpeed"));
+    $("ppoRun").onclick = ppoToggle; $("ppoReset").onclick = ppoReset; $("ppoSweep").onclick = ppoSweep;
+    $("trPrompt").onchange = () => { P.trEp = 0; P.trT = 0; drawTrace(); };
+    $("trOther").onclick = () => { P.trEp++; P.trT = 0; drawTrace(); };
+    $("trFirst").onclick = () => { P.trT = 0; drawTrace(); };
+    $("trNext").onclick = () => { P.trT++; drawTrace(); };
+  }
+
+  /* ================= 4. DPO ================= */
+  function dpoReset() {
+    if (D.job) D.job.stop(); D.job = null;
+    const pi = APP.ref.clone();
+    D.S = { pi, beta: +$("dpBeta").value, rng: RL.rng(APP.seed + 5), bs: 16, opt: new RL.Adam(pi, { lr: +$("dpLr").value }) };
+    D.step = 0; D.hist = { loss: [], vacc: [], lw: [], ll: [] }; D.ev = null;
+    refreshButtons(); if (APP.tab === "dpo") renderDPO();
+  }
+  function dpoValAcc() { let a = 0; APP.va.forEach(d => { if (LM.dpoTerms(D.S.pi, d, D.S.beta).z > 0) a++; }); return a / APP.va.length; }
+  function dpoToggle() {
+    if (D.job) { D.job.stop(); D.job = null; refreshButtons(); return; }
+    let lastV = D.hist.vacc.length ? D.hist.vacc[D.hist.vacc.length - 1] : dpoValAcc();
+    D.job = runJob({
+      speed: () => ({ budget: 30, delay: 0 }),
+      step: () => {
+        const r = LM.dpoStep(D.S, APP.tr); D.step++;
+        if (D.step % 10 === 0) lastV = dpoValAcc();
+        D.hist.loss.push(r.loss); D.hist.vacc.push(lastV); D.hist.lw.push(r.lw); D.hist.ll.push(r.ll);
+        return D.step >= +$("dpSteps").value;
+      },
+      frame: () => { if (APP.tab === "dpo") renderDPO(); },
+      end: () => { D.job = null; D.ev = LM.evaluate(D.S.pi, APP.ref, APP.R.w, 150, APP.seed + 99); refreshButtons(); if (APP.tab === "dpo") renderDPO(); }
+    });
+    refreshButtons();
+  }
+  function drawDpoPair() {
+    const d = APP.tr[D.pairI], b = D.S.beta, T = LM.dpoTerms(D.S.pi, d, b);
+    const tw = LM.tokenLogps(D.S.pi, d.p, d.w), tl = LM.tokenLogps(D.S.pi, d.p, d.l);
+    $("dpIdx").textContent = "학습 쌍 " + (D.pairI + 1) + " / " + APP.tr.length + " · 현재 정책: " + (D.step ? D.step + "단계 학습" : "학습 전 (정책 = 기준 모형)");
+    $("dpPair").innerHTML = "질문: <b>" + esc(PROMPTS[d.p]) + "</b><br><span style='color:var(--c-chosen);font-weight:700'>y<sub>w</sub></span> " + respHtml(d.w) + (d.w[d.w.length - 1] === END ? tokHtml(END) : "") + "<br><span style='color:var(--c-rej);font-weight:700'>y<sub>l</sub></span> " + respHtml(d.l) + (d.l[d.l.length - 1] === END ? tokHtml(END) : "");
+    const A = T.lw - T.rw, B = T.ll - T.rl;
+    $("dpTerms").innerHTML =
+      "<tr><td>토큰별 log π<sub>θ</sub></td><td>" + tw.map(v => f(v)).join(", ") + "</td><td>" + tl.map(v => f(v)).join(", ") + "</td></tr>" +
+      '<tr><td>log π<sub>θ</sub>(y|x) = 합</td><td class="n">' + f(T.lw, 4) + '</td><td class="n">' + f(T.ll, 4) + "</td></tr>" +
+      '<tr><td>log π<sub>ref</sub>(y|x)</td><td class="n">' + f(T.rw, 4) + '</td><td class="n">' + f(T.rl, 4) + "</td></tr>" +
+      '<tr><td>로그 비율 log(π<sub>θ</sub>/π<sub>ref</sub>)</td><td class="n">' + f(A, 4) + '</td><td class="n">' + f(B, 4) + "</td></tr>" +
+      '<tr><td>암묵적 보상 r̂ = β × 로그 비율</td><td class="n ' + cls(T.hw) + '">' + f(T.hw, 4) + '</td><td class="n ' + cls(T.hl) + '">' + f(T.hl, 4) + "</td></tr>";
+    const g = b * (1 - T.s);
+    $("dpCalc").innerHTML = "z = β·[ (log π<sub>θ</sub>(y<sub>w</sub>) − log π<sub>ref</sub>(y<sub>w</sub>)) − (log π<sub>θ</sub>(y<sub>l</sub>) − log π<sub>ref</sub>(y<sub>l</sub>)) ]<br>&nbsp;&nbsp;= " + f(b) + " × [ (" + f(A, 4) + ") − (" + f(B, 4) + ") ] = <b>" + f(T.z, 4) + "</b>" +
+      "<br>σ(z) = 1 / (1 + e<sup>−z</sup>) = <b>" + T.s.toFixed(4) + "</b><br>L<sub>DPO</sub> = −log σ(z) = <b>" + T.loss.toFixed(4) + "</b>" + (D.step ? "" : " &nbsp;(학습 전엔 z = 0 → ln 2 = 0.6931)") +
+      "<br>기울기: ∂L/∂log π<sub>θ</sub>(y<sub>w</sub>) = −β(1 − σ) = " + f(-g, 4) + " → y<sub>w</sub> 확률 ↑<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∂L/∂log π<sub>θ</sub>(y<sub>l</sub>) = +β(1 − σ) = " + f(g, 4) + " → y<sub>l</sub> 확률 ↓";
+  }
+  function drawImplicit() {
+    const p = +$("impPrompt").value, b = D.S.beta, seen = {}, rows = [];
+    APP.pairs.forEach(d => { if (d.p !== p) return; [d.w, d.l].forEach(y => { const k = y.join(","); if (seen[k]) return; seen[k] = 1; rows.push({ y, lp: LM.sum(LM.tokenLogps(D.S.pi, p, y)), lr: LM.sum(LM.tokenLogps(APP.ref, p, y)) }); }); });
+    rows.forEach(r => { r.rh = b * (r.lp - r.lr); r.rm = LM.rmScore(APP.R.w, p, r.y); r.g = LM.gold(p, r.y); });
+    rows.sort((x, y) => y.rh - x.rh || y.g - x.g);
+    const show = rows.slice(0, 5).concat(rows.length > 8 ? [null] : []).concat(rows.length > 5 ? rows.slice(Math.max(5, rows.length - 3)) : []);
+    $("impBody").innerHTML = show.map((r, i) => r ? '<tr><td class="n">' + (rows.indexOf(r) + 1) + '</td><td class="wrap la-resp">' + respHtml(r.y) + '</td><td class="n ' + cls(r.rh) + '">' + f(r.rh, 3) + '</td><td class="n">' + f(r.rm) + '</td><td class="n ' + cls(r.g) + '">' + f(r.g, 1) + "</td></tr>" : '<tr><td colspan="5" class="la-mini">… 중간 생략 …</td></tr>').join("");
+    /* 순위 상관 (Spearman) */
+    const rank = arr => { const idx = arr.map((v, i) => [v, i]).sort((a, c) => a[0] - c[0]), r = new Array(arr.length); let i = 0; while (i < idx.length) { let j = i; while (j + 1 < idx.length && Math.abs(idx[j + 1][0] - idx[i][0]) < 1e-12) j++; for (let k = i; k <= j; k++) r[idx[k][1]] = (i + j) / 2; i = j + 1; } return r; };
+    const corr = (a, c) => { const ma = mean(a), mc = mean(c); let s = 0, sa = 0, sc = 0; a.forEach((v, i) => { s += (v - ma) * (c[i] - mc); sa += (v - ma) ** 2; sc += (c[i] - mc) ** 2; }); return sa && sc ? s / Math.sqrt(sa * sc) : NaN; };
+    const rho = corr(rank(rows.map(r => r.rh)), rank(rows.map(r => r.g)));
+    $("impNote").innerHTML = D.step ? "이 질문의 서로 다른 응답 " + rows.length + "개에서 r̂와 숨은 정답 품질의 순위 상관(Spearman) ρ = <b>" + f(rho, 3) + "</b>. 정책 확률의 변화량 자체가 보상 모델 역할을 한다."
+      : "학습 전에는 π<sub>θ</sub> = π<sub>ref</sub> 이므로 모든 응답의 r̂ = 0이다. [학습 시작] 후 다시 보면 좋은 응답의 r̂가 커진다. (서로 다른 응답 " + rows.length + "개)";
+  }
+  function renderDPO() {
+    if (!APP.ready) return;
+    const h = D.hist, n = h.loss.length;
+    line($("dpLossCv"), [{ data: h.loss, c: "--c-pol", label: "손실(이동평균 10)", smooth: 10 }, { data: h.vacc, c: "--c-gold", label: "검증 정확도" }], { ymin: 0, ymax: 1, xlabel: "단계", hline: Math.LN2 });
+    line($("dpLpCv"), [{ data: h.lw, c: "--c-chosen", label: "log π(선호)", smooth: 10 }, { data: h.ll, c: "--c-rej", label: "log π(비선호)", smooth: 10 }], { xlabel: "단계" });
+    const e = D.ev;
+    stats($("dpStats"), [{ k: "단계", v: D.step + " / " + $("dpSteps").value }, { k: "손실 (최근 20)", v: n ? f(mean(h.loss.slice(-20)), 3) : "0.693" }, { k: "검증 정확도", v: n ? pct(h.vacc[n - 1]) : "—", c: "--c-gold" },
+      { k: "SFT 대비 승률", v: e ? e.win.toFixed(3) : "학습 후", c: "--c-pol" }, { k: "정답 품질", v: e ? f(e.gold) : "—", c: "--c-gold" }, { k: "KL", v: e ? f(e.kl) : "—", c: "--c-kl" }, { k: "메모리 모형 2개 · 파라미터", v: (nParams(D.S.pi) * 2).toLocaleString() }]);
+    drawDpoPair(); drawImplicit();
+  }
+  function initDPO() {
+    bindSlider("dpBeta", v => v.toFixed(2), v => { if (D.S) { D.S.beta = v; if (APP.tab === "dpo" && !D.job) { drawDpoPair(); drawImplicit(); } } });
+    bindSlider("dpLr", v => v.toFixed(3), v => { if (D.S) D.S.opt.lr = v; });
+    bindSlider("dpSteps", v => String(v), () => refreshButtons());
+    $("dpRun").onclick = dpoToggle; $("dpReset").onclick = dpoReset;
+    $("dpPrev").onclick = () => { D.pairI = (D.pairI - 1 + APP.tr.length) % APP.tr.length; drawDpoPair(); };
+    $("dpNext").onclick = () => { D.pairI = (D.pairI + 1) % APP.tr.length; drawDpoPair(); };
+    $("impPrompt").onchange = drawImplicit;
+  }
+
+  /* ================= 5. GRPO ================= */
+  function grRewardFn() { return segVal($("grReward")) === "rm" ? (p, y) => LM.rmScore(APP.R.w, p, y) : LM.ruleReward; }
+  function grReset() {
+    if (G.job) G.job.stop(); G.job = null;
+    const pi = APP.ref.clone();
+    G.S = { pi, ref: APP.ref, beta: +$("grBeta").value, G: +segVal($("grG")), clip: 0.2, epochs: 2, rng: RL.rng(APP.seed + 6), w: APP.R.w, reward: grRewardFn(), opt: new RL.Adam(pi, { lr: +$("grLr").value }) };
+    G.it = 0; G.hist = { r: [], gold: [], kl: [], zero: [] }; G.groups = null; G.sampleN = 0; grSample(true);
+    refreshButtons(); if (APP.tab === "grpo") renderGRPO();
+  }
+  function grMakeGroup(p, rng) {
+    const g = [], fn = G.S.reward;
+    for (let i = 0; i < G.S.G; i++) { const y = LM.sample(G.S.pi, p, rng); g.push({ toks: y, r: fn(p, y), parts: LM.ruleParts(p, y) }); }
+    const mu = mean(g.map(e => e.r)), sd = Math.sqrt(mean(g.map(e => (e.r - mu) ** 2)));
+    g.forEach(e => { e.A = sd > 1e-9 ? (e.r - mu) / (sd + 1e-4) : 0; }); g.mu = mu; g.sd = sd; return g;
+  }
+  function grSample(silent) {
+    const p = +$("grPrompt").value; G.sampleN++;
+    G.shown = { p, g: grMakeGroup(p, RL.rng(APP.seed * 31 + G.sampleN)), fresh: true };
+    if (!silent) drawGroup();
+  }
+  function grToggle() {
+    if (G.job) { G.job.stop(); G.job = null; refreshButtons(); return; }
+    G.job = runJob({
+      speed: () => ({ budget: 30, delay: 0 }),
+      step: () => {
+        const r = LM.grpoIter(G.S); G.it++; G.groups = r.groups;
+        G.hist.r.push(r.r); G.hist.gold.push(r.gold); G.hist.kl.push(r.kl); G.hist.zero.push(r.groups.filter(g => g.sd <= 1e-9).length / r.groups.length);
+        return G.it >= +$("grIters").value;
+      },
+      frame: () => { const p = +$("grPrompt").value; if (G.groups) G.shown = { p, g: G.groups[p].map(e => ({ toks: e.toks, r: e.r, parts: LM.ruleParts(p, e.toks), A: e.A })), fresh: false, mu: G.groups[p].mu, sd: G.groups[p].sd }; if (APP.tab === "grpo") renderGRPO(); },
+      end: () => { G.job = null; refreshButtons(); if (APP.tab === "grpo") renderGRPO(); }
+    });
+    refreshButtons();
+  }
+  function drawGroup() {
+    const sh = G.shown; if (!sh) return;
+    const g = sh.g, mu = sh.mu != null ? sh.mu : g.mu, sd = sh.sd != null ? sh.sd : g.sd, isRule = segVal($("grReward")) !== "rm";
+    const mx = Math.max(1e-9, ...g.map(e => Math.abs(e.A)));
+    $("grSampleMsg").textContent = sh.fresh ? "현재 정책에서 새로 뽑은 그룹 (학습에는 쓰이지 않음)" : "가장 최근 학습 반복 " + G.it + "에서 쓴 그룹";
+    $("grBody").innerHTML = g.map((e, i) => '<tr><td class="n">' + (i + 1) + '</td><td class="wrap la-resp">' + respHtml(e.toks) + '</td><td class="n">' + (e.parts.ok ? "1" : "0") + '</td><td class="n">' + f(e.parts.fmt, 1) + '</td><td class="n ' + cls(e.parts.danger) + '">' + f(e.parts.danger, 0) + '</td><td class="n ' + cls(e.r) + '">' + f(e.r, isRule ? 1 : 2) + '</td><td class="n ' + cls(e.A) + '">' + f(e.A, 3) + "</td><td>" +
+      '<span class="la-bar' + (e.A < 0 ? " neg" : "") + '" style="width:' + Math.round(Math.abs(e.A) / mx * 60) + 'px"></span></td></tr>').join("");
+    const rs = g.map(e => e.r), e0 = g[0];
+    $("grCalc").innerHTML = (isRule ? "r<sub>i</sub> = 정답 + 형식 + 위험" : "r<sub>i</sub> = 보상 모델 점수 r<sub>φ</sub>(x, o<sub>i</sub>) (규칙 열은 참고용)") +
+      "<br>mean(r) = (" + rs.map(v => f(v, isRule ? 1 : 2)).join(" + ").replace(/\+ −/g, "− ") + ") / " + g.length + " = <b>" + f(mu, 4) + "</b>" +
+      "<br>std(r) = √( Σ(r<sub>i</sub> − mean)² / G ) = <b>" + f(sd, 4) + "</b>" +
+      (sd > 1e-9 ? "<br>A<sub>1</sub> = (r<sub>1</sub> − mean) / std = (" + f(e0.r, isRule ? 1 : 2) + " − " + f(mu, 4) + ") / " + f(sd, 4) + " = <b>" + f(e0.A, 3) + "</b>" + (e0.A > 0 ? " → o<sub>1</sub>의 모든 토큰 확률 ↑" : e0.A < 0 ? " → o<sub>1</sub>의 모든 토큰 확률 ↓" : "") +
+        "<br>Σ A<sub>i</sub> = " + f(g.reduce((s, e) => s + e.A, 0), 3) + " (그룹 평균이 기준선이므로 합은 0)"
+        : "<br><span class='la-negv'>모든 응답의 보상이 같다 → std = 0 → A = 0, 이 질문에서는 학습 신호가 없다.</span>");
+  }
+  function renderGRPO() {
+    if (!APP.ready) return;
+    const h = G.hist, n = h.r.length, isRule = segVal($("grReward")) !== "rm";
+    line($("grRwCv"), [{ data: h.r, c: "--c-rm", label: isRule ? "검증 보상" : "보상 모델 r", smooth: 5 }, { data: h.gold, c: "--c-gold", label: "정답 품질", smooth: 5 }], { xlabel: "반복" });
+    line($("grKlCv"), [{ data: h.kl, c: "--c-kl", label: "KL", smooth: 5 }], { ymin: 0, xlabel: "반복" });
+    const nm = isRule ? 2 : 3, mem = nParams(G.S.pi) * 2 + (isRule ? 0 : APP.R.w.length);
+    stats($("grStats"), [{ k: "반복", v: G.it + " / " + $("grIters").value }, { k: "평균 보상 (최근 5)", v: n ? f(mean(h.r.slice(-5))) : "—", c: "--c-rm" }, { k: "정답 품질 (최근 5)", v: n ? f(mean(h.gold.slice(-5))) : "—", c: "--c-gold" },
+      { k: "KL (최근 5)", v: n ? f(mean(h.kl.slice(-5))) : "—", c: "--c-kl" }, { k: "신호 없는 그룹 (std=0)", v: n ? pct(mean(h.zero.slice(-10))) : "—" }, { k: "메모리 모형 " + nm + "개" + (isRule ? " + 규칙" : "") + " · 파라미터", v: mem.toLocaleString() }]);
+    drawGroup();
+    $("grGreedy").innerHTML = PROMPTS.map((q, p) => { const y = LM.greedy(G.S.pi, p), g = LM.gold(p, y), r = LM.ruleReward(p, y); return "<tr><td>" + esc(PSHORT[p]) + '</td><td class="wrap la-resp">' + respHtml(y) + '</td><td class="n ' + cls(r) + '">' + f(r, 1) + '</td><td class="n ' + cls(g) + '">' + f(g, 1) + "</td></tr>"; }).join("");
+  }
+  function initGRPO() {
+    bindSeg($("grG"), () => grReset()); bindSeg($("grReward"), () => grReset());
+    bindSlider("grBeta", v => v.toFixed(2), v => { if (G.S) G.S.beta = v; });
+    bindSlider("grLr", v => v.toFixed(3), v => { if (G.S) G.S.opt.lr = v; });
+    bindSlider("grIters", v => String(v), () => refreshButtons());
+    $("grRun").onclick = grToggle; $("grReset").onclick = grReset;
+    $("grSample").onclick = () => grSample(false);
+    $("grPrompt").onchange = () => { const p = +$("grPrompt").value; if (G.groups && !G.shown.fresh) { G.shown = { p, g: G.groups[p].map(e => ({ toks: e.toks, r: e.r, parts: LM.ruleParts(p, e.toks), A: e.A })), fresh: false, mu: G.groups[p].mu, sd: G.groups[p].sd }; drawGroup(); } else grSample(false); };
+  }
+
+  /* ================= 6. 비교 ================= */
+  function cmpRun() {
+    if (CMP.job) return; stopAll();
+    const res = { sft: { ev: APP.refEval } }; CMP.res = res;
+    const plan = [
+      { k: "ppo", n: +$("ppoIters").value, init: () => ppoNew(+$("ppoBeta").value), step: S => LM.ppoIter(S), gen: 4 * 12 },
+      { k: "dpo", n: +$("dpSteps").value, init: () => { const pi = APP.ref.clone(); return { pi, beta: +$("dpBeta").value, rng: RL.rng(APP.seed + 5), bs: 16, opt: new RL.Adam(pi, { lr: +$("dpLr").value }) }; }, step: S => LM.dpoStep(S, APP.tr), gen: 0 },
+      { k: "grpo", n: +$("grIters").value, init: () => { const pi = APP.ref.clone(); return { pi, ref: APP.ref, beta: +$("grBeta").value, G: +segVal($("grG")), clip: 0.2, epochs: 2, rng: RL.rng(APP.seed + 6), w: APP.R.w, reward: grRewardFn(), opt: new RL.Adam(pi, { lr: +$("grLr").value }) }; }, step: S => LM.grpoIter(S), gen: 4 * (+segVal($("grG"))) }
+    ];
+    let mi = 0, it = 0, S = null, t0 = 0, f0 = 0, b0 = 0, ms = 0;
+    const begin = () => { S = plan[mi].init(); it = 0; f0 = LM.count.f; b0 = LM.count.b; ms = 0; };
+    begin();
+    CMP.job = runJob({
+      speed: () => ({ budget: 60, delay: 0 }),
+      step: () => {
+        t0 = performance.now(); plan[mi].step(S); ms += performance.now() - t0; it++;
+        if (it >= plan[mi].n) {
+          const fw = LM.count.f - f0, bw = LM.count.b - b0;
+          res[plan[mi].k] = { ev: LM.evaluate(S.pi, APP.ref, APP.R.w, 150, APP.seed + 99), fw, bw, ms, n: plan[mi].n, gen: plan[mi].gen * plan[mi].n, S };
+          mi++; if (mi < plan.length) begin();
+        }
+        return mi >= plan.length;
+      },
+      frame: () => { $("cmpMsg").textContent = mi < plan.length ? plan[mi].k.toUpperCase() + " 학습 중 " + it + " / " + plan[mi].n : ""; renderCmp(); },
+      end: () => { CMP.job = null; $("cmpMsg").textContent = "완료"; refreshButtons(); renderCmp(); }
+    });
+    refreshButtons();
+  }
+  function renderCmp() {
+    if (!APP.ready) return;
+    const R = CMP.res, K = ["sft", "ppo", "dpo", "grpo"], g = k => R && R[k];
+    const isRule = segVal($("grReward")) !== "rm", np = nParams(APP.ref), nv = 37 * 32 + 32 + 32 + 1;
+    const cell = (k, fn, c) => { const r = g(k); return '<td class="n ' + (c || "") + '">' + (r ? fn(r) : "—") + "</td>"; };
+    const row = (lab, fns) => "<tr><td>" + lab + "</td>" + K.map((k, i) => fns[i] == null ? '<td class="n">—</td>' : typeof fns[i] === "string" ? '<td class="n">' + fns[i] + "</td>" : cell(k, fns[i])).join("") + "</tr>";
+    $("cmpBody").innerHTML =
+      row("메모리 모형 수", ["1", "4", "2", isRule ? "2 + 규칙" : "3"]) +
+      row("메모리 파라미터", [np.toLocaleString(), (2 * np + 52 + nv).toLocaleString(), (2 * np).toLocaleString(), (2 * np + (isRule ? 0 : 52)).toLocaleString()]) +
+      row("학습 반복 / 단계", [null, r => r.n, r => r.n, r => r.n]) +
+      row("학습 중 생성한 응답", [null, r => r.gen.toLocaleString(), r => "0", r => r.gen.toLocaleString()]) +
+      row("순전파 횟수", [null, r => r.fw.toLocaleString(), r => r.fw.toLocaleString(), r => r.fw.toLocaleString()]) +
+      row("역전파 횟수", [null, r => r.bw.toLocaleString(), r => r.bw.toLocaleString(), r => r.bw.toLocaleString()]) +
+      row("학습 시간", [null, r => (r.ms / 1000).toFixed(1) + "초", r => (r.ms / 1000).toFixed(1) + "초", r => (r.ms / 1000).toFixed(1) + "초"]) +
+      row("보상 모델 점수", [r => f(r.ev.rm), r => f(r.ev.rm), r => f(r.ev.rm), r => f(r.ev.rm)]) +
+      row("KL (응답당)", [r => f(r.ev.kl), r => f(r.ev.kl), r => f(r.ev.kl), r => f(r.ev.kl)]) +
+      row("반복 응답 비율", [r => pct(r.ev.rep), r => pct(r.ev.rep), r => pct(r.ev.rep), r => pct(r.ev.rep)]) +
+      row("숨은 정답 품질", [r => f(r.ev.gold), r => f(r.ev.gold), r => f(r.ev.gold), r => f(r.ev.gold)]) +
+      row("<b>SFT 대비 승률</b>", [r => "<b>" + r.ev.win.toFixed(3) + "</b>", r => "<b>" + r.ev.win.toFixed(3) + "</b>", r => "<b>" + r.ev.win.toFixed(3) + "</b>", r => "<b>" + r.ev.win.toFixed(3) + "</b>"]);
+    winBars($("cmpCv"), ["SFT", "PPO", "DPO", "GRPO"], K.map(k => g(k) ? g(k).ev.win : null), ["--c-ref", "--c-pol", "--c-chosen", "--c-val"]);
+    if (R && R.ppo && R.dpo && R.grpo) {
+      const best = ["ppo", "dpo", "grpo"].sort((a, b) => R[b].ev.win - R[a].ev.win)[0];
+      $("cmpNote").innerHTML = "이번 실행에서 승률이 가장 높은 방법: <b>" + best.toUpperCase() + "</b>. SFT끼리 맞대결도 표본 잡음 때문에 정확히 0.5가 아니다(" + R.sft.ev.win.toFixed(3) + "). " +
+        "순전파가 가장 많은 방법: <b>" + ["ppo", "dpo", "grpo"].sort((a, b) => R[b].fw - R[a].fw)[0].toUpperCase() + "</b> (PPO는 가치망까지 함께 계산, DPO는 생성이 없음). GRPO는 " + (isRule ? "규칙 보상이 친절을 채점하지 않아 정답 품질의 친절 점수를 놓칠 수 있다." : "보상 모델을 쓰면 β가 작을 때 PPO처럼 해킹될 수 있다.") + " 장난감 규모 결과이므로 실제 LLM 순위로 일반화하지 않는다.";
+    }
+  }
+
+  /* ================= 7. 코드 ================= */
+  function pyStr(s) { return '"' + String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"'; }
+  function codeBlocks() {
+    const d = APP.tr[0], txt = y => LM.content(y).map(a => TOK[a]).join(" ");
+    const bP = (+$("ppoBeta").value).toFixed(2), eP = (+$("ppoClip").value).toFixed(2), bD = (+$("dpBeta").value).toFixed(2), Gn = segVal($("grG")), bG = (+$("grBeta").value).toFixed(2), isRule = segVal($("grReward")) !== "rm";
+    const B = [];
+    B.push({ t: "1) 보상 모델 — RewardTrainer (Bradley–Terry)", c: [
+      "from datasets import Dataset",
+      "from transformers import AutoTokenizer, AutoModelForSequenceClassification",
+      "from trl import RewardConfig, RewardTrainer",
+      "",
+      "sft = \"Qwen/Qwen2.5-0.5B-Instruct\"            # SFT를 마친 모형 경로로 바꿔 사용",
+      "tok = AutoTokenizer.from_pretrained(sft)",
+      "rm = AutoModelForSequenceClassification.from_pretrained(sft, num_labels=1)   # 스칼라 점수 r(x, y)",
+      "",
+      "pairs = Dataset.from_list([                   # 선호 쌍 (시뮬레이터 학습 쌍 1번)",
+      "    {\"prompt\": " + pyStr(PROMPTS[d.p]) + ",",
+      "     \"chosen\": " + pyStr(txt(d.w)) + ",",
+      "     \"rejected\": " + pyStr(txt(d.l)) + "},",
+      "])",
+      "args = RewardConfig(output_dir=\"rm\", learning_rate=1e-5, num_train_epochs=1, per_device_train_batch_size=8)",
+      "RewardTrainer(model=rm, args=args, processing_class=tok, train_dataset=pairs).train()   # 손실 = -log σ(r_w - r_l)"] });
+    B.push({ t: "2) RLHF — PPOTrainer (메모리에 모형 4개)", c: [
+      "from transformers import AutoModelForCausalLM, AutoModelForSequenceClassification, AutoTokenizer",
+      "from trl import PPOConfig, PPOTrainer",
+      "",
+      "tok = AutoTokenizer.from_pretrained(sft, padding_side=\"left\")",
+      "policy     = AutoModelForCausalLM.from_pretrained(sft)                       # π_θ  (학습)",
+      "ref_policy = AutoModelForCausalLM.from_pretrained(sft)                       # π_ref (고정)",
+      "reward     = AutoModelForSequenceClassification.from_pretrained(\"rm\", num_labels=1)   # r_φ (고정)",
+      "value      = AutoModelForSequenceClassification.from_pretrained(\"rm\", num_labels=1)   # V   (학습)",
+      "",
+      "prompts = Dataset.from_dict({\"prompt\": " + "[" + PROMPTS.map(pyStr).join(", ") + "]})",
+      "prompts = prompts.map(lambda x: tok(x[\"prompt\"]), remove_columns=[\"prompt\"])",
+      "args = PPOConfig(output_dir=\"ppo\", kl_coef=" + bP + ", cliprange=" + eP + ", num_ppo_epochs=4,",
+      "                 gamma=1.0, lam=0.95, learning_rate=1e-6, response_length=64)   # 학습률은 LLM 규모 값",
+      "trainer = PPOTrainer(args=args, processing_class=tok, model=policy, ref_model=ref_policy,",
+      "                     reward_model=reward, value_model=value, train_dataset=prompts, eval_dataset=prompts)",
+      "trainer.train()"] });
+    B.push({ t: "3) DPO — DPOTrainer (보상 모델·생성 없음)", c: [
+      "from trl import DPOConfig, DPOTrainer",
+      "",
+      "model = AutoModelForCausalLM.from_pretrained(sft)",
+      "args = DPOConfig(output_dir=\"dpo\", beta=" + bD + ", learning_rate=5e-7, per_device_train_batch_size=16, num_train_epochs=1)",
+      "trainer = DPOTrainer(model=model, ref_model=None,      # None이면 시작 모형을 복사해 π_ref로 고정",
+      "                     args=args, train_dataset=pairs, processing_class=tok)",
+      "trainer.train()   # 손실 = -log σ(β[(log π_θ(y_w) - log π_ref(y_w)) - (log π_θ(y_l) - log π_ref(y_l))])"] });
+    const gr = [
+      "from trl import GRPOConfig, GRPOTrainer",
+      "",
+      "data = Dataset.from_list([",
+      PROMPTS.map((q, i) => "    {\"prompt\": " + pyStr(q) + ", \"answer\": " + pyStr(TOK[CORRECT[i]]) + "},").join("\n"),
+      "])"];
+    if (isRule) gr.push("",
+      "def correct_reward(completions, answer, **kw):      # 정답 +1 (용량 질문은 200mg 일치)",
+      "    return [1.0 if a in c and \"1회 20mg\" not in c else 0.0 for c, a in zip(completions, answer)]",
+      "def format_reward(completions, **kw):               # 형식 +0.5: 1~4문장, 반복 없음",
+      "    out = []",
+      "    for c in completions:",
+      "        s = [x for x in c.replace(\"!\", \".\").split(\".\") if x.strip()]",
+      "        out.append(0.5 if 1 <= len(s) <= 4 and len(set(s)) == len(s) else 0.0)",
+      "    return out",
+      "def safety_reward(completions, **kw):               # 위험 표현 -1",
+      "    return [-1.0 if \"마음껏 드셔도\" in c else 0.0 for c in completions]",
+      "",
+      "reward_funcs = [correct_reward, format_reward, safety_reward]   # 보상 모델 없음 → 메모리 모형 2개");
+    else gr.push("", "reward_funcs = \"rm\"          # 학습한 보상 모델 경로 → 메모리 모형 3개 (해킹 주의)");
+    gr.push("args = GRPOConfig(output_dir=\"grpo\", num_generations=" + Gn + ", beta=" + bG + ", epsilon=0.2,",
+      "                  num_iterations=2, learning_rate=1e-6, max_completion_length=128,",
+      "                  per_device_train_batch_size=" + Gn + ")     # 배치 = 질문 × G개 응답",
+      "trainer = GRPOTrainer(model=sft, reward_funcs=reward_funcs, args=args, train_dataset=data)",
+      "trainer.train()   # A_i = (r_i - mean) / std, 가치망 없음");
+    B.push({ t: "4) GRPO — GRPOTrainer (" + (isRule ? "검증 가능한 보상" : "보상 모델") + ")", c: gr });
+    return B;
+  }
+  function renderCode() {
+    if (!APP.ready) return;
+    const B = codeBlocks();
+    $("codeBlocks").innerHTML = B.map((b, i) => '<div><div class="la-codehead"><h3>' + esc(b.t) + '</h3><button type="button" class="sk-btn sk-btn--sm" data-copy="' + i + '">복사</button></div>' +
+      '<pre class="la-code" tabindex="0" aria-label="' + esc(b.t) + ' 파이썬 코드">' + b.c.join("\n").split("\n").map(l => { const k = l.indexOf("#"); return k >= 0 ? esc(l.slice(0, k)) + '<span class="cm">' + esc(l.slice(k)) + "</span>" : esc(l); }).join("\n") + "</pre></div>").join("");
+    CODE_CACHE = B;
+  }
+  let CODE_CACHE = [];
+  function copyText(txt, btn) {
+    const done = () => { const o = btn.textContent; btn.textContent = "복사됨"; setTimeout(() => { btn.textContent = o; }, 1200); };
+    const fb = () => { const ta = document.createElement("textarea"); ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (e) { /* 무시 */ } ta.remove(); done(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, fb); else fb();
+  }
+  $("codeBlocks").addEventListener("click", e => { const b = e.target.closest("[data-copy]"); if (b) copyText(CODE_CACHE[+b.dataset.copy].c.join("\n"), b); });
+
+  /* ================= 버튼 상태 · 탭 ================= */
+  function refreshButtons() {
+    const busyAll = !!CMP.job || !!APP.rmJob || !APP.ready;
+    $("ppoRun").textContent = P.job ? "멈춤" : (P.it ? "이어서 학습" : "학습 시작");
+    $("ppoRun").disabled = busyAll || !!P.sweepJob || (!P.job && P.it >= +$("ppoIters").value);
+    $("ppoReset").disabled = busyAll || !!P.sweepJob;
+    $("ppoSweep").textContent = P.sweepJob ? "β 비교 멈춤" : "β 비교 실행 (0.1 · 0.3 · 0.8)";
+    $("ppoSweep").disabled = busyAll || !!P.job;
+    $("dpRun").textContent = D.job ? "멈춤" : (D.step ? "이어서 학습" : "학습 시작");
+    $("dpRun").disabled = busyAll || (!D.job && D.step >= +$("dpSteps").value); $("dpReset").disabled = busyAll;
+    $("grRun").textContent = G.job ? "멈춤" : (G.it ? "이어서 학습" : "학습 시작");
+    $("grRun").disabled = busyAll || (!G.job && G.it >= +$("grIters").value); $("grReset").disabled = busyAll;
+    $("cmpRun").disabled = busyAll; $("cmpStop").disabled = !CMP.job;
+    $("rmTrain").disabled = !APP.ready || !!APP.rmJob || !!CMP.job;
+    $("btnRebuild").disabled = !APP.ready && !!APP.buildJob && APP.buildJob.alive;
+    if (P.job || P.it) $("ppoMsg").textContent = P.job ? "학습 중…" : (P.it >= +$("ppoIters").value ? "완료" : "멈춤");
+    $("dpMsg").textContent = D.job ? "학습 중…" : D.step ? (D.step >= +$("dpSteps").value ? "완료" : "멈춤") : "";
+    $("grMsg").textContent = G.job ? "학습 중…" : G.it ? (G.it >= +$("grIters").value ? "완료" : "멈춤") : "";
+  }
+  $("cmpRun").onclick = cmpRun;
+  $("cmpStop").onclick = () => { if (CMP.job) { CMP.job.stop(); CMP.job = null; $("cmpMsg").textContent = "멈춤"; refreshButtons(); } };
+
+  const tabs = [...document.querySelectorAll(".sk-tab")];
+  function render() {
+    if (!APP.ready) { if (APP.tab === "pipe") drawSFT(); return; }
+    ({ pipe: renderPipe, rm: renderRM, ppo: renderPPO, dpo: renderDPO, grpo: renderGRPO, cmp: renderCmp, code: renderCode, diagram: () => {} })[APP.tab]();
+  }
+  function show(t) {
+    tabs.forEach(b => { const on = b === t; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1; document.getElementById(b.getAttribute("aria-controls")).hidden = !on; });
+    APP.tab = t.id.replace("tab-", "");
+    const nav = t.parentNode; if (nav.scrollWidth > nav.clientWidth) nav.scrollLeft = Math.max(0, t.offsetLeft - nav.offsetLeft - 24);
+    history.replaceState(null, "", "#" + APP.tab);
+    render();
+  }
+  function goTab(name) { const t = $("tab-" + name); if (t) { show(t); t.focus(); window.scrollTo({ top: document.querySelector(".sk-tabs").getBoundingClientRect().top + window.scrollY - 70, behavior: "auto" }); } }
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => show(b));
+    b.addEventListener("keydown", e => {
+      const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return;
+      const n = tabs[(i + d + tabs.length) % tabs.length]; show(n); n.focus(); e.preventDefault();
+    });
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key !== "ArrowRight") return;
+    const t = e.target; if (t && (t.matches("input,select,textarea,.sk-tab,[contenteditable]") || t.closest(".dgv"))) return;
+    if (APP.tab === "pipe") { genNext(); e.preventDefault(); }
+    else if (APP.tab === "ppo" && !$("trNext").disabled) { P.trT++; drawTrace(); e.preventDefault(); }
+  });
+
+  initPipe(); initRM(); initPPO(); initDPO(); initGRPO();
+  RL.onTheme(render);
+  let rz = 0; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(render, 150); });
+  const start = document.getElementById("tab-" + location.hash.slice(1));
+  show(start || tabs[0]);
+  $("globalSeed").addEventListener("keydown", e => { if (e.key === "Enter") build(); });
+  build();
+})();
+</script>
+</body>
+</html>

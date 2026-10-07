@@ -1,0 +1,1018 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DQN (Deep Q-Network) | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261007a">
+<style>
+/* ===== DQN 시뮬레이터 전용 스타일 ===== */
+:root{
+  --sk-accent: var(--cat-rl);
+  --r-state:#2563EB; --r-act:#EA580C; --r-rew:#16A34A; --r-val:#7C3AED; --r-tgt:#DB2777; --r-td:#DC2626; --r-exp:#B7791F;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --r-state:#79A6F6; --r-act:#F59A5C; --r-rew:#5CCB82; --r-val:#B597FF; --r-tgt:#F27AA3; --r-td:#F07A7A; --r-exp:#E3B455; } }
+:root[data-theme="dark"]{ --r-state:#79A6F6; --r-act:#F59A5C; --r-rew:#5CCB82; --r-val:#B597FF; --r-tgt:#F27AA3; --r-td:#F07A7A; --r-exp:#E3B455; }
+
+.dq-cv{ display:block; width:100%; max-width:100%; border-radius:10px; }
+.dq-train{ display:grid; grid-template-columns: minmax(0,5fr) minmax(0,6fr); gap:16px; align-items:start; }
+@media (max-width: 980px){ .dq-train{ grid-template-columns: minmax(0,1fr); } }
+.dq-col{ display:flex; flex-direction:column; gap:12px; min-width:0; }
+.dq-qbar{ display:grid; grid-template-columns: auto 1fr auto; gap:6px 10px; align-items:center; font-size:13px; }
+.dq-qbar .bar{ height:14px; border-radius:4px; background:var(--surface-2); overflow:hidden; }
+.dq-qbar .bar i{ display:block; height:100%; background:var(--r-val); border-radius:4px; }
+.dq-qbar .bar i.on{ background:var(--r-act); }
+.dq-qbar b{ font-family:var(--mono); font-weight:600; color:var(--ink); min-width:56px; text-align:right; }
+.dq-status{ font-size:13px; color:var(--muted); min-height:1.4em; }
+.dq-status b{ color:var(--ink); }
+.dq-sliders{ display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:10px 22px; }
+@media (max-width: 900px){ .dq-sliders{ grid-template-columns: repeat(2, minmax(0,1fr)); } }
+.dq-svg{ width:100%; height:auto; display:block; }
+.dq-svg text{ font-family:var(--sans); fill:var(--ink); }
+.dq-svg .m{ fill:var(--muted); }
+.dq-svg .box{ fill:var(--surface); stroke:var(--line-strong); stroke-width:1.5; }
+.dq-svg .st{ stroke:var(--r-state); } .dq-svg .ac{ stroke:var(--r-act); } .dq-svg .rw{ stroke:var(--r-rew); } .dq-svg .va{ stroke:var(--r-val); } .dq-svg .tg{ stroke:var(--r-tgt); } .dq-svg .ex{ stroke:var(--r-exp); }
+.dq-svg .fst{ fill:var(--r-state); } .dq-svg .fac{ fill:var(--r-act); } .dq-svg .frw{ fill:var(--r-rew); } .dq-svg .fva{ fill:var(--r-val); } .dq-svg .ftg{ fill:var(--r-tgt); } .dq-svg .fex{ fill:var(--r-exp); }
+.dq-svg .ln{ fill:none; stroke-width:2; }
+.dq-svg .soft{ fill:var(--surface-2); }
+.dq-svg .clk{ cursor:pointer; }
+.dq-svg .clk:focus{ outline:none; }
+.dq-svg .clk:focus-visible .box, .dq-svg .clk.sel .box{ stroke:var(--sk-accent); stroke-width:3; }
+.dq-tbl th, .dq-tbl td{ padding:5px 6px; font-size:12.5px; }
+.dq-tbl td.hl, .dq-tbl th.hl{ background: color-mix(in srgb, var(--sk-accent) 14%, var(--surface)); }
+.dq-tbl td.y{ color:var(--r-tgt); font-weight:700; }
+.dq-tbl td.q{ color:var(--r-val); font-weight:700; }
+.dq-tbl td.d{ color:var(--r-td); font-weight:700; }
+.dq-tbl td.a{ color:var(--r-act); font-weight:700; }
+.dq-tbl td.r{ color:var(--r-rew); }
+.dq-tbl td.dim{ color:var(--faint); }
+.dq-code{ white-space:pre; font-size:12.5px; line-height:1.6; max-height:520px; overflow:auto; }
+.dq-copied{ font-size:12.5px; color:var(--muted); }
+.dq-frames{ display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; }
+.dq-frame{ display:flex; flex-direction:column; gap:4px; align-items:center; font-size:12px; color:var(--muted); }
+.dq-frame canvas{ image-rendering: pixelated; border:1px solid var(--line); border-radius:6px; background:#000; }
+.dq-frame b{ color:var(--ink); font-size:12.5px; }
+.dq-legend i{ border-radius:2px; }
+.dq-tag{ display:inline-block; font-size:11.5px; font-weight:700; border-radius:999px; padding:1px 8px; border:1px solid currentColor; }
+.dq-tag.ok{ color:var(--r-rew); } .dq-tag.bad{ color:var(--r-td); } .dq-tag.mid{ color:var(--r-exp); }
+.dq-info{ min-height:150px; }
+.dq-info h3{ margin:0 0 6px; }
+.dq-info p{ margin:0 0 6px; font-size:14px; }
+.dq-kpi{ display:flex; flex-wrap:wrap; gap:8px; }
+.dq-steps{ font-size:13px; }
+.dq-steps li{ margin:2px 0; }
+@media (max-width: 520px){ .dq-sliders{ grid-template-columns: minmax(0,1fr); } .sk-slider{ min-width:0; } }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+      <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a href="../../index.html#rl" style="--c:var(--cat-rl)" aria-current="page">강화학습</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#rl" style="--c:var(--cat-rl)">강화학습</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">DQN (Deep Q-Network)</h1>
+      <p class="ds-hero__lede">Q표 대신 신경망으로 Q(s,a)를 근사합니다. 브라우저에서 CartPole을 실제로 학습시키며 경험 재생(Experience Replay)과 타깃 네트워크(Target Network)를 빼면 학습이 어떻게 무너지는지 같은 seed로 비교합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button class="sk-tab" role="tab" id="tab-train" aria-controls="pane-train" aria-selected="true"><span class="sk-num">1</span>CartPole 학습</button>
+    <button class="sk-tab" role="tab" id="tab-batch" aria-controls="pane-batch" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>미니배치 한 번</button>
+    <button class="sk-tab" role="tab" id="tab-ablation" aria-controls="pane-ablation" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>리플레이·타깃망 빼 보기</button>
+    <button class="sk-tab" role="tab" id="tab-atari" aria-controls="pane-atari" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>Atari로 확장</button>
+    <button class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>코드</button>
+    <button class="sk-tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>알고리즘 구성도</button>
+  </nav>
+
+  <!-- ========== 1. 학습 ========== -->
+  <section id="pane-train" role="tabpanel" aria-labelledby="tab-train">
+    <div class="sk-card">
+      <div class="sk-head"><h2>에이전트–환경 루프와 DQN의 부품</h2><span class="sk-hint">상태 = 파랑 · 행동 = 주황 · 보상 = 초록 · 가치(Q) = 보라 · 타깃 = 분홍 · 탐험 = 황토</span></div>
+      <div class="sk-scroll"><svg class="dq-svg" id="loopSvg" viewBox="0 0 980 272" style="min-width:720px;max-width:1000px;margin:0 auto" role="img" aria-label="DQN 학습 루프: 환경에서 상태를 받아 Q 네트워크와 ε-greedy로 행동을 고르고, 전이를 리플레이 버퍼에 저장한 뒤 미니배치로 타깃 네트워크를 이용해 손실을 계산한다"></svg></div>
+      <p class="sk-note">CartPole 상태 s = (카트 위치 x, 속도 ẋ, 막대 각도 θ, 각속도 θ̇)는 <b>연속값</b>이라 Q표를 만들 수 없습니다. 그래서 <b>신경망 Q(s,·;θ)</b>가 상태 4개를 받아 행동 2개(← 밀기, → 밀기)의 Q값을 한 번에 내놓습니다. 매 걸음 보상 +1, 막대가 12°를 넘거나 카트가 ±2.4를 벗어나면 끝, 최대 500걸음.</p>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>브라우저에서 DQN 학습</h2><span class="sk-hint">브라우저용 축소 설정 · 기본값이면 보통 30초~1분 안에 수익이 뚜렷하게 오릅니다</span></div>
+      <div class="sk-controls">
+        <button class="sk-btn sk-btn--primary" type="button" id="trRun">학습 시작</button>
+        <button class="sk-btn" type="button" id="trReset">초기화</button>
+        <div class="sk-group"><span class="sk-label">속도</span>
+          <div class="sk-seg" id="trSpeed"><button type="button" data-v="slow" aria-pressed="false">느리게</button><button type="button" data-v="mid" aria-pressed="false">보통</button><button type="button" data-v="fast" aria-pressed="true">빠르게</button></div></div>
+        <div class="sk-group"><span class="sk-label">seed</span><input class="sk-input" id="trSeed" type="number" min="1" max="9999" value="1" style="width:84px" aria-label="seed"></div>
+        <div class="sk-group"><span class="sk-label">최대 걸음</span><div class="sk-seg" id="trMax"><button type="button" data-v="15000" aria-pressed="true">15,000</button><button type="button" data-v="30000" aria-pressed="false">30,000</button></div></div>
+        <label class="sk-check"><input type="checkbox" id="trDemo" checked> 현재 정책 시연</label>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">은닉층</span><div class="sk-seg" id="hpHidden"><button type="button" data-v="16" aria-pressed="false">16·16</button><button type="button" data-v="32" aria-pressed="true">32·32</button><button type="button" data-v="64" aria-pressed="false">64·64</button></div></div>
+        <div class="sk-group"><span class="sk-label">학습률</span><div class="sk-seg" id="hpLr"><button type="button" data-v="0.0003" aria-pressed="false">0.0003</button><button type="button" data-v="0.001" aria-pressed="true">0.001</button><button type="button" data-v="0.003" aria-pressed="false">0.003</button></div></div>
+        <div class="sk-group"><span class="sk-label">배치</span><div class="sk-seg" id="hpBatch"><button type="button" data-v="32" aria-pressed="false">32</button><button type="button" data-v="64" aria-pressed="true">64</button><button type="button" data-v="128" aria-pressed="false">128</button></div></div>
+      </div>
+      <div class="dq-sliders">
+        <label class="sk-slider"><span class="sk-sl-head">할인율 γ <b id="hpGammaV">0.99</b></span><input type="range" id="hpGamma" min="0" max="4" step="1" value="2"></label>
+        <label class="sk-slider"><span class="sk-sl-head">ε 감소 걸음 수 <b id="hpEpsV">6,000</b></span><input type="range" id="hpEps" min="1000" max="20000" step="1000" value="6000"></label>
+        <label class="sk-slider"><span class="sk-sl-head">타깃망 복사 간격 C <b id="hpSyncV">1,000</b></span><input type="range" id="hpSync" min="0" max="5" step="1" value="3"></label>
+        <label class="sk-slider"><span class="sk-sl-head">버퍼 크기 <b id="hpBufV">50,000</b></span><input type="range" id="hpBuf" min="0" max="3" step="1" value="3"></label>
+      </div>
+      <p class="dq-status" id="trStatus" aria-live="polite">[학습 시작]을 누르세요. 설정을 바꾸면 처음부터 다시 학습합니다.</p>
+      <div class="dq-train">
+        <div class="dq-col">
+          <canvas class="dq-cv" id="cpCv" aria-label="현재 정책으로 CartPole을 움직이는 모습"></canvas>
+          <div class="dq-qbar" id="qbars" aria-live="off"></div>
+          <div class="sk-stats" id="trStats"></div>
+        </div>
+        <div class="dq-col">
+          <div class="sk-head"><h3>에피소드 수익 — 가로축 = 환경 걸음</h3><span class="sk-legend dq-legend"><span><i style="background:var(--r-state)"></i>에피소드 수익</span><span><i style="background:var(--r-act)"></i>이동평균 10</span><span><i style="background:var(--r-rew);border-radius:50%"></i>탐욕 평가(1,000걸음마다)</span><span>점선 = 475 (v1 해결 기준)</span></span></div>
+          <canvas class="dq-cv" id="retCv" aria-label="에피소드별 수익 곡선"></canvas>
+          <div class="sk-head"><h3 id="aux2Title">손실 (Huber, 100번 갱신 평균)</h3>
+            <div class="sk-seg" id="auxSel"><button type="button" data-v="loss" aria-pressed="true">손실</button><button type="button" data-v="q" aria-pressed="false">Q 예측</button><button type="button" data-v="eps" aria-pressed="false">ε</button></div></div>
+          <canvas class="dq-cv" id="auxCv" aria-label="보조 곡선: 손실, Q 예측값 또는 ε"></canvas>
+          <p class="sk-hint" id="auxHint">학습 초반에는 타깃 y가 계속 커지므로 손실이 줄지 않고 오르내리는 것이 정상입니다.</p>
+        </div>
+      </div>
+      <p class="sk-note"><b>브라우저용 축소 설정</b>: 은닉층 32·32(파라미터 1,282개), 버퍼 50,000, 배치 64, 타깃망 복사 1,000걸음마다, 2걸음마다 1번 갱신, 처음 500걸음은 무작위 행동으로 버퍼만 채움, ε 1.0 → 0.05, Adam, Huber 손실, 입력 정규화(x/2.4, ẋ/3, θ/0.21, θ̇/3.5). 30,000걸음까지 길게 돌리면 500에 닿았던 수익이 다시 떨어지기도 합니다 — DQN의 대표적인 불안정성(과대추정·망각)이며, 다음 시뮬레이터 'DQN 개선판'이 다루는 문제입니다. 같은 seed면 같은 결과가 나옵니다. 왼쪽 시연은 학습과 별도로 <b>지금의 Q망으로 탐욕(greedy) 행동</b>만 해서 정책이 좋아지는 모습을 보여 줍니다.</p>
+    </div>
+  </section>
+
+  <!-- ========== 2. 미니배치 한 번 ========== -->
+  <section id="pane-batch" role="tabpanel" aria-labelledby="tab-batch" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>미니배치 한 번의 갱신을 숫자로 따라가기</h2><span class="sk-hint" id="bSrc"></span></div>
+      <p class="sk-lead">1번 탭에서 학습 중인 에이전트의 버퍼와 Q망(복사본)으로 계산합니다. 학습을 아직 안 했으면 무작위 정책 1,000걸음으로 버퍼를 채운 에이전트를 씁니다. 이 탭의 계산은 복사본에서 하므로 학습 흐름에는 영향이 없습니다.</p>
+      <div class="sk-controls">
+        <button class="sk-btn" type="button" id="bFirst">처음</button>
+        <button class="sk-btn" type="button" id="bPrev">이전</button>
+        <button class="sk-btn sk-btn--primary" type="button" id="bNext">다음 →</button>
+        <button class="sk-btn" type="button" id="bPlay">재생</button>
+        <div class="sk-group"><span class="sk-label">속도</span><div class="sk-seg" id="bSpeed"><button type="button" data-v="2200" aria-pressed="false">느리게</button><button type="button" data-v="1300" aria-pressed="true">보통</button><button type="button" data-v="700" aria-pressed="false">빠르게</button></div></div>
+        <button class="sk-btn" type="button" id="bNew">새 미니배치 뽑기</button>
+      </div>
+      <ol class="sk-stepper" id="bStepper">
+        <li>① 샘플링</li><li>② 타깃 y</li><li>③ 현재 Q</li><li>④ TD 오차·손실</li><li>⑤ 역전파·Adam</li>
+      </ol>
+      <div class="sk-scroll"><table class="sk-table dq-tbl" id="bTable"></table></div>
+      <div class="sk-formula" id="bFormula"></div>
+      <p class="sk-note" id="bNote"></p>
+    </div>
+  </section>
+
+  <!-- ========== 3. 어블레이션 ========== -->
+  <section id="pane-ablation" role="tabpanel" aria-labelledby="tab-ablation" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>경험 재생과 타깃망을 빼면? — 같은 seed로 네 가지 비교</h2><span class="sk-hint">브라우저용 축소 설정 · 네 가지를 번갈아 학습 (약 30초~1분 30초)</span></div>
+      <div class="sk-controls">
+        <button class="sk-btn sk-btn--primary" type="button" id="abRun">실험 시작</button>
+        <button class="sk-btn" type="button" id="abReset">초기화</button>
+        <div class="sk-group"><span class="sk-label">seed</span><input class="sk-input" id="abSeed" type="number" min="1" max="9999" value="1" style="width:84px" aria-label="seed"></div>
+        <div class="sk-group"><span class="sk-label">걸음 수</span><div class="sk-seg" id="abSteps"><button type="button" data-v="10000" aria-pressed="false">10,000</button><button type="button" data-v="15000" aria-pressed="true">15,000</button><button type="button" data-v="20000" aria-pressed="false">20,000</button></div></div>
+      </div>
+      <p class="dq-status" id="abStatus" aria-live="polite">[실험 시작]을 누르면 네 설정이 같은 초기 가중치·같은 환경 seed로 학습합니다.</p>
+      <div class="sk-grid2">
+        <div class="dq-col">
+          <div class="sk-head"><h3>수익 (최근 10 에피소드 평균)</h3></div>
+          <canvas class="dq-cv" id="abRetCv" aria-label="네 설정의 수익 곡선 비교"></canvas>
+        </div>
+        <div class="dq-col">
+          <div class="sk-head"><h3>Q 예측값 max Q(s₀) — 세로축 log₁₀</h3></div>
+          <canvas class="dq-cv" id="abQCv" aria-label="네 설정의 Q 예측값 비교 (로그 축)"></canvas>
+        </div>
+      </div>
+      <div class="sk-legend dq-legend" id="abLegend"></div>
+      <p class="sk-hint">가로축 = 환경 걸음 수(0 ~ 설정한 걸음). Q 그림의 점선 = 이론 상한 log₁₀(Σγᵗ) — 보상이 매 걸음 1이므로 할인 수익은 (1 − γ⁵⁰⁰)/(1 − γ) ≈ 99.3을 넘을 수 없습니다.</p>
+      <div class="sk-scroll"><table class="sk-table" id="abTable"></table></div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <h3>경험 재생(Experience Replay) — 상관을 끊고, 다시 쓴다</h3>
+        <p class="sk-lead">연속한 전이는 거의 같은 상태라서 서로 강하게 상관되어 있습니다. 이런 표본으로 경사하강을 하면 한쪽 방향으로 계속 끌려갑니다. 버퍼에 쌓아 두고 <b>무작위로</b> 뽑으면 표본이 독립에 가까워지고, 한 번 겪은 경험을 여러 번 학습에 씁니다.</p>
+        <div class="sk-stats" id="corrStats"></div>
+        <p class="sk-hint" id="corrHint">실험이 끝나면 전체 DQN 버퍼에서 직접 계산한 값이 나타납니다: 이웃한 두 표본의 막대 각도 θ 상관계수.</p>
+      </div>
+      <div class="sk-card">
+        <h3>타깃 네트워크(Target Network) — 움직이는 과녁을 붙잡아 둔다</h3>
+        <p class="sk-lead">타깃 y = r + γ·max Q(s′,·)를 <b>학습 중인 같은 망</b>으로 계산하면, Q(s,a)를 올리는 순간 비슷한 상태 s′의 Q도 함께 올라 y도 같이 도망갑니다. 상태가 0.02초 간격으로 거의 같은 CartPole에서는 이 되먹임이 쌓여 Q가 이론 상한(≈99)을 훌쩍 넘어 <b>발산</b>합니다. 타깃망 θ⁻는 C걸음 동안 고정해 두었다가 복사합니다.</p>
+        <div class="sk-formula">y = r + γ · max<sub>a′</sub> Q(s′, a′; <b>θ⁻</b>)   (θ⁻ ← θ : C걸음마다)</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 4. Atari ========== -->
+  <section id="pane-atari" role="tabpanel" aria-labelledby="tab-atari" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>화면 픽셀에서 바로 Q값으로 — Nature DQN (Mnih et al., 2015)</h2><span class="sk-hint">개념 설명 · 화면은 코드로 그린 Breakout 모양 예시 프레임</span></div>
+      <p class="sk-lead">Atari에서는 상태가 게임 화면 그 자체입니다. 같은 DQN 알고리즘에 <b>CNN</b>을 붙이고, 화면을 줄여 4장씩 쌓아 넣습니다. 49개 게임에 <b>같은 구조·같은 하이퍼파라미터</b>를 썼다는 점이 핵심입니다.</p>
+      <div class="sk-controls">
+        <button class="sk-btn" type="button" id="atNext">다음 프레임 →</button>
+        <button class="sk-btn" type="button" id="atPlay">재생</button>
+        <button class="sk-btn" type="button" id="atReset">처음</button>
+      </div>
+      <div class="sk-scroll"><div class="dq-frames" id="atFrames" style="min-width:640px"></div></div>
+      <ol class="dq-steps">
+        <li><b>프레임 건너뛰기(action repeat 4)</b>: 고른 행동을 4프레임 반복하고 그동안의 보상을 더함 → 결정 횟수가 1/4.</li>
+        <li><b>깜빡임 제거</b>: 연속한 두 프레임의 픽셀별 최댓값을 씀(일부 물체가 짝수·홀수 프레임에만 그려지기 때문).</li>
+        <li><b>흑백·축소</b>: 210×160 RGB → 밝기(Y) 채널 → 84×84.</li>
+        <li><b>4장 쌓기(frame stacking)</b>: 사진 한 장으로는 공이 어느 쪽으로 움직이는지 알 수 없음 → 최근 4장을 채널로 쌓아 <b>속도·방향</b> 정보를 줌. 입력 84×84×4.</li>
+      </ol>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>Nature DQN 구조</h2>
+        <div class="sk-group"><span class="sk-label">행동 수</span><div class="sk-seg" id="atA"><button type="button" data-v="4" aria-pressed="false">Breakout 4</button><button type="button" data-v="6" aria-pressed="false">Pong 6</button><button type="button" data-v="18" aria-pressed="true">전체 18</button></div></div></div>
+      <div class="sk-scroll"><svg class="dq-svg" id="archSvg" viewBox="0 0 1000 205" style="min-width:760px" role="img" aria-label="Nature DQN 구조: 84×84×4 입력, 합성곱 3층, 완전연결 512, 행동별 Q 출력. 블록을 누르면 설명이 나옵니다"></svg></div>
+      <div class="sk-grid2">
+        <div class="sk-card sk-card--sunk dq-info" id="archInfo" aria-live="polite"></div>
+        <div class="dq-col">
+          <div class="sk-formula" id="archFormula"></div>
+          <p class="sk-note">CartPole 망(이 페이지의 기본값)은 1,282개 파라미터, Nature DQN은 약 169만 개입니다. 그래도 학습 알고리즘(경험 재생 + 타깃망 + ε-greedy + 오차 자르기)은 <b>완전히 같습니다</b>.</p>
+        </div>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <h3>보상 자르기(Reward Clipping)</h3>
+        <p class="sk-lead">게임마다 점수 단위가 제각각이라(벽돌 1점, 외계인 30점, 보스 200점 …) 한 학습률로 모든 게임을 학습하려고 보상을 부호만 남깁니다: 양수 → +1, 음수 → −1, 0 → 0.</p>
+        <div class="sk-scroll"><table class="sk-table" id="clipTable"></table></div>
+        <p class="sk-hint">대가: 큰 보상과 작은 보상을 구분하지 못함 (점수 200짜리와 1짜리가 같은 +1).</p>
+      </div>
+      <div class="sk-card">
+        <h3>하이퍼파라미터 — Nature DQN vs 이 페이지</h3>
+        <div class="sk-scroll"><table class="sk-table" id="hpTable"></table></div>
+        <p class="sk-hint">Nature DQN 값: 논문 Extended Data Table 1. 학습률 0.00025는 RMSProp 기준.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 5. 코드 ========== -->
+  <section id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>PyTorch로 직접 구현 (Gymnasium CartPole-v1)</h2>
+        <div class="sk-group"><button type="button" class="sk-btn sk-btn--sm" id="cpCopy1">코드 복사</button><span class="dq-copied" id="cpMsg1" aria-live="polite"></span></div></div>
+      <p class="sk-lead">1번 탭의 현재 설정(은닉층·학습률·배치·γ·ε·C·버퍼)이 그대로 들어갑니다. CartPole은 행동 순서가 0 = 왼쪽, 1 = 오른쪽으로 이 페이지와 같습니다.</p>
+      <pre class="sk-formula dq-code" id="code1"></pre>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>stable-baselines3</h2>
+        <div class="sk-group"><button type="button" class="sk-btn sk-btn--sm" id="cpCopy2">코드 복사</button><span class="dq-copied" id="cpMsg2" aria-live="polite"></span></div></div>
+      <p class="sk-lead">SB3의 DQN은 Huber 손실(smooth L1)·타깃망·리플레이를 기본으로 씁니다. <code>target_update_interval</code>은 환경 걸음 단위, <code>exploration_fraction</code> = ε 감소 걸음 ÷ 전체 걸음입니다. 아래쪽은 Atari(84×84 흑백·4장 쌓기) 설정 예시입니다.</p>
+      <pre class="sk-formula dq-code" id="code2"></pre>
+    </div>
+  </section>
+
+  <!-- ========== 6. 구성도 ========== -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">강의 슬라이드 3장 · Q 근사와 학습 루프 → 리플레이·타깃망 비교 → Atari 확장</span></div><div data-ds-diagrams="dqn"></div></section>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20261007a"></script>
+<script src="../../assets/js/rl-kit.js?v=20261007a"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261007a"></script>
+<script src="../../assets/diagrams/dqn.js?v=20261007a"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const reduced = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const fmt = (v, d) => (v < 0 ? "−" : "") + Math.abs(v).toFixed(d == null ? 3 : d);
+  const comma = v => Math.round(v).toLocaleString("en-US");
+
+  /* ---------- 안쪽 탭 (URL 해시 연동, ←/→ 키 이동) ---------- */
+  const tabs = [...document.querySelectorAll(".sk-tab")];
+  const onShow = {};
+  function show(t) {
+    tabs.forEach(b => { const on = b === t; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1;
+      document.getElementById(b.getAttribute("aria-controls")).hidden = !on; });
+    const key = t.id.replace("tab-", "");
+    history.replaceState(null, "", "#" + key);
+    if (onShow[key]) onShow[key]();
+  }
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => show(b));
+    b.addEventListener("keydown", e => {
+      const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return;
+      const n = tabs[(i + d + tabs.length) % tabs.length]; show(n); n.focus(); e.preventDefault();
+    });
+  });
+  function segVal(id) { const b = $(id).querySelector('[aria-pressed="true"]'); return b ? b.getAttribute("data-v") : null; }
+  function segInit(id, fn) { $(id).addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+    $(id).querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false")); fn && fn(b.getAttribute("data-v")); }); }
+
+  /* AGENT-BEGIN ===== DQN 에이전트 (rl-kit 의 CartPole · MLP · Adam 사용) ===== */
+  /* o: seed hidden[] lr gamma batch buf eps0 eps1 epsSteps warmup trainEvery sync(환경 걸음) useReplay useTarget */
+  /* 망 입력 정규화: (x/2.4, ẋ/3, θ/0.21, θ̇/3.5) — 네 값의 크기를 비슷하게 맞춤 */
+  const NORM = s => [s[0] / 2.4, s[1] / 3, s[2] / 0.21, s[3] / 3.5];
+  function DQNAgent(o) {
+    this.o = o;
+    this.rng = RL.rng(o.seed);
+    this.env = new RL.CartPole(RL.rng(o.seed * 7 + 1));
+    this.net = new RL.MLP([4].concat(o.hidden, [2]), { act: "relu", rng: RL.rng(o.seed * 13 + 5) });
+    this.tgt = this.net.clone();
+    this.opt = new RL.Adam(this.net, { lr: o.lr });
+    this.cap = o.useReplay ? o.buf : 1;           /* 리플레이 없음 = 방금 겪은 전이 1개로만 갱신 */
+    this.S = []; this.A = []; this.R = []; this.S2 = []; this.D = [];
+    this.ptr = 0; this.size = 0; this.steps = 0; this.updates = 0; this.lastSync = 0;
+    this.s = this.env.reset(); this.epR = 0; this.returns = []; this.epEnd = [];
+    this.lossAcc = 0; this.lossN = 0; this.lossLog = []; this.qLog = []; this.lastLoss = NaN;
+    this.evalEnv = new RL.CartPole(RL.rng(o.seed * 31 + 3)); this.evalLog = [];
+  }
+  DQNAgent.PROBE = [0, 0, 0, 0];                    /* Q 예측값 기록용 상태 s₀ (똑바로 선 막대, 가운데) */
+  DQNAgent.prototype.eps = function () { const o = this.o; return o.eps0 + (o.eps1 - o.eps0) * Math.min(1, this.steps / o.epsSteps); };
+  DQNAgent.prototype.Q = function (s, net) { return (net || this.net).predict(NORM(s)); };
+  DQNAgent.prototype.greedy = function (s, net) { const q = this.Q(s, net); return q[1] > q[0] ? 1 : 0; };
+  DQNAgent.prototype.act = function (s) {
+    if (this.steps < this.o.warmup || this.rng.random() < this.eps()) return this.rng.int(2);
+    return this.greedy(s);
+  };
+  DQNAgent.prototype.store = function (s, a, r, s2, d) {
+    const i = this.ptr; this.S[i] = s; this.A[i] = a; this.R[i] = r; this.S2[i] = s2; this.D[i] = d;
+    this.ptr = (i + 1) % this.cap; this.size = Math.min(this.size + 1, this.cap);
+  };
+  /* 미니배치 한 번: 표본별 Huber 기울기 clip(δ,−1,1) 누적 → Adam(1/B) */
+  DQNAgent.prototype.train = function () {
+    const o = this.o, B = o.useReplay ? o.batch : 1, tnet = o.useTarget ? this.tgt : this.net, net = this.net;
+    let L = 0;
+    for (let k = 0; k < B; k++) {
+      const j = o.useReplay ? this.rng.int(this.size) : (this.ptr - 1 + this.cap) % this.cap;
+      let y = this.R[j];
+      if (!this.D[j]) { const qt = this.Q(this.S2[j], tnet); y += o.gamma * Math.max(qt[0], qt[1]); }
+      const f = net.forward(NORM(this.S[j])), td = f.y[this.A[j]] - y, ad = Math.abs(td);
+      L += ad <= 1 ? 0.5 * td * td : ad - 0.5;
+      const dq = [0, 0]; dq[this.A[j]] = Math.max(-1, Math.min(1, td));
+      net.backward(f.cache, dq);
+    }
+    this.opt.step(1 / B); this.updates++;
+    this.lastLoss = L / B; this.lossAcc += L / B; this.lossN++;
+    if (this.lossN === 100) { this.lossLog.push(this.lossAcc / 100); this.lossAcc = 0; this.lossN = 0; }
+  };
+  /* 환경 한 걸음 (+ 필요하면 갱신). 에피소드가 끝나면 수익을 돌려줌 */
+  DQNAgent.prototype.step = function () {
+    const o = this.o, s = this.s, a = this.act(s), res = this.env.step(a);
+    this.steps++; this.epR += res.r;
+    this.store(s, a, res.r, res.s, res.done);
+    if (this.steps >= o.warmup && this.steps % o.trainEvery === 0) this.train();
+    if (o.useTarget && this.steps % o.sync === 0) { this.tgt.copyFrom(this.net); this.lastSync = this.steps; }
+    if (this.steps % 250 === 0) { const q = this.Q(DQNAgent.PROBE); this.qLog.push(Math.max(q[0], q[1])); }
+    if (o.evalEvery && this.steps % o.evalEvery === 0) this.evalLog.push([this.steps, this.evaluate()]);
+    let ret = null;
+    if (res.done || res.truncated) { ret = this.epR; this.returns.push(ret); this.epEnd.push(this.steps); this.epR = 0; this.s = this.env.reset(); }
+    else this.s = res.s;
+    return ret;
+  };
+  /* 탐욕 정책 평가: 탐험 없이 1 에피소드 (별도 환경) */
+  DQNAgent.prototype.evaluate = function () {
+    const env = this.evalEnv; let s = env.reset(), T = 0;
+    for (;;) { const r = env.step(this.greedy(s)); T++; if (r.done || r.truncated) return T; s = r.s; }
+  };
+  /* AGENT-END */
+
+  /* ---------- 공통 설정 ---------- */
+  const GAMMAS = [0.9, 0.95, 0.99, 0.995, 0.999], SYNCS = [1, 100, 500, 1000, 2000, 5000], BUFS = [1000, 5000, 20000, 50000];
+  let MAX_STEPS = 15000;
+  function cfg() {
+    const h = +segVal("hpHidden");
+    return { seed: Math.max(1, Math.min(9999, +$("trSeed").value || 1)), hidden: [h, h], lr: +segVal("hpLr"), batch: +segVal("hpBatch"),
+      gamma: GAMMAS[+$("hpGamma").value], epsSteps: +$("hpEps").value, sync: SYNCS[+$("hpSync").value], buf: BUFS[+$("hpBuf").value],
+      eps0: 1, eps1: 0.05, warmup: 500, trainEvery: 2, useReplay: true, useTarget: true, evalEvery: 1000 };
+  }
+  function th() { return RL.theme(); }
+
+  /* ---------- 루프 도식 (SVG) ---------- */
+  function drawLoop() {
+    const s = [];
+    const box = (x, y, w, h, cls, t1, t2) => s.push(`<rect class="box ${cls}" x="${x}" y="${y}" width="${w}" height="${h}" rx="10"/>` +
+      `<text x="${x + w / 2}" y="${y + (t2 ? h / 2 - 4 : h / 2 + 5)}" text-anchor="middle" font-size="14.5" font-weight="700">${t1}</text>` +
+      (t2 ? `<text class="m" x="${x + w / 2}" y="${y + h / 2 + 15}" text-anchor="middle" font-size="12">${t2}</text>` : ""));
+    const arr = (d, cls, dash) => s.push(`<path class="ln ${cls}" d="${d}"${dash ? ' stroke-dasharray="5 4"' : ""} marker-end="url(#ah-${cls})"/>`);
+    const lab = (x, y, t, cls, anchor) => s.push(`<text class="${cls}" x="${x}" y="${y}" font-size="12.5" font-weight="700" text-anchor="${anchor || "middle"}">${t}</text>`);
+    s.push("<defs>" + ["st", "ac", "rw", "va", "tg", "ex"].map(c => `<marker id="ah-${c}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="f${c}" d="M0 0L10 5L0 10z"/></marker>`).join("") + "</defs>");
+    box(20, 100, 150, 64, "st", "환경 CartPole", "s, r, done");
+    box(240, 28, 175, 60, "va", "Q망 Q(s,·;θ)", "4 → 32 → 32 → 2");
+    box(240, 180, 175, 60, "ex", "ε-greedy", "확률 ε로 무작위 행동");
+    box(520, 100, 180, 64, "st", "리플레이 버퍼 D", "(s, a, r, s′, done)");
+    box(780, 28, 180, 60, "tg", "타깃망 Q(s′,·;θ⁻)", "y = r + γ·max Q");
+    box(780, 180, 180, 60, "va", "Huber 손실", "δ = Q(s,a;θ) − y");
+    arr("M95 100 C 95 64, 150 58, 236 58", "st"); lab(150, 50, "s", "fst");
+    arr("M327 88 L327 176", "va"); lab(336, 137, "Q값", "fva", "start");
+    arr("M240 210 C 150 210, 95 206, 95 168", "ac"); lab(150, 230, "a", "fac");
+    arr("M60 164 L60 262 L610 262 L610 168", "rw"); lab(335, 256, "전이 (s, a, r, s′, done) 저장", "frw");
+    arr("M700 116 C 740 116, 740 58, 776 58", "st"); lab(746, 104, "s′", "fst", "start");
+    arr("M700 148 C 740 148, 740 210, 776 210", "st"); lab(746, 172, "s, a, r", "fst", "start");
+    arr("M870 88 L870 176", "tg"); lab(880, 137, "y (타깃)", "ftg", "start");
+    arr("M415 58 L776 58", "tg", true); lab(598, 50, "C걸음마다 θ⁻ ← θ 복사", "ftg");
+    arr("M960 210 L972 210 L972 8 L327 8 L327 24", "va"); lab(650, 25, "∂L/∂θ → Adam으로 θ 갱신 (역전파)", "fva");
+    $("loopSvg").innerHTML = s.join("");
+  }
+
+  /* 좁은 화면에서도 그래프 높이를 유지: 그릴 폭 = min(기준 폭, 부모 폭) */
+  const fitW = (cv, w) => { const p = cv.parentNode; if (!p || !p.clientWidth) return w; const cs = getComputedStyle(p);
+    return Math.min(w, p.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)); };
+  function LC(cv, series, o) { o.w = fitW(cv, o.w); RL.lineChart(cv, series, o); }
+  /* x–y 선 그래프 (가로축 = 환경 걸음). series: [{xs, ys, color, width, dots}] */
+  function xyChart(cv, series, o) {
+    const t = th(), f = RL.fitCanvas(cv, fitW(cv, o.w), o.h), g = f.g, W = f.w, H = f.h, pl = 46, pr = 12, pt = 14, pb = 28;
+    g.clearRect(0, 0, W, H);
+    const X = x => pl + (W - pl - pr) * x / o.xmax, Y = v => pt + (H - pt - pb) * (1 - (v - o.ymin) / (o.ymax - o.ymin));
+    const mono = getComputedStyle(document.documentElement).getPropertyValue("--mono");
+    g.strokeStyle = t.line; g.lineWidth = 1; g.fillStyle = t.faint; g.font = "11px " + mono; g.textAlign = "right";
+    for (let k = 0; k <= 4; k++) { const v = o.ymin + (o.ymax - o.ymin) * k / 4, yy = Y(v); g.beginPath(); g.moveTo(pl, yy); g.lineTo(W - pr, yy); g.stroke(); g.fillText(o.yfmt ? o.yfmt(v) : String(Math.round(v)), pl - 6, yy + 4); }
+    g.textAlign = "center";
+    for (let k = 0; k <= 3; k++) { const v = o.xmax * k / 3; g.fillText(v >= 1000 ? (v / 1000).toFixed(v % 1000 ? 1 : 0) + "k" : String(v), X(v), H - 10); }
+    if (o.xlabel) { g.textAlign = "right"; g.fillText(o.xlabel, W - pr, H - 10 - 12); }
+    if (o.hline != null) { g.strokeStyle = t.faint; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(pl, Y(o.hline)); g.lineTo(W - pr, Y(o.hline)); g.stroke(); g.setLineDash([]); }
+    series.forEach(sr => {
+      if (!sr.xs.length) return;
+      if (sr.dots) { sr.xs.forEach((x, i) => { g.fillStyle = sr.color; g.strokeStyle = t.bg; g.lineWidth = 1.5; g.beginPath(); g.arc(X(x), Y(sr.ys[i]), 4, 0, Math.PI * 2); g.fill(); g.stroke(); }); return; }
+      g.strokeStyle = sr.color; g.lineWidth = sr.width || 2; g.globalAlpha = sr.alpha || 1; g.beginPath();
+      sr.xs.forEach((x, i) => { const yy = Y(Math.max(o.ymin, Math.min(o.ymax, sr.ys[i]))); if (i) g.lineTo(X(x), yy); else g.moveTo(X(x), yy); }); g.stroke(); g.globalAlpha = 1;
+    });
+  }
+
+  /* ---------- 1. 학습 탭 ---------- */
+  let agent = null, running = false, speed = "fast", demoEnv = null, demoS = null, demoT = 0, demoEp = 0, demoLast = [], demoPause = 0, demoAcc = 0, lastA = null;
+  let aux = "loss", lastChart = 0;
+  function newAgent() { agent = new DQNAgent(cfg()); resetDemo(); }
+  function resetDemo() { demoEnv = new RL.CartPole(RL.rng(4242)); demoS = demoEnv.reset(); demoT = 0; demoEp = 0; demoLast = []; demoPause = 0; lastA = null; }
+  function hpLabels() {
+    $("hpGammaV").textContent = GAMMAS[+$("hpGamma").value];
+    $("hpEpsV").textContent = comma(+$("hpEps").value);
+    $("hpSyncV").textContent = SYNCS[+$("hpSync").value] === 1 ? "1걸음 (사실상 없음)" : comma(SYNCS[+$("hpSync").value]) + "걸음";
+    $("hpBufV").textContent = comma(BUFS[+$("hpBuf").value]);
+  }
+  function setRunning(on) { running = on; $("trRun").textContent = on ? "멈춤" : (agent && agent.steps ? "이어서 학습" : "학습 시작"); }
+  function resetTrain() { setRunning(false); newAgent(); setRunning(false); drawTrain(true); }
+  function drawCart() {
+    const t = th();
+    RL.drawCartPole($("cpCv"), demoS || [0, 0, 0, 0], { w: 520, h: 220, action: lastA, label: "현재 정책 시연 · " + (demoEp + 1) + "번째 · " + demoT + "걸음" });
+    const q = agent ? agent.Q(demoS || [0, 0, 0, 0]) : [0, 0];
+    const m = Math.max(1e-9, Math.abs(q[0]), Math.abs(q[1])), best = q[1] > q[0] ? 1 : 0;
+    $("qbars").innerHTML = ["Q(s, ← 왼쪽)", "Q(s, → 오른쪽)"].map((lab, i) =>
+      `<span>${lab}</span><span class="bar"><i class="${i === best ? "on" : ""}" style="width:${Math.max(2, Math.abs(q[i]) / m * 100).toFixed(1)}%"></i></span><b>${fmt(q[i], 2)}</b>`).join("");
+    void t;
+  }
+  function drawTrain(full) {
+    const t = th(), a = agent;
+    const R = a ? a.returns : [];
+    if (!R.length) emptyChart($("retCv"), 640, 230, "[학습 시작]을 누르면 에피소드마다 수익이 찍힙니다");
+    else xyChart($("retCv"), [
+      { xs: a.epEnd, ys: R, color: t.blue, width: 1, alpha: 0.45 },
+      { xs: a.epEnd, ys: RL.movingAvg(R, 10), color: t.orange, width: 2.6 },
+      { xs: a.evalLog.map(e => e[0]), ys: a.evalLog.map(e => e[1]), color: t.green, dots: true }
+    ], { w: 640, h: 230, xmax: MAX_STEPS, ymin: 0, ymax: 500, hline: 475 });
+    if (aux === "loss") {
+      $("aux2Title").textContent = "손실 (Huber, 100번 갱신 평균)";
+      $("auxHint").textContent = "학습 초반에는 타깃 y가 계속 커지므로 손실이 줄지 않고 오르내리는 것이 정상입니다. 지도학습처럼 손실만 보고 판단하지 마세요.";
+      if (a && a.lossLog.length > 1) LC($("auxCv"), [{ data: a.lossLog, color: t.red, width: 2 }], { w: 640, h: 160, ymin: 0 });
+      else emptyChart($("auxCv"), 640, 160, "갱신 100번마다 평균 손실이 찍힙니다");
+    } else if (aux === "q") {
+      $("aux2Title").textContent = "Q 예측값 max Q(s₀) — 250걸음마다";
+      const ub = (1 - Math.pow(a ? a.o.gamma : 0.99, 500)) / (1 - (a ? a.o.gamma : 0.99));
+      $("auxHint").textContent = "s₀ = (0,0,0,0) 똑바로 선 상태. 점선 = 이론 상한 Σγᵗ ≈ " + ub.toFixed(1) + ". 정책이 좋아질수록 상한 쪽으로 천천히 올라갑니다(γ가 클수록 오래 걸림).";
+      if (a && a.qLog.length > 1) LC($("auxCv"), [{ data: a.qLog, color: t.purple, width: 2 }], { w: 640, h: 160, ymin: 0, ymax: Math.max(ub * 1.08, Math.max.apply(null, a.qLog) * 1.05), hline: ub });
+      else emptyChart($("auxCv"), 640, 160, "250걸음마다 Q 예측값이 찍힙니다");
+    } else {
+      $("aux2Title").textContent = "탐험률 ε (환경 걸음에 따라)";
+      $("auxHint").textContent = "처음 500걸음은 무작위 행동으로 버퍼만 채우고, ε은 1.0에서 0.05까지 선형으로 줄어듭니다.";
+      const o = a ? a.o : cfg(), n = 60, total = Math.max(o.epsSteps * 1.5, a ? a.steps : 0, 1000), data = [], cur = [];
+      for (let i = 0; i <= n; i++) { const st = total * i / n; data.push(o.eps0 + (o.eps1 - o.eps0) * Math.min(1, st / o.epsSteps)); cur.push(a && st <= a.steps ? data[i] : NaN); }
+      LC($("auxCv"), [{ data: data, color: t.faint, width: 1.5, dash: [4, 4] }, { data: cur.filter(v => !isNaN(v)), color: t.amber, width: 3 }], { w: 640, h: 160, ymin: 0, ymax: 1 });
+    }
+    /* 통계 */
+    const last10 = R.slice(-10), avg = last10.length ? last10.reduce((x, y) => x + y, 0) / last10.length : 0;
+    const best = R.length ? Math.max.apply(null, RL.movingAvg(R, 10)) : 0;
+    $("trStats").innerHTML = [
+      ["에피소드", a ? comma(R.length) : "0"], ["환경 걸음", a ? comma(a.steps) : "0"], ["ε", a ? a.eps().toFixed(3) : "1.000"],
+      ["최근 10회 평균", avg.toFixed(1)], ["최고 이동평균(10)", best.toFixed(1)], ["갱신 횟수", a ? comma(a.updates) : "0"], ["버퍼", a ? comma(a.size) : "0"]
+    ].map(x => `<div class="sk-stat"><b>${x[1]}</b><span>${x[0]}</span></div>`).join("");
+    if (full) drawCart();
+  }
+  function emptyChart(cv, w, h, msg) {
+    const t = th(), f = RL.fitCanvas(cv, fitW(cv, w), h), g = f.g;
+    g.clearRect(0, 0, f.w, f.h); g.strokeStyle = t.line; g.setLineDash([4, 4]); g.strokeRect(8.5, 8.5, f.w - 17, f.h - 17); g.setLineDash([]);
+    g.fillStyle = t.faint; g.font = "13px " + getComputedStyle(document.documentElement).getPropertyValue("--sans"); g.textAlign = "center"; g.fillText(msg, f.w / 2, f.h / 2 + 4);
+  }
+  function statusTrain() {
+    const a = agent;
+    if (!a) return;
+    if (!a.steps) { $("trStatus").innerHTML = "[학습 시작]을 누르세요. 왼쪽 시연은 아직 학습 전인 무작위 초기 Q망의 정책입니다."; return; }
+    if (a.steps >= MAX_STEPS) { $("trStatus").innerHTML = "<b>최대 " + comma(MAX_STEPS) + "걸음에 도달</b>했습니다. " + (MAX_STEPS < 30000 ? "[최대 걸음 30,000]을 누르면 이어서 학습합니다." : "[초기화] 후 설정이나 seed를 바꿔 다시 해 보세요."); return; }
+    const R = a.returns, avg = R.length ? R.slice(-10).reduce((x, y) => x + y, 0) / Math.min(10, R.length) : 0;
+    let msg = a.steps < a.o.warmup ? "버퍼 채우는 중(무작위 행동, 아직 갱신 없음)" : a.eps() > 0.3 ? "탐험이 많은 단계 — 무작위 행동이 섞여 수익이 들쭉날쭉" : avg > 300 ? "막대를 오래 세우는 정책을 찾았습니다" : "학습 중";
+    $("trStatus").innerHTML = "<b>" + msg + "</b> · 마지막 타깃망 복사: " + comma(a.lastSync) + "걸음" + (running ? "" : " · 멈춤");
+  }
+
+  /* 한 rAF 루프에서 학습 · 시연 · 어블레이션을 함께 처리 */
+  let lastT = performance.now();
+  function tick(now) {
+    const dt = Math.min(100, now - lastT); lastT = now;
+    if (running && agent) {
+      const t0 = performance.now(); let n = 0;
+      const budget = speed === "fast" ? 22 : speed === "mid" ? 8 : 0;
+      do { agent.step(); n++; if (agent.steps >= MAX_STEPS) { setRunning(false); break; } }
+      while (budget ? performance.now() - t0 < budget : n < 4);
+    }
+    const trainVisible = !$("pane-train").hidden;
+    if (trainVisible && $("trDemo").checked && agent) {
+      if (demoPause > 0) { demoPause -= dt; if (demoPause <= 0) { demoS = demoEnv.reset(); demoT = 0; demoEp++; } }
+      else {
+        demoAcc += dt; let k = 0;
+        while (demoAcc >= 20 && k < 5) {
+          demoAcc -= 20; k++;
+          lastA = agent.greedy(demoS); const r = demoEnv.step(lastA); demoS = r.s; demoT++;
+          if (r.done || r.truncated) { demoLast.push(demoT); demoPause = 700; break; }
+        }
+      }
+    }
+    if (abRunning) abTick();
+    if (now - lastChart > 160) {
+      lastChart = now;
+      if (trainVisible) { drawTrain(false); drawCart(); statusTrain(); }
+      if (!$("pane-ablation").hidden && abAgents) drawAblation();
+    }
+    requestAnimationFrame(tick);
+  }
+
+  $("trRun").addEventListener("click", () => { if (!agent) newAgent(); if (agent.steps >= MAX_STEPS) return; setRunning(!running); statusTrain(); });
+  $("trReset").addEventListener("click", () => { resetTrain(); $("trStatus").textContent = "초기화했습니다. [학습 시작]을 누르세요."; });
+  segInit("trSpeed", v => { speed = v; });
+  segInit("trMax", v => { MAX_STEPS = +v; if (agent && agent.steps >= MAX_STEPS) setRunning(false); else setRunning(running); statusTrain(); updateCode(); });
+  segInit("auxSel", v => { aux = v; drawTrain(false); });
+  ["hpHidden", "hpLr", "hpBatch"].forEach(id => segInit(id, () => { resetTrain(); $("trStatus").textContent = "설정이 바뀌어 처음부터 다시 학습합니다. [학습 시작]을 누르세요."; updateCode(); }));
+  ["hpGamma", "hpEps", "hpSync", "hpBuf"].forEach(id => $(id).addEventListener("input", () => { hpLabels(); resetTrain(); $("trStatus").textContent = "설정이 바뀌어 처음부터 다시 학습합니다. [학습 시작]을 누르세요."; updateCode(); }));
+  $("trSeed").addEventListener("change", () => { resetTrain(); updateCode(); });
+  $("trDemo").addEventListener("change", () => { if (!$("trDemo").checked) { demoS = demoEnv.reset(); demoT = 0; drawCart(); } });
+  if (reduced) $("trDemo").checked = false;
+
+  /* ---------- 2. 미니배치 한 번 ---------- */
+  let bStep = 0, bData = null, bTimer = null, bRng = RL.rng(77);
+  function batchSource() {
+    if (agent && agent.size >= Math.max(agent.o.batch, 200)) return { ag: agent, label: "1번 탭에서 학습 중인 에이전트 (" + comma(agent.steps) + "걸음)" };
+    const tmp = new DQNAgent(Object.assign(cfg(), { warmup: 1000000 }));
+    for (let i = 0; i < 1000; i++) tmp.step();
+    return { ag: tmp, label: "무작위 정책 1,000걸음으로 버퍼를 채운 새 에이전트 (학습 전)" };
+  }
+  function makeBatch() {
+    const src = batchSource(), ag = src.ag, o = ag.o, B = o.batch;
+    const net = ag.net.clone(), tgt = ag.tgt.clone(), opt = new RL.Adam(net, { lr: o.lr });
+    /* 실제 Adam 상태(모멘트·걸음 수)를 그대로 복사해 '다음 갱신'과 똑같이 계산 */
+    opt.t = ag.opt.t; opt.mW = ag.opt.mW.map(x => Float64Array.from(x)); opt.vW = ag.opt.vW.map(x => Float64Array.from(x));
+    opt.mb = ag.opt.mb.map(x => Float64Array.from(x)); opt.vb = ag.opt.vb.map(x => Float64Array.from(x));
+    const rows = [];
+    for (let k = 0; k < B; k++) {
+      const j = bRng.int(ag.size), s = ag.S[j], a = ag.A[j], r = ag.R[j], s2 = ag.S2[j], d = ag.D[j];
+      const qt = ag.Q(s2, tgt), mx = Math.max(qt[0], qt[1]), y = r + (d ? 0 : o.gamma * mx);
+      const q = ag.Q(s, net), td = q[a] - y, ad = Math.abs(td), hub = ad <= 1 ? 0.5 * td * td : ad - 0.5;
+      rows.push({ s, a, r, s2, d, qt, mx, y, q, td, hub });
+    }
+    const L = rows.reduce((x, r) => x + r.hub, 0) / B;
+    rows.forEach(r => { const f = net.forward(NORM(r.s)), dq = [0, 0]; dq[r.a] = Math.max(-1, Math.min(1, r.td)); net.backward(f.cache, dq); });
+    const gnorm = net.gradNorm() / B;
+    opt.step(1 / B);
+    let L2 = 0;
+    rows.forEach(r => { const q2 = ag.Q(r.s, net); r.q2 = q2[r.a]; const td2 = r.q2 - r.y, ad = Math.abs(td2); L2 += ad <= 1 ? 0.5 * td2 * td2 : ad - 0.5;
+      const qo = ag.Q(r.s2, net); r.yMove = r.r + (r.d ? 0 : o.gamma * Math.max(qo[0], qo[1])); });
+    L2 /= B;
+    /* 타깃망이 없었다면: 갱신 전 y(같은 망) vs 갱신 후 y */
+    rows.forEach(r => { const qo = ag.Q(r.s2); r.yOnline0 = r.r + (r.d ? 0 : o.gamma * Math.max(qo[0], qo[1])); });
+    bData = { rows, L, L2, B, o, gnorm, label: src.label, sinceSync: ag.steps - ag.lastSync };
+  }
+  const sv = s => "(" + s.map(v => fmt(v, 2)).join(", ") + ")";
+  function renderBatch() {
+    const d = bData, st = bStep, SHOW = 6;
+    $("bSrc").textContent = d.label;
+    [...$("bStepper").children].forEach((li, i) => { li.className = i < st ? "done" : i === st ? "on" : ""; });
+    const cols = [["#", ""], ["s (x, ẋ, θ, θ̇)", ""], ["a", ""], ["r", ""], ["s′", ""], ["done", ""]];
+    if (st >= 1) cols.push(["Q(s′,·;θ⁻)", "y"], ["max", "y"], ["y", "y"]);
+    if (st >= 2) cols.push(["Q(s,·;θ)", "q"], ["Q(s,a)", "q"]);
+    if (st >= 3) cols.push(["δ = Q − y", "d"], ["Huber(δ)", "d"]);
+    if (st >= 4) cols.push(["갱신 후 Q(s,a)", "q"]);
+    const newCols = [0, 3, 2, 2, 1][st];
+    let h = "<thead><tr>" + cols.map((c, i) => `<th class="${i >= cols.length - newCols ? "hl" : ""}">${c[0]}</th>`).join("") + "</tr></thead><tbody>";
+    d.rows.slice(0, SHOW).forEach((r, i) => {
+      const cells = [[i + 1, "n dim"], [sv(r.s), "n"], [r.a ? "→ 1" : "← 0", "a"], [r.r, "n r"], [sv(r.s2), "n"], [r.d ? "예" : "아니오", ""]];
+      if (st >= 1) cells.push(["[" + fmt(r.qt[0], 3) + ", " + fmt(r.qt[1], 3) + "]", "n"], [r.d ? "(종료 → 0)" : fmt(r.mx, 3), "n"], [fmt(r.y, 3), "n y"]);
+      if (st >= 2) cells.push(["[" + fmt(r.q[0], 3) + ", " + fmt(r.q[1], 3) + "]", "n"], [fmt(r.q[r.a], 3), "n q"]);
+      if (st >= 3) cells.push([fmt(r.td, 3), "n d"], [fmt(r.hub, 4), "n d"]);
+      if (st >= 4) cells.push([fmt(r.q2, 3), "n q"]);
+      h += "<tr>" + cells.map((c, k) => `<td class="${c[1]}${k >= cells.length - newCols ? " hl" : ""}">${c[0]}</td>`).join("") + "</tr>";
+    });
+    h += `<tr><td class="dim" colspan="${cols.length}">… 외 ${d.B - SHOW}개 (배치 ${d.B}개 모두 같은 방식으로 계산)</td></tr></tbody>`;
+    $("bTable").innerHTML = h;
+    const r = d.rows[0], g = d.o.gamma;
+    const F = [
+      `버퍼 ${comma(d.B > 0 ? d.B : 0)}개 무작위 추출 → 1번 표본: s = ${sv(r.s)}, a = ${r.a} (${r.a ? "오른쪽" : "왼쪽"}), r = ${r.r}, s′ = ${sv(r.s2)}, done = ${r.d ? "True" : "False"}`,
+      r.d ? `y₁ = r = <b>${fmt(r.y, 3)}</b>  (종료 전이: 다음 상태 가치 없음)` :
+        `y₁ = r + γ · max<sub>a′</sub> Q(s′,a′;θ⁻) = ${r.r} + ${g} × max(${fmt(r.qt[0], 4)}, ${fmt(r.qt[1], 4)}) = ${r.r} + ${g} × ${fmt(r.mx, 4)} = <b>${fmt(r.y, 4)}</b>`,
+      `Q(s,·;θ) = [${fmt(r.q[0], 3)}, ${fmt(r.q[1], 3)}] → 실제로 한 행동 a = ${r.a}의 값만 씀: Q(s₁,a₁) = <b>${fmt(r.q[r.a], 4)}</b>`,
+      `δ₁ = Q(s₁,a₁) − y₁ = ${fmt(r.q[r.a], 4)} − ${fmt(r.y, 4)} = <b>${fmt(r.td, 4)}</b> → Huber = ${Math.abs(r.td) <= 1 ? "½·δ² = ½ × (" + fmt(r.td, 4) + ")²" : "|δ| − ½ = " + fmt(Math.abs(r.td), 4) + " − 0.5"} = ${fmt(r.hub, 4)}<br>L(θ) = (1/${d.B}) Σ Huber(δᵢ) = <b>${fmt(d.L, 4)}</b>`,
+      `∂L/∂Q(sᵢ,aᵢ) = clip(δᵢ, −1, 1) / ${d.B}  → 역전파 → Adam(lr = ${d.o.lr}) 한 걸음<br>Q(s₁,a₁): ${fmt(r.q[r.a], 3)} → <b>${fmt(r.q2, 3)}</b> (y₁ = ${fmt(r.y, 3)} 쪽으로)   ·   같은 배치 손실: ${fmt(d.L, 4)} → <b>${fmt(d.L2, 4)}</b>`
+    ];
+    $("bFormula").innerHTML = F[st];
+    const N = [
+      "버퍼에서 <b>무작위로</b> 뽑기 때문에 연속한 전이가 아닌 서로 다른 시점의 경험이 섞입니다. 표에는 앞의 " + SHOW + "개만 보입니다.",
+      "타깃 y는 <b>타깃망 θ⁻</b>로 계산합니다(마지막 복사 후 " + comma(d.sinceSync) + "걸음 지남). done = 예이면 y = r 입니다. 막대가 쓰러지는 전이만 y가 1로 낮아 'Q값의 바닥'을 잡아 줍니다.",
+      "현재 망 θ는 행동 2개의 Q를 한 번에 내지만, 손실에는 <b>실제로 한 행동</b>의 Q(s,a)만 들어갑니다(다른 행동 출력의 기울기 = 0).",
+      "Huber 손실은 |δ| ≤ 1이면 제곱, 크면 직선이라 큰 오차의 기울기가 ±1로 잘립니다(Nature DQN의 '오차 자르기'와 같음).",
+      "타깃망은 그대로이므로 <b>y는 변하지 않습니다</b>. 타깃망 없이 같은 망으로 y를 계산했다면 1번 표본의 y는 갱신 전 " + fmt(d.rows[0].yOnline0, 3) + " → 갱신 후 " + fmt(d.rows[0].yMove, 3) + "로 함께 움직입니다(움직이는 과녁)."
+    ];
+    $("bNote").innerHTML = N[st];
+    $("bPrev").disabled = st === 0; $("bFirst").disabled = st === 0; $("bNext").disabled = st === 4;
+  }
+  function bGo(k) { bStep = Math.max(0, Math.min(4, k)); renderBatch(); }
+  function bStop() { clearInterval(bTimer); bTimer = null; $("bPlay").textContent = "재생"; }
+  $("bFirst").addEventListener("click", () => { bStop(); bGo(0); });
+  $("bPrev").addEventListener("click", () => { bStop(); bGo(bStep - 1); });
+  $("bNext").addEventListener("click", () => { bStop(); bGo(bStep + 1); });
+  $("bNew").addEventListener("click", () => { bStop(); makeBatch(); bGo(0); });
+  $("bPlay").addEventListener("click", () => {
+    if (bTimer) { bStop(); return; }
+    if (bStep >= 4) bGo(0);
+    $("bPlay").textContent = "멈춤";
+    bTimer = setInterval(() => { if (bStep >= 4) { bStop(); return; } bGo(bStep + 1); }, +segVal("bSpeed"));
+  });
+  segInit("bSpeed", () => { if (bTimer) { bStop(); $("bPlay").click(); } });
+  document.addEventListener("keydown", e => {
+    if ($("pane-batch").hidden || e.target.closest("input,select,textarea,.sk-tab")) return;
+    if (e.key === "ArrowRight") { bStop(); bGo(bStep + 1); e.preventDefault(); }
+    else if (e.key === "ArrowLeft") { bStop(); bGo(bStep - 1); e.preventDefault(); }
+  });
+  onShow.batch = () => { if (!bData || (agent && bData.label.indexOf("새 에이전트") >= 0 && agent.size >= 200)) { makeBatch(); bGo(0); } };
+
+  /* ---------- 3. 어블레이션 ---------- */
+  const AB = [
+    { key: "full", name: "전체 DQN (리플레이 + 타깃망)", short: "전체 DQN", rep: true, tg: true, col: "blue" },
+    { key: "notg", name: "타깃망 없음", short: "타깃망 없음", rep: true, tg: false, col: "red" },
+    { key: "norep", name: "리플레이 없음 (방금 전이 1개로 갱신)", short: "리플레이 없음", rep: false, tg: true, col: "orange" },
+    { key: "none", name: "둘 다 없음", short: "둘 다 없음", rep: false, tg: false, col: "gray" }
+  ];
+  let abAgents = null, abRunning = false, abTotal = 15000, abSeries = null;
+  function abReset() {
+    abRunning = false; $("abRun").textContent = "실험 시작";
+    abTotal = +segVal("abSteps");
+    const seed = Math.max(1, Math.min(9999, +$("abSeed").value || 1));
+    abAgents = AB.map(c => new DQNAgent({ seed: seed, hidden: [32, 32], lr: 0.001, batch: 64, gamma: 0.99, epsSteps: 6000, sync: 1000, buf: 50000,
+      eps0: 1, eps1: 0.05, warmup: 500, trainEvery: c.rep ? 2 : 1, useReplay: c.rep, useTarget: c.tg }));
+    abSeries = AB.map(() => ({ ret: [], q: [] }));
+    $("corrStats").innerHTML = ""; $("corrHint").style.display = "";
+    drawAblation();
+  }
+  function abRecord(i) {
+    const a = abAgents[i], R = a.returns.slice(-10);
+    abSeries[i].ret.push(R.length ? R.reduce((x, y) => x + y, 0) / R.length : 0);
+    abSeries[i].q.push(Math.log10(Math.max(1, a.qLog[a.qLog.length - 1] || 1)));
+  }
+  function abTick() {
+    const t0 = performance.now();
+    let alive = false;
+    do {
+      alive = false;
+      for (let i = 0; i < abAgents.length; i++) {
+        const a = abAgents[i];
+        if (a.steps >= abTotal) continue;
+        alive = true;
+        for (let k = 0; k < 50 && a.steps < abTotal; k++) { a.step(); if (a.steps % 250 === 0) abRecord(i); }
+      }
+    } while (alive && performance.now() - t0 < 24);
+    if (!alive) { abRunning = false; $("abRun").textContent = "다시 실행"; drawAblation(); abFinish(); }
+  }
+  function corr(xs, ys) { const n = xs.length, mx = xs.reduce((a, b) => a + b, 0) / n, my = ys.reduce((a, b) => a + b, 0) / n; let sxy = 0, sx = 0, sy = 0;
+    for (let i = 0; i < n; i++) { sxy += (xs[i] - mx) * (ys[i] - my); sx += (xs[i] - mx) ** 2; sy += (ys[i] - my) ** 2; } return sxy / Math.sqrt(sx * sy); }
+  function abFinish() {
+    const a = abAgents[0], n = 64, cr = RL.rng(5);
+    const seq = []; for (let k = n; k >= 1; k--) seq.push(a.S[(a.ptr - k + a.cap) % a.cap][2]);
+    const rnd = []; for (let k = 0; k < n; k++) rnd.push(a.S[cr.int(a.size)][2]);
+    const c1 = corr(seq.slice(0, -1), seq.slice(1)), c2 = corr(rnd.slice(0, -1), rnd.slice(1));
+    $("corrStats").innerHTML = `<div class="sk-stat"><b>${fmt(c1, 3)}</b><span>연속한 64개 (리플레이 없음)</span></div><div class="sk-stat"><b>${fmt(c2, 3)}</b><span>버퍼에서 무작위 64개</span></div>`;
+    $("corrHint").textContent = "전체 DQN 버퍼에서 계산: 이웃한 두 표본의 막대 각도 θ 상관계수. 1에 가까울수록 '거의 같은 표본'을 연달아 학습하는 셈입니다.";
+  }
+  function drawAblation() {
+    const t = th(), cols = AB.map(c => t[c.col]);
+    const S = abSeries || AB.map(() => ({ ret: [], q: [] })), n = abTotal / 250;
+    const pad = arr => arr.length ? arr : [0];
+    if (S[0].ret.length > 1 || S[3].ret.length > 1) {
+      LC($("abRetCv"), S.map((s, i) => ({ data: s.ret, color: cols[i], width: i === 0 ? 3 : 2 })), { w: 600, h: 240, ymin: 0, ymax: 500 });
+      const ub = Math.log10((1 - Math.pow(0.99, 500)) / 0.01), qmax = Math.max(3, ...S.map(s => Math.max(...pad(s.q)))) ;
+      LC($("abQCv"), S.map((s, i) => ({ data: s.q, color: cols[i], width: i === 0 ? 3 : 2 })), { w: 600, h: 240, ymin: 0, ymax: Math.ceil(qmax), hline: ub });
+    } else { emptyChart($("abRetCv"), 600, 240, "[실험 시작]을 누르세요"); emptyChart($("abQCv"), 600, 240, "log₁₀ Q — 2 = 100, 3 = 1,000, 5 = 100,000"); }
+    $("abLegend").innerHTML = AB.map((c, i) => `<span><i style="background:${cols[i]}"></i>${c.name}</span>`).join("");
+    void n;
+    /* 표 */
+    const ub = (1 - Math.pow(0.99, 500)) / 0.01;
+    let h = "<thead><tr><th>설정</th><th>리플레이</th><th>타깃망</th><th>진행</th><th>에피소드</th><th>후반 1/3 평균 수익</th><th>최고(10회 평균)</th><th>max Q(s₀)</th><th>판정</th></tr></thead><tbody>";
+    AB.forEach((c, i) => {
+      const a = abAgents ? abAgents[i] : null, R = a ? a.returns : [];
+      const best = R.length ? Math.max(...RL.movingAvg(R, 10)) : 0, q = a && a.qLog.length ? a.qLog[a.qLog.length - 1] : NaN;
+      const done = a && a.steps >= abTotal, sr = abSeries ? abSeries[i].ret : [], late = sr.slice(Math.floor(sr.length * 2 / 3)), lateAvg = late.length ? late.reduce((x, y) => x + y, 0) / late.length : 0;
+      let tag = "";
+      if (done) { tag = q > ub * 1.5 ? '<span class="dq-tag bad">Q 발산</span>' : lateAvg >= 200 ? '<span class="dq-tag ok">학습 성공</span>' : best >= 150 ? '<span class="dq-tag mid">불안정</span>' : '<span class="dq-tag bad">학습 실패</span>'; c.verdict = tag.replace(/<[^>]+>/g, ""); }
+      h += `<tr><td style="color:${cols[i]};font-weight:700">${c.short}</td><td>${c.rep ? "버퍼 50,000 · 배치 64" : "없음 (전이 1개)"}</td><td>${c.tg ? "C = 1,000" : "없음"}</td>` +
+        `<td class="n">${a ? Math.round(a.steps / abTotal * 100) : 0}%</td><td class="n">${R.length}</td><td class="n">${lateAvg.toFixed(1)}</td><td class="n">${best.toFixed(1)}</td><td class="n">${isNaN(q) ? "–" : q >= 1000 ? comma(q) : q.toFixed(1)}</td><td>${tag}</td></tr>`;
+    });
+    $("abTable").innerHTML = h + "</tbody>";
+    const all = abAgents && abAgents.every(a => a.steps >= abTotal);
+    const prog = abAgents ? Math.round(abAgents.reduce((x, a) => x + a.steps, 0) / (abTotal * 4) * 100) : 0;
+    $("abStatus").innerHTML = !abAgents || prog === 0 ? "[실험 시작]을 누르면 네 설정이 같은 초기 가중치·같은 환경 seed로 학습합니다." :
+      all ? "<b>완료</b> — " + AB.map(c => c.short + ": " + c.verdict).join(" · ") + ". 타깃망이 없으면 Q가 이론 상한(≈99)을 넘어 폭주하고, 리플레이가 없으면 상관된 표본으로 올라갔다 무너지기를 반복합니다." :
+      "<b>학습 중 " + prog + "%</b>" + (abRunning ? "" : " · 멈춤");
+  }
+  $("abRun").addEventListener("click", () => {
+    if (!abAgents || abAgents.every(a => a.steps >= abTotal)) abReset();
+    abRunning = !abRunning; $("abRun").textContent = abRunning ? "멈춤" : "이어서 실행"; drawAblation();
+  });
+  $("abReset").addEventListener("click", abReset);
+  segInit("abSteps", abReset);
+  $("abSeed").addEventListener("change", abReset);
+  onShow.ablation = () => drawAblation();
+
+  /* ---------- 4. Atari ---------- */
+  const AT = { t: 0, timer: null, A: 18 };
+  function atariFrame(t) {
+    /* 210×160 RGB Breakout 모양 프레임(코드로 그림). 공은 대각선으로 이동 */
+    const W = 160, H = 210, img = new Uint8ClampedArray(W * H * 3);
+    const put = (x0, y0, w, h, c) => { for (let y = Math.max(0, y0); y < Math.min(H, y0 + h); y++) for (let x = Math.max(0, x0); x < Math.min(W, x0 + w); x++) { const i = (y * W + x) * 3; img[i] = c[0]; img[i + 1] = c[1]; img[i + 2] = c[2]; } };
+    put(0, 17, W, 8, [142, 142, 142]); put(0, 17, 8, 180, [142, 142, 142]); put(152, 17, 8, 180, [142, 142, 142]);
+    const rows = [[200, 72, 72], [198, 108, 58], [180, 122, 48], [162, 162, 42], [72, 160, 72], [66, 72, 200]];
+    rows.forEach((c, r) => { for (let b = 0; b < 18; b++) if (!((r === 3 || r === 4) && (b === 6 || b === 7)) && !(r === 5 && b === 11)) put(8 + b * 8, 57 + r * 6, 8, 6, c); });
+    /* 점수 막대(숫자 대신) */
+    put(36, 5, 12, 9, [142, 142, 142]); put(100, 5, 6, 9, [142, 142, 142]);
+    const tri = (v, L) => { const m = v % (2 * L); return m < L ? m : 2 * L - m; };   /* 벽에 튕기는 왕복 운동 */
+    const bx = 8 + tri(40 + t * 5, 140), by = 100 + tri(60 + t * 6, 84);
+    put(Math.round(bx), Math.round(by), 4, 6, [200, 72, 72]);
+    const px = Math.max(8, Math.min(136, Math.round(bx) - 6)); put(px, 189, 16, 4, [200, 72, 72]);
+    return img;
+  }
+  function toGray84(img) {
+    /* 밝기 Y = 0.299R + 0.587G + 0.114B, 210×160 → 84×84 면적 평균 */
+    const W = 160, H = 210, out = new Float32Array(84 * 84);
+    for (let oy = 0; oy < 84; oy++) for (let ox = 0; ox < 84; ox++) {
+      const y0 = oy * H / 84, y1 = (oy + 1) * H / 84, x0 = ox * W / 84, x1 = (ox + 1) * W / 84; let s = 0, n = 0;
+      for (let y = Math.floor(y0); y < Math.ceil(y1); y++) for (let x = Math.floor(x0); x < Math.ceil(x1); x++) {
+        const wy = Math.min(y + 1, y1) - Math.max(y, y0), wx = Math.min(x + 1, x1) - Math.max(x, x0), w = wy * wx, i = (y * W + x) * 3;
+        s += w * (0.299 * img[i] + 0.587 * img[i + 1] + 0.114 * img[i + 2]); n += w; }
+      out[oy * 84 + ox] = s / n;
+    }
+    return out;
+  }
+  function paint(cv, w, h, scale, fn) {
+    const dpr = window.devicePixelRatio || 1; cv.width = w; cv.height = h; cv.style.width = (w * scale) + "px"; cv.style.height = (h * scale) + "px";
+    const g = cv.getContext("2d"), id = g.createImageData(w, h); fn(id.data); g.putImageData(id, 0, 0); void dpr;
+  }
+  function drawAtari() {
+    const box = $("atFrames"); const t = AT.t;
+    if (!box.children.length) {
+      box.innerHTML = `<div class="dq-frame"><canvas id="atRaw" aria-label="원본 프레임 210×160 RGB"></canvas><b>원본 210×160×3</b><span>RGB 게임 화면</span></div>` +
+        `<div class="dq-frame"><canvas id="atGray" aria-label="흑백 84×84"></canvas><b>흑백·축소 84×84</b><span>밝기 Y 채널</span></div>` +
+        [3, 2, 1, 0].map(k => `<div class="dq-frame"><canvas id="atS${k}" aria-label="쌓인 프레임 t−${k}"></canvas><b>${k ? "t − " + k : "t (지금)"}</b><span>채널 ${4 - k}</span></div>`).join("") +
+        `<div class="dq-frame"><canvas id="atDiff" aria-label="두 프레임 차이"></canvas><b>t − (t−1) 차이</b><span>움직인 것만 남음</span></div>`;
+    }
+    const raw = atariFrame(t);
+    paint($("atRaw"), 160, 210, 0.8, d => { for (let i = 0, j = 0; i < 160 * 210; i++, j += 3) { d[i * 4] = raw[j]; d[i * 4 + 1] = raw[j + 1]; d[i * 4 + 2] = raw[j + 2]; d[i * 4 + 3] = 255; } });
+    const gs = [3, 2, 1, 0].map(k => toGray84(atariFrame(Math.max(0, t - k))));
+    const grayPaint = (cv, arr, sc) => paint(cv, 84, 84, sc, d => { for (let i = 0; i < 84 * 84; i++) { const v = Math.min(255, arr[i] * 1.6); d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255; } });
+    grayPaint($("atGray"), gs[3], 2);
+    [3, 2, 1, 0].forEach((k, i) => grayPaint($("atS" + k), gs[i], 1.25));
+    paint($("atDiff"), 84, 84, 1.25, d => { for (let i = 0; i < 84 * 84; i++) { const v = Math.min(255, Math.abs(gs[3][i] - gs[2][i]) * 3); d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255; } });
+  }
+  const ARCH = [
+    { id: "in", t: "입력", s: "84×84×4", p: 0, info: "최근 4프레임을 흑백 84×84로 줄여 채널 방향으로 쌓은 텐서. 값은 0~255를 255로 나눠 0~1로." },
+    { id: "c1", t: "Conv1", s: "32 · 8×8 · s4", o: "20×20×32", p: 8 * 8 * 4 * 32 + 32, f: "⌊(84 − 8)/4⌋ + 1 = 20", info: "8×8 필터 32개, 보폭 4, ReLU. 큰 보폭으로 해상도를 빠르게 줄이며 공·패들 같은 굵은 모양을 잡습니다." },
+    { id: "c2", t: "Conv2", s: "64 · 4×4 · s2", o: "9×9×64", p: 4 * 4 * 32 * 64 + 64, f: "⌊(20 − 4)/2⌋ + 1 = 9", info: "4×4 필터 64개, 보폭 2, ReLU." },
+    { id: "c3", t: "Conv3", s: "64 · 3×3 · s1", o: "7×7×64", p: 3 * 3 * 64 * 64 + 64, f: "⌊(9 − 3)/1⌋ + 1 = 7", info: "3×3 필터 64개, 보폭 1, ReLU. 풀링 층은 없습니다(위치 정보가 중요하기 때문)." },
+    { id: "fc", t: "FC", s: "512 · ReLU", o: "512", p: 3136 * 512 + 512, f: "7 × 7 × 64 = 3,136 → 512", info: "펼친 3,136차원 특징을 512차원으로. 파라미터의 약 95%가 이 층에 있습니다." },
+    { id: "out", t: "출력", s: "선형", o: "A개", p: null, f: "Q(s,a₁) … Q(s,a_A)", info: "행동마다 Q값 하나(선형, 활성화 없음). 한 번의 순전파로 모든 행동의 Q를 얻어 max·argmax가 싸집니다." }
+  ];
+  let archSel = "c1";
+  function drawArch() {
+    const A = AT.A, s = [], x0 = 20, bw = 128, gap = 37, y = 70, h = 96;
+    ARCH.forEach((b, i) => {
+      const x = x0 + i * (bw + gap), p = b.id === "out" ? 512 * A + A : b.p;
+      const cls = b.id === "in" ? "st" : b.id === "out" ? "va" : b.id === "fc" ? "va" : "st";
+      s.push(`<g class="clk${b.id === archSel ? " sel" : ""}" data-id="${b.id}" tabindex="0" role="button" aria-label="${b.t} ${b.s}">` +
+        `<rect class="box ${cls}" x="${x}" y="${y}" width="${bw}" height="${h}" rx="10"/>` +
+        `<text x="${x + bw / 2}" y="${y + 28}" text-anchor="middle" font-size="16" font-weight="800">${b.t}</text>` +
+        `<text class="m" x="${x + bw / 2}" y="${y + 50}" text-anchor="middle" font-size="12.5">${b.id === "out" ? A + "개 행동" : b.s}</text>` +
+        `<text class="m" x="${x + bw / 2}" y="${y + 76}" text-anchor="middle" font-size="12" font-family="var(--mono)">${p ? comma(p) + " 파라미터" : "파라미터 없음"}</text></g>`);
+      const shape = b.id === "in" ? "84×84×4" : b.id === "out" ? A + "" : b.o;
+      s.push(`<text class="fst" x="${x + bw / 2}" y="${y + h + 28}" text-anchor="middle" font-size="13" font-weight="700" font-family="var(--mono)">${shape}</text>`);
+      if (i) s.push(`<path class="ln st" d="M${x - gap + 4} ${y + h / 2} L${x - 6} ${y + h / 2}" marker-end="url(#ah2)"/>`);
+    });
+    const total = 1684128 + 513 * A;
+    s.unshift(`<defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="fst" d="M0 0L10 5L0 10z"/></marker></defs>` +
+      `<text x="20" y="34" font-size="15" font-weight="800">합성곱 3층 + 완전연결 2층 · 전체 ${comma(total)}개 파라미터</text>` +
+      `<text class="m" x="20" y="54" font-size="12.5">블록을 누르면 설명과 출력 크기 계산이 나옵니다 (출력 크기 = ⌊(입력 − 필터)/보폭⌋ + 1, 패딩 없음)</text>`);
+    $("archSvg").innerHTML = s.join("");
+    const b = ARCH.find(z => z.id === archSel), p = b.id === "out" ? 512 * A + A : b.p;
+    $("archInfo").innerHTML = `<h3>${b.t} <span class="sk-hint">${b.id === "out" ? A + "개 행동" : b.s}</span></h3><p>${b.info}</p>` +
+      (p ? `<p class="sk-mono">파라미터 = ${b.id === "c1" ? "8·8·4·32 + 32" : b.id === "c2" ? "4·4·32·64 + 64" : b.id === "c3" ? "3·3·64·64 + 64" : b.id === "fc" ? "3,136·512 + 512" : "512·" + A + " + " + A} = <b>${comma(p)}</b></p>` : "");
+    $("archFormula").innerHTML = (b.f ? b.f + "<br>" : "") + "84 → 20 → 9 → 7 :  7·7·64 = 3,136<br>전체 = 8,224 + 32,832 + 36,928 + 1,606,144 + (512·" + A + " + " + A + ") = <b>" + comma(total) + "</b>";
+  }
+  $("archSvg").addEventListener("click", e => { const g = e.target.closest(".clk"); if (g) { archSel = g.getAttribute("data-id"); drawArch(); } });
+  $("archSvg").addEventListener("keydown", e => { const g = e.target.closest(".clk"); if (g && (e.key === "Enter" || e.key === " ")) { archSel = g.getAttribute("data-id"); drawArch(); const n = $("archSvg").querySelector('[data-id="' + archSel + '"]'); n && n.focus(); e.preventDefault(); } });
+  segInit("atA", v => { AT.A = +v; drawArch(); });
+  function atStop() { clearInterval(AT.timer); AT.timer = null; $("atPlay").textContent = "재생"; }
+  $("atNext").addEventListener("click", () => { atStop(); AT.t++; drawAtari(); });
+  $("atReset").addEventListener("click", () => { atStop(); AT.t = 3; drawAtari(); });
+  $("atPlay").addEventListener("click", () => { if (AT.timer) { atStop(); return; } $("atPlay").textContent = "멈춤"; AT.timer = setInterval(() => { AT.t++; drawAtari(); if (AT.t > 60) AT.t = 3; }, reduced ? 600 : 160); });
+  function tables() {
+    const rw = [["Breakout 벽돌", 7], ["Space Invaders 외계인", 30], ["Pong 실점", -1], ["아무 일 없음", 0], ["보스 처치", 200], ["Seaquest 잠수부 구출 실패", -20]];
+    $("clipTable").innerHTML = "<thead><tr><th>사건(예시)</th><th>게임 점수</th><th>clip 후 보상</th></tr></thead><tbody>" +
+      rw.map(r => `<tr><td>${r[0]}</td><td class="n">${r[1] > 0 ? "+" + r[1] : fmt(r[1], 0)}</td><td class="n" style="font-weight:700;color:${r[1] > 0 ? "var(--r-rew)" : r[1] < 0 ? "var(--r-td)" : "var(--muted)"}">${r[1] > 0 ? "+1" : r[1] < 0 ? "−1" : "0"}</td></tr>`).join("") + "</tbody>";
+    const c = cfg();
+    const hp = [["리플레이 버퍼", "1,000,000", comma(c.buf)], ["미니배치", "32", c.batch], ["할인율 γ", "0.99", c.gamma], ["학습률", "0.00025 (RMSProp)", c.lr + " (Adam)"],
+      ["타깃망 갱신", "10,000번 갱신마다", comma(c.sync) + "걸음마다"], ["갱신 빈도", "4행동마다 1번", "2걸음마다 1번"], ["ε", "1.0 → 0.1 (100만 프레임)", "1.0 → 0.05 (" + comma(c.epsSteps) + "걸음)"],
+      ["학습 시작 전 무작위", "50,000", "500"], ["프레임 반복 / 쌓기", "4 / 4", "없음 (상태 4개)"], ["전체 학습", "5,000만 프레임", "최대 " + comma(MAX_STEPS) + "걸음"]];
+    $("hpTable").innerHTML = "<thead><tr><th>항목</th><th>Nature DQN</th><th>이 페이지</th></tr></thead><tbody>" + hp.map(r => `<tr><td>${r[0]}</td><td class="n">${r[1]}</td><td class="n">${r[2]}</td></tr>`).join("") + "</tbody>";
+  }
+  onShow.atari = () => { tables(); drawAtari(); drawArch(); };
+
+  /* ---------- 5. 코드 ---------- */
+  function updateCode() {
+    const c = cfg(), h = c.hidden[0];
+    $("code1").textContent =
+`import random, collections
+import numpy as np
+import gymnasium as gym
+import torch, torch.nn as nn, torch.nn.functional as F
+
+SCALE = np.array([2.4, 3.0, 0.21, 3.5], dtype=np.float32)
+class Normalize(gym.ObservationWrapper):   # 입력 정규화 (x/2.4, ẋ/3, θ/0.21, θ̇/3.5)
+    def observation(self, obs):
+        return (obs / SCALE).astype(np.float32)
+
+env = Normalize(gym.make("CartPole-v1"))   # 행동 0 = 왼쪽, 1 = 오른쪽
+torch.manual_seed(${c.seed}); random.seed(${c.seed}); np.random.seed(${c.seed})
+
+def make_net():
+    return nn.Sequential(nn.Linear(4, ${h}), nn.ReLU(),
+                         nn.Linear(${h}, ${h}), nn.ReLU(),
+                         nn.Linear(${h}, 2))          # 행동마다 Q값 하나
+q_net, target_net = make_net(), make_net()
+target_net.load_state_dict(q_net.state_dict())        # θ⁻ ← θ
+opt = torch.optim.Adam(q_net.parameters(), lr=${c.lr})
+buffer = collections.deque(maxlen=${c.buf})           # 경험 재생 버퍼
+
+GAMMA, BATCH, SYNC, WARMUP = ${c.gamma}, ${c.batch}, ${c.sync}, 500
+EPS_START, EPS_END, EPS_STEPS = 1.0, 0.05, ${c.epsSteps}
+
+def epsilon(t):
+    return EPS_START + (EPS_END - EPS_START) * min(1.0, t / EPS_STEPS)
+
+def train_step():
+    s, a, r, s2, done = map(np.array, zip(*random.sample(buffer, BATCH)))
+    s  = torch.tensor(s,  dtype=torch.float32); s2 = torch.tensor(s2, dtype=torch.float32)
+    a  = torch.tensor(a);  r = torch.tensor(r, dtype=torch.float32)
+    done = torch.tensor(done, dtype=torch.float32)
+    with torch.no_grad():                                  # 타깃은 θ⁻로, 기울기 없음
+        y = r + GAMMA * target_net(s2).max(1).values * (1 - done)
+    q = q_net(s).gather(1, a.unsqueeze(1)).squeeze(1)      # 실제로 한 행동의 Q(s,a)
+    loss = F.smooth_l1_loss(q, y)                          # Huber 손실
+    opt.zero_grad(); loss.backward(); opt.step()
+    return loss.item()
+
+s, _ = env.reset(seed=${c.seed}); ep_ret, returns = 0.0, []
+for t in range(${MAX_STEPS}):
+    if t < WARMUP or random.random() < epsilon(t):
+        a = env.action_space.sample()                      # 탐험
+    else:
+        with torch.no_grad():
+            a = int(q_net(torch.tensor(s, dtype=torch.float32)).argmax())
+    s2, r, terminated, truncated, _ = env.step(a)
+    buffer.append((s, a, r, s2, float(terminated)))        # 시간 초과(truncated)는 종료로 보지 않음
+    s, ep_ret = s2, ep_ret + r
+    if t >= WARMUP and t % 2 == 0:
+        train_step()
+    if t % SYNC == 0:
+        target_net.load_state_dict(q_net.state_dict())     # C걸음마다 θ⁻ ← θ
+    if terminated or truncated:
+        returns.append(ep_ret); s, _ = env.reset(); ep_ret = 0.0
+        if len(returns) % 20 == 0:
+            print(len(returns), "에피소드, 최근 20회 평균", np.mean(returns[-20:]))`;
+    $("code2").textContent =
+`import numpy as np
+import gymnasium as gym
+from stable_baselines3 import DQN
+
+SCALE = np.array([2.4, 3.0, 0.21, 3.5], dtype=np.float32)
+class Normalize(gym.ObservationWrapper):   # 입력 정규화 (x/2.4, ẋ/3, θ/0.21, θ̇/3.5)
+    def observation(self, obs):
+        return (obs / SCALE).astype(np.float32)
+
+TOTAL = ${MAX_STEPS}
+model = DQN(
+    "MlpPolicy", Normalize(gym.make("CartPole-v1")),
+    policy_kwargs=dict(net_arch=[${h}, ${h}]),
+    learning_rate=${c.lr},
+    buffer_size=${c.buf},
+    learning_starts=500,
+    batch_size=${c.batch},
+    gamma=${c.gamma},
+    train_freq=2, gradient_steps=1,          # 2걸음마다 1번 갱신
+    target_update_interval=${c.sync},         # 환경 걸음 단위 (C)
+    exploration_initial_eps=1.0,
+    exploration_final_eps=0.05,
+    exploration_fraction=${(c.epsSteps / MAX_STEPS).toFixed(3)},        # ${comma(c.epsSteps)} / ${comma(MAX_STEPS)}
+    seed=${c.seed}, verbose=1,
+)
+model.learn(total_timesteps=TOTAL)
+
+env = Normalize(gym.make("CartPole-v1", render_mode="human"))
+obs, _ = env.reset()
+for _ in range(500):
+    action, _ = model.predict(obs, deterministic=True)     # 탐욕 정책
+    obs, r, terminated, truncated, _ = env.step(action)
+    if terminated or truncated:
+        obs, _ = env.reset()
+
+# ---- Atari (Nature DQN 설정에 가깝게) ----
+# pip install "stable-baselines3[extra]" "gymnasium[atari]"
+from stable_baselines3.common.env_util import make_atari_env
+from stable_baselines3.common.vec_env import VecFrameStack
+
+atari = make_atari_env("BreakoutNoFrameskip-v4", n_envs=1, seed=0)  # 84×84 흑백·프레임 반복 4·보상 자르기
+atari = VecFrameStack(atari, n_stack=4)                            # 4장 쌓기 → 84×84×4
+model = DQN("CnnPolicy", atari,                                     # Conv 3층 + FC 512 (Nature 구조)
+            buffer_size=100_000, learning_rate=1e-4, batch_size=32,
+            learning_starts=100_000, target_update_interval=1000,
+            train_freq=4, exploration_fraction=0.1, exploration_final_eps=0.01,
+            optimize_memory_usage=False, verbose=1)
+model.learn(total_timesteps=10_000_000)`;
+  }
+  function copyText(t, msgEl) {
+    const done = () => { msgEl.textContent = "복사했습니다."; setTimeout(() => { msgEl.textContent = ""; }, 1800); };
+    const fb = () => { const ta = document.createElement("textarea"); ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); done(); } catch (e) { msgEl.textContent = "복사하지 못했습니다. 직접 선택해 복사하세요."; } ta.remove(); };
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(t).then(done, fb); else fb();
+  }
+  $("cpCopy1").addEventListener("click", () => copyText($("code1").textContent, $("cpMsg1")));
+  $("cpCopy2").addEventListener("click", () => copyText($("code2").textContent, $("cpMsg2")));
+  onShow.code = updateCode;
+
+  /* ---------- 테마 · 크기 변경 시 다시 그리기 ---------- */
+  function redrawAll() {
+    drawLoop(); drawTrain(true);
+    if (!$("pane-ablation").hidden) drawAblation();
+    if (!$("pane-atari").hidden) { drawArch(); }
+  }
+  RL.onTheme(redrawAll);
+  let rsT = null; window.addEventListener("resize", () => { clearTimeout(rsT); rsT = setTimeout(redrawAll, 120); });
+
+  /* ---------- 시작 ---------- */
+  hpLabels(); drawLoop(); newAgent(); drawTrain(true); updateCode(); tables(); AT.t = 3;
+  const start = document.getElementById("tab-" + location.hash.slice(1)); if (start) show(start);
+  requestAnimationFrame(t => { lastT = t; requestAnimationFrame(tick); });
+})();
+</script>
+</body>
+</html>

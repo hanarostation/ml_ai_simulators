@@ -1,0 +1,1039 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Monte Carlo 학습 | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261007a">
+<style>
+/* ===== Monte Carlo 학습 전용 스타일 ===== */
+:root{
+  --sk-accent: var(--cat-rl);
+  --rl-s:#2563EB; --rl-a:#EA580C; --rl-r:#16A34A; --rl-rneg:#DC2626; --rl-v:#7C3AED; --rl-tgt:#DB2777; --rl-exp:#B7791F;
+  --c1:#0D9488; --c2:#C026D3; --c3:#4F46E5;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --rl-s:#79A6F6; --rl-a:#F59A5C; --rl-r:#5CCB82; --rl-rneg:#F07A7A; --rl-v:#B597FF; --rl-tgt:#F472B6; --rl-exp:#E3B455;
+  --c1:#45CFBF; --c2:#E879F9; --c3:#A5B4FC; } }
+:root[data-theme="dark"]{
+  --rl-s:#79A6F6; --rl-a:#F59A5C; --rl-r:#5CCB82; --rl-rneg:#F07A7A; --rl-v:#B597FF; --rl-tgt:#F472B6; --rl-exp:#E3B455;
+  --c1:#45CFBF; --c2:#E879F9; --c3:#A5B4FC; }
+
+.mc-split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:16px;align-items:start}
+.mc-split--even{grid-template-columns:repeat(2,minmax(0,1fr))}
+.mc-tri{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.mc-box{min-width:0;display:flex;flex-direction:column;gap:8px}
+.mc-cap{font-size:13px;font-weight:700;color:var(--muted);line-height:1.5}
+.mc-cap i{display:inline-block;width:12px;height:4px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.mc-cv{display:block;width:100%;max-width:100%;border-radius:8px}
+.mc-cvwrap{min-width:0;width:100%}
+canvas.mc-click{cursor:pointer}
+@media (max-width:1080px){ .mc-tri{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:900px){ .mc-split,.mc-split--even,.mc-tri{grid-template-columns:minmax(0,1fr)} }
+
+.mc-loop{width:100%;max-width:560px;height:auto;display:block}
+.mc-loop .bx{fill:var(--surface-2);stroke-width:2}
+.mc-loop text{font-family:var(--sans);font-size:14px;fill:var(--ink)}
+.mc-loop .sm{font-size:12.5px;fill:var(--muted)}
+.mc-loop .s{stroke:var(--rl-s)} .mc-loop .a{stroke:var(--rl-a)} .mc-loop .r{stroke:var(--rl-r)}
+.mc-loop .ts{fill:var(--rl-s);font-weight:700} .mc-loop .ta{fill:var(--rl-a);font-weight:700} .mc-loop .tr{fill:var(--rl-r);font-weight:700}
+.mc-loop path{fill:none;stroke-width:2.2}
+
+.mc-tracewrap{max-height:380px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.mc-trace td,.mc-trace th{text-align:center}
+.mc-trace tr.cur td{background:color-mix(in srgb,var(--rl-tgt) 13%,var(--surface))}
+.mc-trace tr.fut td{color:var(--faint)}
+.mc-trace td.g{font-weight:700;color:var(--rl-v)}
+.mc-trace td.rpos{color:var(--rl-r);font-weight:700} .mc-trace td.rneg{color:var(--rl-rneg);font-weight:700}
+.mc-trace td.act{color:var(--rl-a);font-weight:700} .mc-trace td.st{color:var(--rl-s);font-weight:600}
+.mc-tag{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:0 6px;margin-left:4px;border:1px solid currentColor}
+.mc-tag--f{color:var(--c1)} .mc-tag--e{color:var(--c2)}
+
+.k-s{color:var(--rl-s);font-weight:700} .k-a{color:var(--rl-a);font-weight:700} .k-r{color:var(--rl-r);font-weight:700}
+.k-rn{color:var(--rl-rneg);font-weight:700} .k-v{color:var(--rl-v);font-weight:700} .k-t{color:var(--rl-tgt);font-weight:700}
+.k-x{color:var(--rl-exp);font-weight:700} .k-1{color:var(--c1);font-weight:700} .k-2{color:var(--c2);font-weight:700}
+.mc-formula{font-family:var(--sans);font-size:14.5px}
+.mc-formula b{font-weight:700}
+.mc-big{font-size:15px}
+.mc-small{font-size:12.5px;color:var(--muted);margin:0}
+.mc-detail{font-size:13.5px}
+.mc-detail .sk-table td,.mc-detail .sk-table th{padding:5px 7px}
+.mc-pre{white-space:pre;margin:0;max-height:620px;overflow:auto;font-size:12.5px;line-height:1.6}
+.mc-flash{font-size:12.5px;color:var(--muted)}
+.mc-mdp{width:100%;max-width:460px;height:auto;display:block}
+.mc-mdp text{font-family:var(--sans);font-size:13px;fill:var(--ink)}
+.mc-mdp .mut{fill:var(--muted);font-size:12px}
+.mc-mdp .node{fill:color-mix(in srgb,var(--rl-s) 14%,var(--surface));stroke:var(--rl-s);stroke-width:2}
+.mc-mdp .term{fill:var(--surface-2);stroke:var(--line-strong);stroke-width:2}
+.mc-mdp .ln{fill:none;stroke:var(--muted);stroke-width:1.8}
+.mc-mdp .lnA{fill:none;stroke:var(--rl-a);stroke-width:2}
+.mc-mdp .hd{fill:var(--muted)} .mc-mdp .hdA{fill:var(--rl-a)}
+.mc-mdp .tr{fill:var(--rl-r);font-weight:700} .mc-mdp .ta{fill:var(--rl-a);font-weight:700}
+.mc-statsrow .sk-stat{min-width:110px}
+.mc-statsrow .sk-stat b{font-size:18px}
+@media (max-width:520px){ .mc-statsrow .sk-stat{min-width:0;flex:1 1 40%} .sk-slider{min-width:140px} }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+      <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a href="../../index.html#rl" style="--c:var(--cat-rl)" aria-current="page">강화학습</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#rl" style="--c:var(--cat-rl)">강화학습</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">Monte Carlo 학습</h1>
+      <p class="ds-hero__lede">환경의 전이 확률(모델)을 모르는 채로, 에피소드를 끝까지 해 본 뒤 실제로 받은 리턴 G의 평균으로 가치를 배웁니다. FrozenLake와 GridWorld에서 리턴 계산 → 첫 방문·모든 방문 예측 → ε-탐욕 제어 → 중요도 샘플링까지 직접 돌려 봅니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button class="sk-tab" role="tab" id="tab-episode" aria-controls="pane-episode" aria-selected="true"><span class="sk-num">1</span>에피소드와 리턴</button>
+    <button class="sk-tab" role="tab" id="tab-predict" aria-controls="pane-predict" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>MC 예측</button>
+    <button class="sk-tab" role="tab" id="tab-variance" aria-controls="pane-variance" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>분산과 수렴</button>
+    <button class="sk-tab" role="tab" id="tab-control" aria-controls="pane-control" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>MC 제어</button>
+    <button class="sk-tab" role="tab" id="tab-offpolicy" aria-controls="pane-offpolicy" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>중요도 샘플링</button>
+    <button class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>코드</button>
+    <button class="sk-tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>알고리즘 구성도</button>
+  </nav>
+
+  <!-- ========== 1. 에피소드와 리턴 ========== -->
+  <section id="pane-episode" role="tabpanel" aria-labelledby="tab-episode">
+    <div class="sk-card">
+      <div class="sk-head"><h2>에피소드를 끝까지 → 뒤에서부터 리턴 계산</h2><span class="sk-hint">→ 키 또는 [다음]으로 한 칸씩</span></div>
+      <p class="sk-lead">Monte Carlo(MC)는 모델 없이 <b>에피소드 하나를 끝까지</b> 진행한 뒤, 마지막 걸음부터 거꾸로 <span class="k-v">G<sub>t</sub> = R<sub>t+1</sub> + γ·G<sub>t+1</sub></span>을 계산해 각 상태의 “실제로 받은 미래 보상 합”을 얻습니다. 기본 화면은 강의 예제(GridWorld, 매 걸음 −1, γ = 0.9)입니다.</p>
+      <div class="mc-split">
+        <div class="mc-box">
+          <svg class="mc-loop" viewBox="0 0 560 170" role="img" aria-label="에이전트와 환경의 상호작용 루프: 상태 s에서 행동 a, 보상 r과 다음 상태 s′">
+            <defs>
+              <marker id="mA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--rl-a)"/></marker>
+              <marker id="mS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--rl-s)"/></marker>
+              <marker id="mR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--rl-r)"/></marker>
+            </defs>
+            <rect class="bx a" x="20" y="48" width="150" height="64" rx="12"/>
+            <text x="95" y="75" text-anchor="middle" font-weight="700">에이전트</text>
+            <text class="sm" x="95" y="96" text-anchor="middle">정책 π(a | s)</text>
+            <rect class="bx s" x="390" y="48" width="150" height="64" rx="12"/>
+            <text x="465" y="75" text-anchor="middle" font-weight="700">환경</text>
+            <text class="sm" x="465" y="96" text-anchor="middle">전이 확률은 모름</text>
+            <path class="a" d="M170 62 C 250 18, 310 18, 388 62" marker-end="url(#mA)"/>
+            <text class="ta" x="280" y="24" text-anchor="middle">행동 a<tspan baseline-shift="sub" font-size="10">t</tspan></text>
+            <path class="s" d="M390 100 C 310 150, 250 150, 172 100" marker-end="url(#mS)"/>
+            <text class="ts" x="280" y="160" text-anchor="middle">다음 상태 s<tspan baseline-shift="sub" font-size="10">t+1</tspan></text>
+            <path class="r" d="M390 82 L 172 82" marker-end="url(#mR)"/>
+            <text class="tr" x="280" y="76" text-anchor="middle">보상 r<tspan baseline-shift="sub" font-size="10">t+1</tspan></text>
+          </svg>
+          <div class="sk-controls">
+            <label class="sk-group"><span class="sk-label">환경</span>
+              <select class="sk-select" id="epEnv"><option value="gw">GridWorld 4×4</option><option value="fl4">FrozenLake 4×4</option><option value="fl8">FrozenLake 8×8</option></select></label>
+            <label class="sk-check"><input type="checkbox" id="epSlip" checked>미끄러짐</label>
+          </div>
+          <div class="sk-controls">
+            <div class="sk-slider"><div class="sk-sl-head"><span>할인율 γ</span><b id="epGv">0.90</b></div><input type="range" id="epG" min="0.5" max="1" step="0.01" value="0.9" aria-label="할인율 감마"></div>
+            <div class="sk-group"><span class="sk-label">정책</span>
+              <div class="sk-seg" id="epPol"><button type="button" data-v="rand" aria-pressed="true">균등 무작위</button><button type="button" data-v="opt" aria-pressed="false">최적 + ε 0.2</button></div></div>
+          </div>
+          <div class="sk-controls">
+            <button class="sk-btn" type="button" id="epPreset">강의 예제</button>
+            <button class="sk-btn sk-btn--primary" type="button" id="epNew">새 에피소드 뽑기</button>
+            <label class="sk-check" id="epGoalWrap"><input type="checkbox" id="epGoal" checked>목표 도달한 에피소드만</label>
+          </div>
+          <div class="mc-cvwrap"><canvas class="mc-cv" id="epCv" aria-label="격자 환경과 에피소드 경로"></canvas></div>
+          <p class="mc-small" id="epInfo"></p>
+        </div>
+        <div class="mc-box">
+          <div class="sk-controls">
+            <div class="sk-group">
+              <button class="sk-btn sk-btn--sm" type="button" id="epFirst">처음</button>
+              <button class="sk-btn sk-btn--sm" type="button" id="epPrev">이전</button>
+              <button class="sk-btn sk-btn--sm sk-btn--primary" type="button" id="epNext">다음</button>
+              <button class="sk-btn sk-btn--sm" type="button" id="epPlay">재생</button>
+              <button class="sk-btn sk-btn--sm" type="button" id="epLast">끝까지</button>
+            </div>
+            <div class="sk-slider" style="min-width:150px"><div class="sk-sl-head"><span>속도</span><b id="epSpv">보통</b></div><input type="range" id="epSp" min="1" max="5" step="1" value="3" aria-label="재생 속도"></div>
+          </div>
+          <ol class="sk-stepper" id="epStepper"><li>① 에피소드 진행 (앞으로)</li><li>② 리턴 계산 (뒤로)</li><li>③ 상태별 리턴 정리</li></ol>
+          <div class="sk-formula mc-formula mc-big" id="epFormula" aria-live="polite"></div>
+          <div class="mc-tracewrap"><table class="sk-table mc-trace" id="epTable"></table></div>
+          <div id="epPerState"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 2. MC 예측 ========== -->
+  <section id="pane-predict" role="tabpanel" aria-labelledby="tab-predict" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>MC 예측 — 무작위 정책의 V<sup>π</sup>를 리턴 평균으로</h2><span class="sk-hint">칸을 누르면 그 상태의 계산이 보입니다</span></div>
+      <p class="sk-lead">같은 에피소드들로 두 방식을 동시에 갱신합니다. <span class="k-1">첫 방문 MC</span>는 에피소드에서 그 상태를 처음 방문한 시점의 G만, <span class="k-2">모든 방문 MC</span>는 방문할 때마다의 G를 모두 평균합니다. 오른쪽 끝은 전이 모형 env.P로 계산한 <b>DP 참값</b>입니다(MC는 이 표를 쓰지 않음).</p>
+      <div class="sk-controls">
+        <label class="sk-group"><span class="sk-label">환경</span>
+          <select class="sk-select" id="prEnv"><option value="gw">GridWorld 4×4</option><option value="fl4">FrozenLake 4×4</option><option value="fl8">FrozenLake 8×8</option></select></label>
+        <label class="sk-check"><input type="checkbox" id="prSlip" checked>미끄러짐</label>
+        <label class="sk-check" id="prEsWrap"><input type="checkbox" id="prEs" checked>시작 상태 무작위(exploring starts)</label>
+        <div class="sk-slider"><div class="sk-sl-head"><span>할인율 γ</span><b id="prGv">1.00</b></div><input type="range" id="prG" min="0.5" max="1" step="0.01" value="1" aria-label="할인율 감마"></div>
+        <label class="sk-group"><span class="sk-label">seed</span><input class="sk-input" id="prSeed" type="number" value="1" min="1" max="9999" style="width:76px"></label>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button class="sk-btn" type="button" id="prAdd1">+1 에피소드</button>
+          <button class="sk-btn" type="button" id="prAdd100">+100</button>
+          <button class="sk-btn" type="button" id="prAdd1000">+1,000</button>
+          <button class="sk-btn sk-btn--primary" type="button" id="prPlay">자동 진행</button>
+          <button class="sk-btn" type="button" id="prReset">초기화</button>
+        </div>
+        <div class="sk-stats mc-statsrow" id="prStats"></div>
+      </div>
+      <div class="mc-tri">
+        <div class="mc-box"><div class="mc-cap"><i style="background:var(--c1)"></i>첫 방문 MC 추정 V</div><div class="mc-cvwrap"><canvas class="mc-cv mc-click" id="prCvF" aria-label="첫 방문 MC 가치 추정 격자"></canvas></div></div>
+        <div class="mc-box"><div class="mc-cap"><i style="background:var(--c2)"></i>모든 방문 MC 추정 V</div><div class="mc-cvwrap"><canvas class="mc-cv mc-click" id="prCvE" aria-label="모든 방문 MC 가치 추정 격자"></canvas></div></div>
+        <div class="mc-box"><div class="mc-cap"><i style="background:var(--muted)"></i>DP 참값 V<sup>π</sup> (env.P 사용)</div><div class="mc-cvwrap"><canvas class="mc-cv mc-click" id="prCvT" aria-label="동적 계획법 참값 격자"></canvas></div></div>
+      </div>
+      <div class="mc-split">
+        <div class="mc-box">
+          <div class="mc-cap">참값과의 오차 (RMSE, 종료가 아닌 모든 상태)</div>
+          <div class="mc-cvwrap"><canvas class="mc-cv" id="prChart" aria-label="에피소드 수에 따른 오차 곡선"></canvas></div>
+        </div>
+        <div class="mc-box mc-detail" id="prDetail"></div>
+      </div>
+      <p class="sk-note" id="prNote"></p>
+    </div>
+  </section>
+
+  <!-- ========== 3. 분산과 수렴 ========== -->
+  <section id="pane-variance" role="tabpanel" aria-labelledby="tab-variance" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>MC는 편향이 없지만 분산이 크다</h2><span class="sk-hint">같은 실험을 seed만 바꿔 여러 번 반복</span></div>
+      <p class="sk-lead">시작 상태의 가치 V(s<sub>0</sub>)를 무작위 정책으로 추정하는 실험을 여러 번 반복합니다. 리턴 G는 많은 무작위 보상의 합이라 에피소드마다 크게 흔들립니다. 표본 평균(1/N)은 흔들림이 점점 줄며 참값으로 모이고, 고정 α는 최근 리턴에 계속 반응하므로 일정한 폭으로 흔들립니다.</p>
+      <div class="sk-controls">
+        <label class="sk-group"><span class="sk-label">환경</span>
+          <select class="sk-select" id="vaEnv"><option value="gw">GridWorld 4×4</option><option value="fl4">FrozenLake 4×4</option></select></label>
+        <div class="sk-slider"><div class="sk-sl-head"><span>할인율 γ</span><b id="vaGv">0.90</b></div><input type="range" id="vaG" min="0.5" max="1" step="0.01" value="0.9" aria-label="할인율 감마"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><span>반복 실험 수</span><b id="vaRv">20</b></div><input type="range" id="vaR" min="5" max="50" step="5" value="20" aria-label="반복 실험 수"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><span>실험당 에피소드</span><b id="vaNv">300</b></div><input type="range" id="vaN" min="50" max="2000" step="50" value="300" aria-label="실험당 에피소드 수"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><span>고정 α</span><b id="vaAv">0.10</b></div><input type="range" id="vaA" min="0.01" max="0.5" step="0.01" value="0.1" aria-label="고정 학습률 알파"></div>
+        <button class="sk-btn sk-btn--primary" type="button" id="vaRun">다른 seed로 다시</button>
+      </div>
+      <div class="sk-stats mc-statsrow" id="vaStats"></div>
+      <div class="mc-split--even mc-split">
+        <div class="mc-box"><div class="mc-cap"><i style="background:var(--c1)"></i>표본 평균 V ← V + (1/N)(G − V)</div><div class="mc-cvwrap"><canvas class="mc-cv" id="vaCvM" aria-label="표본 평균 추정 궤적"></canvas></div></div>
+        <div class="mc-box"><div class="mc-cap"><i style="background:var(--c2)"></i>고정 α: V ← V + α(G − V)</div><div class="mc-cvwrap"><canvas class="mc-cv" id="vaCvA" aria-label="고정 학습률 추정 궤적"></canvas></div></div>
+      </div>
+      <div class="mc-split">
+        <div class="mc-box"><div class="mc-cap">시작 상태에서 받은 리턴 G<sub>0</sub>의 분포 (전체 실험)</div><div class="mc-cvwrap"><canvas class="mc-cv" id="vaHist" aria-label="리턴 분포 히스토그램"></canvas></div></div>
+        <div class="mc-box">
+          <div class="sk-formula" id="vaFormula"></div>
+          <p class="sk-note"><b>왜 분산이 클까?</b> G<sub>t</sub> = R<sub>t+1</sub> + γR<sub>t+2</sub> + γ²R<sub>t+3</sub> + … 는 에피소드 끝까지의 모든 무작위 행동·전이가 섞인 값입니다. 에피소드가 길수록 더 많이 흔들립니다. 대신 실제 리턴의 평균이므로 <b>편향은 없습니다</b>. 다음 시뮬레이터(TD)는 한 걸음 뒤의 추정값 V(s′)를 빌려 와 분산을 줄이는 대신 편향을 받아들입니다.</p>
+          <p class="sk-note sk-note--warn" id="vaWarn">FrozenLake처럼 보상이 드물면(대부분 G = 0) 평균은 아주 작은데 가끔 큰 값이 나와 상대 오차가 매우 큽니다. 무작위 정책으로는 목표에 거의 가지 못합니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 4. MC 제어 ========== -->
+  <section id="pane-control" role="tabpanel" aria-labelledby="tab-control" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>On-policy MC 제어 — 평가(Q 평균)와 개선(ε-탐욕)을 번갈아</h2><span class="sk-hint">표 기반 · 브라우저에서 실제 학습</span></div>
+      <p class="sk-lead">에피소드를 하나 끝낼 때마다 방문한 (s, a)의 리턴으로 <span class="k-v">Q(s, a)</span>를 갱신하고, 정책은 곧바로 Q에 대해 <span class="k-x">ε-탐욕</span>으로 바뀝니다. 모델을 모르므로 V가 아니라 <b>행동 가치 Q</b>를 배워야 행동을 고를 수 있습니다.</p>
+      <div class="sk-controls">
+        <label class="sk-group"><span class="sk-label">환경</span>
+          <select class="sk-select" id="ctEnv"><option value="fl4">FrozenLake 4×4</option><option value="fl8">FrozenLake 8×8</option><option value="gw">GridWorld 4×4</option></select></label>
+        <label class="sk-check"><input type="checkbox" id="ctSlip" checked>미끄러짐</label>
+        <div class="sk-slider"><div class="sk-sl-head"><span>할인율 γ</span><b id="ctGv">0.99</b></div><input type="range" id="ctG" min="0.5" max="1" step="0.01" value="0.99" aria-label="할인율 감마"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><span>탐험 ε</span><b id="ctEv">0.10</b></div><input type="range" id="ctE" min="0" max="0.5" step="0.01" value="0.1" aria-label="탐험률 엡실론"></div>
+        <label class="sk-check"><input type="checkbox" id="ctDecay">ε 감소 (1 → 0.05)</label>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">갱신</span>
+          <div class="sk-seg" id="ctUpd"><button type="button" data-v="mean" aria-pressed="true">표본 평균 1/N</button><button type="button" data-v="alpha" aria-pressed="false">고정 α</button></div></div>
+        <div class="sk-slider" id="ctAWrap"><div class="sk-sl-head"><span>α</span><b id="ctAv">0.05</b></div><input type="range" id="ctA" min="0.01" max="0.5" step="0.01" value="0.05" aria-label="고정 학습률 알파"></div>
+        <div class="sk-group"><span class="sk-label">방문</span>
+          <div class="sk-seg" id="ctVisit"><button type="button" data-v="first" aria-pressed="true">첫 방문</button><button type="button" data-v="every" aria-pressed="false">모든 방문</button></div></div>
+        <label class="sk-group"><span class="sk-label">에피소드</span>
+          <select class="sk-select" id="ctMax"><option value="2000">2,000</option><option value="5000">5,000</option><option value="10000" selected>10,000</option><option value="30000">30,000</option></select></label>
+        <label class="sk-group"><span class="sk-label">seed</span><input class="sk-input" id="ctSeed" type="number" value="3" min="1" max="9999" style="width:76px"></label>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button class="sk-btn sk-btn--primary" type="button" id="ctRun">학습 시작</button>
+          <button class="sk-btn" type="button" id="ctOne">+1 에피소드</button>
+          <button class="sk-btn" type="button" id="ctReset">초기화</button>
+        </div>
+        <div class="sk-slider" style="min-width:160px"><div class="sk-sl-head"><span>속도 (에피소드/프레임)</span><b id="ctSpv">50</b></div><input type="range" id="ctSp" min="0" max="5" step="1" value="3" aria-label="학습 속도"></div>
+        <label class="sk-group"><span class="sk-label">격자 보기</span>
+          <div class="sk-seg" id="ctView"><button type="button" data-v="q" aria-pressed="true">max Q + 정책</button><button type="button" data-v="visit" aria-pressed="false">방문 횟수</button></div></label>
+      </div>
+      <div class="sk-stats mc-statsrow" id="ctStats"></div>
+      <div class="mc-split">
+        <div class="mc-box">
+          <div class="mc-cap" id="ctGridCap">max<sub>a</sub> Q(s, a) 색 + 탐욕 정책 화살표</div>
+          <div class="mc-cvwrap"><canvas class="mc-cv mc-click" id="ctCv" aria-label="학습 중인 Q와 탐욕 정책 격자"></canvas></div>
+          <div class="mc-detail" id="ctDetail"></div>
+        </div>
+        <div class="mc-box">
+          <div class="mc-cap" id="ctCurveCap">학습 곡선</div>
+          <div class="mc-cvwrap"><canvas class="mc-cv" id="ctCurve" aria-label="에피소드 리턴 학습 곡선"></canvas></div>
+          <div class="mc-cap">DP 참값과 비교 — <span class="k-1">탐욕 정책의 실제 가치 V<sup>π</sup>(s<sub>0</sub>)</span> vs <span>V*(s<sub>0</sub>)</span>, <span class="k-2">RMSE(max Q, V*)</span></div>
+          <div class="mc-cvwrap"><canvas class="mc-cv" id="ctErr" aria-label="DP 최적 가치와의 오차 곡선"></canvas></div>
+        </div>
+      </div>
+      <p class="sk-note" id="ctNote"></p>
+    </div>
+  </section>
+
+  <!-- ========== 5. 오프폴리시 ========== -->
+  <section id="pane-offpolicy" role="tabpanel" aria-labelledby="tab-offpolicy" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>오프폴리시 MC — 다른 정책 b로 모은 에피소드로 π를 평가</h2><span class="sk-hint">작은 예제 (상태 1개)</span></div>
+      <p class="sk-lead">행동 정책 <span class="k-a">b</span>로 데이터를 모으고 목표 정책 <span class="k-v">π</span>의 가치를 추정하려면, 리턴에 <b>중요도 비율 ρ = Π π(a|s) / b(a|s)</b>를 곱해 “π였다면 이 에피소드가 나올 확률”로 다시 가중합니다. 아래 예제의 참값은 v<sub>π</sub>(s) = 1입니다.</p>
+      <div class="mc-split">
+        <div class="mc-box">
+          <svg class="mc-mdp" viewBox="0 0 460 190" role="img" aria-label="상태 하나짜리 MDP: 왼쪽 행동은 0.9 확률로 제자리, 0.1 확률로 보상 1과 함께 종료, 오른쪽 행동은 보상 0으로 종료">
+            <defs>
+              <marker id="hd1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="hd" d="M0 0L10 5L0 10z"/></marker>
+              <marker id="hd2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="hdA" d="M0 0L10 5L0 10z"/></marker>
+            </defs>
+            <rect class="term" x="20" y="74" width="80" height="44" rx="8"/><text x="60" y="101" text-anchor="middle">종료</text>
+            <circle class="node" cx="250" cy="96" r="34"/><text x="250" y="101" text-anchor="middle" font-weight="700">s</text>
+            <rect class="term" x="370" y="74" width="80" height="44" rx="8"/><text x="410" y="101" text-anchor="middle">종료</text>
+            <path class="lnA" d="M216 96 L104 96" marker-end="url(#hd2)"/>
+            <text class="ta" x="160" y="88" text-anchor="middle">← 왼쪽</text>
+            <text class="mut" x="160" y="118" text-anchor="middle">0.1 확률, <tspan class="tr">r = +1</tspan></text>
+            <path class="ln" d="M284 96 L366 96" marker-end="url(#hd1)"/>
+            <text class="ta" x="325" y="88" text-anchor="middle">→ 오른쪽</text>
+            <text class="mut" x="325" y="118" text-anchor="middle">r = 0</text>
+            <path class="lnA" d="M232 66 C 200 10, 300 10, 268 66" marker-end="url(#hd2)"/>
+            <text class="mut" x="292" y="30">← 0.9 확률로 제자리, r = 0</text>
+            <text class="mut" x="250" y="160" text-anchor="middle">목표 π: 항상 ←  ·  행동 b: ←, → 각 0.5  ·  γ = 1</text>
+            <text class="mut" x="250" y="180" text-anchor="middle">← 한 번마다 ρ ×2 (=1/0.5), → 가 한 번이라도 나오면 ρ = 0</text>
+          </svg>
+          <div class="sk-controls">
+            <label class="sk-group"><span class="sk-label">에피소드</span>
+              <select class="sk-select" id="opN"><option value="1000">1,000</option><option value="10000" selected>10,000</option><option value="100000">100,000</option></select></label>
+            <div class="sk-slider" style="min-width:150px"><div class="sk-sl-head"><span>반복 실험 수</span><b id="opRv">10</b></div><input type="range" id="opR" min="1" max="20" step="1" value="10" aria-label="반복 실험 수"></div>
+            <label class="sk-group"><span class="sk-label">seed</span><input class="sk-input" id="opSeed" type="number" value="1" min="1" max="9999" style="width:76px"></label>
+            <button class="sk-btn sk-btn--primary" type="button" id="opRun">다시 실행</button>
+          </div>
+          <div class="sk-formula" id="opFormula"></div>
+          <div class="sk-stats mc-statsrow" id="opStats"></div>
+        </div>
+        <div class="mc-box">
+          <div class="mc-cap"><i style="background:var(--c2)"></i>보통 중요도 샘플링 <i style="background:var(--c1);margin-left:10px"></i>가중 중요도 샘플링 <span class="mc-small">(가로축 로그, 세로축은 0~3에서 자름)</span></div>
+          <div class="mc-cvwrap"><canvas class="mc-cv" id="opCv" aria-label="보통 대 가중 중요도 샘플링 추정값 궤적"></canvas></div>
+          <div class="mc-cap">실험 1에서 ρ &gt; 0 이었던 처음 10개 에피소드 (나머지는 ρ = 0이라 분자·분모에 0을 더함)</div>
+          <div class="sk-scroll"><table class="sk-table" id="opTable"></table></div>
+        </div>
+      </div>
+      <p class="sk-note"><b>정리</b> — 보통 IS는 편향이 없지만 ρ가 2<sup>k</sup>로 폭발해 분산이 무한대일 수 있습니다(곡선이 계속 튐). 가중 IS는 Σρ로 나눠 편향이 조금 생기는 대신(첫 에피소드에서는 그 리턴 그대로) 분산이 작아 실제로는 훨씬 빨리 수렴합니다. 실무의 오프폴리시 MC 제어(Sutton &amp; Barto 5.7)는 가중 IS를 씁니다.</p>
+    </div>
+  </section>
+
+  <!-- ========== 6. 코드 ========== -->
+  <section id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>Gymnasium + numpy 코드 (현재 설정 반영)</h2>
+        <div class="sk-group"><button class="sk-btn sk-btn--primary sk-btn--sm" type="button" id="codeCopy">복사</button><span class="mc-flash" id="codeMsg" role="status"></span></div></div>
+      <p class="sk-lead">[MC 제어] 탭의 환경·γ·ε·갱신 방식·방문 방식·에피소드 수·seed가 그대로 들어갑니다. <span class="sk-mono">pip install gymnasium numpy</span></p>
+      <p class="sk-note"><b>행동 번호 주의</b> — 이 시뮬레이터의 격자 행동은 0↑ 1→ 2↓ 3← 이지만, Gymnasium FrozenLake는 <b>0← 1↓ 2→ 3↑</b> 입니다. 아래 코드는 Gymnasium 번호를 그대로 씁니다(화살표 출력만 맞춤).</p>
+      <div class="sk-controls">
+        <label class="sk-check"><input type="checkbox" id="codePred" checked>첫 방문 MC 예측 함수 포함</label>
+        <label class="sk-check"><input type="checkbox" id="codeIS">가중 중요도 샘플링 예제 포함</label>
+        <label class="sk-check"><input type="checkbox" id="codeDP" checked>env.P로 V* 검산 포함</label>
+      </div>
+      <pre class="sk-formula mc-pre" id="codeOut" tabindex="0" aria-label="파이썬 코드"></pre>
+    </div>
+  </section>
+
+  <!-- ========== 7. 알고리즘 구성도 ========== -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">리턴 계산과 MC 예측 · ε-탐욕 MC 제어 · 분산과 중요도 샘플링을 강의 슬라이드로 정리</span></div><div data-ds-diagrams="monte-carlo"></div></section>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20261007a"></script>
+<script src="../../assets/js/rl-kit.js?v=20261007a"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261007a"></script>
+<script src="../../assets/diagrams/monte-carlo.js?v=20261007a"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const COL = () => ({ s: cssv("--rl-s"), a: cssv("--rl-a"), r: cssv("--rl-r"), rn: cssv("--rl-rneg"), v: cssv("--rl-v"), t: cssv("--rl-tgt"), x: cssv("--rl-exp"),
+    c1: cssv("--c1"), c2: cssv("--c2"), c3: cssv("--c3"), ink: cssv("--ink"), text: cssv("--text"), muted: cssv("--muted"), faint: cssv("--faint"), line: cssv("--line"), bg: cssv("--surface"), bg2: cssv("--surface-2") });
+  const fmt = (v, d) => (v < 0 ? "−" : "") + Math.abs(v).toFixed(d == null ? 3 : d);
+  const fmtS = (v, d) => { const s = fmt(v, d); return v < 0 ? "(" + s + ")" : s; };
+  const ARW = RL.ACTIONS;
+  const sub = (s, t) => s + "<sub>" + t + "</sub>";
+  const nf = (v, d) => { let s = Math.abs(v).toFixed(d == null ? 4 : d); if (s.indexOf(".") >= 0) s = s.replace(/0+$/, "").replace(/\.$/, ""); return (v < 0 && +s !== 0 ? "−" : "") + s; };
+  const nfp = (v, d) => v < 0 && Math.abs(v) >= 1e-12 ? "(" + nf(v, d) + ")" : nf(v, d);
+
+  /* ================= 환경 ================= */
+  function makeEnv(kind, slip) {
+    if (kind === "gw") return new RL.GridEnv({ name: "GridWorld 4×4", kind: "grid", rows: 4, cols: 4, start: 9, goals: { 0: -1, 15: -1 }, stepR: -1, maxSteps: 1000 });
+    return RL.FrozenLake({ map: kind === "fl8" ? "8x8" : "4x4", slippery: slip });
+  }
+  function cellName(env, s) { const rc = env.rc(s); return s + " (" + rc[0] + "," + rc[1] + ")"; }
+
+  /* ================= DP (참값 계산용, env.P 사용) ================= */
+  function qsa(env, V, s, a, g) { let q = 0; for (const [p, s2, r, d] of env.P[s][a]) q += p * (r + (d ? 0 : g * V[s2])); return q; }
+  function policyEval(env, pi, g, tol, maxIt) {
+    const V = new Array(env.nS).fill(0); tol = tol || 1e-9; maxIt = maxIt || 20000; let it = 0, d = 1;
+    for (; it < maxIt && d > tol; it++) { d = 0;
+      for (let s = 0; s < env.nS; s++) { if (env.terminal[s]) continue; let v = 0;
+        for (let a = 0; a < 4; a++) if (pi[s][a]) v += pi[s][a] * qsa(env, V, s, a, g);
+        d = Math.max(d, Math.abs(v - V[s])); V[s] = v; } }
+    V.converged = d <= tol; return V;
+  }
+  function valueIter(env, g) {
+    const V = new Array(env.nS).fill(0);
+    for (let it = 0; it < 20000; it++) { let d = 0;
+      for (let s = 0; s < env.nS; s++) { if (env.terminal[s]) continue; let b = -Infinity;
+        for (let a = 0; a < 4; a++) b = Math.max(b, qsa(env, V, s, a, g));
+        d = Math.max(d, Math.abs(b - V[s])); V[s] = b; }
+      if (d < 1e-10) break; }
+    const pi = V.map((_, s) => RL.argmax([0, 1, 2, 3].map(a => qsa(env, V, s, a, g))));
+    return { V, pi };
+  }
+  const uniform = env => Array.from({ length: env.nS }, () => [0.25, 0.25, 0.25, 0.25]);
+  const nonTerm = env => { const o = []; for (let s = 0; s < env.nS; s++) if (!env.terminal[s]) o.push(s); return o; };
+  function rmse(env, A, B) { const st = nonTerm(env); let e = 0; st.forEach(s => { e += (A[s] - B[s]) ** 2; }); return Math.sqrt(e / st.length); }
+
+  /* 에피소드 생성: 행동은 에이전트 rng, 전이는 환경 rng */
+  function episode(env, act, erng, start) {
+    let s = env.reset(); if (start != null) { env.s = start; s = start; }
+    const tr = [];
+    for (;;) { const a = act(s); const o = env.step(a, erng); tr.push({ s, a, r: o.r, s2: o.s, done: o.done, trunc: o.truncated }); s = o.s; if (o.done || o.truncated) break; }
+    return tr;
+  }
+  function returns(tr, g) { const G = new Array(tr.length); let x = 0; for (let t = tr.length - 1; t >= 0; t--) { x = tr[t].r + g * x; G[t] = x; } return G; }
+
+  /* ================= 그리기 도구 ================= */
+  function drawGridFit(cv, env, opts, maxCell) {
+    const pw = (cv.parentNode && cv.parentNode.clientWidth) || 320;
+    const size = Math.max(16, Math.min(maxCell || 84, Math.floor(pw / env.cols)));
+    return RL.drawGrid(cv, env, Object.assign({ size }, opts));
+  }
+  function niceStep(range, n) { const raw = range / Math.max(1, n), p = Math.pow(10, Math.floor(Math.log10(raw))), m = raw / p; return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p; }
+  function tickLabel(v) { const a = Math.abs(v); const s = a >= 1000 ? String(+(a / 1000).toPrecision(3)) + "k" : String(+a.toPrecision(3)); return (v < 0 && a > 0 ? "−" : "") + s; }
+  /* 꺾은선 그림. o: { series:[{x,y,color,width,dash,alpha,label}], xlog, xmin,xmax,ymin,ymax, xlabel, hlines:[{y,color,label,dash}], h, legend } */
+  function plot(cv, o) {
+    const C = COL(), f = RL.fitCanvas(cv, Math.max(260, (cv.parentNode && cv.parentNode.clientWidth) || 640), o.h || 240), g = f.g, W = f.w, H = f.h;
+    const leg = o.series.filter(s => s.label).length + (o.hlines || []).filter(h => h.label).length;
+    const pl = 50, pr = 14, pt = leg ? 26 : 12, pb = 32;
+    g.clearRect(0, 0, W, H);
+    let x0 = o.xmin, x1 = o.xmax, y0 = o.ymin, y1 = o.ymax;
+    if (x0 == null || x1 == null || y0 == null || y1 == null) {
+      let ax = Infinity, bx = -Infinity, ay = Infinity, by = -Infinity;
+      o.series.forEach(s => { for (let i = 0; i < s.y.length; i++) { const xv = s.x[i], yv = s.y[i]; if (!isFinite(yv)) continue; if (xv < ax) ax = xv; if (xv > bx) bx = xv; if (yv < ay) ay = yv; if (yv > by) by = yv; } });
+      (o.hlines || []).forEach(h => { ay = Math.min(ay, h.y); by = Math.max(by, h.y); });
+      if (x0 == null) x0 = isFinite(ax) ? ax : 0; if (x1 == null) x1 = isFinite(bx) ? bx : 1;
+      if (y0 == null) y0 = isFinite(ay) ? ay : 0; if (y1 == null) y1 = isFinite(by) ? by : 1;
+      if (o.ymin == null && o.ymax == null) { const pad = (y1 - y0) * 0.06 || 0.5; y0 -= pad; y1 += pad; }
+    }
+    if (x1 <= x0) x1 = x0 + 1; if (y1 <= y0) y1 = y0 + 1;
+    const lx0 = o.xlog ? Math.log10(Math.max(1e-9, x0)) : x0, lx1 = o.xlog ? Math.log10(x1) : x1;
+    const X = v => pl + (W - pl - pr) * ((o.xlog ? Math.log10(Math.max(v, 1e-9)) : v) - lx0) / (lx1 - lx0);
+    const Y = v => pt + (H - pt - pb) * (1 - (v - y0) / (y1 - y0));
+    g.font = "11px " + cssv("--mono"); g.lineWidth = 1;
+    const ys = niceStep(y1 - y0, 4); g.textAlign = "right"; g.textBaseline = "middle";
+    for (let v = Math.ceil(y0 / ys) * ys; v <= y1 + 1e-9; v += ys) { const yy = Y(v); g.strokeStyle = C.line; g.beginPath(); g.moveTo(pl, yy); g.lineTo(W - pr, yy); g.stroke(); g.fillStyle = C.faint; g.fillText(tickLabel(Math.abs(v) < 1e-12 ? 0 : v), pl - 6, yy); }
+    g.textAlign = "center"; g.textBaseline = "alphabetic";
+    if (o.xlog) { for (let p = Math.ceil(lx0); p <= lx1 + 1e-9; p++) { const xx = X(Math.pow(10, p)); g.strokeStyle = C.line; g.beginPath(); g.moveTo(xx, pt); g.lineTo(xx, H - pb); g.stroke(); g.fillStyle = C.faint; g.fillText(tickLabel(Math.pow(10, p)), xx, H - pb + 15); } }
+    else { const xs = niceStep(x1 - x0, Math.max(3, Math.floor((W - pl - pr) / 80))); for (let v = Math.ceil(x0 / xs) * xs; v <= x1 + 1e-9; v += xs) { g.fillStyle = C.faint; g.fillText(tickLabel(v), X(v), H - pb + 15); } }
+    if (o.xlabel) { g.fillStyle = C.muted; g.font = "600 11.5px " + cssv("--sans"); g.textAlign = "right"; g.fillText(o.xlabel, W - pr, H - 4); }
+    g.save(); g.beginPath(); g.rect(pl, pt - 2, W - pl - pr, H - pt - pb + 4); g.clip();
+    (o.hlines || []).forEach(h => { g.strokeStyle = h.color || C.muted; g.lineWidth = 1.5; g.setLineDash(h.dash || [6, 4]); g.beginPath(); g.moveTo(pl, Y(h.y)); g.lineTo(W - pr, Y(h.y)); g.stroke(); g.setLineDash([]); });
+    o.series.forEach(s => {
+      g.strokeStyle = s.color; g.lineWidth = s.width || 2; g.globalAlpha = s.alpha == null ? 1 : s.alpha; if (s.dash) g.setLineDash(s.dash);
+      g.beginPath(); let on = false;
+      for (let i = 0; i < s.y.length; i++) { const yv = s.y[i]; if (!isFinite(yv)) { on = false; continue; } const xx = X(s.x[i]), yy = Y(Math.max(y0 - (y1 - y0), Math.min(y1 + (y1 - y0), yv))); if (on) g.lineTo(xx, yy); else { g.moveTo(xx, yy); on = true; } }
+      g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
+      if (s.dots) { g.fillStyle = s.color; for (let i = 0; i < s.y.length; i++) { g.beginPath(); g.arc(X(s.x[i]), Y(s.y[i]), 2.6, 0, 7); g.fill(); } }
+    });
+    g.restore();
+    g.strokeStyle = C.faint; g.lineWidth = 1; g.beginPath(); g.moveTo(pl, pt - 2); g.lineTo(pl, H - pb); g.lineTo(W - pr, H - pb); g.stroke();
+    let lx = pl + 4; g.font = "600 11.5px " + cssv("--sans"); g.textAlign = "left"; g.textBaseline = "middle";
+    o.series.concat((o.hlines || []).map(h => ({ color: h.color || C.muted, label: h.label, dash: h.dash || [6, 4] }))).forEach(s => {
+      if (!s.label) return; const w = g.measureText(s.label).width; if (lx + w + 26 > W) return;
+      g.strokeStyle = s.color; g.lineWidth = 2.5; if (s.dash) g.setLineDash(s.dash); g.beginPath(); g.moveTo(lx, 12); g.lineTo(lx + 14, 12); g.stroke(); g.setLineDash([]);
+      g.fillStyle = C.text; g.fillText(s.label, lx + 18, 12); lx += w + 34; });
+  }
+  function bars(cv, o) {
+    const C = COL(), f = RL.fitCanvas(cv, Math.max(260, (cv.parentNode && cv.parentNode.clientWidth) || 640), o.h || 220), g = f.g, W = f.w, H = f.h, pl = 46, pr = 12, pt = 14, pb = 32;
+    g.clearRect(0, 0, W, H);
+    const n = o.counts.length, mx = Math.max(1, ...o.counts), bw = (W - pl - pr) / n;
+    const ys = niceStep(mx, 4); g.font = "11px " + cssv("--mono"); g.textAlign = "right"; g.textBaseline = "middle";
+    for (let v = 0; v <= mx + 1e-9; v += ys) { const yy = pt + (H - pt - pb) * (1 - v / mx); g.strokeStyle = C.line; g.beginPath(); g.moveTo(pl, yy); g.lineTo(W - pr, yy); g.stroke(); g.fillStyle = C.faint; g.fillText(tickLabel(v), pl - 6, yy); }
+    o.counts.forEach((c, i) => { const h = (H - pt - pb) * c / mx; g.fillStyle = o.color; g.globalAlpha = 0.75; g.fillRect(pl + i * bw + 1, H - pb - h, Math.max(1, bw - 2), h); g.globalAlpha = 1; });
+    g.textAlign = "center"; g.textBaseline = "alphabetic"; g.fillStyle = C.faint;
+    const step = Math.max(1, Math.ceil(n / Math.floor((W - pl - pr) / 56)));
+    o.labels.forEach((l, i) => { if (i % step === 0) g.fillText(l, pl + (i + 0.5) * bw, H - pb + 15); });
+    (o.vlines || []).forEach(v => { const xx = pl + (W - pl - pr) * v.f; g.strokeStyle = v.color; g.lineWidth = 2; g.setLineDash(v.dash || []); g.beginPath(); g.moveTo(xx, pt); g.lineTo(xx, H - pb); g.stroke(); g.setLineDash([]);
+      g.fillStyle = v.color; g.font = "700 11.5px " + cssv("--sans"); g.textAlign = xx > W * 0.7 ? "right" : "left"; g.fillText(v.label, xx + (xx > W * 0.7 ? -5 : 5), pt + 10); g.font = "11px " + cssv("--mono"); });
+    if (o.xlabel) { g.fillStyle = C.muted; g.font = "600 11.5px " + cssv("--sans"); g.textAlign = "right"; g.fillText(o.xlabel, W - pr, H - 4); }
+  }
+  function seg(id, cb) {
+    const el = $(id); el.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+      el.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false")); cb(b.dataset.v); });
+    return () => el.querySelector('[aria-pressed="true"]').dataset.v;
+  }
+  function setSeg(id, v) { $(id).querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x.dataset.v === v ? "true" : "false")); }
+  function stat(label, val, cls) { return '<div class="sk-stat"><b' + (cls ? ' class="' + cls + '"' : "") + ">" + val + "</b><span>" + label + "</span></div>"; }
+  function visible(el) { return el && el.offsetParent !== null; }
+
+  /* ================================================================
+     1. 에피소드와 리턴
+     ================================================================ */
+  const EP = { env: null, tr: [], G: [], k: 0, n: 0, num: 0, timer: 0, preset: true };
+  const PRESET = [1, 3, 0, 3, 0]; /* 9 →10 ←9 ↑5 ←4 ↑0 */
+  function epEnvBuild() { EP.env = makeEnv($("epEnv").value, $("epSlip").checked); EP.opt = valueIter(EP.env, +$("epG").value).pi; }
+  function epSetTraj(tr) { EP.tr = tr; EP.n = tr.length; EP.G = returns(tr, +$("epG").value); EP.k = EP.n; epRender(); }
+  function epPresetLoad() {
+    $("epEnv").value = "gw"; epEnvBuild(); $("epG").value = 0.9; $("epGv").textContent = "0.90"; EP.preset = true;
+    const env = EP.env; env.reset(); const tr = []; let s = env.s;
+    PRESET.forEach(a => { const o = env.step(a); tr.push({ s, a, r: o.r, s2: o.s, done: o.done }); s = o.s; });
+    EP.num = 0; epSetTraj(tr); epUi();
+  }
+  function epSample() {
+    epEnvBuild(); EP.preset = false; EP.num++;
+    const env = EP.env, eps = 0.2, pol = $("epPol").querySelector('[aria-pressed="true"]').dataset.v;
+    const needGoal = env.kind === "frozenlake" && $("epGoal").checked;
+    let tr = null, tries = 0;
+    for (; tries < 20000; tries++) {
+      const rng = RL.rng(EP.num * 7919 + tries * 104729 + 17), erng = RL.rng(EP.num * 31 + tries * 977 + 5);
+      tr = episode(env, s => pol === "rand" || rng.random() < eps ? rng.int(4) : EP.opt[s], erng);
+      if (!needGoal || tr[tr.length - 1].r > 0) break;
+    }
+    EP.tries = needGoal ? tries : 0; EP.found = !needGoal || tr[tr.length - 1].r > 0; epSetTraj(tr);
+  }
+  function epUi() {
+    const fl = $("epEnv").value !== "gw";
+    $("epSlip").closest("label").style.display = fl ? "" : "none"; $("epGoalWrap").style.display = fl ? "" : "none";
+  }
+  function epRender() {
+    const env = EP.env, tr = EP.tr, n = EP.n, k = EP.k, g = +$("epG").value;
+    /* 단계 표시 */
+    const phase = k < n ? 0 : k < 2 * n ? 1 : 2;
+    [...$("epStepper").children].forEach((li, i) => { li.className = i === phase ? "on" : i < phase ? "done" : ""; });
+    /* 격자 */
+    const path = [tr.length ? tr[0].s : env.start]; const upto = Math.min(k, n);
+    for (let i = 0; i < upto; i++) path.push(tr[i].s2);
+    const agent = k <= n ? path[path.length - 1] : tr[2 * n - k] ? tr[2 * n - k].s : null;
+    const hl = {}; if (k > n && k <= 2 * n) hl[tr[2 * n - k].s] = COL().t;
+    drawGridFit($("epCv"), env, { path, agent, labels: true, highlight: hl }, 90);
+    /* 표 */
+    const rows = ['<thead><tr><th>t</th><th>상태 S<sub>t</sub></th><th>행동 A<sub>t</sub></th><th>보상 R<sub>t+1</sub></th><th>리턴 G<sub>t</sub></th><th>방문</th></tr></thead><tbody>'];
+    const firstIdx = {}; tr.forEach((x, t) => { if (firstIdx[x.s] == null) firstIdx[x.s] = t; });
+    const curT = k > n && k <= 2 * n ? 2 * n - k : -1;
+    for (let t = 0; t < n; t++) {
+      const x = tr[t], shown = t < k, gShown = k > n && t >= 2 * n - k;
+      const cls = t === curT ? "cur" : shown ? "" : "fut";
+      rows.push('<tr class="' + cls + '"><td class="n">' + t + '</td><td class="st">' + (shown ? cellName(env, x.s) : "") + '</td><td class="act">' + (shown ? ARW[x.a] : "") +
+        '</td><td class="n ' + (shown ? (x.r > 0 ? "rpos" : x.r < 0 ? "rneg" : "") : "") + '">' + (shown ? fmt(x.r, 0) : "") + '</td><td class="n g">' + (gShown ? nf(EP.G[t]) : "") +
+        "</td><td>" + (shown ? (firstIdx[x.s] === t ? '<span class="mc-tag mc-tag--f">첫 방문</span>' : '<span class="mc-tag mc-tag--e">재방문</span>') : "") + "</td></tr>");
+    }
+    rows.push("</tbody>"); $("epTable").innerHTML = rows.join("");
+    const curRow = $("epTable").querySelector("tr.cur"); if (curRow) { const w = curRow.closest(".mc-tracewrap"); w.scrollTop = Math.max(0, curRow.offsetTop - w.clientHeight / 2); }
+    /* 식 */
+    const gs = g.toFixed(2).replace(/0$/, "");
+    let f;
+    if (k < n) {
+      const x = tr[k];
+      f = "t = " + k + " : 상태 <span class='k-s'>" + cellName(env, x.s) + "</span>에서 행동 <span class='k-a'>" + ARW[x.a] + " " + RL.ACTION_NAMES[x.a] + "</span> → 보상 <span class='" + (x.r < 0 ? "k-rn" : "k-r") + "'>" + fmt(x.r, 0) + "</span>, 다음 상태 <span class='k-s'>" + x.s2 + "</span>" + (x.done ? " (종료)" : "") +
+        "<br><span class='mc-small'>MC는 이 시점에서는 아무것도 갱신하지 않습니다. 에피소드가 끝나야 G를 알 수 있기 때문입니다.</span>";
+    } else if (k === n) {
+      const last = tr[n - 1];
+      f = "에피소드 종료 (T = " + n + ", 마지막 상태 " + last.s2 + (last.trunc ? ", 걸음 한도로 잘림" : "") + "). 종료 뒤 리턴은 " + sub("G", "T") + " = 0.<br>이제 <b>마지막 걸음부터 거꾸로</b> " + sub("G", "t") + " = " + sub("R", "t+1") + " + γ·" + sub("G", "t+1") + " 를 계산합니다 → [다음]";
+    } else if (k <= 2 * n) {
+      const t = 2 * n - k, x = tr[t], gn = t + 1 < n ? EP.G[t + 1] : 0;
+      f = sub("G", t) + " = " + sub("R", t + 1) + " + γ · " + sub("G", t + 1) + " = <span class='" + (x.r < 0 ? "k-rn" : "k-r") + "'>" + nfp(x.r) + "</span> + " + gs + " × <span class='k-v'>" + nfp(gn) + "</span> = <span class='k-t'>" + nf(EP.G[t]) + "</span>";
+      f += "<br><span class='mc-small'>상태 " + x.s + "의 " + (firstIdx[x.s] === t ? "첫 방문" : "재방문") + " 리턴입니다.</span>";
+    }
+    else f = "";
+    if (k >= 2 * n) {
+      f = "모든 " + sub("G", "t") + " 계산 완료. 시작 상태의 리턴 " + sub("G", 0) + " = <span class='k-t'>" + nf(EP.G[0]) + "</span>" +
+        "<br><span class='mc-small'>아래 표의 값이 V(s) 평균에 들어갑니다. 첫 방문은 상태당 하나, 모든 방문은 방문 횟수만큼.</span>";
+    }
+    $("epFormula").innerHTML = f;
+    /* 상태별 정리 */
+    if (k >= 2 * n) {
+      const by = {}; tr.forEach((x, t) => { (by[x.s] = by[x.s] || []).push(t); });
+      const keys = Object.keys(by).map(Number).sort((a, b) => by[a][0] - by[b][0]);
+      let h = '<div class="mc-cap">상태별 리턴 — 이 에피소드 하나로 얻는 표본</div><div class="sk-scroll"><table class="sk-table"><thead><tr><th>상태</th><th>방문 시점 t</th><th>각 방문의 G</th><th><span class="k-1">첫 방문</span> 표본</th><th><span class="k-2">모든 방문</span> 평균</th></tr></thead><tbody>';
+      keys.forEach(s => { const ts = by[s], gsv = ts.map(t => EP.G[t]), avg = gsv.reduce((a, b) => a + b, 0) / gsv.length;
+        const f4 = v => nf(v);
+        h += "<tr><td class='st'>" + s + "</td><td class='n'>" + ts.join(", ") + "</td><td class='n'>" + gsv.map(f4).join(", ") + "</td><td class='n k-1'>" + f4(gsv[0]) + "</td><td class='n k-2'>" + (gsv.length > 1 ? "(" + gsv.map((v, i) => i ? nfp(v) : f4(v)).join(" + ") + ") / " + gsv.length + " = " : "") + f4(avg) + "</td></tr>"; });
+      h += "</tbody></table></div>";
+      $("epPerState").innerHTML = h;
+    } else $("epPerState").innerHTML = "";
+    const tot = tr.reduce((a, x) => a + x.r, 0);
+    $("epInfo").innerHTML = (EP.preset ? "<b>강의 예제</b> · " : "에피소드 #" + EP.num + (EP.tries ? (EP.found ? " (목표 도달까지 " + (EP.tries + 1).toLocaleString() + "번 뽑음)" : " (" + EP.tries.toLocaleString() + "번 뽑아도 목표 도달 없음 — 정책을 바꿔 보세요)") : "") + " · ") + env.name + (env.kind === "frozenlake" ? (env.gymSlippery ? " · 미끄러짐(의도 방향과 양옆 각 1/3)" : " · 미끄러짐 없음") : " · 매 걸음 −1, 두 모서리(G)가 종료") +
+      " · 길이 T = " + n + " · 보상 합 " + fmt(tot, 0) + " · 칸 번호는 오른쪽 위";
+  }
+  function epGo(k) { EP.k = Math.max(0, Math.min(2 * EP.n, k)); epRender(); }
+  function epStop() { if (EP.timer) { clearInterval(EP.timer); EP.timer = 0; $("epPlay").textContent = "재생"; } }
+  function epPlay() {
+    if (EP.timer) { epStop(); return; }
+    if (EP.k >= 2 * EP.n) EP.k = 0;
+    const ms = [1100, 750, 480, 260, 120][+$("epSp").value - 1];
+    $("epPlay").textContent = "멈춤";
+    EP.timer = setInterval(() => { if (EP.k >= 2 * EP.n) { epStop(); return; } epGo(EP.k + 1); }, ms);
+  }
+  $("epFirst").onclick = () => { epStop(); epGo(0); };
+  $("epPrev").onclick = () => { epStop(); epGo(EP.k - 1); };
+  $("epNext").onclick = () => { epStop(); epGo(EP.k + 1); };
+  $("epLast").onclick = () => { epStop(); epGo(2 * EP.n); };
+  $("epPlay").onclick = epPlay;
+  $("epSp").oninput = () => { $("epSpv").textContent = ["아주 느림", "느림", "보통", "빠름", "아주 빠름"][+$("epSp").value - 1]; if (EP.timer) { epStop(); epPlay(); } };
+  $("epPreset").onclick = () => { epStop(); setSeg("epPol", "rand"); epPresetLoad(); };
+  $("epNew").onclick = () => { epStop(); epSample(); };
+  $("epEnv").onchange = () => { epStop(); epUi(); epSample(); };
+  $("epSlip").onchange = () => { epStop(); epSample(); };
+  $("epGoal").onchange = () => { epStop(); epSample(); };
+  seg("epPol", () => { epStop(); epSample(); });
+  $("epG").oninput = () => { $("epGv").textContent = (+$("epG").value).toFixed(2); EP.G = returns(EP.tr, +$("epG").value); EP.opt = valueIter(EP.env, +$("epG").value).pi; epRender(); };
+
+  /* ================================================================
+     2. MC 예측
+     ================================================================ */
+  const PR = { timer: 0 };
+  function prReset() {
+    prStop();
+    const kind = $("prEnv").value; PR.env = makeEnv(kind, $("prSlip").checked); PR.g = +$("prG").value;
+    const seed = Math.max(1, +$("prSeed").value || 1); PR.rng = RL.rng(seed); PR.erng = RL.rng(seed * 7919 + 13);
+    const nS = PR.env.nS; PR.Vf = new Array(nS).fill(0); PR.Ve = new Array(nS).fill(0); PR.Nf = new Array(nS).fill(0); PR.Ne = new Array(nS).fill(0);
+    PR.Sf = new Array(nS).fill(0); PR.Se = new Array(nS).fill(0);
+    PR.ep = 0; PR.hx = [0]; PR.hf = []; PR.he = []; PR.last = null;
+    PR.Vt = policyEval(PR.env, uniform(PR.env), PR.g);
+    PR.hf.push(rmse(PR.env, PR.Vf, PR.Vt)); PR.he.push(rmse(PR.env, PR.Ve, PR.Vt));
+    if (PR.sel == null || PR.sel >= nS || PR.env.terminal[PR.sel]) PR.sel = PR.env.start;
+    $("prSlip").closest("label").style.display = kind === "gw" ? "none" : ""; $("prEsWrap").style.display = kind === "gw" ? "" : "none";
+    prRender();
+  }
+  function prRun(n) {
+    const env = PR.env, g = PR.g, es = env.kind === "grid" && $("prEs").checked, cand = nonTerm(env);
+    for (let i = 0; i < n; i++) {
+      const start = es ? cand[PR.rng.int(cand.length)] : null;
+      const tr = episode(env, () => PR.rng.int(4), PR.erng, start), G = returns(tr, g);
+      const first = {}; tr.forEach((x, t) => { if (first[x.s] == null) first[x.s] = t; });
+      const upd = [];
+      for (let t = tr.length - 1; t >= 0; t--) {
+        const s = tr[t].s;
+        PR.Ne[s]++; PR.Se[s] += G[t]; PR.Ve[s] += (G[t] - PR.Ve[s]) / PR.Ne[s];
+        if (first[s] === t) { const old = PR.Vf[s]; PR.Nf[s]++; PR.Sf[s] += G[t]; PR.Vf[s] += (G[t] - PR.Vf[s]) / PR.Nf[s]; if (s === PR.sel) upd.push({ old, G: G[t], N: PR.Nf[s], nw: PR.Vf[s] }); }
+      }
+      PR.ep++;
+      if (upd.length) PR.last = Object.assign({ ep: PR.ep, Gs: tr.map((x, t) => x.s === PR.sel ? G[t] : null).filter(v => v != null) }, upd[0]);
+      if (PR.ep <= 200 || PR.ep % Math.max(1, Math.floor(PR.ep / 200)) === 0) { PR.hx.push(PR.ep); PR.hf.push(rmse(env, PR.Vf, PR.Vt)); PR.he.push(rmse(env, PR.Ve, PR.Vt)); }
+    }
+  }
+  function prRender() {
+    if (!visible($("pane-predict"))) return;
+    const env = PR.env, dec = env.kind === "frozenlake" ? 3 : (Math.abs(PR.Vt[env.start]) >= 10 ? 1 : 2), f = v => (Math.abs(v) < 5e-4 && dec === 3 ? "0" : v.toFixed(dec));
+    const hl = {}; hl[PR.sel] = COL().t;
+    drawGridFit($("prCvF"), env, { V: PR.Vf, fmt: f, highlight: hl, arrows: false }, 80);
+    drawGridFit($("prCvE"), env, { V: PR.Ve, fmt: f, highlight: hl, arrows: false }, 80);
+    drawGridFit($("prCvT"), env, { V: PR.Vt, fmt: f, highlight: hl, arrows: false }, 80);
+    const C = COL();
+    plot($("prChart"), { series: [{ x: PR.hx, y: PR.hf, color: C.c1, label: "첫 방문" }, { x: PR.hx, y: PR.he, color: C.c2, label: "모든 방문", dash: [5, 3] }], ymin: 0, xlabel: "에피소드", h: 230 });
+    const ef = PR.hf[PR.hf.length - 1], ee = PR.he[PR.he.length - 1];
+    $("prStats").innerHTML = stat("에피소드", PR.ep.toLocaleString()) + stat("RMSE 첫 방문", ef.toFixed(dec + 1), "k-1") + stat("RMSE 모든 방문", ee.toFixed(dec + 1), "k-2") + stat("참값 V(시작 " + env.start + ")", fmt(PR.Vt[env.start], dec));
+    const s = PR.sel, L = PR.last && PR.last.ep === PR.ep ? PR.last : null;
+    let h = '<div class="mc-cap">선택한 상태 <span class="k-s">' + cellName(env, s) + "</span></div>" +
+      '<table class="sk-table"><thead><tr><th></th><th class="k-1">첫 방문</th><th class="k-2">모든 방문</th></tr></thead><tbody>' +
+      "<tr><td>방문 수 N(s)</td><td class='n'>" + PR.Nf[s] + "</td><td class='n'>" + PR.Ne[s] + "</td></tr>" +
+      "<tr><td>리턴 합 ΣG</td><td class='n'>" + fmt(PR.Sf[s], 3) + "</td><td class='n'>" + fmt(PR.Se[s], 3) + "</td></tr>" +
+      "<tr><td>V(s) = ΣG / N</td><td class='n'>" + fmt(PR.Vf[s], 4) + "</td><td class='n'>" + fmt(PR.Ve[s], 4) + "</td></tr>" +
+      "<tr><td>참값 V<sup>π</sup>(s)</td><td class='n' colspan='2' style='text-align:center'>" + fmt(PR.Vt[s], 4) + "</td></tr></tbody></table>";
+    if (L) h += '<div class="sk-formula">방금 에피소드(#' + L.ep + ")에서 이 상태의 리턴: " + L.Gs.map(v => fmt(v, 3)).join(", ") + "<br>첫 방문 증분 평균: V ← V + (1/N)(G − V) = " + fmt(L.old, 4) + " + (1/" + L.N + ")(" + fmt(L.G, 3) + " − " + fmtS(L.old, 4) + ") = <span class='k-t'>" + fmt(L.nw, 4) + "</span></div>";
+    else h += '<p class="mc-small">[+1 에피소드]를 누르면 이 상태가 방문된 경우 증분 평균 계산이 숫자로 나옵니다.</p>';
+    $("prDetail").innerHTML = h;
+    $("prNote").innerHTML = env.kind === "grid"
+      ? (Math.abs(PR.g - 1) < 1e-9 ? "<b>검산</b> — γ = 1이면 DP 참값이 교재(Sutton &amp; Barto 예제 4.1)의 0, −14, −20, −22 / −14, −18, −20, −20 / … 과 같습니다. " : "") + "무작위 걸음은 같은 칸을 여러 번 지나므로 첫 방문과 모든 방문의 표본 수 차이가 큽니다. 두 방식 모두 에피소드가 쌓이면 참값으로 수렴합니다(모든 방문은 초반에 약간 편향)."
+      : "FrozenLake는 목표에 닿았을 때만 보상 1이고, 무작위 정책으로는 거의 닿지 못해 가치가 작습니다. 시작 상태는 항상 0이라 구석 칸은 표본이 적어 오차가 오래 남습니다.";
+  }
+  function prStop() { if (PR.timer) { cancelAnimationFrame(PR.timer); PR.timer = 0; $("prPlay").textContent = "자동 진행"; } }
+  function prLoop() { prRun(PR.ep < 100 ? 2 : PR.ep < 1000 ? 10 : 40); prRender(); if (PR.ep >= 20000) { prStop(); return; } PR.timer = requestAnimationFrame(prLoop); }
+  $("prAdd1").onclick = () => { prRun(1); prRender(); };
+  $("prAdd100").onclick = () => { prRun(100); prRender(); };
+  $("prAdd1000").onclick = () => { prRun(1000); prRender(); };
+  $("prPlay").onclick = () => { if (PR.timer) { prStop(); return; } $("prPlay").textContent = "멈춤"; PR.timer = requestAnimationFrame(prLoop); };
+  $("prReset").onclick = prReset;
+  ["prEnv", "prSlip", "prEs", "prSeed"].forEach(id => $(id).addEventListener("change", prReset));
+  $("prG").oninput = () => { $("prGv").textContent = (+$("prG").value).toFixed(2); };
+  $("prG").onchange = prReset;
+  ["prCvF", "prCvE", "prCvT"].forEach(id => $(id).addEventListener("click", e => { const s = RL.gridHit($(id), PR.env, e); if (s >= 0 && !PR.env.terminal[s]) { PR.sel = s; PR.last = null; prRender(); } }));
+
+  /* ================================================================
+     3. 분산과 수렴
+     ================================================================ */
+  const VA = { base: 1 };
+  function vaRun() {
+    const kind = $("vaEnv").value, env = makeEnv(kind, true), g = +$("vaG").value, R = +$("vaR").value, N = +$("vaN").value, al = +$("vaA").value;
+    const vt = policyEval(env, uniform(env), g)[env.start];
+    const runsM = [], runsA = [], allG = [], xs = [];
+    const keep = []; for (let i = 1; i <= N; i++) if (i <= 20 || i % Math.max(1, Math.round(N / 150)) === 0 || i === N) keep.push(i);
+    for (let r = 0; r < R; r++) {
+      const rng = RL.rng(VA.base * 1000 + r + 1), erng = RL.rng(VA.base * 7777 + r * 13 + 5);
+      let m = 0, a = 0; const ym = [], ya = []; let ki = 0;
+      for (let i = 1; i <= N; i++) {
+        const tr = episode(env, () => rng.int(4), erng), G0 = returns(tr, g)[0];
+        allG.push(G0); m += (G0 - m) / i; a = i === 1 ? G0 : a + al * (G0 - a);
+        if (keep[ki] === i) { ym.push(m); ya.push(a); ki++; }
+      }
+      runsM.push(ym); runsA.push(ya);
+    }
+    keep.forEach(i => xs.push(i));
+    VA.res = { env, g, R, N, al, vt, runsM, runsA, allG, xs };
+    vaRender();
+  }
+  function vaRender() {
+    if (!VA.res || !visible($("pane-variance"))) return;
+    const { env, g, R, N, al, vt, runsM, runsA, allG, xs } = VA.res, C = COL();
+    let lo = Infinity, hi = -Infinity; [runsM, runsA].forEach(rs => rs.forEach(r => r.forEach((v, i) => { if (xs[i] >= 5) { lo = Math.min(lo, v); hi = Math.max(hi, v); } })));
+    lo = Math.min(lo, vt); hi = Math.max(hi, vt); const pad = (hi - lo) * 0.08 || 0.1;
+    const opt = { xs, ymin: lo - pad, ymax: hi + pad, xlabel: "에피소드 수", h: 230 };
+    plot($("vaCvM"), Object.assign({}, opt, { series: runsM.map((y, i) => ({ x: xs, y, color: C.c1, width: 1.3, alpha: 0.55, label: i ? null : "실험 " + R + "번" })), hlines: [{ y: vt, color: C.ink, label: "참값 " + fmt(vt, 3) }] }));
+    plot($("vaCvA"), Object.assign({}, opt, { series: runsA.map((y, i) => ({ x: xs, y, color: C.c2, width: 1.3, alpha: 0.55, label: i ? null : "실험 " + R + "번" })), hlines: [{ y: vt, color: C.ink, label: "참값 " + fmt(vt, 3) }] }));
+    /* 히스토그램 */
+    let mn = Infinity, mx = -Infinity; allG.forEach(v => { if (v < mn) mn = v; if (v > mx) mx = v; });
+    const B = 30, w = (mx - mn) / B || 1, counts = new Array(B).fill(0); allG.forEach(v => { counts[Math.min(B - 1, Math.floor((v - mn) / w))]++; });
+    const mean = allG.reduce((a, b) => a + b, 0) / allG.length, sd = Math.sqrt(allG.reduce((a, b) => a + (b - mean) ** 2, 0) / (allG.length - 1));
+    bars($("vaHist"), { counts, labels: counts.map((_, i) => tickLabel(mn + (i + 0.5) * w)), color: C.c3, h: 220, xlabel: "G₀", vlines: [{ f: (vt - mn) / (mx - mn || 1), color: C.ink, label: "참값", dash: [5, 3] }] });
+    const fin = rs => rs.map(r => r[r.length - 1]), sdOf = a => { const m = a.reduce((x, y) => x + y, 0) / a.length; return Math.sqrt(a.reduce((x, y) => x + (y - m) ** 2, 0) / Math.max(1, a.length - 1)); };
+    const sM = sdOf(fin(runsM)), sA = sdOf(fin(runsA));
+    $("vaStats").innerHTML = stat("참값 V(s₀) (DP)", fmt(vt, 3)) + stat("G₀ 평균", fmt(mean, 3)) + stat("G₀ 표준편차 σ", sd.toFixed(3)) +
+      stat("σ/√N (N=" + N + ")", (sd / Math.sqrt(N)).toFixed(3)) + stat("최종 추정 퍼짐 · 1/N", sM.toFixed(3), "k-1") + stat("최종 추정 퍼짐 · α", sA.toFixed(3), "k-2");
+    $("vaFormula").innerHTML = "표본 평균의 표준오차 ≈ σ / √N = " + sd.toFixed(3) + " / √" + N + " = <span class='k-1'>" + (sd / Math.sqrt(N)).toFixed(3) + "</span> (실제 퍼짐 " + sM.toFixed(3) + ")<br>" +
+      "고정 α의 정상 상태 퍼짐 ≈ σ·√(α / (2 − α)) = " + sd.toFixed(3) + " × √(" + al.toFixed(2) + " / " + (2 - al).toFixed(2) + ") = <span class='k-2'>" + (sd * Math.sqrt(al / (2 - al))).toFixed(3) + "</span> (실제 " + sA.toFixed(3) + ")<br>" +
+      "<span class='mc-small'>N을 4배로 늘리면 표본 평균의 흔들림은 절반이 되지만, 고정 α의 흔들림은 α를 줄이지 않는 한 그대로입니다.</span>";
+    $("vaWarn").style.display = env.kind === "frozenlake" ? "" : "none";
+  }
+  ["vaEnv", "vaG", "vaR", "vaN", "vaA"].forEach(id => {
+    $(id).addEventListener("input", () => { if ($(id + "v")) $(id + "v").textContent = id === "vaR" || id === "vaN" ? $(id).value : (+$(id).value).toFixed(2); });
+    $(id).addEventListener("change", vaRun);
+  });
+  $("vaRun").onclick = () => { VA.base++; vaRun(); };
+
+  /* ================================================================
+     4. MC 제어
+     ================================================================ */
+  const CT = { timer: 0, sel: null };
+  const SPEEDS = [1, 5, 20, 50, 200, 1000];
+  function ctReset() {
+    ctStop();
+    const kind = $("ctEnv").value; CT.env = makeEnv(kind, $("ctSlip").checked); CT.g = +$("ctG").value;
+    const seed = Math.max(1, +$("ctSeed").value || 1); CT.rng = RL.rng(seed); CT.erng = RL.rng(seed * 7919 + 13);
+    const nS = CT.env.nS; CT.Q = Array.from({ length: nS }, () => [0, 0, 0, 0]); CT.N = Array.from({ length: nS }, () => [0, 0, 0, 0]); CT.vis = new Array(nS).fill(0);
+    CT.ep = 0; CT.rets = []; CT.succ = []; CT.ex = []; CT.evp = []; CT.erm = []; CT.lastTr = null;
+    const vi = valueIter(CT.env, CT.g); CT.Vs = vi.V;
+    CT.max = +$("ctMax").value;
+    if (CT.sel == null || CT.sel >= nS) CT.sel = CT.env.start;
+    $("ctSlip").closest("label").style.display = kind === "gw" ? "none" : "";
+    ctEval(); ctRender();
+  }
+  function ctEps() { return $("ctDecay").checked ? Math.max(0.05, 1 - CT.ep / (CT.max * 0.6)) : +$("ctE").value; }
+  function greedyPi() { return CT.Q.map(q => { const a = RL.argmax(q); return [0, 1, 2, 3].map(b => b === a ? 1 : 0); }); }
+  function ctEval() {
+    const V = policyEval(CT.env, greedyPi(), CT.g, 1e-7, 3000);
+    let v0 = V[CT.env.start]; if (!V.converged && CT.g >= 0.999) v0 = NaN;
+    CT.ex.push(CT.ep); CT.evp.push(v0); CT.erm.push(rmse(CT.env, CT.Q.map(q => Math.max(...q)), CT.Vs));
+  }
+  function ctEpisode() {
+    const env = CT.env, g = CT.g, eps = ctEps(), mean = $("ctUpd").querySelector('[aria-pressed="true"]').dataset.v === "mean", al = +$("ctA").value;
+    const every = $("ctVisit").querySelector('[aria-pressed="true"]').dataset.v === "every";
+    const tr = episode(env, s => CT.rng.random() < eps ? CT.rng.int(4) : RL.argmax(CT.Q[s], CT.rng), CT.erng);
+    const first = {}; tr.forEach((x, t) => { const k = x.s * 4 + x.a; if (first[k] == null) first[k] = t; });
+    let G = 0;
+    for (let t = tr.length - 1; t >= 0; t--) {
+      const { s, a, r } = tr[t]; G = r + g * G; CT.vis[s]++;
+      if (!every && first[s * 4 + a] !== t) continue;
+      CT.N[s][a]++; CT.Q[s][a] += (mean ? 1 / CT.N[s][a] : al) * (G - CT.Q[s][a]);
+    }
+    CT.ep++; CT.lastTr = tr; CT.lastEps = eps;
+    let tot = 0; tr.forEach(x => { tot += x.r; }); CT.rets.push(tot); CT.succ.push(env.kind === "frozenlake" ? (tr[tr.length - 1].r > 0 ? 1 : 0) : tot);
+    const every2 = CT.max <= 2000 ? 20 : CT.max <= 10000 ? 50 : 150;
+    if (CT.ep % every2 === 0) ctEval();
+  }
+  function ctStop() { if (CT.timer) { cancelAnimationFrame(CT.timer); CT.timer = 0; $("ctRun").textContent = CT.ep >= CT.max ? "학습 완료" : CT.ep ? "이어서 학습" : "학습 시작"; } }
+  function ctLoop() {
+    const n = SPEEDS[+$("ctSp").value];
+    for (let i = 0; i < n && CT.ep < CT.max; i++) ctEpisode();
+    ctRender();
+    if (CT.ep >= CT.max) { ctStop(); return; }
+    CT.timer = requestAnimationFrame(ctLoop);
+  }
+  function ctRender() {
+    if (!visible($("pane-control"))) return;
+    const env = CT.env, C = COL(), view = $("ctView").querySelector('[aria-pressed="true"]').dataset.v, fl = env.kind === "frozenlake";
+    const hl = {}; if (CT.sel != null) hl[CT.sel] = C.t;
+    const maxQ = CT.Q.map(q => Math.max(...q));
+    const anyN = s => CT.N[s].some(v => v > 0);
+    if (view === "q") {
+      drawGridFit($("ctCv"), env, { V: maxQ, policy: CT.Q.map((q, s) => anyN(s) ? RL.argmax(q) : null), highlight: hl, fmt: v => fl ? v.toFixed(2) : v.toFixed(1) }, 86);
+      $("ctGridCap").innerHTML = "max<sub>a</sub> Q(s, a) 색 + 탐욕 정책 화살표 (아직 안 가 본 칸은 화살표 없음)";
+    } else {
+      drawGridFit($("ctCv"), env, { visits: CT.vis, highlight: hl, showValues: false, arrows: false }, 86);
+      const cv = $("ctCv"), g2 = cv.getContext("2d"), cell = cv.clientWidth / env.cols; g2.fillStyle = C.ink; g2.textAlign = "center"; g2.textBaseline = "middle"; g2.font = "600 " + Math.max(9, Math.round(cell * 0.19)) + "px " + cssv("--mono");
+      CT.vis.forEach((v, s) => { if (env.walls.indexOf(s) >= 0) return; const rc = env.rc(s); g2.fillText(v >= 10000 ? (v / 1000).toFixed(0) + "k" : String(v), rc[1] * cell + cell / 2, rc[0] * cell + cell * 0.6); });
+      $("ctGridCap").innerHTML = "상태 방문 횟수 (진할수록 많이 방문 · ε가 작으면 탐욕 경로에 몰림)";
+    }
+    /* 학습 곡선 */
+    const w = Math.max(10, Math.min(500, Math.round(CT.ep / 20))), ma = RL.movingAvg(CT.succ, w), xs = ma.map((_, i) => i + 1);
+    const sx = [], sy = []; const st = Math.max(1, Math.floor(ma.length / 600)); for (let i = 0; i < ma.length; i += st) { sx.push(xs[i]); sy.push(ma[i]); } if (ma.length) { sx.push(xs[ma.length - 1]); sy.push(ma[ma.length - 1]); }
+    $("ctCurveCap").innerHTML = fl ? "학습 곡선 — 목표 도달 비율 (이동평균 " + w + ", ε-탐욕 행동 그대로)" : "학습 곡선 — 에피소드 리턴 (이동평균 " + w + ")";
+    plot($("ctCurve"), { series: [{ x: sx, y: sy, color: C.r, label: fl ? "성공률" : "리턴" }], ymin: fl ? 0 : null, ymax: fl ? 1 : null, xmin: 0, xmax: Math.max(10, CT.ep), xlabel: "에피소드", h: 200 });
+    const v0s = CT.Vs[env.start];
+    const ev = CT.evp.map(v => isFinite(v) ? v : NaN);
+    plot($("ctErr"), { series: [{ x: CT.ex, y: ev, color: C.c1, label: "V^π(s₀) 탐욕 정책" }, { x: CT.ex, y: CT.erm, color: C.c2, dash: [5, 3], label: "RMSE(max Q, V*)" }],
+      hlines: [{ y: v0s, color: C.ink, label: "V*(s₀) " + fmt(v0s, 4) }], xmin: 0, xmax: Math.max(10, CT.ep), ymin: fl ? 0 : null, ymax: fl ? Math.max(0.6, v0s * 1.15) : null, xlabel: "에피소드", h: 200 });
+    const lastV = CT.evp[CT.evp.length - 1], rec = CT.succ.slice(-100), avg = rec.length ? rec.reduce((a, b) => a + b, 0) / rec.length : 0;
+    $("ctStats").innerHTML = stat("에피소드", CT.ep.toLocaleString() + " / " + CT.max.toLocaleString()) + stat("현재 ε", ctEps().toFixed(3), "k-x") +
+      stat(fl ? "최근 100 성공률" : "최근 100 평균 리턴", fl ? (avg * 100).toFixed(0) + "%" : avg.toFixed(1)) +
+      stat("탐욕 정책 V^π(s₀)", isFinite(lastV) ? fmt(lastV, 4) : "종료 못 함", "k-1") + stat("최적 V*(s₀) (DP)", fmt(v0s, 4));
+    /* 선택 칸 */
+    const s = CT.sel;
+    if (s != null && !env.terminal[s]) {
+      const q = CT.Q[s], b = RL.argmax(q), eps = ctEps();
+      let h = '<div class="mc-cap">선택한 상태 <span class="k-s">' + cellName(env, s) + "</span> · 방문 " + CT.vis[s] + "번</div><div class='sk-scroll'><table class='sk-table'><thead><tr><th>행동</th><th>Q(s, a)</th><th>N(s, a)</th><th>DP Q*(s, a)</th><th>ε-탐욕 확률</th></tr></thead><tbody>";
+      for (let a = 0; a < 4; a++) { const p = (a === b ? 1 - eps : 0) + eps / 4;
+        h += "<tr><td class='act'>" + ARW[a] + " " + RL.ACTION_NAMES[a] + (a === b ? " <span class='mc-tag' style='color:var(--rl-a)'>탐욕</span>" : "") + "</td><td class='n k-v'>" + fmt(q[a], 4) + "</td><td class='n'>" + CT.N[s][a] + "</td><td class='n'>" + fmt(qsa(env, CT.Vs, s, a, CT.g), 4) + "</td><td class='n k-x'>" + p.toFixed(3) + "</td></tr>"; }
+      h += "</tbody></table></div><p class='mc-small'>ε-탐욕: 탐욕 행동은 1 − ε + ε/4, 나머지는 ε/4. 칸을 눌러 다른 상태를 보세요.</p>";
+      $("ctDetail").innerHTML = h;
+    } else $("ctDetail").innerHTML = "";
+    $("ctNote").innerHTML = fl
+      ? "MC 제어는 에피소드가 끝나야 갱신되고 리턴의 분산이 커서 <b>수렴이 느리고 seed에 따라 결과가 꽤 흔들립니다</b>. 탐욕 정책의 실제 가치 V<sup>π</sup>(s₀)는 매번 env.P로 정확히 계산한 값이며(MC 자신은 env.P를 쓰지 않음), 미끄러운 4×4에서 γ = 0.9일 때 V*(s₀) = 0.0689, γ = 0.99일 때 0.5420, 8×8(γ = 0.99)은 0.4146입니다."
+      : "GridWorld의 최적 정책은 가까운 모서리로 곧장 가는 것입니다. 초반에는 Q가 모두 0이라 탐욕 정책이 벽에 부딪히며 오래 헤맬 수 있고, 그 긴 에피소드의 큰 음수 리턴이 Q를 빠르게 바로잡습니다.";
+  }
+  $("ctRun").onclick = () => { if (CT.timer) { ctStop(); return; } if (CT.ep >= CT.max) ctReset(); $("ctRun").textContent = "멈춤"; CT.timer = requestAnimationFrame(ctLoop); };
+  $("ctOne").onclick = () => { ctStop(); if (CT.ep < CT.max) { const n0 = CT.ex.length; ctEpisode(); if (CT.ex.length === n0) ctEval(); } ctRender(); };
+  $("ctReset").onclick = ctReset;
+  ["ctEnv", "ctSlip", "ctSeed", "ctMax"].forEach(id => $(id).addEventListener("change", () => {
+    if (id === "ctEnv") { const k = $("ctEnv").value; $("ctG").value = k === "gw" ? 0.9 : 0.99; $("ctGv").textContent = (+$("ctG").value).toFixed(2); }
+    ctReset(); }));
+  $("ctG").oninput = () => { $("ctGv").textContent = (+$("ctG").value).toFixed(2); }; $("ctG").onchange = ctReset;
+  $("ctE").oninput = () => { $("ctEv").textContent = (+$("ctE").value).toFixed(2); if (!CT.timer) ctRender(); };
+  $("ctA").oninput = () => { $("ctAv").textContent = (+$("ctA").value).toFixed(2); };
+  $("ctDecay").onchange = () => { $("ctE").disabled = $("ctDecay").checked; ctRender(); };
+  $("ctSp").oninput = () => { $("ctSpv").textContent = SPEEDS[+$("ctSp").value]; };
+  seg("ctUpd", v => { $("ctAWrap").style.display = v === "alpha" ? "" : "none"; ctReset(); });
+  seg("ctVisit", () => ctReset());
+  seg("ctView", () => ctRender());
+  $("ctCv").addEventListener("click", e => { const s = RL.gridHit($("ctCv"), CT.env, e); if (s >= 0) { CT.sel = s; ctRender(); } });
+  $("ctAWrap").style.display = "none";
+
+  /* ================================================================
+     5. 오프폴리시: 중요도 샘플링
+     ================================================================ */
+  function opRun() {
+    const N = +$("opN").value, R = +$("opR").value, seed = Math.max(1, +$("opSeed").value || 1);
+    const keep = []; for (let i = 1; i <= N; i++) if (i <= 20 || Math.floor(Math.log10(i) * 90) !== Math.floor(Math.log10(i - 1) * 90) || i === N) keep.push(i);
+    const runsO = [], runsW = [], table = [];
+    for (let r = 0; r < R; r++) {
+      const rng = RL.rng(seed * 1000 + r + 1); let sumRG = 0, sumR = 0; const yo = [], yw = []; let ki = 0;
+      for (let i = 1; i <= N; i++) {
+        let rho = 1, G = 0, acts = "";
+        for (;;) { const left = rng.random() < 0.5; acts += left ? "←" : "→";
+          if (!left) { rho = 0; break; } rho *= 2;
+          if (rng.random() < 0.1) { G = 1; break; } }
+        sumRG += rho * G; sumR += rho;
+        const o = sumRG / i, w = sumR > 0 ? sumRG / sumR : NaN;
+        if (r === 0 && rho > 0 && table.length < 10) table.push({ i, acts, G, rho, o, w, sumR, sumRG });
+        if (keep[ki] === i) { yo.push(o); yw.push(w); ki++; }
+      }
+      runsO.push(yo); runsW.push(yw);
+    }
+    OP.res = { keep, runsO, runsW, table, N, R };
+    opRender();
+  }
+  const OP = {};
+  function opRender() {
+    if (!OP.res || !visible($("pane-offpolicy"))) return;
+    const { keep, runsO, runsW, table, N, R } = OP.res, C = COL();
+    const series = runsO.map((y, i) => ({ x: keep, y, color: C.c2, width: 1.2, alpha: 0.6 })).concat(runsW.map((y, i) => ({ x: keep, y, color: C.c1, width: 1.6, alpha: 0.85 })));
+    plot($("opCv"), { series, xlog: true, xmin: 1, xmax: N, ymin: 0, ymax: 3, hlines: [{ y: 1, color: C.ink, label: "참값 v_π(s) = 1" }], xlabel: "에피소드 (로그)", h: 260 });
+    const finO = runsO.map(r => r[r.length - 1]), finW = runsW.map(r => r[r.length - 1]);
+    const sd = a => { const f = a.filter(isFinite); const m = f.reduce((x, y) => x + y, 0) / f.length; return Math.sqrt(f.reduce((x, y) => x + (y - m) ** 2, 0) / Math.max(1, f.length - 1)); };
+    const mean = a => { const f = a.filter(isFinite); return f.reduce((x, y) => x + y, 0) / f.length; };
+    $("opStats").innerHTML = stat("보통 IS 최종 평균", mean(finO).toFixed(3), "k-2") + stat("보통 IS 실험 간 표준편차", sd(finO).toFixed(3), "k-2") + stat("가중 IS 최종 평균", mean(finW).toFixed(3), "k-1") + stat("가중 IS 실험 간 표준편차", sd(finW).toFixed(3), "k-1");
+    let h = "<thead><tr><th>에피소드 n</th><th>b의 행동</th><th>G</th><th>ρ</th><th>ρ·G</th><th class='k-2'>보통 Σρ G / n</th><th class='k-1'>가중 Σρ G / Σρ</th></tr></thead><tbody>";
+    table.forEach(t => { h += "<tr><td class='n'>" + t.i + "</td><td class='act'>" + (t.acts.length > 14 ? t.acts.slice(0, 13) + "…(" + t.acts.length + ")" : t.acts) + "</td><td class='n'>" + t.G + "</td><td class='n'>" + t.rho + "</td><td class='n'>" + t.rho * t.G + "</td><td class='n k-2'>" + t.sumRG + " / " + t.i + " = " + t.o.toFixed(3) + "</td><td class='n k-1'>" + (t.sumR > 0 ? t.sumRG + " / " + t.sumR + " = " + t.w.toFixed(3) : "0 / 0 (정의 안 됨)") + "</td></tr>"; });
+    $("opTable").innerHTML = h + "</tbody>";
+    $("opFormula").innerHTML = "ρ = Π<sub>k</sub> π(A<sub>k</sub>|S<sub>k</sub>) / b(A<sub>k</sub>|S<sub>k</sub>) &nbsp;(← 하나에 1 / 0.5 = 2, → 하나에 0 / 0.5 = 0)<br>" +
+      "<span class='k-2'>보통 IS</span> V = (1/n) Σ ρ<sub>i</sub> G<sub>i</sub> — 편향 없음, 분산 큼<br><span class='k-1'>가중 IS</span> V = Σ ρ<sub>i</sub> G<sub>i</sub> / Σ ρ<sub>i</sub> — 편향 있음(점점 사라짐), 분산 작음";
+  }
+  $("opRun").onclick = () => { $("opSeed").value = (+$("opSeed").value || 1) + 1; opRun(); };
+  $("opN").onchange = opRun; $("opSeed").onchange = opRun;
+  $("opR").oninput = () => { $("opRv").textContent = $("opR").value; }; $("opR").onchange = opRun;
+
+  /* ================================================================
+     6. 코드
+     ================================================================ */
+  function genCode() {
+    const kind = $("ctEnv").value, g = (+$("ctG").value).toFixed(2), eps = (+$("ctE").value).toFixed(2), decay = $("ctDecay").checked;
+    const mean = $("ctUpd").querySelector('[aria-pressed="true"]').dataset.v === "mean", al = (+$("ctA").value).toFixed(2);
+    const first = $("ctVisit").querySelector('[aria-pressed="true"]').dataset.v === "first", E = $("ctMax").value, seed = $("ctSeed").value, slip = $("ctSlip").checked;
+    const L = [];
+    L.push("import numpy as np", "import gymnasium as gym", "");
+    if (kind === "gw") {
+      L.push("# GridWorld 4×4 (Sutton & Barto 예제 4.1): 매 걸음 −1, 두 모서리(0, 15)가 종료 — Gymnasium에 없어 직접 정의",
+        "class GridWorld4x4:", "    nS, nA = 16, 4   # 행동: 0← 1↓ 2→ 3↑ (FrozenLake와 같은 번호로 맞춤)",
+        "    MOVES = {0: (0, -1), 1: (1, 0), 2: (0, 1), 3: (-1, 0)}",
+        "    def __init__(self, start=9): self.start = start", "    def reset(self, seed=None):", "        self.s = self.start", "        return self.s, {}",
+        "    def step(self, a):", "        r, c = divmod(self.s, 4); dr, dc = self.MOVES[a]",
+        "        r, c = min(max(r + dr, 0), 3), min(max(c + dc, 0), 3)", "        self.s = r * 4 + c", "        done = self.s in (0, 15)", "        return self.s, -1.0, done, False, {}",
+        "    @property", "    def P(self):   # 전이 모형 (DP 검산용)", "        P = {}", "        for s in range(16):", "            P[s] = {}", "            for a in range(4):",
+        "                if s in (0, 15): P[s][a] = [(1.0, s, 0.0, True)]; continue", "                self.s = s; s2, r, d, _, _ = self.step(a)", "                P[s][a] = [(1.0, s2, r, d)]", "        return P", "",
+        "env = GridWorld4x4()", "nS, nA, P = env.nS, env.nA, env.P");
+    } else {
+      L.push('env = gym.make("FrozenLake-v1", map_name="' + (kind === "fl8" ? "8x8" : "4x4") + '", is_slippery=' + (slip ? "True" : "False") + ")",
+        "nS, nA = env.observation_space.n, env.action_space.n", "P = env.unwrapped.P          # P[s][a] = [(확률, 다음 상태, 보상, 종료)]");
+    }
+    L.push("ARROWS = np.array(['←', '↓', '→', '↑'])   # Gymnasium 행동 번호 0← 1↓ 2→ 3↑", "gamma = " + g, "");
+    if ($("codePred").checked) {
+      L.push("# ---------- 첫 방문 MC 예측: 무작위 정책의 V(s) ----------",
+        "def mc_prediction(env, n_episodes=5000, gamma=gamma, seed=0):", "    rng = np.random.default_rng(seed)", "    V, N = np.zeros(nS), np.zeros(nS)",
+        "    for ep in range(n_episodes):", "        s, _ = env.reset(seed=int(rng.integers(1 << 30)))", "        traj, done = [], False",
+        "        while not done:", "            a = int(rng.integers(nA))", "            s2, r, term, trunc, _ = env.step(a)", "            traj.append((s, a, r)); s = s2; done = term or trunc",
+        "        G, first = 0.0, {}", "        for t, (s, _, _) in enumerate(traj): first.setdefault(s, t)",
+        "        for t in reversed(range(len(traj))):          # 뒤에서부터 G_t = R_{t+1} + γ G_{t+1}", "            s, a, r = traj[t]", "            G = r + gamma * G",
+        "            if first[s] == t:                          # 첫 방문만 (모든 방문이면 이 줄 삭제)", "                N[s] += 1", "                V[s] += (G - V[s]) / N[s]   # 증분 평균",
+        "    return V", "");
+    }
+    L.push("# ---------- On-policy " + (first ? "첫 방문" : "모든 방문") + " MC 제어 (ε-탐욕) ----------",
+      "def epsilon_greedy(Q, s, eps, rng):", "    if rng.random() < eps:", "        return int(rng.integers(nA))",
+      "    best = np.flatnonzero(Q[s] == Q[s].max())        # 동점이면 무작위", "    return int(rng.choice(best))", "",
+      "def mc_control(env, n_episodes=" + E + ", gamma=gamma, seed=" + seed + "):", "    rng = np.random.default_rng(seed)", "    Q, N = np.zeros((nS, nA)), np.zeros((nS, nA))", "    returns = []",
+      "    for ep in range(n_episodes):");
+    L.push(decay ? "        eps = max(0.05, 1.0 - ep / (0.6 * n_episodes))   # ε 감소" : "        eps = " + eps);
+    L.push("        s, _ = env.reset(seed=int(rng.integers(1 << 30)))", "        traj, done = [], False", "        while not done:", "            a = epsilon_greedy(Q, s, eps, rng)",
+      "            s2, r, term, trunc, _ = env.step(a)", "            traj.append((s, a, r)); s = s2; done = term or trunc", "        G = 0.0");
+    if (first) L.push("        first = {}", "        for t, (s, a, _) in enumerate(traj): first.setdefault((s, a), t)");
+    L.push("        for t in reversed(range(len(traj))):", "            s, a, r = traj[t]", "            G = r + gamma * G");
+    if (first) L.push("            if first[(s, a)] != t:", "                continue");
+    L.push("            N[s, a] += 1");
+    L.push(mean ? "            Q[s, a] += (G - Q[s, a]) / N[s, a]          # 표본 평균" : "            Q[s, a] += " + al + " * (G - Q[s, a])            # 고정 α");
+    L.push("        returns.append(sum(r for _, _, r in traj))", "    return Q, returns", "",
+      "Q, returns = mc_control(env)", "policy = Q.argmax(axis=1)", "print(ARROWS[policy].reshape(" + (kind === "fl8" ? "8, 8" : "4, 4") + "))",
+      'print("최근 100 에피소드 평균 리턴:", np.mean(returns[-100:]))');
+    if ($("codeDP").checked) {
+      L.push("", "# ---------- 검산: 모델(P)을 아는 DP로 V*와 탐욕 정책의 실제 가치 ----------",
+        "def q_from_v(V, s, a): return sum(p * (r + (0 if d else gamma * V[s2])) for p, s2, r, d in P[s][a])",
+        "V_star = np.zeros(nS)", "for _ in range(10000):", "    V_new = np.array([max(q_from_v(V_star, s, a) for a in range(nA)) for s in range(nS)])",
+        "    if np.max(np.abs(V_new - V_star)) < 1e-10: break", "    V_star = V_new",
+        "V_pi = np.zeros(nS)", "for _ in range(10000):", "    V_pi = np.array([q_from_v(V_pi, s, policy[s]) for s in range(nS)])",
+        'print("V*(시작) =", round(V_star[0' + (kind === "gw" ? "" : "") + '], 4), " 탐욕 정책 V^π(시작) =", round(V_pi[0], 4))');
+      if (kind === "gw") L[L.length - 1] = 'print("V*(9) =", round(V_star[9], 4), " 탐욕 정책 V^π(9) =", round(V_pi[9], 4))';
+      if (kind !== "gw") L.push("# 미끄러운 4×4: γ=0.9 → 0.0689, γ=0.99 → 0.542 / 8×8 γ=0.99 → 0.4146");
+    }
+    if ($("codeIS").checked) {
+      L.push("", "# ---------- 가중 중요도 샘플링: b(ε-탐욕)로 모은 에피소드로 π(탐욕)를 평가 ----------",
+        "def off_policy_eval(env, policy, n_episodes=20000, gamma=gamma, eps_b=0.1, seed=1):", "    rng = np.random.default_rng(seed)", "    num = den = 0.0",
+        "    for _ in range(n_episodes):", "        s, _ = env.reset(seed=int(rng.integers(1 << 30)))", "        rho, G, disc, done = 1.0, 0.0, 1.0, False",
+        "        while not done:", "            greedy = int(policy[s])",
+        "            a = int(rng.integers(nA)) if rng.random() < eps_b else greedy   # 행동 정책 b",
+        "            b_prob = eps_b / nA + (1 - eps_b) * (a == greedy)", "            rho *= (1.0 if a == greedy else 0.0) / b_prob   # π(a|s) / b(a|s)", "            if rho == 0: break",
+        "            s, r, term, trunc, _ = env.step(a); G += disc * r; disc *= gamma; done = term or trunc",
+        "        num += rho * G; den += rho", "    return num / den if den > 0 else float('nan')   # 보통 IS라면 num / n_episodes", "",
+        'print("가중 IS 추정 V^π(시작) =", off_policy_eval(env, policy))');
+    }
+    return L.join("\n");
+  }
+  function renderCode() { $("codeOut").textContent = genCode(); }
+  ["codePred", "codeIS", "codeDP"].forEach(id => $(id).addEventListener("change", renderCode));
+  async function copyText(txt, msgEl) {
+    let ok = false;
+    try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(txt); ok = true; } } catch (e) { ok = false; }
+    if (!ok) { try { const ta = document.createElement("textarea"); ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); ok = document.execCommand("copy"); ta.remove(); } catch (e) { ok = false; } }
+    msgEl.textContent = ok ? "복사했습니다" : "복사하지 못했습니다. 직접 선택해 복사하세요"; setTimeout(() => { msgEl.textContent = ""; }, 2200);
+  }
+  $("codeCopy").onclick = () => copyText($("codeOut").textContent, $("codeMsg"));
+
+  /* ================= 탭 · 렌더링 ================= */
+  const tabs = [...document.querySelectorAll(".sk-tab")];
+  const activeTab = () => (tabs.find(b => b.getAttribute("aria-selected") === "true") || tabs[0]).id.replace("tab-", "");
+  function render() {
+    const t = activeTab();
+    try { (({ episode: epRender, predict: prRender, variance: vaRender, control: ctRender, offpolicy: opRender, code: renderCode })[t] || function () {})(); }
+    catch (err) { console.error(err); }
+  }
+  function show(t) {
+    tabs.forEach(b => { const on = b === t; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1; $(b.getAttribute("aria-controls")).hidden = !on; });
+    history.replaceState(null, "", "#" + t.id.replace("tab-", ""));
+    epStop(); prStop(); if (t.id !== "tab-control") ctStop(); render();
+    if (t.id === "tab-control" && !CT.auto) { CT.auto = true; if (CT.ep === 0) { if (reduce) { while (CT.ep < CT.max) ctEpisode(); ctRender(); ctStop(); } else $("ctRun").click(); } }
+  }
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => show(b));
+    b.addEventListener("keydown", e => { const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return;
+      const n = tabs[(i + d + tabs.length) % tabs.length]; show(n); n.focus(); e.preventDefault(); });
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return; const tg = e.target;
+    if (tg && (/^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName) || tg.getAttribute("role") === "tab" || tg.isContentEditable || tg.closest(".dgv"))) return;
+    if (activeTab() === "episode") { epStop(); epGo(EP.k + (e.key === "ArrowRight" ? 1 : -1)); e.preventDefault(); }
+  });
+  let rz = 0; window.addEventListener("resize", () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(render); });
+  RL.onTheme(render);
+
+  /* 초기화 */
+  epPresetLoad(); epUi();
+  prReset(); prRun(200); ctReset(); vaRun(); opRun();
+  const start = $("tab-" + location.hash.slice(1)); if (start) show(start); else render();
+})();
+</script>
+</body>
+</html>

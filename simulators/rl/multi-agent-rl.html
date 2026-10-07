@@ -1,0 +1,1079 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Multi-agent RL (MADDPG · QMIX) | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261007a">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+:root{
+  --sk-accent: var(--cat-rl);
+  --rl-state:#2563EB; --rl-action:#EA580C; --rl-reward:#16A34A; --rl-neg:#DC2626; --rl-value:#7C3AED; --rl-target:#DB2777; --rl-explore:#B7791F;
+  --ag1:#2563EB; --ag2:#EA580C; --m-iql:#5B6578; --m-vdn:#0D9488; --m-qmix:#7C3AED; --m-cen:#B7791F;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --rl-state:#79A6F6; --rl-action:#F59A5C; --rl-reward:#5CCB82; --rl-neg:#F07A7A; --rl-value:#B597FF; --rl-target:#F472B6; --rl-explore:#E3B455;
+  --ag1:#79A6F6; --ag2:#F59A5C; --m-iql:#A3ACBD; --m-vdn:#45CFBF; --m-qmix:#B597FF; --m-cen:#E3B455;
+} }
+:root[data-theme="dark"]{
+  --rl-state:#79A6F6; --rl-action:#F59A5C; --rl-reward:#5CCB82; --rl-neg:#F07A7A; --rl-value:#B597FF; --rl-target:#F472B6; --rl-explore:#E3B455;
+  --ag1:#79A6F6; --ag2:#F59A5C; --m-iql:#A3ACBD; --m-vdn:#45CFBF; --m-qmix:#B597FF; --m-cen:#E3B455;
+}
+.ma-split{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:18px; align-items:start; }
+@media (max-width:960px){ .ma-split{ grid-template-columns:minmax(0,1fr); } }
+.ma-col{ display:flex; flex-direction:column; gap:12px; min-width:0; }
+.ma-cv{ display:block; width:100%; max-width:100%; }
+.ma-sq{ max-width:420px; }
+.ma-code{ font-family:var(--mono); font-size:12.5px; line-height:1.6; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:12px 14px; overflow-x:auto; white-space:pre; margin:0; color:var(--ink); max-width:100%; }
+.ma-svg{ width:100%; min-width:640px; height:auto; display:block; }
+.ma-svg .bx{ fill:var(--surface-2); stroke:var(--line-strong); stroke-width:1.5; }
+.ma-svg .t{ fill:var(--ink); font-size:14px; font-weight:700; font-family:var(--sans); }
+.ma-svg .s{ fill:var(--muted); font-size:12px; font-family:var(--sans); }
+.ma-svg .ln{ fill:none; stroke-width:2; }
+.ma-svg .st{ stroke:var(--rl-state); } .ma-svg .ac{ stroke:var(--rl-action); } .ma-svg .rw{ stroke:var(--rl-reward); } .ma-svg .vl{ stroke:var(--rl-value); } .ma-svg .tg{ stroke:var(--rl-target); stroke-dasharray:6 4; }
+.ma-svg .f-st{ fill:var(--rl-state); } .ma-svg .f-ac{ fill:var(--rl-action); } .ma-svg .f-rw{ fill:var(--rl-reward); } .ma-svg .f-vl{ fill:var(--rl-value); } .ma-svg .f-tg{ fill:var(--rl-target); }
+.ma-svg .a1{ stroke:var(--ag1); } .ma-svg .a2{ stroke:var(--ag2); }
+.ma-svg .critic{ transition:opacity .3s; }
+.ma-svg[data-phase="exec"] .critic{ opacity:.18; }
+.ma-svg[data-phase="exec"] .trainonly{ opacity:0; }
+.ma-svg[data-phase="train"] .execonly{ opacity:0; }
+@media (prefers-reduced-motion: reduce){ .ma-svg .critic{ transition:none; } }
+.ma-pay{ border-collapse:collapse; font-family:var(--mono); font-size:14px; }
+.ma-pay th{ font-family:var(--sans); font-size:12.5px; color:var(--muted); font-weight:700; padding:4px 8px; }
+.ma-pay td{ border:1px solid var(--line); padding:7px 12px; text-align:center; min-width:64px; font-variant-numeric:tabular-nums; }
+.ma-pay td.hl{ outline:2.5px solid var(--ink); outline-offset:-3px; font-weight:700; }
+.ma-pay td.opt{ background:color-mix(in srgb, var(--rl-reward) 16%, var(--surface)); }
+.ma-pay td.pick{ cursor:pointer; }
+.ma-pay td.sel{ box-shadow:inset 0 0 0 3px var(--rl-value); }
+.ma-r1{ color:var(--ag1); } .ma-r2{ color:var(--ag2); }
+.ma-tri{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+@media (max-width:1080px){ .ma-tri{ grid-template-columns:minmax(0,1fr); } }
+.ma-box{ background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:10px 12px; min-width:0; }
+.ma-box h3{ margin:0 0 6px; font-size:14.5px; }
+.ma-res{ font-size:13.5px; margin:8px 0 0; }
+.ma-good{ color:var(--rl-reward); font-weight:700; } .ma-bad{ color:var(--rl-neg); font-weight:700; }
+.sk-table td.c1{ color:var(--ag1); } .sk-table td.c2{ color:var(--ag2); }
+.ma-legend i.l1{ background:var(--ag1); } .ma-legend i.l2{ background:var(--ag2); }
+.ma-prog{ font-size:13px; color:var(--muted); }
+.c-state{ color:var(--rl-state); } .c-action{ color:var(--rl-action); } .c-reward{ color:var(--rl-reward); } .c-neg{ color:var(--rl-neg); } .c-value{ color:var(--rl-value); } .c-target{ color:var(--rl-target); }
+.ma-mix{ width:100%; min-width:560px; height:auto; display:block; }
+.ma-mix text{ font-family:var(--mono); font-size:12px; fill:var(--ink); paint-order:stroke; stroke:var(--surface); stroke-width:4px; stroke-linejoin:round; }
+.ma-mix .lab{ font-family:var(--sans); font-size:12.5px; font-weight:700; fill:var(--muted); }
+.ma-mix .nd{ fill:var(--surface); stroke:var(--line-strong); stroke-width:1.5; }
+.ma-mix .nq1{ stroke:var(--ag1); stroke-width:2.5; } .ma-mix .nq2{ stroke:var(--ag2); stroke-width:2.5; } .ma-mix .nqt{ stroke:var(--rl-value); stroke-width:2.5; }
+.ma-mix .w{ stroke:var(--rl-value); fill:none; }
+.ma-mix .hyp{ fill:color-mix(in srgb, var(--rl-value) 10%, var(--surface)); stroke:var(--rl-value); stroke-dasharray:5 4; }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+      <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a href="../../index.html#rl" style="--c:var(--cat-rl)" aria-current="page">강화학습</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#rl" style="--c:var(--cat-rl)">강화학습</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">Multi-agent RL (MADDPG · QMIX)</h1>
+      <p class="ds-hero__lede">여러 에이전트가 함께 배우면 서로가 서로의 환경이 되어 목표가 계속 움직입니다. 독립 학습의 비정상성, 중앙 학습·분산 실행(CTDE), VDN·QMIX의 가치 분해, MADDPG의 중앙 critic을 브라우저에서 직접 학습시키며 비교합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button class="sk-tab" type="button" role="tab" id="tab-settings" aria-controls="pane-settings" aria-selected="true"><span class="sk-num">1</span>설정 · 비정상성</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-ctde" aria-controls="pane-ctde" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>CTDE</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-qmix" aria-controls="pane-qmix" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>VDN vs QMIX</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-grid" aria-controls="pane-grid" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>협력 격자</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-maddpg" aria-controls="pane-maddpg" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>MADDPG</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>파이썬 코드</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>알고리즘 구성도</button>
+  </nav>
+
+  <!-- 1. 설정 · 비정상성 -->
+  <section id="pane-settings" role="tabpanel" aria-labelledby="tab-settings">
+    <div class="sk-card">
+      <div class="sk-head"><h2>다중 에이전트 루프 — 마르코프 게임</h2><span class="sk-hint">상태 = 파랑 · 행동 = 주황 · 보상 = 초록</span></div>
+      <div class="sk-scroll">
+        <svg class="ma-svg" viewBox="0 0 900 270" role="img" aria-label="두 에이전트가 각자 관측 o1, o2를 받아 행동 a1, a2를 내고, 환경은 공동 행동으로 다음 상태와 각자의 보상 r1, r2를 돌려준다">
+          <defs>
+            <marker id="hSt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="f-st" d="M0 0L10 5L0 10z"/></marker>
+            <marker id="hAc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="f-ac" d="M0 0L10 5L0 10z"/></marker>
+          </defs>
+          <rect class="bx a1" x="40" y="44" width="200" height="64" rx="10"/><text class="t" x="140" y="72" text-anchor="middle">에이전트 1  π₁(a₁|o₁)</text><text class="s" x="140" y="92" text-anchor="middle">자기 관측만 보고 행동</text>
+          <rect class="bx a2" x="40" y="162" width="200" height="64" rx="10"/><text class="t" x="140" y="190" text-anchor="middle">에이전트 2  π₂(a₂|o₂)</text><text class="s" x="140" y="210" text-anchor="middle">자기 관측만 보고 행동</text>
+          <rect class="bx" x="350" y="100" width="200" height="70" rx="10"/><text class="t" x="450" y="130" text-anchor="middle">환경 (공유)</text><text class="s" x="450" y="152" text-anchor="middle">P(s′ | s, a₁, a₂)</text>
+          <path class="ln ac" d="M242 76 C 300 76, 300 118, 346 122" marker-end="url(#hAc)"/><text class="s f-ac" x="282" y="70" font-weight="700">a₁</text>
+          <path class="ln ac" d="M242 194 C 300 194, 300 152, 346 148" marker-end="url(#hAc)"/><text class="s f-ac" x="282" y="214" font-weight="700">a₂</text>
+          <rect class="bx" x="640" y="80" width="240" height="110" rx="10"/>
+          <text class="t" x="760" y="108" text-anchor="middle">다음 상태 s′</text>
+          <text class="s f-rw" x="760" y="130" text-anchor="middle" font-weight="700">보상 r₁, r₂</text>
+          <text class="s" x="760" y="152" text-anchor="middle">협력: r₁ = r₂ (팀 보상)</text>
+          <text class="s" x="760" y="172" text-anchor="middle">경쟁: r₁ = −r₂ · 혼합: 그 밖</text>
+          <path class="ln st" d="M552 135 H 636" marker-end="url(#hSt)"/>
+          <path class="ln st" d="M760 78 V 18 H 140 V 40" marker-end="url(#hSt)"/><text class="s f-st" x="450" y="12" text-anchor="middle" font-weight="700">o₁′, r₁</text>
+          <path class="ln st" d="M760 192 V 254 H 140 V 230" marker-end="url(#hSt)"/><text class="s f-st" x="450" y="268" text-anchor="middle" font-weight="700">o₂′, r₂</text>
+        </svg>
+      </div>
+      <p class="sk-note">공동 행동 (a₁, a₂)가 결과를 정합니다. 그래서 <b>내 보상은 상대의 행동에도 달려 있고</b>, 상대가 배우는 동안 내 입장에서 환경이 계속 바뀝니다(비정상성).</p>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>독립 학습자의 비정상성 — 서로를 쫓는 두 에이전트</h2><span class="sk-hint">그림을 누르면 시작 정책을 바꿉니다</span></div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">설정</span>
+          <div class="sk-seg" role="group" aria-label="게임" id="segGame">
+            <button type="button" data-v="coop" aria-pressed="false">협력</button>
+            <button type="button" data-v="comp" aria-pressed="true">경쟁</button>
+            <button type="button" data-v="mixed" aria-pressed="false">혼합</button>
+          </div>
+        </div>
+        <label class="sk-slider"><span class="sk-sl-head">학습률 η <b id="vEta">1.0</b></span><input type="range" id="sEta" min="0.2" max="3" step="0.1" value="1"></label>
+        <div class="sk-group">
+          <button class="sk-btn" type="button" id="ngFirst">처음</button>
+          <button class="sk-btn sk-btn--primary" type="button" id="ngNext">다음 단계</button>
+          <button class="sk-btn" type="button" id="ngPlay">재생</button>
+          <button class="sk-btn" type="button" id="ngEnd">끝까지</button>
+        </div>
+        <span class="sk-pill" id="ngStep">단계 0</span>
+      </div>
+      <p class="sk-lead" id="gameDesc"></p>
+      <div class="ma-split">
+        <div class="ma-col">
+          <div class="sk-scroll"><table class="ma-pay" id="payTbl"></table></div>
+          <canvas class="ma-cv ma-sq" id="cvPhase" aria-label="두 에이전트 정책의 궤적: 가로 = 에이전트 1이 첫 행동을 고를 확률, 세로 = 에이전트 2가 첫 행동을 고를 확률"></canvas>
+          <div class="sk-legend"><span>가로 p₁ = P(에이전트 1이 첫 행동)</span><span>세로 p₂ = P(에이전트 2가 첫 행동)</span><span>회색 화살표 = 독립 기울기 방향</span></div>
+        </div>
+        <div class="ma-col">
+          <div class="sk-mat-label">정책 확률 p₁(파랑) · p₂(주황)</div>
+          <canvas class="ma-cv" id="cvPT" aria-label="시간에 따른 정책 확률"></canvas>
+          <div class="sk-mat-label">에이전트 1이 보는 두 행동의 가치 차이 Q₁(첫) − Q₁(둘째) — 상대가 바뀌면 부호가 뒤집힌다</div>
+          <canvas class="ma-cv" id="cvDQ" aria-label="에이전트 1이 보는 행동 가치 차이의 변화"></canvas>
+          <div class="sk-formula" id="ngCalc"></div>
+        </div>
+      </div>
+      <p class="sk-note">각 에이전트는 상대를 <b>환경의 일부</b>로 보고 자기 보상만 키우는 방향(정책 기울기)으로 움직입니다. 그런데 상대도 동시에 바뀌므로, 어제 좋던 행동이 오늘은 나빠집니다(가치 차이의 부호가 바뀜). 경쟁 게임에서는 두 정책이 서로를 쫓아 빙글빙글 돌고, 혼합(죄수의 딜레마)에서는 둘 다 손해인 (배신, 배신)으로 갑니다.</p>
+    </div>
+  </section>
+
+  <!-- 2. CTDE -->
+  <section id="pane-ctde" role="tabpanel" aria-labelledby="tab-ctde" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>중앙 학습 · 분산 실행 (CTDE)</h2><span class="sk-hint">Centralized Training, Decentralized Execution</span></div>
+      <div class="sk-controls">
+        <div class="sk-seg" role="group" aria-label="단계" id="segPhase">
+          <button type="button" data-v="train" aria-pressed="true">학습할 때</button>
+          <button type="button" data-v="exec" aria-pressed="false">실행할 때</button>
+        </div>
+        <span class="sk-hint" id="phaseHint"></span>
+      </div>
+      <div class="sk-scroll">
+        <svg class="ma-svg" id="ctdeSvg" data-phase="train" viewBox="0 0 900 340" role="img" aria-label="학습할 때는 중앙 critic이나 믹서가 전체 상태와 모든 행동을 보고 각 에이전트에게 학습 신호를 주고, 실행할 때는 각 에이전트가 자기 관측만으로 행동한다">
+          <defs>
+            <marker id="cSt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="f-st" d="M0 0L10 5L0 10z"/></marker>
+            <marker id="cAc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="f-ac" d="M0 0L10 5L0 10z"/></marker>
+            <marker id="cVl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="f-vl" d="M0 0L10 5L0 10z"/></marker>
+            <marker id="cTg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="f-tg" d="M0 0L10 5L0 10z"/></marker>
+          </defs>
+          <rect class="bx" x="20" y="120" width="150" height="90" rx="10"/><text class="t" x="95" y="152" text-anchor="middle">환경</text><text class="s" x="95" y="174" text-anchor="middle">전체 상태 s</text><text class="s" x="95" y="192" text-anchor="middle">(학습 때만 사용)</text>
+          <path class="ln st" d="M172 140 L 262 70" marker-end="url(#cSt)"/><text class="s f-st" x="190" y="92">o₁</text>
+          <path class="ln st" d="M172 190 L 262 262" marker-end="url(#cSt)"/><text class="s f-st" x="190" y="248">o₂</text>
+          <rect class="bx a1" x="266" y="36" width="180" height="70" rx="10"/><text class="t" x="356" y="64" text-anchor="middle">행위자 1  π₁(o₁)</text><text class="s" x="356" y="86" text-anchor="middle">또는 에이전트 Q₁(o₁, ·)</text>
+          <rect class="bx a2" x="266" y="230" width="180" height="70" rx="10"/><text class="t" x="356" y="258" text-anchor="middle">행위자 2  π₂(o₂)</text><text class="s" x="356" y="280" text-anchor="middle">또는 에이전트 Q₂(o₂, ·)</text>
+          <path class="ln ac" d="M448 70 H 560" marker-end="url(#cAc)"/><text class="s f-ac" x="490" y="62">a₁</text>
+          <path class="ln ac" d="M448 266 H 560" marker-end="url(#cAc)"/><text class="s f-ac" x="490" y="290">a₂</text>
+          <text class="t execonly" x="660" y="74">→ 환경에서 바로 실행</text>
+          <text class="t execonly" x="660" y="270">→ 환경에서 바로 실행</text>
+          <text class="s execonly" x="600" y="170" font-weight="700">통신·중앙 서버 없이 각자 자기 관측으로만 행동</text>
+          <g class="critic">
+            <rect class="bx" x="600" y="118" width="280" height="96" rx="10" style="stroke:var(--rl-value)"/>
+            <text class="t" x="740" y="146" text-anchor="middle">중앙 critic · 믹서</text>
+            <text class="s" x="740" y="168" text-anchor="middle">MADDPG: Qᵢ(s, a₁, a₂)</text>
+            <text class="s" x="740" y="188" text-anchor="middle">VDN·QMIX: Q_tot = f(Q₁, Q₂; s)</text>
+            <path class="ln ac" d="M560 70 C 600 70, 610 100, 640 116" marker-end="url(#cAc)"/>
+            <path class="ln ac" d="M560 266 C 600 266, 610 236, 640 216" marker-end="url(#cAc)"/>
+            <path class="ln st" d="M95 212 V 320 H 740 V 218" marker-end="url(#cSt)"/><text class="s f-st" x="420" y="314">전체 상태 s (학습 때만)</text>
+            <path class="ln tg trainonly" d="M600 150 C 520 150, 470 110, 450 98" marker-end="url(#cTg)"/>
+            <path class="ln tg trainonly" d="M600 182 C 520 182, 470 226, 450 238" marker-end="url(#cTg)"/>
+            <text class="s f-tg trainonly" x="462" y="172" font-weight="700">학습 신호</text>
+          </g>
+        </svg>
+      </div>
+      <p class="sk-note" id="phaseNote"></p>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>왜 중앙에서 다 하지 않나 — 공동 행동 공간의 폭발</h2></div>
+      <div class="sk-controls">
+        <label class="sk-slider"><span class="sk-sl-head">에이전트 수 N <b id="vN">2</b></span><input type="range" id="sN" min="1" max="10" step="1" value="2"></label>
+        <label class="sk-slider"><span class="sk-sl-head">에이전트당 행동 수 |A| <b id="vA">5</b></span><input type="range" id="sA" min="2" max="20" step="1" value="5"></label>
+      </div>
+      <div class="sk-stats">
+        <div class="sk-stat"><b id="stJoint">25</b><span>완전 중앙: 공동 행동 수 |A|ᴺ</span></div>
+        <div class="sk-stat"><b id="stDecomp">10</b><span>가치 분해: 각자 |A|개씩 N·|A|</span></div>
+      </div>
+      <div class="sk-scroll"><table class="sk-table">
+        <tr><th>방식</th><th>학습 때 보는 것</th><th>실행 때 보는 것</th><th>장점</th><th>약점</th><th>대표 알고리즘</th></tr>
+        <tr><td><b>독립 학습</b></td><td>자기 관측 · 자기 행동</td><td>자기 관측</td><td>단순, 확장 쉬움</td><td>비정상성, 팀 보상의 공 나누기 어려움</td><td>IQL, IPPO</td></tr>
+        <tr><td><b>CTDE</b></td><td>전체 상태 · 모든 행동</td><td>자기 관측</td><td>안정적 학습 + 분산 실행</td><td>분해 가정(합·단조)의 표현 한계</td><td>VDN, QMIX, MADDPG, MAPPO</td></tr>
+        <tr><td><b>완전 중앙</b></td><td>전체</td><td>전체 (중앙 서버)</td><td>최적 협력 표현</td><td>|A|ᴺ 폭발, 통신 필수</td><td>공동 행동 Q 학습</td></tr>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- 3. VDN vs QMIX -->
+  <section id="pane-qmix" role="tabpanel" aria-labelledby="tab-qmix" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>가치 분해 — VDN(합)과 QMIX(단조 믹서)</h2><span class="sk-hint">공동 행동을 모두 고르게 시도한 데이터(ε = 1)로 실제 학습</span></div>
+      <div class="sk-formula">VDN: Q<sub>tot</sub>(s,a₁,a₂) = Q₁(s,a₁) + Q₂(s,a₂) &nbsp;&nbsp;|&nbsp;&nbsp; QMIX: Q<sub>tot</sub> = w₂(s)ᵀ · ELU( W₁(s)ᵀ [Q₁, Q₂] + b₁(s) ) + b₂(s), &nbsp;<b class="c-value">W₁, w₂ = |하이퍼네트워크(s)| ≥ 0</b> → ∂Q<sub>tot</sub>/∂Qᵢ ≥ 0<br>
+        <span style="color:var(--muted)">둘 다 argmax Q<sub>tot</sub> = (argmax Q₁, argmax Q₂) — 각자 자기 Q의 최댓값만 고르면 팀 최선과 일치(분산 실행 가능)</span></div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">보상 게임</span>
+          <div class="sk-seg" role="group" aria-label="게임" id="segMat">
+            <button type="button" data-v="twostep" aria-pressed="true">2단계 게임</button>
+            <button type="button" data-v="climb" aria-pressed="false">Climbing</button>
+            <button type="button" data-v="qtran" aria-pressed="false">비단조</button>
+          </div>
+        </div>
+        <label class="sk-slider"><span class="sk-sl-head">seed <b id="vMSeed">1</b></span><input type="range" id="sMSeed" min="1" max="20" step="1" value="1"></label>
+        <button class="sk-btn sk-btn--primary" type="button" id="mxPlay">학습 과정 재생</button>
+        <span class="sk-pill" id="mxStep">반복 0</span>
+      </div>
+      <p class="sk-lead" id="matDesc"></p>
+      <div class="sk-controls" id="stateRow">
+        <div class="sk-group"><span class="sk-label">상태</span><div class="sk-seg" role="group" aria-label="상태" id="segState"></div></div>
+      </div>
+      <div class="ma-tri">
+        <div class="ma-box"><h3>실제 보상 (팀 공통)</h3><div class="sk-scroll"><table class="ma-pay" id="tblTrue"></table></div><p class="ma-res" id="resTrue"></p></div>
+        <div class="ma-box"><h3 style="color:var(--m-vdn)">VDN이 배운 Q<sub>tot</sub></h3><div class="sk-scroll"><table class="ma-pay" id="tblVdn"></table></div><p class="ma-res" id="resVdn"></p></div>
+        <div class="ma-box"><h3 style="color:var(--m-qmix)">QMIX가 배운 Q<sub>tot</sub> <span class="sk-hint">칸을 누르면 아래 계산</span></h3><div class="sk-scroll"><table class="ma-pay" id="tblQmix"></table></div><p class="ma-res" id="resQmix"></p></div>
+      </div>
+      <p class="sk-note" id="mxVerdict"></p>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>QMIX 믹서 안을 들여다보기</h2><span class="sk-hint" id="mixHint"></span></div>
+      <div class="sk-scroll"><svg class="ma-mix" id="mixSvg" viewBox="0 0 900 300" role="img" aria-label="QMIX 믹서의 계산: 두 에이전트 Q가 비음수 가중치를 지나 Q_tot이 된다"></svg></div>
+      <div class="sk-formula" id="mixCalc"></div>
+      <div class="ma-split">
+        <div><div class="sk-mat-label">단조성 확인: Q₁만 바꿀 때 Q<sub>tot</sub> (Q₂ 고정) — 항상 오르막</div><canvas class="ma-cv" id="cvMono" aria-label="Q1을 바꿀 때 Q_tot의 변화"></canvas></div>
+        <div><div class="sk-mat-label">학습 손실 (평균 제곱 TD 오차) — VDN(청록) · QMIX(보라)</div><canvas class="ma-cv" id="cvMixLoss" aria-label="학습 손실 곡선"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. 협력 격자 -->
+  <section id="pane-grid" role="tabpanel" aria-labelledby="tab-grid" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>협력 격자 — 스위치를 누르는 동안만 문이 열린다</h2><span class="sk-hint">독립 Q vs VDN vs QMIX-lite, 표 기반 · 브라우저에서 실제 학습</span></div>
+      <p class="sk-lead">격리 병동 약품 전달: 로봇 <b class="ma-r1">A</b>나 <b class="ma-r2">B</b> 중 하나가 스위치(W)를 밟고 있는 동안만 문(D)이 열립니다. 누구든 격리실 G에 도착하면 팀 보상 +10(종료), 매 걸음 팀 보상 −0.1. 각 로봇은 <b>자기 위치와 문 열림 여부만</b> 보고 행동합니다(분산 실행). 행동 5개: ↑ → ↓ ← 정지 · γ 0.95 · 학습률 0.1 · ε 1 → 0.05.</p>
+      <div class="sk-controls">
+        <label class="sk-slider"><span class="sk-sl-head">에피소드 <b id="vGEp">3000</b></span><input type="range" id="sGEp" min="500" max="5000" step="500" value="3000"></label>
+        <label class="sk-slider"><span class="sk-sl-head">seed <b id="vGSeed">1</b></span><input type="range" id="sGSeed" min="1" max="30" step="1" value="1"></label>
+        <button class="sk-btn sk-btn--primary" type="button" id="gTrain">학습 시작</button>
+        <button class="sk-btn" type="button" id="gStop">멈춤</button>
+        <button class="sk-btn" type="button" id="gReset">초기화</button>
+        <label class="sk-slider" style="min-width:140px"><span class="sk-sl-head">속도 <b id="vGSpd">보통</b></span><input type="range" id="sGSpd" min="1" max="3" step="1" value="2"></label>
+        <span class="ma-prog" id="gProg"></span>
+      </div>
+      <div class="ma-split">
+        <div class="ma-col">
+          <div class="sk-controls">
+            <div class="sk-group"><span class="sk-label">실행해 볼 방법</span>
+              <div class="sk-seg" role="group" aria-label="방법" id="segGM">
+                <button type="button" data-v="iql" aria-pressed="false">독립 Q</button>
+                <button type="button" data-v="vdn" aria-pressed="true">VDN</button>
+                <button type="button" data-v="qmix" aria-pressed="false">QMIX-lite</button>
+              </div>
+            </div>
+            <div class="sk-group">
+              <button class="sk-btn" type="button" id="grFirst">처음</button>
+              <button class="sk-btn" type="button" id="grNext">다음 걸음</button>
+              <button class="sk-btn" type="button" id="grPlay">재생</button>
+            </div>
+          </div>
+          <canvas class="ma-cv" id="cvGrid" aria-label="협력 격자: 로봇 A와 B, 스위치, 문, 격리실"></canvas>
+          <div class="sk-legend ma-legend"><span><i class="l1"></i>로봇 A</span><span><i class="l2"></i>로봇 B</span><span>W 스위치 · D 문 · G 격리실</span></div>
+          <div class="sk-formula" id="grInfo"></div>
+        </div>
+        <div class="ma-col">
+          <div class="sk-mat-label">탐욕 정책으로 G까지 걸린 걸음 (100에피소드마다 평가, 실패 = 30, 최적 7)</div>
+          <canvas class="ma-cv" id="cvGCurve" aria-label="방법별 평가 걸음 수"></canvas>
+          <div class="sk-mat-label">학습 중 에피소드 리턴 (이동평균 100)</div>
+          <canvas class="ma-cv" id="cvGRet" aria-label="방법별 학습 리턴"></canvas>
+          <div class="sk-legend"><span><i style="background:var(--m-iql)"></i>독립 Q</span><span><i style="background:var(--m-vdn)"></i>VDN</span><span><i style="background:var(--m-qmix)"></i>QMIX-lite</span></div>
+          <div class="sk-formula" id="gTd"></div>
+        </div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>seed를 바꿔 여러 번 — 안정성 비교</h2><button class="sk-btn sk-btn--sm" type="button" id="gMulti">seed 20개 실행</button></div>
+      <p class="sk-lead">같은 설정에서 seed만 바꿔 세 방법을 학습한 뒤, 마지막 탐욕 정책이 최적(7걸음)인지, 성공했는지, 학습 중 평가 결과가 몇 번 흔들렸는지 셉니다.</p>
+      <div class="sk-scroll"><table class="sk-table" id="tblMulti"><tr><td>버튼을 누르면 계산합니다 (몇 초).</td></tr></table></div>
+      <p class="sk-note">읽는 법: 이 작은 문제에서는 세 방법 모두 대부분의 seed에서 결국 최적(7걸음)에 도달합니다. 차이는 <b>학습 과정의 흔들림</b>에서 납니다. 독립 Q는 각 로봇이 같은 팀 보상을 자기 Q에 통째로 귀속하고, 상대 위치를 볼 수 없어 상대가 배우는 동안 같은 관측의 결과가 계속 바뀝니다(비정상성) — 평가 결과가 바뀐 횟수가 가장 많습니다. VDN·QMIX-lite는 <b>팀 TD 오차 하나</b>를 두 로봇의 Q로 나눠 갖고, 목표값을 두 로봇이 모두 탐욕적으로 행동한다고 보고 계산해 덜 흔들립니다. 단 QMIX-lite는 믹서 가중치까지 함께 배우느라 가끔 실패하는 seed가 있습니다(seed 1~60에서 직접 계산: 바뀐 횟수 합 독립 Q 79·81·97, VDN 50·51·52, QMIX-lite 41·34·41 / 최적 도달 독립 Q 19·17·19, VDN 19·19·19, QMIX-lite 17·17·18, 20개씩).</p>
+    </div>
+  </section>
+
+  <!-- 5. MADDPG -->
+  <section id="pane-maddpg" role="tabpanel" aria-labelledby="tab-maddpg" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>MADDPG — 분산 행위자 + 중앙 critic (연속 행동)</h2><span class="sk-hint">simple_spread 축소판 · 브라우저용 축소 설정</span></div>
+      <div class="sk-formula">critic: y = <span class="c-reward">r</span> + γ · Q′ᵢ( x′, μ′₁(o′₁), μ′₂(o′₂) ), &nbsp; L = (Qᵢ(x, a₁, a₂) − y)² &nbsp;&nbsp;(x = [o₁, o₂] 모두 봄)<br>
+        actor: ∇θᵢ J = E[ ∇θᵢ μᵢ(oᵢ) · <b class="c-value">∇aᵢ Qᵢ(x, a₁, …, aᵢ = μᵢ(oᵢ), …)</b> ] &nbsp;&nbsp;(행동은 자기 관측 oᵢ만으로)</div>
+      <p class="sk-lead">두 로봇(파랑·주황)이 두 목표 지점(초록)을 나눠 덮어야 합니다. 팀 보상 = −(각 목표에서 가장 가까운 로봇까지 거리의 합) − 충돌 0.5. 행동은 2차원 속도(−1~1), 한 에피소드 25걸음. 관측 oᵢ = [자기 위치, 두 목표까지 상대 위치, 상대 로봇까지 상대 위치] 8개. <b>브라우저용 축소:</b> 목표 위치 고정, 관성 없음, 은닉 32-32, 배치 32, 400에피소드.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">critic 입력</span>
+          <div class="sk-seg" role="group" aria-label="critic" id="segCritic">
+            <button type="button" data-v="maddpg" aria-pressed="true">중앙 (MADDPG)</button>
+            <button type="button" data-v="ddpg" aria-pressed="false">독립 (DDPG)</button>
+          </div>
+        </div>
+        <label class="sk-slider"><span class="sk-sl-head">에피소드 <b id="vMEp">400</b></span><input type="range" id="sMEp" min="100" max="800" step="100" value="400"></label>
+        <label class="sk-slider"><span class="sk-sl-head">seed <b id="vMdSeed">1</b></span><input type="range" id="sMdSeed" min="1" max="20" step="1" value="1"></label>
+        <button class="sk-btn sk-btn--primary" type="button" id="mdTrain">학습 시작</button>
+        <button class="sk-btn" type="button" id="mdStop">멈춤</button>
+        <button class="sk-btn" type="button" id="mdReset">초기화</button>
+        <span class="ma-prog" id="mdProg"></span>
+      </div>
+      <div class="ma-split">
+        <div class="ma-col">
+          <canvas class="ma-cv ma-sq" id="cvWorld" aria-label="입자 세계: 로봇 두 대와 목표 두 곳, 최근 평가 에피소드의 궤적"></canvas>
+          <div class="sk-legend ma-legend"><span><i class="l1"></i>로봇 1</span><span><i class="l2"></i>로봇 2</span><span><i style="background:var(--rl-reward)"></i>목표 지점</span><span>선 = 최근 평가 에피소드 궤적</span></div>
+        </div>
+        <div class="ma-col">
+          <div class="sk-stats">
+            <div class="sk-stat"><b id="mdEval">–</b><span>최근 평가 리턴</span></div>
+            <div class="sk-stat"><b id="mdRand">–</b><span>무작위 정책</span></div>
+            <div class="sk-stat"><b id="mdOrac">–</b><span>직선 이동 기준</span></div>
+            <div class="sk-stat"><b id="mdUpd">0</b><span>갱신 횟수</span></div>
+          </div>
+          <div class="sk-mat-label">에피소드 리턴 (이동평균 20, 점 = 평가) · 점선 = 무작위 / 직선 이동 기준</div>
+          <canvas class="ma-cv" id="cvMdCurve" aria-label="MADDPG 학습 곡선"></canvas>
+          <div class="sk-formula" id="mdCalc">학습을 시작하면 배치의 첫 표본으로 계산한 숫자가 여기에 나옵니다.</div>
+        </div>
+      </div>
+      <p class="sk-note">독립 DDPG의 critic은 Q(oᵢ, aᵢ)만 봅니다. 팀 보상은 상대 행동에도 달려 있는데 그것을 볼 수 없으니, 상대 정책이 바뀔 때마다 같은 입력의 정답이 달라집니다(비정상성). MADDPG의 critic은 학습 때만 모든 관측과 행동을 보아 이 흔들림을 없애고, 실행 때는 행위자 μᵢ(oᵢ)만 씁니다. 이 작은 협력 과제에서는 차이가 작을 수 있으며, 에이전트가 많거나 경쟁·혼합 과제일수록 차이가 커집니다.</p>
+    </div>
+  </section>
+
+  <!-- 6. 코드 -->
+  <section id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>파이썬 코드 — 현재 설정 반영</h2><button class="sk-btn sk-btn--sm" type="button" id="btnCopy">복사</button></div>
+      <p class="sk-lead">PettingZoo MPE simple_spread 환경, PyTorch로 쓴 QMIX 믹서(하이퍼네트워크 + 절댓값 가중치)와 MADDPG 중앙 critic의 핵심 부분입니다. 격자 행동 순서는 이 페이지 기준 0↑ 1→ 2↓ 3← 4정지 입니다(Gymnasium FrozenLake는 0← 1↓ 2→ 3↑ 순서라 다름).</p>
+      <pre class="ma-code" id="code" tabindex="0"></pre>
+    </div>
+  </section>
+
+  <!-- 7. 알고리즘 구성도 -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">설정·비정상성·CTDE · VDN/QMIX · MADDPG 3장 · 강의용 도식</span></div><div data-ds-diagrams="multi-agent-rl"></div></section>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20261007a"></script>
+<script src="../../assets/js/rl-kit.js?v=20261007a"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261007a"></script>
+<script src="../../assets/diagrams/multi-agent-rl.js?v=20261007a"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const RM = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  function f(v, d) { if (v == null || Number.isNaN(v)) return "–"; d = d == null ? 2 : d; const r = Math.abs(v) < 0.5 * Math.pow(10, -d) ? 0 : v; return (r < 0 ? "−" : "") + Math.abs(r).toFixed(d); }
+
+  /* ---------------- 안쪽 탭 ---------------- */
+  const tabs = [...document.querySelectorAll(".sk-tab")];
+  let curTab = "settings";
+  function show(t) {
+    tabs.forEach(b => { const on = b === t; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1; document.getElementById(b.getAttribute("aria-controls")).hidden = !on; });
+    curTab = t.id.replace("tab-", ""); history.replaceState(null, "", "#" + curTab);
+    stopUi(); renderTab();
+  }
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => show(b));
+    b.addEventListener("keydown", e => { const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return; const n = tabs[(i + d + tabs.length) % tabs.length]; show(n); n.focus(); e.preventDefault(); });
+  });
+  function seg(id, cb) { const el = $(id); el.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; el.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); cb(b.getAttribute("data-v")); }); }
+
+  /* 공통 선 그래프 */
+  function xyChart(cv, o) {
+    const T = RL.theme(), pw = Math.max(260, (cv.parentNode && cv.parentNode.clientWidth) || 560), fit = RL.fitCanvas(cv, pw, o.h || 200), g = fit.g, W = fit.w, H = fit.h, pl = 46, pr = 12, pt = 12, pb = 30;
+    g.clearRect(0, 0, W, H);
+    const xs = [].concat.apply([], o.series.map(s => s.x)).concat(o.xmax != null ? [o.xmax] : []), ys = [].concat.apply([], o.series.map(s => s.y)).concat((o.hlines || []).map(h => h.y)).filter(Number.isFinite);
+    let x0 = o.xmin != null ? o.xmin : (xs.length ? Math.min.apply(null, xs) : 0), x1 = o.xmax != null ? o.xmax : (xs.length ? Math.max.apply(null, xs) : 1); if (x1 - x0 < 1e-9) x1 = x0 + 1;
+    let y0 = o.ymin != null ? o.ymin : (ys.length ? Math.min.apply(null, ys) : 0), y1 = o.ymax != null ? o.ymax : (ys.length ? Math.max.apply(null, ys) : 1); if (y1 - y0 < 1e-9) { y0 -= 1; y1 += 1; }
+    if (o.ymin == null) y0 -= (y1 - y0) * 0.06; if (o.ymax == null) y1 += (y1 - y0) * 0.06;
+    const X = x => pl + (W - pl - pr) * (x - x0) / (x1 - x0), Y = y => pt + (H - pt - pb) * (1 - (Math.max(y0, Math.min(y1, y)) - y0) / (y1 - y0));
+    const mono = css("--mono") || "monospace"; g.font = "11px " + mono; g.lineWidth = 1;
+    for (let k = 0; k <= 4; k++) { const v = y0 + (y1 - y0) * k / 4; g.strokeStyle = T.line; g.beginPath(); g.moveTo(pl, Y(v)); g.lineTo(W - pr, Y(v)); g.stroke(); g.fillStyle = T.faint; g.textAlign = "right"; g.fillText(f(v, Math.abs(y1 - y0) >= 8 ? 0 : 1), pl - 6, Y(v) + 4); }
+    g.textAlign = "center"; [x0, (x0 + x1) / 2, x1].forEach(v => g.fillText(String(Math.round(v)), X(v), H - 16));
+    if (o.xlabel) { g.fillStyle = T.muted; g.fillText(o.xlabel, (pl + W - pr) / 2, H - 2); }
+    (o.hlines || []).forEach(h => { g.strokeStyle = h.color || T.faint; g.setLineDash([5, 4]); g.beginPath(); g.moveTo(pl, Y(h.y)); g.lineTo(W - pr, Y(h.y)); g.stroke(); g.setLineDash([]); });
+    o.series.forEach(s => {
+      if (!s.y.length) return;
+      g.strokeStyle = s.color; g.lineWidth = s.width || 2; if (s.dash) g.setLineDash(s.dash);
+      if (!s.dotsOnly) { g.beginPath(); s.y.forEach((v, i) => { const xx = X(s.x[i]), yy = Y(v); if (i) g.lineTo(xx, yy); else g.moveTo(xx, yy); }); g.stroke(); }
+      g.setLineDash([]);
+      if (s.dots) s.y.forEach((v, i) => { g.fillStyle = s.color; g.beginPath(); g.arc(X(s.x[i]), Y(v), s.r || 2.6, 0, 7); g.fill(); });
+    });
+    let lx = pl + 8; o.series.forEach(s => { if (!s.label) return; g.fillStyle = s.color; g.fillRect(lx, pt + 2, 10, 10); g.fillStyle = T.text; g.textAlign = "left"; g.font = "600 11.5px " + (css("--sans") || "sans-serif"); g.fillText(s.label, lx + 14, pt + 11); lx += 26 + g.measureText(s.label).width; });
+    return { X: X, Y: Y };
+  }
+
+  /* =========================================================
+     1. 행렬 게임 · 독립 정책 기울기
+     ========================================================= */
+  const GAMES = {
+    coop: { name: "협력 — 조율 게임", acts: ["A안", "B안"], R1: [[4, 0], [0, 2]], R2: [[4, 0], [0, 2]], start: [0.35, 0.3],
+      desc: "두 병원이 같은 진료 프로토콜을 고르면 이득(A안 4, B안 2), 엇갈리면 0. 팀 보상이 같은 협력 설정입니다. 시작점에 따라 더 나쁜 (B안, B안)에 갇힐 수 있습니다." },
+    comp: { name: "경쟁 — 동전 맞추기", acts: ["앞", "뒤"], R1: [[1, -1], [-1, 1]], R2: [[-1, 1], [1, -1]], start: [0.8, 0.35],
+      desc: "에이전트 1은 같은 면을, 에이전트 2는 다른 면을 내면 +1(제로섬 r₁ = −r₂). 한쪽이 바꾸면 다른 쪽이 따라 바꾸어 영원히 쫓고 쫓깁니다." },
+    mixed: { name: "혼합 — 죄수의 딜레마", acts: ["협력", "배신"], R1: [[3, 0], [5, 1]], R2: [[3, 5], [0, 1]], start: [0.9, 0.85],
+      desc: "함께 협력하면 각 3, 혼자 배신하면 5 대 0, 함께 배신하면 각 1. 각자 자기 보상만 키우면 둘 다 손해인 (배신, 배신)에 도달합니다." }
+  };
+  const NG_STEPS = 400;
+  const NG = { game: "comp", eta: 1, start: GAMES.comp.start.slice(), step: 0, traj: null };
+  const sig = z => 1 / (1 + Math.exp(-z)), logit = p => Math.log(p / (1 - p));
+  function qvals(R, pOther, forAgent) { /* 에이전트가 행동 0·1을 냈을 때 기대 보상 */
+    return forAgent === 1 ? [pOther * R[0][0] + (1 - pOther) * R[0][1], pOther * R[1][0] + (1 - pOther) * R[1][1]]
+                          : [pOther * R[0][0] + (1 - pOther) * R[1][0], pOther * R[0][1] + (1 - pOther) * R[1][1]];
+  }
+  function ngSim() {
+    const G = GAMES[NG.game]; let z1 = logit(NG.start[0]), z2 = logit(NG.start[1]); const tr = [];
+    for (let t = 0; t <= NG_STEPS; t++) {
+      const p1 = sig(z1), p2 = sig(z2), q1 = qvals(G.R1, p2, 1), q2 = qvals(G.R2, p1, 2);
+      const g1 = p1 * (1 - p1) * (q1[0] - q1[1]), g2 = p2 * (1 - p2) * (q2[0] - q2[1]);
+      tr.push({ p1: p1, p2: p2, z1: z1, z2: z2, q1: q1, q2: q2, g1: g1, g2: g2 });
+      z1 += NG.eta * g1; z2 += NG.eta * g2;
+      z1 = Math.max(-12, Math.min(12, z1)); z2 = Math.max(-12, Math.min(12, z2));
+    }
+    NG.traj = tr;
+  }
+  function renderPay() {
+    const G = GAMES[NG.game], tr = NG.traj[NG.step];
+    let h = '<tr><th></th><th colspan="2">에이전트 2</th></tr><tr><th>에이전트 1</th>' + G.acts.map(a => '<th>' + a + '</th>').join("") + '</tr>';
+    for (let i = 0; i < 2; i++) {
+      h += '<tr><th>' + G.acts[i] + '</th>';
+      for (let j = 0; j < 2; j++) { const pj = (i ? 1 - tr.p1 : tr.p1) * (j ? 1 - tr.p2 : tr.p2); h += '<td' + (pj > 0.5 ? ' class="hl"' : '') + '><span class="ma-r1">' + f(G.R1[i][j], 0) + '</span>, <span class="ma-r2">' + f(G.R2[i][j], 0) + '</span><br><small style="color:var(--faint)">' + (pj * 100).toFixed(0) + '%</small></td>'; }
+      h += '</tr>';
+    }
+    $("payTbl").innerHTML = h;
+  }
+  function renderPhase() {
+    const cv = $("cvPhase"), T = RL.theme(), W0 = Math.min(420, Math.max(240, cv.parentNode.clientWidth)), fit = RL.fitCanvas(cv, W0, W0), g = fit.g, W = fit.w, H = fit.h, p = 42;
+    const X = v => p + (W - p - 10) * v, Y = v => H - p - (H - p - 10) * v, G = GAMES[NG.game];
+    g.clearRect(0, 0, W, H); g.fillStyle = T.bg2; g.fillRect(X(0), Y(1), X(1) - X(0), Y(0) - Y(1));
+    g.strokeStyle = T.line; g.lineWidth = 1; for (let k = 0; k <= 4; k++) { g.beginPath(); g.moveTo(X(k / 4), Y(0)); g.lineTo(X(k / 4), Y(1)); g.moveTo(X(0), Y(k / 4)); g.lineTo(X(1), Y(k / 4)); g.stroke(); }
+    /* 기울기 화살표 */
+    g.strokeStyle = T.faint; g.fillStyle = T.faint;
+    for (let i = 1; i < 10; i++) for (let j = 1; j < 10; j++) {
+      const p1 = i / 10, p2 = j / 10, q1 = qvals(G.R1, p2, 1), q2 = qvals(G.R2, p1, 2);
+      let dx = p1 * (1 - p1) * p1 * (1 - p1) * (q1[0] - q1[1]), dy = p2 * (1 - p2) * p2 * (1 - p2) * (q2[0] - q2[1]); const L = Math.hypot(dx, dy); if (L < 1e-9) continue;
+      dx /= L; dy /= L; const cx = X(p1), cy = Y(p2), s = (W - p) * 0.035;
+      g.lineWidth = 1.2; g.beginPath(); g.moveTo(cx - dx * s, cy + dy * s); g.lineTo(cx + dx * s, cy - dy * s); g.stroke();
+      g.beginPath(); g.arc(cx + dx * s, cy - dy * s, 1.8, 0, 7); g.fill();
+    }
+    /* 궤적 */
+    const tr = NG.traj.slice(0, NG.step + 1);
+    g.lineWidth = 2; g.strokeStyle = css("--rl-value"); g.beginPath(); tr.forEach((t, i) => { if (i) g.lineTo(X(t.p1), Y(t.p2)); else g.moveTo(X(t.p1), Y(t.p2)); }); g.stroke();
+    const t0 = tr[0], tn = tr[tr.length - 1];
+    g.fillStyle = T.bg; g.strokeStyle = T.ink; g.lineWidth = 2; g.beginPath(); g.arc(X(t0.p1), Y(t0.p2), 5, 0, 7); g.fill(); g.stroke();
+    g.fillStyle = css("--rl-value"); g.beginPath(); g.arc(X(tn.p1), Y(tn.p2), 6, 0, 7); g.fill();
+    const mono = css("--mono") || "monospace"; g.fillStyle = T.muted; g.font = "11px " + mono; g.textAlign = "center";
+    [0, 0.5, 1].forEach(v => { g.fillText(v.toFixed(1), X(v), H - p + 14); g.textAlign = "right"; g.fillText(v.toFixed(1), p - 6, Y(v) + 4); g.textAlign = "center"; });
+    g.font = "600 11.5px " + (css("--sans") || "sans-serif"); g.fillStyle = T.text;
+    g.fillText("p₁ (에이전트 1이 " + G.acts[0] + ")", (X(0) + X(1)) / 2, H - 4);
+    g.save(); g.translate(10, (Y(0) + Y(1)) / 2); g.rotate(-Math.PI / 2); g.fillText("p₂ (에이전트 2가 " + G.acts[0] + ")", 0, 0); g.restore();
+    g.font = "600 11px " + (css("--sans") || "sans-serif"); g.fillStyle = T.faint;
+    g.textAlign = "right"; g.fillText("(" + G.acts[0] + "," + G.acts[0] + ")", X(1) - 4, Y(1) + 14); g.textAlign = "left"; g.fillText("(" + G.acts[1] + "," + G.acts[1] + ")", X(0) + 4, Y(0) - 6);
+  }
+  function renderSettings() {
+    const G = GAMES[NG.game], tr = NG.traj[NG.step];
+    $("gameDesc").textContent = G.desc; $("ngStep").textContent = "단계 " + NG.step + " / " + NG_STEPS;
+    renderPay(); renderPhase();
+    const xs = NG.traj.slice(0, NG.step + 1).map((_, i) => i);
+    xyChart($("cvPT"), { series: [{ x: xs, y: NG.traj.slice(0, NG.step + 1).map(t => t.p1), color: css("--ag1"), label: "p₁" }, { x: xs, y: NG.traj.slice(0, NG.step + 1).map(t => t.p2), color: css("--ag2"), label: "p₂" }], ymin: 0, ymax: 1, xmin: 0, xmax: NG_STEPS, xlabel: "학습 단계", h: 170 });
+    xyChart($("cvDQ"), { series: [{ x: xs, y: NG.traj.slice(0, NG.step + 1).map(t => t.q1[0] - t.q1[1]), color: css("--rl-value"), label: "Q₁(" + G.acts[0] + ") − Q₁(" + G.acts[1] + ")" }], xmin: 0, xmax: NG_STEPS, hlines: [{ y: 0 }], xlabel: "학습 단계", h: 150 });
+    $("ngCalc").innerHTML = '단계 ' + NG.step + ': p₂ = ' + tr.p2.toFixed(3) + ' 이므로 에이전트 1이 보는 Q₁(' + G.acts[0] + ') = ' + f(tr.q1[0], 3) + ', Q₁(' + G.acts[1] + ') = ' + f(tr.q1[1], 3) +
+      '<br>z₁ ← z₁ + η·p₁(1−p₁)·(Q₁(' + G.acts[0] + ') − Q₁(' + G.acts[1] + ')) = ' + f(tr.z1, 3) + ' + ' + NG.eta.toFixed(1) + '×' + (tr.p1 * (1 - tr.p1)).toFixed(3) + '×' + f(tr.q1[0] - tr.q1[1], 3) + ' = <b>' + f(tr.z1 + NG.eta * tr.g1, 3) + '</b> &nbsp;(p₁ = σ(z₁) = ' + tr.p1.toFixed(3) + ')' +
+      '<br><span style="color:var(--muted)">에이전트 2도 같은 방식으로 동시에 z₂를 바꿉니다 → 에이전트 1의 Q₁이 다음 단계에서 달라짐</span>';
+  }
+
+  /* =========================================================
+     2. CTDE
+     ========================================================= */
+  function renderCtde() {
+    const ph = $("ctdeSvg").getAttribute("data-phase");
+    $("phaseHint").textContent = ph === "train" ? "중앙 critic·믹서가 전체 상태와 모든 행동을 본다" : "각자 자기 관측만으로 행동 — critic·믹서는 버린다";
+    $("phaseNote").innerHTML = ph === "train"
+      ? "<b>학습할 때</b>: 시뮬레이터나 기록 데이터에서는 전체 상태 s와 모든 에이전트의 행동을 알 수 있습니다. 중앙 critic(MADDPG) 또는 믹서(VDN·QMIX)가 이 정보로 팀 가치를 추정하고, 각 에이전트에게 학습 신호(분홍 점선)를 나눠 줍니다. 상대의 행동이 입력에 들어 있으니 상대가 바뀌어도 critic의 목표가 흔들리지 않습니다."
+      : "<b>실행할 때</b>: 실제 현장(예: 여러 대의 병원 물류 로봇)에서는 통신이 느리거나 끊길 수 있습니다. 각 에이전트는 학습된 π<sub>i</sub>(o<sub>i</sub>) 또는 argmax Q<sub>i</sub>(o<sub>i</sub>,·)만으로 바로 행동합니다. QMIX는 단조성 덕분에 각자 고른 최선이 곧 팀의 최선입니다.";
+    const N = +$("sN").value, A = +$("sA").value;
+    $("vN").textContent = N; $("vA").textContent = A;
+    const j = Math.pow(A, N); $("stJoint").textContent = j >= 1e7 ? j.toExponential(2).replace("e+", "×10^") : j.toLocaleString("ko-KR"); $("stDecomp").textContent = (N * A).toLocaleString("ko-KR");
+  }
+
+  /* =========================================================
+     3. VDN vs QMIX (행렬 게임)
+     ========================================================= */
+  const MGAMES = {
+    twostep: { nA: 2, acts: ["0", "1"], states: [
+      { name: "상태 1", R: [[0, 0], [0, 0]], next: (a1) => a1 === 0 ? 1 : 2 },
+      { name: "2A", R: [[7, 7], [7, 7]], next: () => -1 },
+      { name: "2B", R: [[0, 1], [1, 8]], next: () => -1 }],
+      desc: "QMIX 논문의 2단계 게임: 상태 1에서 에이전트 1의 행동이 다음 상태를 정합니다(0 → 2A, 1 → 2B, 보상 0). 2A는 무엇을 하든 7, 2B는 둘 다 1을 고르면 8. 최선은 2B로 가서 (1,1) = 8. γ = 1." },
+    climb: { nA: 3, acts: ["a", "b", "c"], states: [{ name: "상태", R: [[11, -30, 0], [-30, 7, 6], [0, 0, 5]], next: () => -1 }],
+      desc: "Climbing 게임: 최선은 (a,a) = 11이지만 한쪽만 a를 고르면 −30. 고르게 시도한 데이터에서는 a의 평균이 나빠 보입니다." },
+    qtran: { nA: 3, acts: ["A", "B", "C"], states: [{ name: "상태", R: [[8, -12, -12], [-12, 0, 0], [-12, 0, 0]], next: () => -1 }],
+      desc: "비단조 행렬(QTRAN 논문 예): 최선은 (A,A) = 8. 그런데 A의 가치는 상대가 A일 때만 높고 아니면 −12 — 한 에이전트의 Q만 올려서는 표현할 수 없는 구조입니다." }
+  };
+  const MIX_E = 8, MIX_STEPS = 3000, MIX_LR = 0.02;
+  const elu = x => x > 0 ? x : Math.exp(x) - 1, delu = x => x > 0 ? 1 : Math.exp(x);
+  function MixTrainer(game, kind, seed) {
+    const rng = RL.rng(seed * 97 + (kind === "vdn" ? 1 : 2)), S = game.states.length, nA = game.nA, E = MIX_E;
+    const P = {}; const add = (k, n, sd) => { P[k] = new Float64Array(n); for (let i = 0; i < n; i++) P[k][i] = rng.normal(0, sd); };
+    add("q", S * 2 * nA, 0.1);
+    if (kind === "qmix") { add("W1", S * 2 * E, 0.5); add("b1", S * E, 0.1); add("w2", S * E, 0.5); add("b2", S, 0.1); }
+    const keys = Object.keys(P), m = {}, v = {}; keys.forEach(k => { m[k] = new Float64Array(P[k].length); v[k] = new Float64Array(P[k].length); });
+    this.P = P; this.kind = kind; this.game = game; this.t = 0; this.losses = [];
+    const q = (s, i, a) => P.q[(s * 2 + i) * nA + a];
+    const fwd = (s, a1, a2, x) => {
+      x = x || [q(s, 0, a1), q(s, 1, a2)];
+      if (kind === "vdn") return { y: x[0] + x[1], x: x };
+      const z = [], h = []; let y = P.b2[s];
+      for (let e = 0; e < E; e++) { z[e] = P.b1[s * E + e] + Math.abs(P.W1[(s * 2) * E + e]) * x[0] + Math.abs(P.W1[(s * 2 + 1) * E + e]) * x[1]; h[e] = elu(z[e]); y += Math.abs(P.w2[s * E + e]) * h[e]; }
+      return { y: y, x: x, z: z, h: h };
+    };
+    const greedy = s => [0, 1].map(i => { let b = 0; for (let k = 1; k < nA; k++) if (q(s, i, k) > q(s, i, b) + 1e-12) b = k; return b; });
+    this.q = q; this.fwd = fwd; this.greedy = greedy;
+    this.step = function (n) {
+      for (let it = 0; it < n; it++) {
+        const Gd = {}; keys.forEach(k => { Gd[k] = new Float64Array(P[k].length); }); let L = 0, N = 0;
+        for (let s = 0; s < S; s++) for (let a1 = 0; a1 < nA; a1++) for (let a2 = 0; a2 < nA; a2++) {
+          const st = game.states[s], ns = st.next(a1, a2); let y = st.R[a1][a2];
+          if (ns >= 0) { const g = greedy(ns); y += fwd(ns, g[0], g[1]).y; }
+          const fo = fwd(s, a1, a2), d = fo.y - y; L += d * d; N++;
+          if (kind === "vdn") { Gd.q[(s * 2) * nA + a1] += d; Gd.q[(s * 2 + 1) * nA + a2] += d; }
+          else {
+            Gd.b2[s] += d; let dx0 = 0, dx1 = 0;
+            for (let e = 0; e < E; e++) {
+              const w2 = P.w2[s * E + e]; Gd.w2[s * E + e] += d * fo.h[e] * Math.sign(w2); const dz = d * Math.abs(w2) * delu(fo.z[e]);
+              Gd.b1[s * E + e] += dz; const i0 = (s * 2) * E + e, i1 = (s * 2 + 1) * E + e;
+              Gd.W1[i0] += dz * fo.x[0] * Math.sign(P.W1[i0]); Gd.W1[i1] += dz * fo.x[1] * Math.sign(P.W1[i1]); dx0 += dz * Math.abs(P.W1[i0]); dx1 += dz * Math.abs(P.W1[i1]);
+            }
+            Gd.q[(s * 2) * nA + a1] += dx0; Gd.q[(s * 2 + 1) * nA + a2] += dx1;
+          }
+        }
+        this.t++; const b1 = 0.9, b2 = 0.999, lrt = MIX_LR * Math.sqrt(1 - Math.pow(b2, this.t)) / (1 - Math.pow(b1, this.t));
+        keys.forEach(k => { const p = P[k], gg = Gd[k], mm = m[k], vv = v[k]; for (let i = 0; i < p.length; i++) { const g = gg[i] / N; mm[i] = b1 * mm[i] + (1 - b1) * g; vv[i] = b2 * vv[i] + (1 - b2) * g * g; p[i] -= lrt * mm[i] / (Math.sqrt(vv[i]) + 1e-8); } });
+        this.losses.push(L / N);
+      }
+    };
+    /* 탐욕 실행: 상태 0에서 시작해 실제로 얻는 보상 */
+    this.play = function () { let s = 0, R = 0; const path = []; while (s >= 0) { const g = greedy(s); path.push({ s: s, a: g }); R += game.states[s].R[g[0]][g[1]]; s = game.states[s].next(g[0], g[1]); } return { R: R, path: path }; };
+  }
+  const MX = { game: "twostep", seed: 1, state: 0, cell: null, vdn: null, qmix: null };
+  function mixBuild(steps) { const G = MGAMES[MX.game]; MX.vdn = new MixTrainer(G, "vdn", MX.seed); MX.qmix = new MixTrainer(G, "qmix", MX.seed); if (steps) { MX.vdn.step(steps); MX.qmix.step(steps); } }
+  function optimum(G) { /* 실제 최적 (상태 0부터) */
+    function best(s) { let b = -Infinity, arg = null; const st = G.states[s]; for (let a1 = 0; a1 < G.nA; a1++) for (let a2 = 0; a2 < G.nA; a2++) { const ns = st.next(a1, a2), v = st.R[a1][a2] + (ns >= 0 ? best(ns).v : 0); if (v > b) { b = v; arg = [a1, a2]; } } return { v: b, a: arg }; }
+    return best(0);
+  }
+  function payTable(el, G, s, val, gr, clickable, dig) {
+    const st = G.states[s], nA = G.nA; let opt = -Infinity;
+    const trueV = (a1, a2) => { const ns = st.next(a1, a2); return st.R[a1][a2] + (ns >= 0 ? bestFrom(G, ns) : 0); };
+    for (let a1 = 0; a1 < nA; a1++) for (let a2 = 0; a2 < nA; a2++) opt = Math.max(opt, trueV(a1, a2));
+    let h = '<tr><th></th>' + G.acts.map(a => '<th>a₂=' + a + '</th>').join("") + '</tr>';
+    for (let a1 = 0; a1 < nA; a1++) { h += '<tr><th>a₁=' + G.acts[a1] + '</th>';
+      for (let a2 = 0; a2 < nA; a2++) { const cls = []; if (Math.abs(trueV(a1, a2) - opt) < 1e-9) cls.push("opt"); if (gr && gr[0] === a1 && gr[1] === a2) cls.push("hl"); if (clickable) cls.push("pick"); if (clickable && MX.cell && MX.cell[0] === a1 && MX.cell[1] === a2) cls.push("sel");
+        h += '<td class="' + cls.join(" ") + '" data-a1="' + a1 + '" data-a2="' + a2 + '">' + f(val(a1, a2), dig == null ? 2 : dig) + '</td>'; }
+      h += '</tr>'; }
+    el.innerHTML = h;
+  }
+  function bestFrom(G, s) { const st = G.states[s]; let b = -Infinity; for (let a1 = 0; a1 < G.nA; a1++) for (let a2 = 0; a2 < G.nA; a2++) { const ns = st.next(a1, a2); b = Math.max(b, st.R[a1][a2] + (ns >= 0 ? bestFrom(G, ns) : 0)); } return b; }
+  function renderQmix() {
+    const G = MGAMES[MX.game], s = MX.state, opt = optimum(G);
+    $("matDesc").textContent = G.desc; $("mxStep").textContent = "반복 " + MX.vdn.t + " / " + MIX_STEPS;
+    $("stateRow").hidden = G.states.length < 2;
+    $("segState").innerHTML = G.states.map((st, i) => '<button type="button" data-v="' + i + '" aria-pressed="' + (i === s) + '">' + st.name + '</button>').join("");
+    const st = G.states[s];
+    payTable($("tblTrue"), G, s, (a1, a2) => { const ns = st.next(a1, a2); return st.R[a1][a2] + (ns >= 0 ? bestFrom(G, ns) : 0); }, null, false, 0);
+    $("resTrue").innerHTML = G.states.length > 1 && s === 0 ? "다음 상태의 최선 값까지 더한 값 (2A → 7, 2B → 8)" : "초록 = 실제 최선의 공동 행동";
+    [["vdn", "tblVdn", "resVdn"], ["qmix", "tblQmix", "resQmix"]].forEach(c => {
+      const tr = MX[c[0]], gr = tr.greedy(s);
+      payTable($(c[1]), G, s, (a1, a2) => tr.fwd(s, a1, a2).y, gr, c[0] === "qmix");
+      const pl = tr.play(), good = Math.abs(pl.R - opt.v) < 1e-9;
+      $(c[2]).innerHTML = '각자 고른 행동 (a₁, a₂) = (' + G.acts[gr[0]] + ', ' + G.acts[gr[1]] + ') · Q₁ = [' + Array.from({ length: G.nA }, (_, a) => f(tr.q(s, 0, a))).join(", ") + '] · Q₂ = [' + Array.from({ length: G.nA }, (_, a) => f(tr.q(s, 1, a))).join(", ") + ']' +
+        '<br>처음부터 실행한 실제 보상 <span class="' + (good ? "ma-good" : "ma-bad") + '">' + f(pl.R, 0) + '</span> (최선 ' + f(opt.v, 0) + ')';
+    });
+    const rv = MX.vdn.play().R, rq = MX.qmix.play().R;
+    $("mxVerdict").innerHTML = MX.game === "twostep"
+      ? "VDN은 합으로만 표현해 2B의 (1,1) = 8을 " + f(MX.vdn.fwd(2, 1, 1).y) + "로 낮게 맞추고, 상태 1에서 2A 쪽(" + f(MX.vdn.fwd(0, 0, MX.vdn.greedy(0)[1]).y) + ")을 고릅니다 → 실제 보상 <b>" + f(rv, 0) + "</b>. QMIX는 단조 믹서로 2B를 정확히 표현해(" + f(MX.qmix.fwd(2, 1, 1).y) + ") 2B로 갑니다 → <b>" + f(rq, 0) + "</b>."
+      : "VDN → 실제 보상 <b>" + f(rv, 0) + "</b>, QMIX → <b>" + f(rq, 0) + "</b> (최선 " + f(opt.v, 0) + "). QMIX도 단조성(∂Q<sub>tot</sub>/∂Qᵢ ≥ 0) 때문에 '상대가 같은 행동일 때만 좋은' 구조는 표현하지 못합니다. 이런 보상에는 QTRAN·Weighted QMIX·QPLEX 같은 확장이 필요합니다.";
+    renderMixer();
+  }
+  function renderMixer() {
+    const G = MGAMES[MX.game], s = MX.state, tr = MX.qmix, E = MIX_E, P = tr.P;
+    const cell = MX.cell || tr.greedy(s), a1 = cell[0], a2 = cell[1], fo = tr.fwd(s, a1, a2);
+    $("mixHint").textContent = G.states[s].name + " · (a₁, a₂) = (" + G.acts[a1] + ", " + G.acts[a2] + ")";
+    const W1 = (i, e) => Math.abs(P.W1[(s * 2 + i) * E + e]), w2 = e => Math.abs(P.w2[s * E + e]);
+    let wmax = 1e-9; for (let e = 0; e < E; e++) wmax = Math.max(wmax, W1(0, e), W1(1, e), w2(e));
+    let svg = '<rect class="hyp" x="300" y="6" width="300" height="34" rx="8"/><text class="lab" x="450" y="28" text-anchor="middle">하이퍼네트워크(s = ' + G.states[s].name + ') → |W₁|, b₁, |w₂|, b₂</text>';
+    const qy = [110, 220], hx = 450, ox = 780, hy = e => 66 + e * 28;
+    for (let e = 0; e < E; e++) {
+      [0, 1].forEach(i => { svg += '<line class="w" x1="150" y1="' + qy[i] + '" x2="' + (hx - 14) + '" y2="' + hy(e) + '" style="stroke-width:' + (0.4 + 4 * W1(i, e) / wmax).toFixed(2) + ';opacity:.75"/>'; });
+      svg += '<line class="w" x1="' + (hx + 14) + '" y1="' + hy(e) + '" x2="' + (ox - 30) + '" y2="165" style="stroke-width:' + (0.4 + 4 * w2(e) / wmax).toFixed(2) + ';opacity:.75"/>';
+    }
+    for (let e = 0; e < E; e++) svg += '<circle class="nd" cx="' + hx + '" cy="' + hy(e) + '" r="13"/><text x="' + (hx + 20) + '" y="' + (hy(e) + 4) + '">' + f(fo.h[e], 2) + '</text>';
+    svg += '<rect class="nd nq1" x="40" y="' + (qy[0] - 24) + '" width="110" height="48" rx="8"/><text class="lab" x="95" y="' + (qy[0] - 4) + '" text-anchor="middle">Q₁(' + G.acts[a1] + ')</text><text x="95" y="' + (qy[0] + 15) + '" text-anchor="middle">' + f(fo.x[0]) + '</text>';
+    svg += '<rect class="nd nq2" x="40" y="' + (qy[1] - 24) + '" width="110" height="48" rx="8"/><text class="lab" x="95" y="' + (qy[1] - 4) + '" text-anchor="middle">Q₂(' + G.acts[a2] + ')</text><text x="95" y="' + (qy[1] + 15) + '" text-anchor="middle">' + f(fo.x[1]) + '</text>';
+    svg += '<rect class="nd nqt" x="' + (ox - 30) + '" y="141" width="110" height="48" rx="8"/><text class="lab" x="' + (ox + 25) + '" y="161" text-anchor="middle">Q_tot</text><text x="' + (ox + 25) + '" y="180" text-anchor="middle">' + f(fo.y) + '</text>';
+    svg += '<text class="lab" x="' + hx + '" y="294" text-anchor="middle">은닉 8개: h = ELU(|W₁|ᵀ[Q₁,Q₂] + b₁) — 선 굵기 = |가중치|</text>';
+    $("mixSvg").innerHTML = svg;
+    let e0 = 0; for (let e = 1; e < E; e++) if (w2(e) * (W1(0, e) + W1(1, e)) > w2(e0) * (W1(0, e0) + W1(1, e0))) e0 = e;
+    let dq1 = 0, dq2 = 0; for (let e = 0; e < E; e++) { dq1 += w2(e) * delu(fo.z[e]) * W1(0, e); dq2 += w2(e) * delu(fo.z[e]) * W1(1, e); }
+    $("mixCalc").innerHTML = '예: 은닉 ' + (e0 + 1) + '번 z = b₁ + |W₁|₁·Q₁ + |W₁|₂·Q₂ = ' + f(P.b1[s * E + e0], 3) + ' + ' + W1(0, e0).toFixed(3) + '×' + f(fo.x[0], 3) + ' + ' + W1(1, e0).toFixed(3) + '×' + f(fo.x[1], 3) + ' = ' + f(fo.z[e0], 3) + ' → ELU = ' + f(fo.h[e0], 3) +
+      '<br>Q_tot = b₂ + Σ |w₂|·h = ' + f(P.b2[s], 3) + ' + (' + Array.from({ length: E }, (_, e) => w2(e).toFixed(2) + '×' + f(fo.h[e], 2)).join(' + ') + ') = <b class="c-value">' + f(fo.y, 3) + '</b>' +
+      '<br>∂Q_tot/∂Q₁ = Σ |w₂|·ELU′(z)·|W₁|₁ = <b>' + dq1.toFixed(3) + '</b> ≥ 0, &nbsp; ∂Q_tot/∂Q₂ = <b>' + dq2.toFixed(3) + '</b> ≥ 0 &nbsp;(가중치가 모두 |·| 이므로 항상 0 이상)';
+    /* 단조성 곡선 */
+    const xs = [], ys = []; for (let i = 0; i <= 60; i++) { const v = fo.x[0] - 15 + 30 * i / 60; xs.push(v); ys.push(tr.fwd(s, a1, a2, [v, fo.x[1]]).y); }
+    xyChart($("cvMono"), { series: [{ x: xs, y: ys, color: css("--m-qmix"), label: "Q_tot(Q₁, Q₂ = " + f(fo.x[1]) + ")" }], xlabel: "Q₁ 값", h: 180 });
+    const lx = MX.vdn.losses.map((_, i) => i + 1), step = Math.max(1, Math.floor(lx.length / 300)), sx = lx.filter((_, i) => i % step === 0);
+    xyChart($("cvMixLoss"), { series: [{ x: sx, y: sx.map(i => Math.log10(MX.vdn.losses[i - 1] + 1e-6)), color: css("--m-vdn"), label: "VDN" }, { x: sx, y: sx.map(i => Math.log10(MX.qmix.losses[i - 1] + 1e-6)), color: css("--m-qmix"), label: "QMIX" }], xmin: 0, xmax: MIX_STEPS, xlabel: "반복 (세로: log₁₀ 손실)", h: 180 });
+  }
+
+  /* =========================================================
+     4. 협력 격자 (스위치 · 문)
+     ========================================================= */
+  const GR = 5, GC = 5, GN = 25, WALLS = [2, 7, 17, 22], DOOR = 12, SW = 20, GOAL = 4, SA = 16, SB = 1, G_GAMMA = 0.95, G_LR = 0.1, G_T = 30, NA5 = 5;
+  const genv = new RL.GridEnv({ name: "협력 격자", rows: GR, cols: GC, start: 2, walls: WALLS, goals: { 4: 10 } });
+  const DR5 = [-1, 0, 1, 0, 0], DC5 = [0, 1, 0, -1, 0], AR5 = ["↑", "→", "↓", "←", "·"];
+  function mv(p, a, open) { const r = Math.floor(p / GC) + DR5[a], c = p % GC + DC5[a]; if (r < 0 || r >= GR || c < 0 || c >= GC) return p; const n = r * GC + c; if (WALLS.indexOf(n) >= 0) return p; if (n === DOOR && !open) return p; return n; }
+  function gstep(pa, pb, a1, a2) {
+    const open = pa === SW || pb === SW;
+    let na = mv(pa, a1, open), nb = mv(pb, a2, open);
+    if (na === nb || (na === pb && nb === pa)) { na = pa; nb = pb; }
+    const done = na === GOAL || nb === GOAL;
+    return { na: na, nb: nb, r: done ? 10 : -0.1, done: done, open: open };
+  }
+  const gobs = (i, pa, pb) => (i === 0 ? pa : pb) * 2 + ((pa === SW || pb === SW) ? 1 : 0);
+  const NO = GN * 2;
+  function GTrainer(kind, seed, episodes) {
+    this.kind = kind; this.rng = RL.rng(seed * 131 + { iql: 1, vdn: 2, qmix: 3 }[kind]); this.episodes = episodes; this.ep = 0;
+    this.Q = [0, 1].map(() => Array.from({ length: NO }, () => new Float64Array(NA5)));
+    this.W = Array.from({ length: GN * GN }, () => [1, 1, 0]);
+    this.rets = []; this.evalX = []; this.evalY = []; this.last = null;
+  }
+  const amax5 = (q, rng) => RL.argmax(Array.from(q), rng), mx5 = q => Math.max.apply(null, q);
+  GTrainer.prototype.greedyRun = function () {
+    let pa = SA, pb = SB; const path = [{ pa: pa, pb: pb }];
+    for (let t = 0; t < G_T; t++) { const a = [0, 1].map(i => amax5(this.Q[i][gobs(i, pa, pb)])); const st = gstep(pa, pb, a[0], a[1]); path[path.length - 1].a = a; path[path.length - 1].open = st.open; pa = st.na; pb = st.nb; path.push({ pa: pa, pb: pb }); if (st.done) return { ok: true, steps: t + 1, path: path }; }
+    return { ok: false, steps: G_T, path: path };
+  };
+  GTrainer.prototype.episode = function () {
+    const rng = this.rng, Q = this.Q, eps = Math.max(0.05, 1 - this.ep / (this.episodes * 0.6)); let pa = SA, pb = SB, Gs = 0;
+    for (let t = 0; t < G_T; t++) {
+      const o = [gobs(0, pa, pb), gobs(1, pa, pb)], s = pa * GN + pb;
+      const a = o.map((oi, i) => rng.random() < eps ? rng.int(NA5) : amax5(Q[i][oi], rng));
+      const st = gstep(pa, pb, a[0], a[1]); Gs += st.r;
+      const o2 = [gobs(0, st.na, st.nb), gobs(1, st.na, st.nb)], s2 = st.na * GN + st.nb;
+      let info;
+      if (this.kind === "iql") {
+        const ms = [0, 1].map(i => mx5(Q[i][o2[i]])), ys = [0, 1].map(i => st.r + (st.done ? 0 : G_GAMMA * ms[i]));
+        info = { o: o, a: a, r: st.r, y: ys, m: ms, done: st.done, q: [Q[0][o[0]][a[0]], Q[1][o[1]][a[1]]] };
+        for (let i = 0; i < 2; i++) Q[i][o[i]][a[i]] += G_LR * (ys[i] - Q[i][o[i]][a[i]]);
+      } else if (this.kind === "vdn") {
+        const m1 = mx5(Q[0][o2[0]]), m2 = mx5(Q[1][o2[1]]), y = st.r + (st.done ? 0 : G_GAMMA * (m1 + m2)), q1 = Q[0][o[0]][a[0]], q2 = Q[1][o[1]][a[1]], d = y - (q1 + q2);
+        info = { o: o, a: a, r: st.r, m: [m1, m2], y: y, q: [q1, q2], d: d, done: st.done };
+        Q[0][o[0]][a[0]] += G_LR * d; Q[1][o[1]][a[1]] += G_LR * d;
+      } else {
+        const w = this.W[s], w2 = this.W[s2], q1 = Q[0][o[0]][a[0]], q2 = Q[1][o[1]][a[1]], tot = w[0] * q1 + w[1] * q2 + w[2];
+        const m1 = mx5(Q[0][o2[0]]), m2 = mx5(Q[1][o2[1]]), nt = w2[0] * m1 + w2[1] * m2 + w2[2], y = st.r + (st.done ? 0 : G_GAMMA * nt), d = y - tot;
+        info = { o: o, a: a, r: st.r, m: [m1, m2], w: w.slice(), w2: w2.slice(), y: y, q: [q1, q2], tot: tot, d: d, done: st.done };
+        Q[0][o[0]][a[0]] += G_LR * d * w[0]; Q[1][o[1]][a[1]] += G_LR * d * w[1];
+        const lw = G_LR * 0.02; w[0] = Math.max(0, Math.min(2, w[0] + lw * d * q1)); w[1] = Math.max(0, Math.min(2, w[1] + lw * d * q2)); w[2] += lw * d;
+      }
+      this.last = info; pa = st.na; pb = st.nb; if (st.done) break;
+    }
+    this.rets.push(Gs); this.ep++;
+    if (this.ep % 100 === 0) { const g = this.greedyRun(); this.evalX.push(this.ep); this.evalY.push(g.steps); }
+  };
+  const GM = { trainers: null, sel: "vdn", seed: 1, episodes: 3000, running: false, roll: null, rstep: 0 };
+  function gInit() { GM.trainers = { iql: new GTrainer("iql", GM.seed, GM.episodes), vdn: new GTrainer("vdn", GM.seed, GM.episodes), qmix: new GTrainer("qmix", GM.seed, GM.episodes) }; GM.roll = null; GM.rstep = 0; }
+  function gRollout() { GM.roll = GM.trainers[GM.sel].greedyRun(); if (GM.rstep >= GM.roll.path.length) GM.rstep = 0; }
+  function drawGridWorld() {
+    const cv = $("cvGrid"), T = RL.theme(), size = Math.max(40, Math.min(80, Math.floor(cv.parentNode.clientWidth / GC)));
+    const res = RL.drawGrid(cv, genv, { size: size }), c = res.cell, g = cv.getContext("2d");
+    if (!GM.roll) gRollout();
+    const p = GM.roll.path[Math.min(GM.rstep, GM.roll.path.length - 1)], open = p.pa === SW || p.pb === SW;
+    const sans = css("--sans") || "sans-serif";
+    /* 스위치·문 */
+    const cxy = s => [(s % GC) * c, Math.floor(s / GC) * c];
+    let q = cxy(SW); g.strokeStyle = css("--rl-explore"); g.lineWidth = 3; g.strokeRect(q[0] + 6, q[1] + 6, c - 12, c - 12);
+    g.fillStyle = css("--rl-explore"); g.font = "700 " + Math.round(c * 0.22) + "px " + sans; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("W", q[0] + c / 2, q[1] + c * 0.78);
+    q = cxy(DOOR); g.fillStyle = open ? T.bg : T.wall; g.fillRect(q[0] + 1, q[1] + 1, c - 2, c - 2);
+    g.strokeStyle = open ? css("--rl-reward") : T.ink; g.lineWidth = 3; if (open) g.setLineDash([5, 4]); g.strokeRect(q[0] + 4, q[1] + 4, c - 8, c - 8); g.setLineDash([]);
+    g.fillStyle = open ? css("--rl-reward") : T.bg; g.fillText(open ? "열림" : "D", q[0] + c / 2, q[1] + c / 2);
+    /* 지나온 경로 */
+    [["pa", css("--ag1"), -3], ["pb", css("--ag2"), 3]].forEach(k => {
+      g.strokeStyle = k[1]; g.lineWidth = 2.5; g.globalAlpha = 0.55; g.beginPath();
+      GM.roll.path.slice(0, GM.rstep + 1).forEach((st, i) => { const xy = cxy(st[k[0]]); if (i) g.lineTo(xy[0] + c / 2 + k[2], xy[1] + c / 2 + k[2]); else g.moveTo(xy[0] + c / 2 + k[2], xy[1] + c / 2 + k[2]); });
+      g.stroke(); g.globalAlpha = 1;
+    });
+    [["A", p.pa, css("--ag1")], ["B", p.pb, css("--ag2")]].forEach(k => { const xy = cxy(k[1]); g.fillStyle = k[2]; g.strokeStyle = T.bg; g.lineWidth = 2; g.beginPath(); g.arc(xy[0] + c / 2, xy[1] + c / 2, c * 0.26, 0, 7); g.fill(); g.stroke(); g.fillStyle = T.bg; g.font = "700 " + Math.round(c * 0.24) + "px " + sans; g.fillText(k[0], xy[0] + c / 2, xy[1] + c / 2 + 1); });
+    const tr = GM.trainers[GM.sel], name = { iql: "독립 Q", vdn: "VDN", qmix: "QMIX-lite" }[GM.sel], rc = s => "(" + Math.floor(s / GC) + "," + (s % GC) + ")";
+    let info = name + " · 학습 " + tr.ep + "에피소드 후 탐욕 정책 · 걸음 " + Math.min(GM.rstep, GM.roll.path.length - 1) + " / " + (GM.roll.path.length - 1) + (GM.roll.ok ? " (G 도착)" : " (30걸음 안에 실패)");
+    if (p.a) {
+      const o1 = gobs(0, p.pa, p.pb), o2 = gobs(1, p.pa, p.pb);
+      info += '<br>A: 관측 (위치 ' + rc(p.pa) + ', 문 ' + (open ? "열림" : "닫힘") + ') → Q_A = [' + Array.from(tr.Q[0][o1]).map(v => f(v)).join(", ") + '] → <b class="ma-r1">' + AR5[p.a[0]] + '</b>' +
+        '<br>B: 관측 (위치 ' + rc(p.pb) + ', 문 ' + (open ? "열림" : "닫힘") + ') → Q_B = [' + Array.from(tr.Q[1][o2]).map(v => f(v)).join(", ") + '] → <b class="ma-r2">' + AR5[p.a[1]] + '</b>' +
+        '<br><span style="color:var(--muted)">Q 순서 ↑ → ↓ ← 정지 · 각자 자기 관측의 argmax만 사용 (분산 실행)</span>';
+    }
+    $("grInfo").innerHTML = info;
+  }
+  function renderGridCharts() {
+    const C = { iql: css("--m-iql"), vdn: css("--m-vdn"), qmix: css("--m-qmix") }, T = GM.trainers;
+    xyChart($("cvGCurve"), { series: ["iql", "vdn", "qmix"].map(k => ({ x: T[k].evalX, y: T[k].evalY, color: C[k], dots: true, width: 1.6 })), xmin: 0, xmax: GM.episodes, ymin: 0, ymax: 31, hlines: [{ y: 7, color: css("--rl-reward") }], xlabel: "에피소드", h: 180 });
+    const sm = k => { const ma = RL.movingAvg(T[k].rets, 100), st = Math.max(1, Math.floor(ma.length / 400)), xs = [], ys = []; ma.forEach((v, i) => { if (i % st === 0) { xs.push(i + 1); ys.push(v); } }); return { x: xs, y: ys, color: C[k] }; };
+    xyChart($("cvGRet"), { series: ["iql", "vdn", "qmix"].map(sm), xmin: 0, xmax: GM.episodes, xlabel: "에피소드", h: 160 });
+    const L = T.vdn.last, Lq = T.qmix.last, Li = T.iql.last;
+    if (!L) { $("gTd").innerHTML = "학습을 시작하면 각 방법의 가장 최근 TD 갱신을 숫자로 보여 줍니다."; return; }
+    $("gTd").innerHTML =
+      '<b style="color:var(--m-iql)">독립 Q</b> 각자: y_A = r + γ·max Q_A(o_A′) = ' + f(Li.r, 1) + ' + 0.95×' + f(Li.m[0], 3) + (Li.done ? ' (종료라 0)' : '') + ' = ' + f(Li.y[0], 3) + ', y_B = ' + f(Li.r, 1) + ' + 0.95×' + f(Li.m[1], 3) + (Li.done ? ' (종료라 0)' : '') + ' = ' + f(Li.y[1], 3) + ' — 같은 팀 보상 r을 각자 자기 Q에 통째로 귀속' +
+      '<br><b style="color:var(--m-vdn)">VDN</b> y = r + γ(max Q_A′ + max Q_B′) = ' + f(L.r, 1) + ' + 0.95×(' + f(L.m[0], 3) + ' + ' + f(L.m[1], 3) + ')' + (L.done ? ' (종료라 0)' : '') + ' = ' + f(L.y, 3) +
+      ', δ = y − (Q_A + Q_B) = ' + f(L.y, 3) + ' − (' + f(L.q[0], 3) + ' + ' + f(L.q[1], 3) + ') = <b>' + f(L.d, 3) + '</b> → 두 Q 모두 +0.1·δ' +
+      '<br><b style="color:var(--m-qmix)">QMIX-lite</b> Q_tot = w_A·Q_A + w_B·Q_B + b = ' + Lq.w[0].toFixed(2) + '×' + f(Lq.q[0], 2) + ' + ' + Lq.w[1].toFixed(2) + '×' + f(Lq.q[1], 2) + ' + ' + f(Lq.w[2], 2) + ' = ' + f(Lq.tot, 3) + ', δ = <b>' + f(Lq.d, 3) + '</b> → Q_A += 0.1·δ·w_A (w ≥ 0, 상태별 표 = 원-핫 하이퍼네트워크)';
+  }
+  function renderGrid() { $("gProg").textContent = GM.running ? "학습 중 " + GM.trainers.vdn.ep + " / " + GM.episodes : (GM.trainers.vdn.ep ? "완료 " + GM.trainers.vdn.ep + "에피소드" : ""); drawGridWorld(); renderGridCharts(); }
+  let gTimer = null;
+  function gTrain() {
+    if (GM.running) return; if (GM.trainers.vdn.ep >= GM.episodes) gInit();
+    GM.running = true; const per = { 1: 10, 2: 40, 3: 150 }[$("sGSpd").value];
+    const tick = () => {
+      if (!GM.running) return;
+      for (let i = 0; i < per && GM.trainers.vdn.ep < GM.episodes; i++) ["iql", "vdn", "qmix"].forEach(k => GM.trainers[k].episode());
+      GM.roll = null; if (GM.trainers.vdn.ep >= GM.episodes) { GM.running = false; GM.rstep = 0; }
+      if (curTab === "grid") renderGrid();
+      if (GM.running) gTimer = setTimeout(tick, RM ? 80 : 30);
+    };
+    tick();
+  }
+  function gStop() { GM.running = false; clearTimeout(gTimer); if (curTab === "grid") renderGrid(); }
+  function gMulti() {
+    $("tblMulti").innerHTML = '<tr><td>계산 중…</td></tr>';
+    const res = { iql: { opt: 0, ok: 0, flips: 0, conv: [] }, vdn: { opt: 0, ok: 0, flips: 0, conv: [] }, qmix: { opt: 0, ok: 0, flips: 0, conv: [] } }; let sd = 1;
+    const next = () => {
+      ["iql", "vdn", "qmix"].forEach(k => {
+        const tr = new GTrainer(k, sd, GM.episodes); while (tr.ep < GM.episodes) tr.episode();
+        const y = tr.evalY, last = y[y.length - 1]; if (last < G_T) res[k].ok++; if (last === 7) res[k].opt++;
+        for (let i = 1; i < y.length; i++) if (y[i] !== y[i - 1]) res[k].flips++;
+        let fo = -1; for (let i = 0; i < y.length; i++) if (y.slice(i).every(v => v === 7)) { fo = tr.evalX[i]; break; } if (fo > 0) res[k].conv.push(fo);
+      });
+      sd++;
+      if (sd <= 20) { $("tblMulti").innerHTML = '<tr><td>계산 중… seed ' + (sd - 1) + ' / 20</td></tr>'; setTimeout(next, 0); return; }
+      let h = '<tr><th>방법</th><th>최적(7걸음) 도달</th><th>성공(30걸음 안)</th><th>평가 결과 바뀐 횟수(합)</th><th>최적에 안착한 평균 시점</th></tr>';
+      [["iql", "독립 Q"], ["vdn", "VDN"], ["qmix", "QMIX-lite"]].forEach(m => { const r = res[m[0]];
+        h += '<tr><td><b>' + m[1] + '</b></td><td class="n">' + r.opt + ' / 20</td><td class="n">' + r.ok + ' / 20</td><td class="n">' + r.flips + '</td><td class="n">' + (r.conv.length ? Math.round(r.conv.reduce((a, b) => a + b, 0) / r.conv.length) + '에피소드' : '–') + '</td></tr>'; });
+      $("tblMulti").innerHTML = h;
+    };
+    setTimeout(next, 20);
+  }
+
+  /* =========================================================
+     5. MADDPG
+     ========================================================= */
+  const MD_T = 25, MD_G = 0.95, MD_TAU = 0.01, MD_B = 32, MD_H = 32, OD = 8, LMK = [[-0.5, 0.4], [0.5, -0.4]];
+  function mdObs(p, i) { const a = p[i], o = p[1 - i]; return [a[0], a[1], LMK[0][0] - a[0], LMK[0][1] - a[1], LMK[1][0] - a[0], LMK[1][1] - a[1], o[0] - a[0], o[1] - a[1]]; }
+  function mdReward(p) { let r = 0; LMK.forEach(l => { r -= Math.min(Math.hypot(p[0][0] - l[0], p[0][1] - l[1]), Math.hypot(p[1][0] - l[0], p[1][1] - l[1])); }); if (Math.hypot(p[0][0] - p[1][0], p[0][1] - p[1][1]) < 0.15) r -= 0.5; return r; }
+  function mdMove(p, a) { for (let i = 0; i < 2; i++) for (let d = 0; d < 2; d++) p[i][d] = Math.max(-1, Math.min(1, p[i][d] + 0.1 * a[i][d])); return mdReward(p); }
+  const EVAL_STARTS = (function () { const r = RL.rng(4242), out = []; for (let k = 0; k < 10; k++) out.push([[r.uniform(-1, 1), r.uniform(-1, 1)], [r.uniform(-1, 1), r.uniform(-1, 1)]]); return out; })();
+  const MD_BASE = (function () {
+    const r = RL.rng(777); let rnd = 0, orc = 0, n = 200;
+    for (let k = 0; k < n; k++) { const p = [[r.uniform(-1, 1), r.uniform(-1, 1)], [r.uniform(-1, 1), r.uniform(-1, 1)]]; for (let t = 0; t < MD_T; t++) rnd += mdMove(p, [[r.uniform(-1, 1), r.uniform(-1, 1)], [r.uniform(-1, 1), r.uniform(-1, 1)]]); }
+    for (let k = 0; k < n; k++) {
+      const p = [[r.uniform(-1, 1), r.uniform(-1, 1)], [r.uniform(-1, 1), r.uniform(-1, 1)]], d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+      const as = d(p[0], LMK[0]) + d(p[1], LMK[1]) <= d(p[0], LMK[1]) + d(p[1], LMK[0]) ? [0, 1] : [1, 0];
+      for (let t = 0; t < MD_T; t++) orc += mdMove(p, [0, 1].map(i => { const l = LMK[as[i]], dx = l[0] - p[i][0], dy = l[1] - p[i][1], nn = Math.hypot(dx, dy), s = Math.min(1, nn / 0.1); return nn > 1e-9 ? [dx / nn * s, dy / nn * s] : [0, 0]; }));
+    }
+    return { rnd: rnd / n, orc: orc / n };
+  })();
+  function MD(mode, seed, episodes) {
+    this.mode = mode; this.episodes = episodes; this.rng = RL.rng(seed * 1009 + 7); this.ep = 0; this.upd = 0;
+    const cIn = mode === "maddpg" ? OD * 2 + 4 : OD + 2; this.cIn = cIn;
+    this.actors = [0, 1].map(i => new RL.MLP([OD, MD_H, MD_H, 2], { act: "relu", out: "tanh", rng: RL.rng(seed * 10 + i), lastScale: 0.1 }));
+    this.critics = [0, 1].map(i => new RL.MLP([cIn, MD_H, MD_H, 1], { act: "relu", rng: RL.rng(seed * 20 + i) }));
+    this.tA = this.actors.map(a => a.clone()); this.tC = this.critics.map(c => c.clone());
+    this.oA = this.actors.map(a => new RL.Adam(a, { lr: 1e-3 })); this.oC = this.critics.map(c => new RL.Adam(c, { lr: 2e-3 }));
+    this.buf = []; this.bi = 0; this.rets = []; this.evalX = []; this.evalY = []; this.traj = null; this.calc = null;
+    this.world = null; this.t = 0; this.G = 0;
+  }
+  MD.prototype.cinput = function (i, o1, o2, a1, a2) { return this.mode === "maddpg" ? o1.concat(o2, a1, a2) : (i === 0 ? o1.concat(a1) : o2.concat(a2)); };
+  MD.prototype.update = function () {
+    const rng = this.rng, idx = []; for (let k = 0; k < MD_B; k++) idx.push(rng.int(this.buf.length));
+    for (let i = 0; i < 2; i++) {
+      const cr = this.critics[i], ac = this.actors[i];
+      idx.forEach((k, j) => { const e = this.buf[k];
+        const na = [this.tA[0].predict(e.o2[0]), this.tA[1].predict(e.o2[1])], qn = this.tC[i].predict(this.cinput(i, e.o2[0], e.o2[1], na[0], na[1]))[0], y = e.r + MD_G * qn;
+        const fo = cr.forward(this.cinput(i, e.o[0], e.o[1], e.a[0], e.a[1])); cr.backward(fo.cache, [fo.y[0] - y]);
+        if (i === 0 && j === 0) this.calc = { r: e.r, qn: qn, y: y, q: fo.y[0], a: e.a };
+      });
+      cr.clipGrad(MD_B); this.oC[i].step(1 / MD_B);
+      idx.forEach((k, j) => { const e = this.buf[k], fa = ac.forward(e.o[i]), a = [e.a[0], e.a[1]]; a[i] = fa.y;
+        const fc = cr.forward(this.cinput(i, e.o[0], e.o[1], a[0], a[1])), dIn = cr.backward(fc.cache, [-1]); cr.zeroGrad();
+        const off = this.mode === "maddpg" ? OD * 2 + 2 * i : OD; ac.backward(fa.cache, [dIn[off], dIn[off + 1]]);
+        if (i === 0 && j === 0) { this.calc.mu = fa.y; this.calc.dq = [-dIn[off], -dIn[off + 1]]; this.calc.qmu = fc.y[0]; }
+      });
+      this.oA[i].step(1 / MD_B); this.tA[i].softUpdate(ac, MD_TAU); this.tC[i].softUpdate(cr, MD_TAU);
+    }
+    this.upd++;
+  };
+  MD.prototype.stepOnce = function () {
+    const rng = this.rng;
+    if (!this.world) { this.world = [[rng.uniform(-1, 1), rng.uniform(-1, 1)], [rng.uniform(-1, 1), rng.uniform(-1, 1)]]; this.t = 0; this.G = 0; }
+    const sigma = Math.max(0.1, 0.5 * (1 - this.ep / (this.episodes * 0.7)));
+    const o = [mdObs(this.world, 0), mdObs(this.world, 1)];
+    const a = o.map((oi, i) => this.actors[i].predict(oi).map(v => Math.max(-1, Math.min(1, v + rng.normal(0, sigma)))));
+    const r = mdMove(this.world, a); this.G += r; const o2 = [mdObs(this.world, 0), mdObs(this.world, 1)];
+    const e = { o: o, a: a, r: r, o2: o2 }; if (this.buf.length < 50000) this.buf.push(e); else { this.buf[this.bi] = e; this.bi = (this.bi + 1) % 50000; }
+    if (this.buf.length > 500 && this.t % 2 === 0) this.update();
+    this.t++;
+    if (this.t >= MD_T) { this.rets.push(this.G); this.ep++; this.world = null; if (this.ep % 20 === 0 || this.ep === this.episodes) this.evaluate(); }
+  };
+  MD.prototype.evaluate = function () {
+    let tot = 0; const traj = [];
+    EVAL_STARTS.forEach((st, k) => { const p = [st[0].slice(), st[1].slice()]; const tr = [[p[0].slice(), p[1].slice()]];
+      for (let t = 0; t < MD_T; t++) { tot += mdMove(p, [0, 1].map(i => this.actors[i].predict(mdObs(p, i)))); tr.push([p[0].slice(), p[1].slice()]); }
+      if (k === 0) traj.push(tr); });
+    this.evalX.push(this.ep); this.evalY.push(tot / EVAL_STARTS.length); this.traj = traj[0];
+  };
+  const MDS = { mode: "maddpg", seed: 1, episodes: 400, run: null, running: false };
+  function mdInit() { MDS.run = new MD(MDS.mode, MDS.seed, MDS.episodes); MDS.run.evaluate(); MDS.run.evalX = [0]; }
+  let mdTimer = null, animT = 0, animRAF = null;
+  function mdTrain() {
+    if (MDS.running) return; if (MDS.run.ep >= MDS.episodes) mdInit();
+    MDS.running = true;
+    const tick = () => {
+      if (!MDS.running) return; const t0 = performance.now();
+      while (performance.now() - t0 < 28 && MDS.run.ep < MDS.episodes) MDS.run.stepOnce();
+      if (MDS.run.ep >= MDS.episodes) MDS.running = false;
+      if (curTab === "maddpg") renderMdStats();
+      if (MDS.running) mdTimer = setTimeout(tick, 8);
+    };
+    tick(); startAnim();
+  }
+  function mdStop() { MDS.running = false; clearTimeout(mdTimer); if (curTab === "maddpg") renderMdStats(); }
+  function drawWorld() {
+    const cv = $("cvWorld"), T = RL.theme(), W0 = Math.min(420, Math.max(240, cv.parentNode.clientWidth)), fit = RL.fitCanvas(cv, W0, W0), g = fit.g, W = fit.w, H = fit.h;
+    const X = v => (v + 1) / 2 * (W - 20) + 10, Y = v => (1 - (v + 1) / 2) * (H - 20) + 10, sc = (W - 20) / 2;
+    g.clearRect(0, 0, W, H); g.fillStyle = T.bg2; g.fillRect(10, 10, W - 20, H - 20); g.strokeStyle = T.line; g.strokeRect(10.5, 10.5, W - 21, H - 21);
+    g.strokeStyle = T.line; g.beginPath(); g.moveTo(X(0), 10); g.lineTo(X(0), H - 10); g.moveTo(10, Y(0)); g.lineTo(W - 10, Y(0)); g.stroke();
+    LMK.forEach(l => { g.fillStyle = css("--rl-reward"); g.globalAlpha = 0.25; g.beginPath(); g.arc(X(l[0]), Y(l[1]), 0.12 * sc, 0, 7); g.fill(); g.globalAlpha = 1; g.beginPath(); g.arc(X(l[0]), Y(l[1]), 0.04 * sc, 0, 7); g.fill(); });
+    const tr = MDS.run && MDS.run.traj; if (!tr) return;
+    const n = RM ? tr.length - 1 : Math.min(tr.length - 1, Math.floor(animT) % (tr.length + 8));
+    const cols = [css("--ag1"), css("--ag2")];
+    [0, 1].forEach(i => { g.strokeStyle = cols[i]; g.lineWidth = 2; g.globalAlpha = 0.7; g.beginPath(); tr.slice(0, n + 1).forEach((p, k) => { if (k) g.lineTo(X(p[i][0]), Y(p[i][1])); else g.moveTo(X(p[i][0]), Y(p[i][1])); }); g.stroke(); g.globalAlpha = 1;
+      const s0 = tr[0][i]; g.strokeStyle = cols[i]; g.lineWidth = 1.5; g.beginPath(); g.arc(X(s0[0]), Y(s0[1]), 4, 0, 7); g.stroke();
+      const p = tr[Math.min(n, tr.length - 1)][i]; g.fillStyle = cols[i]; g.strokeStyle = T.bg; g.lineWidth = 2; g.beginPath(); g.arc(X(p[0]), Y(p[1]), 0.075 * sc, 0, 7); g.fill(); g.stroke();
+      g.fillStyle = T.bg; g.font = "700 12px " + (css("--sans") || "sans-serif"); g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(String(i + 1), X(p[0]), Y(p[1]) + 1); });
+    g.fillStyle = T.muted; g.textAlign = "left"; g.textBaseline = "alphabetic"; g.font = "600 11.5px " + (css("--sans") || "sans-serif"); g.fillText("평가 에피소드 (학습 " + MDS.run.evalX[MDS.run.evalX.length - 1] + "회 후) · t = " + Math.min(n, MD_T), 16, 26);
+  }
+  function startAnim() {
+    if (animRAF || RM) return; let last = performance.now();
+    const loop = now => { animT += (now - last) / 120; last = now; if (curTab === "maddpg") drawWorld(); animRAF = (curTab === "maddpg") ? requestAnimationFrame(loop) : null; };
+    animRAF = requestAnimationFrame(loop);
+  }
+  function renderMdStats() {
+    const R = MDS.run;
+    $("mdProg").textContent = MDS.running ? "학습 중 " + R.ep + " / " + MDS.episodes : (R.ep ? "완료 " + R.ep + "에피소드" : "");
+    $("mdEval").textContent = f(R.evalY[R.evalY.length - 1], 2); $("mdRand").textContent = f(MD_BASE.rnd, 1); $("mdOrac").textContent = f(MD_BASE.orc, 1); $("mdUpd").textContent = R.upd.toLocaleString("ko-KR");
+    const ma = RL.movingAvg(R.rets, 20);
+    xyChart($("cvMdCurve"), { series: [{ x: ma.map((_, i) => i + 1), y: ma, color: css("--rl-action"), label: R.mode === "maddpg" ? "MADDPG" : "독립 DDPG" }, { x: R.evalX, y: R.evalY, color: css("--rl-value"), dots: true, dotsOnly: true, r: 3.2, label: "평가" }],
+      xmin: 0, xmax: MDS.episodes, ymin: -40, ymax: 0, hlines: [{ y: MD_BASE.rnd }, { y: MD_BASE.orc, color: css("--rl-reward") }], xlabel: "에피소드", h: 210 });
+    const c = R.calc;
+    $("mdCalc").innerHTML = c ? '최근 배치 첫 표본 (에이전트 1): <span class="c-reward">r</span> = ' + f(c.r, 3) + ', Q′₁(x′, μ′₁, μ′₂) = ' + f(c.qn, 3) + ' → y = r + 0.95×Q′ = <b class="c-target">' + f(c.y, 3) + '</b>, Q₁(x, a₁, a₂) = ' + f(c.q, 3) + ', TD 오차 = ' + f(c.q - c.y, 3) +
+      '<br>행위자 1: μ₁(o₁) = (' + f(c.mu[0], 3) + ', ' + f(c.mu[1], 3) + '), ∇a₁Q₁ = (' + f(c.dq[0], 3) + ', ' + f(c.dq[1], 3) + ') → 이 방향으로 μ₁을 민다 (critic 입력 ' + R.cIn + '개: ' + (R.mode === "maddpg" ? "o₁·o₂·a₁·a₂" : "o₁·a₁ 뿐") + ')' : "학습을 시작하면 배치의 첫 표본으로 계산한 숫자가 여기에 나옵니다.";
+    if (RM || !MDS.running) drawWorld();
+  }
+
+  /* =========================================================
+     6. 코드
+     ========================================================= */
+  function codeText() {
+    return [
+      "# pip install pettingzoo[mpe] torch   (PettingZoo 1.25+ 에서는 pip install mpe2 → from mpe2 import simple_spread_v3)",
+      "import numpy as np, torch, torch.nn as nn, torch.nn.functional as F",
+      "from pettingzoo.mpe import simple_spread_v3",
+      "",
+      "env = simple_spread_v3.parallel_env(N=2, max_cycles=" + MD_T + ", continuous_actions=True)",
+      "obs, info = env.reset(seed=" + MDS.seed + ")",
+      "agents = env.agents                       # ['agent_0', 'agent_1']",
+      "",
+      "# ---------- MADDPG: 분산 행위자 + " + (MDS.mode === "maddpg" ? "중앙 critic Q_i(x, a_1, a_2)" : "독립 critic Q_i(o_i, a_i) (비교용 DDPG)") + " ----------",
+      "def mlp(i, o, h=" + MD_H + ", out=None):",
+      "    layers = [nn.Linear(i, h), nn.ReLU(), nn.Linear(h, h), nn.ReLU(), nn.Linear(h, o)]",
+      "    return nn.Sequential(*layers, *( [out] if out else [] ))",
+      "obs_dim = env.observation_space(agents[0]).shape[0]; act_dim = env.action_space(agents[0]).shape[0]",
+      "actors  = [mlp(obs_dim, act_dim, out=nn.Tanh()) for _ in agents]          # mu_i(o_i): 자기 관측만",
+      (MDS.mode === "maddpg" ? "critics = [mlp(len(agents) * (obs_dim + act_dim), 1) for _ in agents]   # 모든 관측 + 모든 행동"
+                             : "critics = [mlp(obs_dim + act_dim, 1) for _ in agents]                   # 자기 관측 + 자기 행동"),
+      "gamma, tau = " + MD_G + ", " + MD_TAU,
+      "",
+      "def critic_in(i, o, a):   # o, a: [에이전트][배치, 차원]",
+      (MDS.mode === "maddpg" ? "    return torch.cat(o + a, dim=-1)" : "    return torch.cat([o[i], a[i]], dim=-1)"),
+      "",
+      "def maddpg_update(i, o, a, r, o2, done, actors_t, critics_t, opt_a, opt_c):",
+      "    with torch.no_grad():",
+      "        a2 = [actors_t[j](o2[j]) for j in range(len(agents))]",
+      "        y = r[i] + gamma * (1 - done) * critics_t[i](critic_in(i, o2, a2)).squeeze(-1)",
+      "    q = critics[i](critic_in(i, o, a)).squeeze(-1)",
+      "    opt_c[i].zero_grad(); F.mse_loss(q, y).backward(); opt_c[i].step()",
+      "    a_new = [a[j].detach() for j in range(len(agents))]; a_new[i] = actors[i](o[i])",
+      "    loss_pi = -critics[i](critic_in(i, o, a_new)).mean()            # dQ/da_i 방향으로 행위자 갱신",
+      "    opt_a[i].zero_grad(); loss_pi.backward(); opt_a[i].step()",
+      "    for net, tgt in ((actors[i], actors_t[i]), (critics[i], critics_t[i])):",
+      "        for p, pt in zip(net.parameters(), tgt.parameters()): pt.data.mul_(1 - tau).add_(tau * p.data)",
+      "",
+      "# ---------- QMIX 믹서: 하이퍼네트워크 + 절댓값 가중치 (단조성) ----------",
+      "class QMixer(nn.Module):",
+      "    def __init__(self, n_agents, state_dim, embed=" + MIX_E + "):",
+      "        super().__init__(); self.n, self.e = n_agents, embed",
+      "        self.hyper_w1 = nn.Linear(state_dim, n_agents * embed)",
+      "        self.hyper_b1 = nn.Linear(state_dim, embed)",
+      "        self.hyper_w2 = nn.Linear(state_dim, embed)",
+      "        self.hyper_b2 = nn.Sequential(nn.Linear(state_dim, embed), nn.ReLU(), nn.Linear(embed, 1))",
+      "    def forward(self, agent_qs, state):          # agent_qs: [B, n], state: [B, state_dim]",
+      "        w1 = torch.abs(self.hyper_w1(state)).view(-1, self.n, self.e)   # |W1| >= 0",
+      "        h = F.elu(torch.bmm(agent_qs.unsqueeze(1), w1) + self.hyper_b1(state).unsqueeze(1))",
+      "        w2 = torch.abs(self.hyper_w2(state)).view(-1, self.e, 1)         # |w2| >= 0",
+      "        return (torch.bmm(h, w2) + self.hyper_b2(state).unsqueeze(1)).view(-1)   # Q_tot",
+      "",
+      "# VDN은 믹서 없이 Q_tot = agent_qs.sum(dim=1)",
+      "# 학습: y = r + gamma * mixer(max_a' Q_i(o_i', a'), s')  ,  loss = (mixer(Q_i(o_i, a_i), s) - y)^2",
+      "# 이 페이지의 행렬 게임: '" + MX.game + "' , seed " + MX.seed + " , Adam lr " + MIX_LR + " , " + MIX_STEPS + "회 (모든 공동 행동을 고르게 사용)"
+    ].join("\n");
+  }
+
+  /* ---------------- 탭 그리기 ---------------- */
+  function renderTab() {
+    if (curTab === "settings") renderSettings();
+    else if (curTab === "ctde") renderCtde();
+    else if (curTab === "qmix") renderQmix();
+    else if (curTab === "grid") { renderGrid(); if (!GM.auto) { GM.auto = true; gTrain(); } }
+    else if (curTab === "maddpg") { renderMdStats(); drawWorld(); startAnim(); if (!MDS.auto) { MDS.auto = true; mdTrain(); } }
+    else if (curTab === "code") $("code").textContent = codeText();
+  }
+  let uiTimer = null;
+  function stopUi() { if (uiTimer) { clearTimeout(uiTimer); uiTimer = null; } $("ngPlay").textContent = "재생"; $("grPlay").textContent = "재생"; }
+
+  /* ---------------- 이벤트 ---------------- */
+  seg("segGame", v => { stopUi(); NG.game = v; NG.start = GAMES[v].start.slice(); NG.step = 0; ngSim(); NG.step = NG_STEPS; renderSettings(); });
+  $("sEta").addEventListener("input", e => { NG.eta = +e.target.value; $("vEta").textContent = NG.eta.toFixed(1); ngSim(); renderSettings(); });
+  $("ngFirst").onclick = () => { stopUi(); NG.step = 0; renderSettings(); };
+  $("ngNext").onclick = () => { stopUi(); NG.step = Math.min(NG_STEPS, NG.step + 1); renderSettings(); };
+  $("ngEnd").onclick = () => { stopUi(); NG.step = NG_STEPS; renderSettings(); };
+  $("ngPlay").onclick = () => {
+    if (uiTimer) { stopUi(); return; } if (NG.step >= NG_STEPS) NG.step = 0; $("ngPlay").textContent = "멈춤";
+    const tick = () => { NG.step = Math.min(NG_STEPS, NG.step + (RM ? 20 : 4)); renderSettings(); if (NG.step >= NG_STEPS) { stopUi(); return; } uiTimer = setTimeout(tick, RM ? 200 : 40); }; tick();
+  };
+  $("cvPhase").addEventListener("click", ev => { const cv = $("cvPhase"), r = cv.getBoundingClientRect(), W = r.width, p = 42; const x = (ev.clientX - r.left - p) / (W - p - 10), y = (r.height - p - (ev.clientY - r.top)) / (r.height - p - 10);
+    if (x <= 0 || x >= 1 || y <= 0 || y >= 1) return; stopUi(); NG.start = [Math.min(0.98, Math.max(0.02, x)), Math.min(0.98, Math.max(0.02, y))]; ngSim(); NG.step = NG_STEPS; renderSettings(); });
+  document.addEventListener("keydown", e => {
+    if (e.key !== "ArrowRight") return; const t = e.target; if (t.closest && (t.closest(".sk-tabs") || /INPUT|SELECT|TEXTAREA/.test(t.tagName))) return;
+    if (curTab === "settings") { stopUi(); NG.step = Math.min(NG_STEPS, NG.step + 1); renderSettings(); e.preventDefault(); }
+    else if (curTab === "grid") { stopUi(); grNext(); e.preventDefault(); }
+  });
+  seg("segPhase", v => { $("ctdeSvg").setAttribute("data-phase", v); renderCtde(); });
+  $("sN").addEventListener("input", renderCtde); $("sA").addEventListener("input", renderCtde);
+  seg("segMat", v => { stopUi(); MX.game = v; MX.state = 0; MX.cell = null; mixBuild(MIX_STEPS); renderQmix(); });
+  $("sMSeed").addEventListener("input", e => { stopUi(); MX.seed = +e.target.value; $("vMSeed").textContent = MX.seed; MX.cell = null; mixBuild(MIX_STEPS); renderQmix(); });
+  $("segState").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; MX.state = +b.getAttribute("data-v"); MX.cell = null; renderQmix(); });
+  $("tblQmix").addEventListener("click", e => { const td = e.target.closest("td[data-a1]"); if (!td) return; MX.cell = [+td.getAttribute("data-a1"), +td.getAttribute("data-a2")]; renderQmix(); });
+  $("mxPlay").onclick = () => {
+    stopUi(); mixBuild(0); const per = 30;
+    const tick = () => { MX.vdn.step(per); MX.qmix.step(per); renderQmix(); if (MX.vdn.t >= MIX_STEPS) { uiTimer = null; return; } uiTimer = setTimeout(tick, RM ? 120 : 30); }; tick();
+  };
+  $("sGEp").addEventListener("input", e => { gStop(); GM.episodes = +e.target.value; $("vGEp").textContent = GM.episodes; gInit(); renderGrid(); });
+  $("sGSeed").addEventListener("input", e => { gStop(); GM.seed = +e.target.value; $("vGSeed").textContent = GM.seed; gInit(); renderGrid(); });
+  $("sGSpd").addEventListener("input", e => { $("vGSpd").textContent = { 1: "느리게", 2: "보통", 3: "빠르게" }[e.target.value]; });
+  $("gTrain").onclick = gTrain; $("gStop").onclick = gStop; $("gReset").onclick = () => { gStop(); gInit(); renderGrid(); };
+  $("gMulti").onclick = gMulti;
+  seg("segGM", v => { stopUi(); GM.sel = v; GM.roll = null; GM.rstep = 0; drawGridWorld(); });
+  function grNext() { if (!GM.roll) gRollout(); GM.rstep = Math.min(GM.roll.path.length - 1, GM.rstep + 1); drawGridWorld(); }
+  $("grFirst").onclick = () => { stopUi(); GM.rstep = 0; drawGridWorld(); };
+  $("grNext").onclick = () => { stopUi(); grNext(); };
+  $("grPlay").onclick = () => {
+    if (uiTimer) { stopUi(); return; } if (!GM.roll) gRollout(); if (GM.rstep >= GM.roll.path.length - 1) GM.rstep = 0; $("grPlay").textContent = "멈춤";
+    const tick = () => { grNext(); if (GM.rstep >= GM.roll.path.length - 1) { stopUi(); return; } uiTimer = setTimeout(tick, RM ? 600 : 380); }; tick();
+  };
+  seg("segCritic", v => { mdStop(); MDS.mode = v; mdInit(); renderTab(); });
+  $("sMEp").addEventListener("input", e => { mdStop(); MDS.episodes = +e.target.value; $("vMEp").textContent = MDS.episodes; mdInit(); renderTab(); });
+  $("sMdSeed").addEventListener("input", e => { mdStop(); MDS.seed = +e.target.value; $("vMdSeed").textContent = MDS.seed; mdInit(); renderTab(); });
+  $("mdTrain").onclick = mdTrain; $("mdStop").onclick = mdStop; $("mdReset").onclick = () => { mdStop(); mdInit(); renderTab(); };
+  $("btnCopy").onclick = () => {
+    const txt = $("code").textContent, done = () => { $("btnCopy").textContent = "복사됨"; setTimeout(() => { $("btnCopy").textContent = "복사"; }, 1400); };
+    const fb = () => { const ta = document.createElement("textarea"); ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (e) {} ta.remove(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, () => { fb(); done(); }); else { fb(); done(); }
+  };
+  RL.onTheme(() => renderTab());
+  let rz = null; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(renderTab, 120); });
+
+  /* ---------------- 시작 ---------------- */
+  ngSim(); NG.step = NG_STEPS;
+  mixBuild(MIX_STEPS);
+  gInit();
+  mdInit();
+  const start = document.getElementById("tab-" + location.hash.slice(1));
+  if (start) show(start); else renderTab();
+})();
+</script>
+</body>
+</html>

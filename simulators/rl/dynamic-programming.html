@@ -1,0 +1,835 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>동적 계획법 (Policy Iteration · Value Iteration) | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261007a">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 강화학습 공통 색: 상태·환경 파랑 · 행동·정책 주황 · 보상 초록(음수 빨강) · 가치 보라 · 목표값 분홍 · 탐험 황토 */
+:root{
+  --sk-accent: var(--cat-rl);
+  --c-state:#2563EB; --c-act:#EA580C; --c-rew:#16A34A; --c-neg:#DC2626; --c-val:#7C3AED; --c-tgt:#DB2777; --c-exp:#B7791F;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --c-state:#79A6F6; --c-act:#F59A5C; --c-rew:#5CCB82; --c-neg:#F07A7A; --c-val:#B597FF; --c-tgt:#F472B6; --c-exp:#E3B455;
+} }
+:root[data-theme="dark"]{
+  --c-state:#79A6F6; --c-act:#F59A5C; --c-rew:#5CCB82; --c-neg:#F07A7A; --c-val:#B597FF; --c-tgt:#F472B6; --c-exp:#E3B455;
+}
+.dp-env{display:flex;flex-wrap:wrap;gap:12px 22px;align-items:end}
+.dp-env .sk-slider{min-width:170px}
+.c-state{color:var(--c-state)} .c-act{color:var(--c-act)} .c-rew{color:var(--c-rew)} .c-neg{color:var(--c-neg)} .c-val{color:var(--c-val)} .c-tgt{color:var(--c-tgt)} .c-exp{color:var(--c-exp)}
+.dp-gridwrap{width:100%;max-width:560px;margin:0 auto}
+.dp-gridwrap canvas{display:block;margin:0 auto;cursor:pointer;touch-action:manipulation}
+.dp-gridwrap canvas:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.dp-cv{display:block;width:100%}
+.dp-player{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.dp-tnow{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--ink);min-width:120px}
+.dp-loop{width:100%;max-width:520px;height:auto;display:block;margin:0 auto}
+.dp-loop .bx{fill:var(--surface-2);stroke-width:2}
+.dp-loop .t{fill:var(--ink);font-family:var(--sans);font-size:15px;font-weight:700}
+.dp-loop .s{fill:var(--muted);font-family:var(--sans);font-size:12.5px}
+.dp-loop .ag{stroke:var(--c-act)} .dp-loop .en{stroke:var(--c-state)}
+.dp-loop .la{stroke:var(--c-act);fill:none;stroke-width:2.4} .dp-loop .ha{fill:var(--c-act)}
+.dp-loop .ls{stroke:var(--c-state);fill:none;stroke-width:2.4} .dp-loop .hs{fill:var(--c-state)}
+.dp-loop .lr{stroke:var(--c-rew);fill:none;stroke-width:2.4} .dp-loop .hr{fill:var(--c-rew)}
+.dp-loop .ta{fill:var(--c-act);font-family:var(--sans);font-size:13px;font-weight:700}
+.dp-loop .ts{fill:var(--c-state);font-family:var(--sans);font-size:13px;font-weight:700}
+.dp-loop .tr{fill:var(--c-rew);font-family:var(--sans);font-size:13px;font-weight:700}
+.dp-loop .tv{fill:var(--c-val);font-family:var(--sans);font-size:13px;font-weight:700}
+.dp-tbl tr.hl td{background:color-mix(in srgb,var(--c-act) 12%,var(--surface))}
+.dp-tbl tr.hl td:first-child{box-shadow:inset 3px 0 0 var(--c-act)}
+.dp-q{display:flex;flex-direction:column;gap:6px;font-family:var(--mono);font-size:13px;line-height:1.55}
+.dp-q .row{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+.dp-q .tm{white-space:nowrap}
+.dp-q .row.best{border-color:var(--c-act);box-shadow:inset 3px 0 0 var(--c-act)}
+.dp-q .row b{font-weight:700}
+.dp-pre{margin:0;font-family:var(--mono);font-size:12.5px;line-height:1.55;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;overflow-x:auto;white-space:pre;color:var(--ink)}
+.dp-code{margin:0;font-family:var(--mono);font-size:13px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;white-space:pre;color:var(--ink);tab-size:4;max-height:680px}
+.dp-code .cm{color:var(--muted)}
+.dp-code .kw{color:var(--c-state);font-weight:600}
+.dp-code .nu{color:var(--c-act)}
+.dp-twin{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.dp-twin h3{text-align:center}
+@media (max-width:700px){ .dp-twin{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:520px){ .dp-code{font-size:12px;padding:12px} .dp-q{font-size:12px} .dp-long{display:none} }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+      <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a href="../../index.html#rl" style="--c:var(--cat-rl)" aria-current="page">강화학습</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#rl" style="--c:var(--cat-rl)">강화학습</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">동적 계획법 (Policy Iteration · Value Iteration)</h1>
+      <p class="ds-hero__lede">환경 모형(전이 확률 P와 보상 R)을 알 때는 직접 부딪혀 보지 않고도 벨만 방정식을 반복해 풀어 최적 정책을 구할 수 있습니다. FrozenLake와 작은 GridWorld에서 칸 하나의 백업 계산부터 정책 반복·가치 반복의 수렴까지 따라갑니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <section class="sk-card" aria-label="환경 설정">
+    <div class="sk-head"><h2>환경 설정</h2><span class="sk-hint">모든 탭이 같은 환경·γ·θ를 씁니다</span></div>
+    <div class="dp-env">
+      <div class="sk-group"><span class="sk-label">환경</span>
+        <div class="sk-seg" role="group" aria-label="환경 선택" id="segEnv">
+          <button type="button" data-v="fl4" aria-pressed="true"><span class="dp-long">FrozenLake </span>4×4</button>
+          <button type="button" data-v="fl8" aria-pressed="false"><span class="dp-long">FrozenLake </span>8×8</button>
+          <button type="button" data-v="grid" aria-pressed="false">GridWorld 3×4</button>
+        </div>
+      </div>
+      <label class="sk-check"><input type="checkbox" id="chkSlip" checked><span id="slipLabel">미끄러짐 (의도·양옆 각 1/3)</span></label>
+      <label class="sk-slider"><span class="sk-sl-head">할인율 γ <b id="gV">0.90</b></span><input type="range" id="gamma" min="0.5" max="0.99" step="0.01" value="0.90"></label>
+      <div class="sk-group"><span class="sk-label">수렴 기준 θ</span>
+        <select class="sk-select" id="theta" aria-label="수렴 기준 θ">
+          <option value="1e-2">1e-2</option><option value="1e-4">1e-4</option><option value="1e-6">1e-6</option><option value="1e-8" selected>1e-8</option><option value="1e-10">1e-10</option>
+        </select>
+      </div>
+      <label class="sk-slider" id="stepRWrap" hidden><span class="sk-sl-head">걸음 보상 (GridWorld) <b id="stepRV">−0.04</b></span><input type="range" id="stepR" min="-0.3" max="0" step="0.01" value="-0.04"></label>
+    </div>
+    <p class="sk-note" id="envNote"></p>
+  </section>
+
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button class="sk-tab" type="button" role="tab" id="tab-model" aria-controls="pane-model" aria-selected="true"><span class="sk-num">1</span>환경 모형 P</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-bellman" aria-controls="pane-bellman" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>벨만 백업</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-pi" aria-controls="pane-pi" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>정책 반복</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-vi" aria-controls="pane-vi" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>가치 반복</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-compare" aria-controls="pane-compare" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>비교</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>코드</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>알고리즘 구성도</button>
+  </nav>
+
+  <!-- 1. 환경 모형 -->
+  <section id="pane-model" role="tabpanel" aria-labelledby="tab-model">
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>격자와 전이</h2><span class="sk-hint">칸을 누르면 그 상태 s의 전이를 봅니다</span></div>
+        <div class="sk-controls">
+          <div class="sk-group"><span class="sk-label">행동 a</span>
+            <div class="sk-seg" role="group" aria-label="행동 선택" id="segAct">
+              <button type="button" data-a="0" aria-pressed="false">0 ↑</button><button type="button" data-a="1" aria-pressed="false">1 →</button><button type="button" data-a="2" aria-pressed="true">2 ↓</button><button type="button" data-a="3" aria-pressed="false">3 ←</button>
+            </div>
+          </div>
+          <label class="sk-check" id="editWrap" hidden><input type="checkbox" id="chkEdit">편집 모드 (빈칸 → 벽 → 함정 −1 → 목표 +1)</label>
+        </div>
+        <div class="dp-gridwrap"><canvas id="cvModel" tabindex="0" aria-label="격자 환경. 칸을 눌러 상태 선택"></canvas></div>
+        <div class="sk-legend" id="legModel"></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2 id="pTitle">env.P[s][a]</h2><span class="sk-hint">[확률, 다음 상태, 보상, 종료]</span></div>
+        <div class="sk-scroll"><table class="sk-table dp-tbl" id="pTable"></table></div>
+        <div><div class="sk-mat-label">이 상태의 네 행동 전체 (rl-kit 의 env.P[s])</div><pre class="dp-pre" id="pRaw"></pre></div>
+        <p class="sk-note">행동 번호는 이 사이트 공통 순서 <b>0↑ 1→ 2↓ 3←</b> 입니다. Gymnasium FrozenLake는 <b>0← 1↓ 2→ 3↑</b> 순서라 같은 칸이라도 env.unwrapped.P[s][a]의 a가 다릅니다.</p>
+        <svg class="dp-loop" viewBox="0 0 520 190" role="img" aria-label="동적 계획법은 환경과 상호작용 대신 P와 R을 읽어 계산한다">
+          <defs>
+            <marker id="dpHa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ha" d="M0 0L10 5L0 10z"/></marker>
+            <marker id="dpHs" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="hs" d="M0 0L10 5L0 10z"/></marker>
+          </defs>
+          <rect class="bx ag" x="10" y="54" width="170" height="86" rx="12"/>
+          <text class="t" x="95" y="90" text-anchor="middle">계획(Planning)</text>
+          <text class="s" x="95" y="112" text-anchor="middle">V(s) · π(s) 표를 갱신</text>
+          <rect class="bx en" x="340" y="54" width="170" height="86" rx="12"/>
+          <text class="t" x="425" y="90" text-anchor="middle">환경 모형 (P, R)</text>
+          <text class="s" x="425" y="112" text-anchor="middle">env.P 를 그대로 읽음</text>
+          <path class="la" d="M180 76 C 240 30, 280 30, 338 76" marker-end="url(#dpHa)"/>
+          <text class="ta" x="260" y="30" text-anchor="middle">모든 (s, a) 를 물어봄</text>
+          <path class="ls" d="M340 120 C 280 168, 240 168, 182 120" marker-end="url(#dpHs)"/>
+          <text class="ts" x="260" y="182" text-anchor="middle">p(s′, r | s, a) 전체를 돌려받음</text>
+          <text class="tv" x="260" y="104" text-anchor="middle">시행착오 없음</text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. 벨만 백업 -->
+  <section id="pane-bellman" role="tabpanel" aria-labelledby="tab-bellman" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>벨만 백업 — 칸 하나의 새 값 계산</h2><span class="sk-hint">칸을 눌러 바꿉니다</span></div>
+      <div class="sk-formula">
+        <span class="c-val">q(s, a)</span> = Σ<sub>s′</sub> p(s′ | s, a) · [ <span class="c-rew">r</span> + γ · <span class="c-val">V(s′)</span> ]   (종료 상태의 V = 0)<br>
+        벨만 기대 방정식  <span class="c-val">V<sub>π</sub>(s)</span> = Σ<sub>a</sub> <span class="c-act">π(a | s)</span> · q(s, a)        벨만 최적 방정식  <span class="c-val">V*(s)</span> = max<sub>a</sub> q(s, a)
+      </div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">대입할 V</span>
+          <div class="sk-seg" role="group" aria-label="대입할 V 선택" id="segVsrc">
+            <button type="button" data-v="zero" aria-pressed="false">V = 0</button>
+            <button type="button" data-v="rand" aria-pressed="false">무작위 정책 평가 중</button>
+            <button type="button" data-v="star" aria-pressed="true">V* (수렴값)</button>
+          </div>
+        </div>
+        <label class="sk-slider" id="kRandWrap" hidden><span class="sk-sl-head">무작위 정책 평가 sweep 수 <b id="kRandV">5</b></span><input type="range" id="kRand" min="1" max="60" step="1" value="5"></label>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h3 id="bGridTitle">V 값</h3><span class="sk-legend"><span><i style="background:var(--c-act)"></i>선택한 s</span><span><i style="background:var(--c-state)"></i>다음 상태 s′</span></span></div>
+        <div class="dp-gridwrap"><canvas id="cvBell" tabindex="0" aria-label="V 값 격자. 칸을 눌러 백업할 상태 선택"></canvas></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h3 id="bTitle">백업 계산</h3></div>
+        <div class="dp-q" id="bQ"></div>
+        <div class="sk-stats" id="bStats"></div>
+        <p class="sk-note" id="bNote"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. 정책 반복 -->
+  <section id="pane-pi" role="tabpanel" aria-labelledby="tab-pi" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>정책 반복 (Policy Iteration) — 평가 ⇄ 개선</h2><span class="sk-hint">→ 키: 다음 단계 (평가 1 sweep 또는 개선 1번)</span></div>
+      <div class="sk-formula">
+        ① 정책 평가: 모든 s에 대해 <span class="c-val">V(s) ← Σ<sub>a</sub> π(a|s) Σ p · [ r + γ V(s′) ]</span> 를 Δ = max|V<sub>새</sub> − V| &lt; θ 일 때까지 반복 (sweep)<br>
+        ② 정책 개선: <span class="c-act">π(s) ← argmax<sub>a</sub> q(s, a)</span> (같으면 기존 행동 유지) → 바뀐 칸이 없으면 정책 안정 = 최적
+      </div>
+      <ol class="sk-stepper" id="piStepper"><li>① 정책 평가</li><li>② 정책 개선</li><li>③ 정책 안정 (종료)</li></ol>
+      <div class="dp-player" data-player="pi"></div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h3 id="piGridTitle">V와 정책</h3><span class="sk-legend"><span><i style="background:var(--c-act)"></i>이번 개선에서 바뀐 칸</span></span></div>
+        <div class="dp-gridwrap"><canvas id="cvPI" aria-label="정책 반복의 가치와 정책 격자"></canvas></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h3>지금 단계</h3></div>
+        <p class="sk-note" id="piNow"></p>
+        <div class="sk-stats" id="piStats"></div>
+        <div class="sk-scroll"><table class="sk-table dp-tbl" id="piTable"></table></div>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card"><div class="sk-head"><h3>평가 sweep별 Δ (log₁₀)</h3><span class="sk-hint">점선 = θ · 반복이 바뀌면 다시 튀어오름</span></div><div><canvas class="dp-cv" id="chPI1" aria-label="정책 반복 델타 곡선"></canvas></div></div>
+      <div class="sk-card"><div class="sk-head"><h3>V(시작)의 변화</h3><span class="sk-hint">sweep마다</span></div><div><canvas class="dp-cv" id="chPI2" aria-label="시작 상태 가치 곡선"></canvas></div></div>
+    </div>
+  </section>
+
+  <!-- 4. 가치 반복 -->
+  <section id="pane-vi" role="tabpanel" aria-labelledby="tab-vi" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>가치 반복 (Value Iteration) — 최적 방정식을 바로 반복</h2><span class="sk-hint">→ 키: 다음 sweep · 칸을 누르면 그 칸의 계산</span></div>
+      <div class="sk-formula">V<sub>k+1</sub>(s) ← <span class="c-act">max<sub>a</sub></span> Σ<sub>s′</sub> p(s′|s, a) · [ <span class="c-rew">r</span> + γ · <span class="c-val">V<sub>k</sub>(s′)</span> ]   ,   Δ<sub>k</sub> = max<sub>s</sub> |V<sub>k+1</sub>(s) − V<sub>k</sub>(s)| &lt; θ 이면 멈춤 → π*(s) = argmax<sub>a</sub> q(s, a)</div>
+      <div class="dp-player" data-player="vi"></div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h3 id="viGridTitle">V<sub>k</sub>와 탐욕 정책</h3><span class="sk-legend"><span><i style="background:var(--c-act)"></i>선택한 칸</span><span><i style="background:var(--c-tgt)"></i>이번에 가장 많이 바뀐 칸</span></span></div>
+        <div class="dp-gridwrap"><canvas id="cvVI" tabindex="0" aria-label="가치 반복 격자. 칸을 눌러 계산 보기"></canvas></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h3 id="viCalcTitle">이번 sweep의 계산</h3></div>
+        <div class="sk-stats" id="viStats"></div>
+        <div class="dp-q" id="viQ"></div>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card"><div class="sk-head"><h3>Δ<sub>k</sub> (log₁₀)</h3><span class="sk-hint">점선 = θ · 대략 γ배씩 줄어듦</span></div><div><canvas class="dp-cv" id="chVI1" aria-label="가치 반복 델타 곡선"></canvas></div></div>
+      <div class="sk-card"><div class="sk-head"><h3>V<sub>k</sub>(시작)</h3><span class="sk-hint">점선 = 수렴값</span></div><div><canvas class="dp-cv" id="chVI2" aria-label="시작 상태 가치 곡선"></canvas></div></div>
+    </div>
+  </section>
+
+  <!-- 5. 비교 -->
+  <section id="pane-compare" role="tabpanel" aria-labelledby="tab-compare" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>정책 반복 vs 가치 반복</h2><span class="sk-hint" id="cmpHint"></span></div>
+      <div class="sk-scroll"><table class="sk-table dp-tbl" id="cmpTable"></table></div>
+      <p class="sk-note" id="cmpNote"></p>
+    </div>
+    <div class="dp-twin">
+      <div class="sk-card"><h3>정책 반복 결과</h3><div class="dp-gridwrap"><canvas id="cvCmpPI" aria-label="정책 반복 최종 정책"></canvas></div></div>
+      <div class="sk-card"><h3>가치 반복 결과</h3><div class="dp-gridwrap"><canvas id="cvCmpVI" aria-label="가치 반복 최종 정책"></canvas></div></div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h3>γ에 따른 변화</h3><span class="sk-hint">현재 환경·θ 기준</span></div>
+        <div class="sk-scroll"><table class="sk-table dp-tbl" id="gTable"></table></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h3>필요한 sweep 수</h3><span class="sk-legend"><span><i style="background:var(--c-val)"></i>가치 반복</span><span><i style="background:var(--c-act)"></i>정책 반복 (평가 sweep 합)</span></span></div>
+        <div><canvas class="dp-cv" id="chG" aria-label="γ별 sweep 수 막대그래프"></canvas></div>
+        <p class="sk-note">보상이 멀리 있는 FrozenLake처럼 γ가 1에 가까울수록 먼 미래까지 보므로 값이 퍼지는 데 sweep이 더 필요합니다(오차가 sweep마다 대략 γ배로 줄어듦). 정책 반복은 바깥 반복 횟수는 적지만 매번 평가를 끝까지 해서 sweep 합은 오히려 많을 수 있습니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. 코드 -->
+  <section id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>파이썬 코드 (Gymnasium · numpy)</h2>
+        <div class="sk-group"><span class="sk-hint">현재 설정이 반영됩니다</span><button class="sk-btn sk-btn--primary sk-btn--sm" type="button" id="copyBtn">복사</button></div>
+      </div>
+      <p class="sk-note"><b>행동 번호 주의</b> — 이 시뮬레이터는 0↑ 1→ 2↓ 3←, Gymnasium FrozenLake는 0← 1↓ 2→ 3↑ 입니다. 가치 V는 같고 정책의 행동 번호만 다르게 나옵니다.</p>
+      <pre class="dp-code" id="code" tabindex="0" aria-label="파이썬 코드"></pre>
+    </div>
+  </section>
+
+  <!-- 7. 알고리즘 구성도 -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">환경 모형과 벨만 방정식 → 정책 반복 → 가치 반복과 비교 순서의 강의 슬라이드</span></div><div data-ds-diagrams="dynamic-programming"></div></section>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20261007a"></script>
+<script src="../../assets/js/rl-kit.js?v=20261007a"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261007a"></script>
+<script src="../../assets/diagrams/dynamic-programming.js?v=20261007a"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const reduced = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const AR = RL.ACTIONS, f4 = v => v.toFixed(4), neg = s => String(s).replace(/-/g, "−");
+  const fv = v => neg(f4(v));
+
+  function C() {
+    const s = getComputedStyle(document.documentElement), g = n => s.getPropertyValue(n).trim();
+    return { ink: g("--ink"), text: g("--text"), muted: g("--muted"), faint: g("--faint"), line: g("--line"), surface: g("--surface"), surface2: g("--surface-2"),
+      act: g("--c-act"), rew: g("--c-rew"), neg: g("--c-neg"), val: g("--c-val"), exp: g("--c-exp"), state: g("--c-state"), tgt: g("--c-tgt"),
+      sans: g("--sans") || "sans-serif", mono: g("--mono") || "monospace" };
+  }
+  function fit(cv, h) {
+    const dpr = window.devicePixelRatio || 1, w = Math.max(240, (cv.parentNode && cv.parentNode.clientWidth) || 600);
+    cv.style.width = "100%"; cv.style.height = h + "px"; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); return { g, w, h };
+  }
+  function chart(cv, series, o) { o = o || {}; RL.lineChart(cv, series, Object.assign({ w: Math.max(240, cv.parentNode.clientWidth || 560), h: o.h || 210 }, o)); }
+
+  /* ---------- 환경 ---------- */
+  const S = { env: "fl4", slip: true, gamma: 0.9, theta: 1e-8, stepR: -0.04 };
+  const G = { goals: { 3: 1 }, holes: [7], walls: [5] };          /* GridWorld 3×4 (Russell & Norvig 예제) */
+  let env = null, ACT = [];
+  function makeEnv() {
+    if (S.env === "fl4") return RL.FrozenLake({ map: "4x4", slippery: S.slip });
+    if (S.env === "fl8") return RL.FrozenLake({ map: "8x8", slippery: S.slip });
+    return new RL.GridEnv({ name: "GridWorld 3×4", kind: "grid", rows: 3, cols: 4, start: 8, goals: Object.assign({}, G.goals), holes: G.holes.slice(), holeR: -1,
+      walls: G.walls.slice(), stepR: S.stepR, slip: S.slip ? 0.2 : 0 });
+  }
+  const active = s => !env.terminal[s] && env.walls.indexOf(s) < 0;
+  function qv(V, s, g) {
+    const q = [0, 0, 0, 0];
+    for (let a = 0; a < 4; a++) for (const [p, ns, r, done] of env.P[s][a]) q[a] += p * (r + (done ? 0 : g * V[ns]));
+    return q;
+  }
+  const argmax0 = q => { let b = 0; for (let a = 1; a < q.length; a++) if (q[a] > q[b] + 1e-12) b = a; return b; };
+
+  /* 가치 반복: Vs[k] = k번 sweep 후 V (동기식: 이전 sweep의 V만 사용) */
+  function viTrace(g, th) {
+    const nS = env.nS; let V = new Float64Array(nS); const Vs = [V], deltas = [], argD = [];
+    for (let k = 0; k < 20000; k++) {
+      const NV = new Float64Array(nS); let d = 0, ds = -1;
+      for (const s of ACT) { const q = qv(V, s, g), v = Math.max(...q); NV[s] = v; const dd = Math.abs(v - V[s]); if (dd > d) { d = dd; ds = s; } }
+      Vs.push(NV); deltas.push(d); argD.push(ds); V = NV;
+      if (d < th) break;
+    }
+    return { Vs, deltas, argD, V, pol: greedy(V, g) };
+  }
+  function greedy(V, g) { const p = new Array(env.nS).fill(null); for (const s of ACT) p[s] = argmax0(qv(V, s, g)); return p; }
+  /* 정책 반복: 무작위 균등 정책에서 시작, 평가는 이전 V에서 이어서(warm start) */
+  function piTrace(g, th) {
+    const nS = env.nS; let V = new Float64Array(nS), pol = null;
+    const steps = [{ kind: "init", iter: 1, V, pol: null }], iters = []; let total = 0;
+    for (let it = 1; it <= 200; it++) {
+      let sw = 0;
+      for (;;) {
+        const NV = new Float64Array(nS); let d = 0;
+        for (const s of ACT) { const q = qv(V, s, g), v = pol ? q[pol[s]] : (q[0] + q[1] + q[2] + q[3]) / 4; NV[s] = v; d = Math.max(d, Math.abs(v - V[s])); }
+        V = NV; sw++; total++;
+        steps.push({ kind: "eval", iter: it, sweep: sw, V, delta: d, pol, total });
+        if (d < th || sw >= 20000) break;
+      }
+      const np = new Array(nS).fill(null), chg = [];
+      for (const s of ACT) { const q = qv(V, s, g); let b = argmax0(q); if (pol && q[pol[s]] >= q[b] - 1e-12) b = pol[s]; np[s] = b; if (!pol || pol[s] !== b) chg.push(s); }
+      const stable = !!pol && chg.length === 0;
+      iters.push({ iter: it, sweeps: sw, changed: chg.length, v0: V[env.start], first: !pol });
+      steps.push({ kind: "improve", iter: it, V, pol: np, prev: pol, chg, stable, total });
+      if (stable) break;
+      pol = np;
+    }
+    return { steps, iters, total, V, pol: steps[steps.length - 1].pol };
+  }
+  const polArrows = pol => pol ? pol : new Array(env.nS).fill([0.25, 0.25, 0.25, 0.25]);
+
+  /* 격자 그리기 (rl-kit drawGrid 위에 덧그림) */
+  function cellSize(cv) { const w = cv.parentNode.clientWidth || 400; return Math.max(26, Math.min(env.cols >= 8 ? 68 : 110, Math.floor(w / env.cols))); }
+  function grid(cv, o) {
+    const csz = cellSize(cv), res = RL.drawGrid(cv, env, Object.assign({ size: csz, fmt: v => neg(v.toFixed(csz >= 70 ? 4 : csz >= 44 ? 3 : 2)) }, o)), c = C(), g = cv.getContext("2d"), cs = res.cell;
+    if (env.kind === "grid") {
+      g.font = "700 " + Math.max(11, Math.round(cs * 0.2)) + "px " + c.sans; g.textAlign = "center"; g.textBaseline = "middle";
+      Object.keys(env.goals).forEach(k => { const [r, cc] = env.rc(+k); g.fillStyle = c.ink; g.fillText("+" + env.goals[k], cc * cs + cs / 2, r * cs + cs / 2); });
+      env.holes.forEach(h => { const [r, cc] = env.rc(h); g.fillStyle = "#F1F5F9"; g.fillText("−1", cc * cs + cs / 2, r * cs + cs / 2); });
+    }
+    /* 아래 화살표가 값 글자를 가리지 않게 값 칸을 다시 칠하고 글자를 다시 씀 */
+    if (o.V && o.policy && o.showValues !== false) {
+      const th = RL.theme(); let vmax = 0; ACT.forEach(s => { vmax = Math.max(vmax, Math.abs(o.V[s])); });
+      const fs = Math.max(9, Math.round(cs * 0.2));
+      ACT.forEach(s => {
+        if (o.policy[s] !== 2) return;
+        const [r, cc] = env.rc(s), x = cc * cs, y = r * cs;
+        g.fillStyle = RL.valueColor(o.V[s], vmax, th); g.fillRect(x + 2, y + cs * 0.66, cs - 4, cs * 0.26);
+        if (o.highlight && o.highlight[s]) { g.globalAlpha = 0.35; g.fillStyle = o.highlight[s]; g.fillRect(x + 2, y + cs * 0.66, cs - 4, cs * 0.26); g.globalAlpha = 1; }
+        g.fillStyle = th.text; g.font = "600 " + fs + "px " + c.mono; g.textAlign = "center"; g.textBaseline = "middle";
+        g.fillText(neg(o.V[s].toFixed(cs >= 70 ? 4 : cs >= 44 ? 3 : 2)), x + cs / 2, y + cs * 0.78);
+      });
+    }
+    if (o.draw) o.draw(g, cs, c);
+    return cs;
+  }
+  function center(s, cs) { const [r, c] = env.rc(s); return [c * cs + cs / 2, r * cs + cs / 2]; }
+  function arrowTo(g, x1, y1, x2, y2, col, w, label) {
+    const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L, ex = x2 - ux * 8, ey = y2 - uy * 8;
+    g.strokeStyle = col; g.fillStyle = col; g.lineWidth = w; g.beginPath(); g.moveTo(x1 + ux * 6, y1 + uy * 6); g.lineTo(ex, ey); g.stroke();
+    g.beginPath(); g.moveTo(x2 - ux * 2, y2 - uy * 2); g.lineTo(ex - uy * 6, ey + ux * 6); g.lineTo(ex + uy * 6, ey - ux * 6); g.closePath(); g.fill();
+    if (label) { g.font = "700 12px " + C().mono; g.textAlign = "center"; g.textBaseline = "middle"; const mx = (x1 + x2) / 2 - uy * 11, my = (y1 + y2) / 2 + ux * 11; g.fillStyle = C().surface; g.fillRect(mx - 15, my - 8, 30, 16); g.fillStyle = col; g.fillText(label, mx, my); }
+  }
+  const pStr = p => Math.abs(p - 1 / 3) < 1e-9 ? "⅓" : Math.abs(p - 2 / 3) < 1e-9 ? "⅔" : Math.abs(p - 1) < 1e-9 ? "1" : p.toFixed(2);
+  const sName = s => { const [r, c] = env.rc(s); return "s" + s + " (" + r + "," + c + ")"; };
+
+  /* ---------- 1. 환경 모형 ---------- */
+  const MD = { s: 0, a: 2 };
+  function renderModel() {
+    const c = C(), outs = env.P[MD.s][MD.a];
+    grid($("cvModel"), { labels: true, showValues: false, arrows: false, highlight: { [MD.s]: c.act },
+      draw: (g, cs) => {
+        const [x0, y0] = center(MD.s, cs);
+        outs.forEach(([p, ns]) => {
+          const [x1, y1] = center(ns, cs);
+          if (ns === MD.s) { g.strokeStyle = c.state; g.lineWidth = 2.5; g.beginPath(); g.arc(x0 + cs * 0.22, y0 - cs * 0.22, cs * 0.13, 0, Math.PI * 2); g.stroke();
+            g.font = "700 12px " + c.mono; g.fillStyle = c.state; g.textAlign = "center"; g.fillText(pStr(p), x0 + cs * 0.22, y0 - cs * 0.22); }
+          else arrowTo(g, x0, y0, x1, y1, c.state, 2.5, pStr(p));
+        });
+      } });
+    $("pTitle").textContent = "env.P[" + MD.s + "][" + MD.a + "]  ·  " + sName(MD.s) + " 에서 " + AR[MD.a] + " (" + RL.ACTION_NAMES[MD.a] + ")";
+    let html = "<thead><tr><th>확률 p</th><th>다음 상태 s′</th><th>칸 종류</th><th>보상 r</th><th>종료</th></tr></thead><tbody>";
+    const TY = { free: "얼음/빈칸", start: "시작", hole: env.kind === "grid" ? "함정" : "구멍 H", goal: "목표 G", wall: "벽" };
+    outs.forEach(([p, ns, r, d]) => { html += '<tr><td class="n">' + p.toFixed(4) + '</td><td>' + sName(ns) + (ns === MD.s ? " (제자리)" : "") + "</td><td>" + (TY[env.cellType(ns)] || "") + '</td><td class="n ' + (r > 0 ? "c-rew" : r < 0 ? "c-neg" : "") + '">' + neg(r) + "</td><td>" + (d ? "True" : "False") + "</td></tr>"; });
+    const sum = outs.reduce((x, o) => x + o[0], 0);
+    html += '<tr><td class="n"><b>' + sum.toFixed(4) + "</b></td><td colspan=\"4\" style=\"color:var(--muted)\">확률의 합 = 1</td></tr></tbody>";
+    $("pTable").innerHTML = html;
+    $("pRaw").textContent = [0, 1, 2, 3].map(a => "P[" + MD.s + "][" + a + "] " + AR[a] + "  " + JSON.stringify(env.P[MD.s][a].map(([p, ns, r, d]) => [+p.toFixed(3), ns, r, d]))).join("\n");
+    $("legModel").innerHTML = '<span><i style="background:var(--c-act)"></i>선택한 s</span><span><i style="background:var(--c-state)"></i>전이 (숫자 = 확률)</span>' +
+      (env.kind === "grid" ? "<span>+1 목표 · −1 함정 · 회색 = 벽 · 걸음마다 " + neg(S.stepR.toFixed(2)) + "</span>" : "<span>S 시작 · H 구멍(보상 0, 종료) · G 목표(보상 1, 종료)</span>");
+  }
+  function modelClick(e) {
+    const s = RL.gridHit($("cvModel"), env, e); if (s < 0) return;
+    if (env.kind === "grid" && $("chkEdit").checked) { editCell(s); return; }
+    MD.s = s; renderModel();
+  }
+  function editCell(s) {
+    if (s === env.start) return;
+    const isW = G.walls.includes(s), isH = G.holes.includes(s), isG = G.goals[s] != null;
+    G.walls = G.walls.filter(x => x !== s); G.holes = G.holes.filter(x => x !== s); delete G.goals[s];
+    if (!isW && !isH && !isG) G.walls.push(s); else if (isW) G.holes.push(s); else if (isH) G.goals[s] = 1;
+    if (!Object.keys(G.goals).length) G.goals[3] = 1;
+    MD.s = s; rebuild();
+  }
+  $("cvModel").addEventListener("click", modelClick);
+  $("segAct").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; MD.a = +b.getAttribute("data-a");
+    $("segAct").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); renderModel(); });
+  function gridKeys(cv, getS, setS) {
+    cv.addEventListener("keydown", e => {
+      const m = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[e.key]; if (!m) return;
+      const [r, c] = env.rc(getS()), nr = Math.max(0, Math.min(env.rows - 1, r + m[0])), nc = Math.max(0, Math.min(env.cols - 1, c + m[1]));
+      setS(env.idx(nr, nc)); e.preventDefault(); e.stopPropagation();
+    });
+  }
+  gridKeys($("cvModel"), () => MD.s, s => { MD.s = s; renderModel(); });
+
+  /* ---------- 2. 벨만 백업 ---------- */
+  const BL = { s: 14, src: "star", k: 5 };
+  let VI = null, PI = null;
+  function randEvalV(k) { let V = new Float64Array(env.nS); for (let i = 0; i < k; i++) { const NV = new Float64Array(env.nS); for (const s of ACT) { const q = qv(V, s, S.gamma); NV[s] = (q[0] + q[1] + q[2] + q[3]) / 4; } V = NV; } return V; }
+  /* q(s,a) 전개식 HTML */
+  function qRow(V, s, a, g, best, extra) {
+    const outs = env.P[s][a]; let q = 0;
+    const terms = outs.map(([p, ns, r, d]) => { q += p * (r + (d ? 0 : g * V[ns])); return '<span class="tm">' + pStr(p) + "·(" + neg(r) + " + " + g.toFixed(2) + "×" + (d ? "0<span style=\"color:var(--muted)\">(종료)</span>" : fv(V[ns])) + ")</span>"; });
+    return { q, html: '<div class="row' + (best ? " best" : "") + '">q(s, ' + AR[a] + ") = " + terms.join(" + ") + " = <b class=\"c-val\">" + fv(q) + "</b>" + (extra || "") + "</div>" };
+  }
+  function bellV() { return BL.src === "zero" ? new Float64Array(env.nS) : BL.src === "rand" ? randEvalV(BL.k) : VI.V; }
+  function renderBell() {
+    const c = C(), V = bellV(), s = BL.s, g = S.gamma;
+    const nexts = {}; for (let a = 0; a < 4; a++) env.P[s][a].forEach(o => { if (o[1] !== s) nexts[o[1]] = c.state; });
+    nexts[s] = c.act;
+    grid($("cvBell"), { V, arrows: false, highlight: nexts, labels: true });
+    $("bGridTitle").textContent = BL.src === "zero" ? "V = 0 (모두 0에서 시작)" : BL.src === "rand" ? "무작위 정책을 " + BL.k + "번 sweep 평가한 V" : "V* (가치 반복 수렴값)";
+    $("bTitle").textContent = "s = " + sName(s) + " 의 백업 · γ = " + g.toFixed(2);
+    if (!active(s)) {
+      $("bQ").innerHTML = '<div class="row">' + (env.walls.includes(s) ? "벽" : "종료 상태") + "는 백업하지 않습니다 (V = 0 고정). 다른 칸을 누르세요.</div>";
+      $("bStats").innerHTML = ""; $("bNote").textContent = ""; return;
+    }
+    const qs = [0, 1, 2, 3].map(a => qRow(V, s, a, g, false).q), best = argmax0(qs), mx = qs[best], ex = qs.reduce((x, y) => x + y, 0) / 4;
+    $("bQ").innerHTML = [0, 1, 2, 3].map(a => qRow(V, s, a, g, a === best).html).join("") +
+      '<div class="row">기대 백업 (π = 무작위 0.25씩): 0.25×(' + qs.map(fv).join(" + ") + ") = <b class=\"c-val\">" + fv(ex) + "</b></div>" +
+      '<div class="row best">최적 백업: max(' + qs.map(fv).join(", ") + ") = <b class=\"c-val\">" + fv(mx) + "</b> → 탐욕 행동 <b class=\"c-act\">" + AR[best] + " " + RL.ACTION_NAMES[best] + "</b></div>";
+    $("bStats").innerHTML = '<div class="sk-stat"><b>' + fv(V[s]) + '</b><span>지금 V(s)</span></div><div class="sk-stat"><b class="c-val">' + fv(ex) + '</b><span>기대 백업 (무작위 π)</span></div><div class="sk-stat"><b class="c-val">' + fv(mx) + '</b><span>최적 백업 (max)</span></div>';
+    $("bNote").innerHTML = BL.src === "star" ? "V*를 대입하면 최적 백업 결과가 지금 값과 같습니다(차이 " + Math.abs(mx - V[s]).toExponential(1) + ") — V*가 <b>벨만 최적 방정식의 해</b>(고정점)라는 뜻입니다."
+      : BL.src === "zero" ? "V = 0이면 목표에 바로 닿는 전이의 보상만 남습니다. 이 계산을 모든 칸에 한 번 하는 것이 sweep 한 번입니다."
+      : "무작위 정책 평가 중의 V를 대입하면 기대 백업은 다음 sweep의 값, 최적 백업은 '정책 개선'이 고를 행동을 보여 줍니다.";
+  }
+  $("cvBell").addEventListener("click", e => { const s = RL.gridHit($("cvBell"), env, e); if (s >= 0) { BL.s = s; renderBell(); } });
+  gridKeys($("cvBell"), () => BL.s, s => { BL.s = s; renderBell(); });
+  $("segVsrc").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; BL.src = b.getAttribute("data-v");
+    $("segVsrc").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); $("kRandWrap").hidden = BL.src !== "rand"; renderBell(); });
+  $("kRand").oninput = () => { BL.k = +$("kRand").value; $("kRandV").textContent = BL.k; renderBell(); };
+
+  /* ---------- 단계 재생기 ---------- */
+  const players = {};
+  function makePlayer(id, getT, render, extra) {
+    const host = document.querySelector('[data-player="' + id + '"]');
+    host.innerHTML =
+      '<div class="sk-group"><button class="sk-btn sk-btn--sm" type="button" data-a="first">처음</button><button class="sk-btn sk-btn--sm" type="button" data-a="prev">이전</button>' +
+      '<button class="sk-btn sk-btn--sm sk-btn--primary" type="button" data-a="next">다음</button><button class="sk-btn sk-btn--sm" type="button" data-a="play">▶ 재생</button>' +
+      (extra ? '<button class="sk-btn sk-btn--sm" type="button" data-a="extra">' + extra.label + "</button>" : "") +
+      '<button class="sk-btn sk-btn--sm" type="button" data-a="last">끝으로</button></div>' +
+      '<label class="sk-slider" style="min-width:150px"><span class="sk-sl-head">속도 (단계/초) <b data-o="spv">' + (reduced ? 3 : 8) + '</b></span><input type="range" data-o="sp" min="1" max="120" step="1" value="' + (reduced ? 3 : 8) + '"></label>' +
+      '<span class="dp-tnow" data-o="now"></span>';
+    const P = { t: 0, playing: false, acc: 0, last: 0 };
+    const btnPlay = host.querySelector('[data-a="play"]'), sp = host.querySelector('[data-o="sp"]'), now = host.querySelector('[data-o="now"]');
+    sp.oninput = () => { host.querySelector('[data-o="spv"]').textContent = sp.value; };
+    function set(t) { P.t = Math.max(0, Math.min(getT(), t)); now.textContent = "단계 " + P.t + " / " + getT(); render(P.t); }
+    function stop() { P.playing = false; btnPlay.textContent = "▶ 재생"; }
+    function loop(ts) {
+      if (!P.playing) return;
+      P.acc += (ts - P.last) / 1000 * +sp.value; P.last = ts;
+      const n = Math.floor(P.acc); if (n > 0) { P.acc -= n; set(P.t + n); }
+      if (P.t >= getT()) { stop(); return; }
+      requestAnimationFrame(loop);
+    }
+    function play() { if (P.t >= getT()) set(0); P.playing = true; btnPlay.textContent = "❚❚ 멈춤"; P.last = performance.now(); P.acc = 1; requestAnimationFrame(loop); }
+    host.addEventListener("click", e => {
+      const b = e.target.closest("[data-a]"); if (!b) return; const a = b.getAttribute("data-a");
+      if (a === "play") { P.playing ? stop() : play(); return; }
+      stop();
+      if (a === "first") set(0); else if (a === "prev") set(P.t - 1); else if (a === "next") set(P.t + 1); else if (a === "last") set(getT()); else if (a === "extra") set(extra.go(P.t));
+    });
+    const api = { set, stop, get t() { return P.t; }, next: () => { stop(); set(P.t + 1); }, prev: () => { stop(); set(P.t - 1); } };
+    players[id] = api; return api;
+  }
+  const padSeries = n => ({ data: new Array(Math.max(2, n)).fill(0), color: "rgba(0,0,0,0)", width: 0.01 });
+  const lg = d => Math.log10(Math.max(d, 1e-16));
+
+  /* ---------- 3. 정책 반복 ---------- */
+  function renderPI(t) {
+    const c = C(), st = PI.steps[t], hl = {};
+    if (st.kind === "improve" && st.chg) st.chg.forEach(s => { hl[s] = c.act; });
+    grid($("cvPI"), { V: st.V, policy: polArrows(st.pol), highlight: hl });
+    const lis = $("piStepper").querySelectorAll("li"), ph = st.kind === "improve" ? (st.stable ? 2 : 1) : 0;
+    lis.forEach((li, i) => { li.className = i === ph ? "on" : i < ph ? "done" : ""; });
+    $("piGridTitle").textContent = "반복 " + st.iter + " · " + (st.kind === "init" ? "시작: V = 0, π = 무작위 균등" : st.kind === "eval" ? "평가 sweep " + st.sweep : st.stable ? "정책 안정" : "개선 후 새 정책");
+    let msg;
+    if (st.kind === "init") msg = "처음 정책은 네 방향을 0.25씩 고르는 <b>무작위 균등 정책</b>, V는 모두 0입니다. [다음]을 누르면 이 정책을 평가하는 sweep이 시작됩니다.";
+    else if (st.kind === "eval") msg = "<b>① 정책 평가</b> (반복 " + st.iter + ", sweep " + st.sweep + ") — 정책을 고정한 채 기대 방정식으로 V를 갱신. Δ = <b>" + st.delta.toExponential(2) + "</b>" + (st.delta < S.theta ? " &lt; θ → 평가 끝, 다음은 개선" : " ≥ θ = " + S.theta.toExponential(0) + " → 계속");
+    else if (st.stable) msg = "<b>③ 정책 안정</b> — 개선해도 바뀌는 칸이 없습니다. 이 정책이 최적 정책 π*, V가 V*입니다. V(시작) = <b>" + fv(st.V[env.start]) + "</b>";
+    else msg = "<b>② 정책 개선</b> (반복 " + st.iter + ") — 칸마다 argmax q(s, a)로 행동을 바꿈. " + (st.prev ? "바뀐 칸 <b>" + st.chg.length + "</b>개 (주황)" : "무작위 → 결정적 정책 (모든 칸 " + st.chg.length + "개)") + " → 새 정책을 다시 평가";
+    $("piNow").innerHTML = msg;
+    const evals = PI.steps.slice(1, t + 1).filter(x => x.kind === "eval");
+    $("piStats").innerHTML = '<div class="sk-stat"><b>' + st.iter + '</b><span>바깥 반복</span></div><div class="sk-stat"><b>' + evals.length + '</b><span>누적 평가 sweep</span></div>' +
+      '<div class="sk-stat"><b class="c-val">' + fv(st.V[env.start]) + '</b><span>V(시작)</span></div><div class="sk-stat"><b>' + PI.iters.length + " / " + PI.total + '</b><span>최종 반복 / sweep 합</span></div>';
+    let html = "<thead><tr><th>반복</th><th>평가 sweep</th><th>바뀐 칸</th><th>V(시작)</th></tr></thead><tbody>";
+    PI.iters.forEach(it => {
+      const done = PI.steps.findIndex(x => x.kind === "improve" && x.iter === it.iter) <= t;
+      if (it.iter > st.iter) return;
+      html += '<tr class="' + (it.iter === st.iter ? "hl" : "") + '"><td>' + it.iter + '</td><td class="n">' + (st.kind === "init" ? "–" : done || st.kind !== "eval" ? it.sweeps : st.sweep + "…") + '</td><td class="n">' + (done ? (it.first ? it.changed + " (무작위→결정적)" : it.changed) : "–") + '</td><td class="n">' + (done ? fv(it.v0) : "–") + "</td></tr>";
+    });
+    $("piTable").innerHTML = html + "</tbody>";
+    const dl = evals.map(x => lg(x.delta)), v0 = evals.map(x => x.V[env.start]);
+    const all = PI.steps.filter(x => x.kind === "eval");
+    chart($("chPI1"), [padSeries(all.length), { data: dl, color: c.act, label: "log₁₀ Δ" }], { ymin: Math.min(lg(S.theta) - 1, ...all.map(x => lg(x.delta))), ymax: Math.max(0, ...all.map(x => lg(x.delta))), hline: lg(S.theta) });
+    chart($("chPI2"), [padSeries(all.length), { data: v0, color: c.val, label: "V(시작)" }], { ymin: Math.min(0, PI.V[env.start]), ymax: Math.max(0.01, PI.V[env.start] * 1.1) });
+  }
+
+  /* ---------- 4. 가치 반복 ---------- */
+  const VS = { s: 0 };
+  function renderVI(k) {
+    const c = C(), V = VI.Vs[k], pol = k ? greedy(V, S.gamma) : null, hl = {};
+    if (k && VI.argD[k - 1] >= 0) hl[VI.argD[k - 1]] = c.tgt;
+    hl[VS.s] = c.act;
+    grid($("cvVI"), { V, policy: pol || undefined, arrows: !!k, highlight: hl });
+    $("viGridTitle").innerHTML = "V<sub>" + k + "</sub>와 탐욕 정책" + (k === VI.Vs.length - 1 ? " (수렴)" : "");
+    const d = k ? VI.deltas[k - 1] : null;
+    $("viStats").innerHTML = '<div class="sk-stat"><b>' + k + '</b><span>sweep k</span></div><div class="sk-stat"><b>' + (d == null ? "–" : d.toExponential(2)) + '</b><span>Δ<sub>k</sub> (θ = ' + S.theta.toExponential(0) + ')</span></div>' +
+      '<div class="sk-stat"><b class="c-val">' + fv(V[env.start]) + '</b><span>V<sub>' + k + '</sub>(시작)</span></div><div class="sk-stat"><b>' + (VI.Vs.length - 1) + '</b><span>수렴까지 sweep</span></div>';
+    const s = VS.s;
+    if (!k) { $("viCalcTitle").textContent = "시작 (k = 0)"; $("viQ").innerHTML = '<div class="row">모든 V<sub>0</sub>(s) = 0. [다음]을 누르면 sweep 1이 V<sub>0</sub>을 대입해 V<sub>1</sub>을 만듭니다.</div>'; }
+    else if (!active(s)) { $("viCalcTitle").textContent = "sweep " + k + " 의 계산"; $("viQ").innerHTML = '<div class="row">종료 상태·벽은 V = 0 고정입니다. 다른 칸을 누르세요.</div>'; }
+    else {
+      const Vp = VI.Vs[k - 1], qs = [0, 1, 2, 3].map(a => qv(Vp, s, S.gamma)[a]), b = argmax0(qs);
+      $("viCalcTitle").textContent = "sweep " + k + " · " + sName(s) + " : V" + (k - 1) + " 를 대입";
+      $("viQ").innerHTML = [0, 1, 2, 3].map(a => qRow(Vp, s, a, S.gamma, a === b).html).join("") +
+        '<div class="row best">V<sub>' + k + "</sub>(s) = max(" + qs.map(fv).join(", ") + ") = <b class=\"c-val\">" + fv(qs[b]) + "</b>  (이전 " + fv(Vp[s]) + ")</div>";
+    }
+    const dl = VI.deltas.slice(0, k).map(lg), all = VI.deltas.map(lg);
+    chart($("chVI1"), [padSeries(VI.deltas.length), { data: dl, color: c.tgt, label: "log₁₀ Δ" }], { ymin: Math.min(lg(S.theta) - 1, ...all), ymax: Math.max(0, ...all), hline: lg(S.theta) });
+    chart($("chVI2"), [padSeries(VI.Vs.length), { data: VI.Vs.slice(0, k + 1).map(v => v[env.start]), color: c.val, label: "V(시작)" }], { ymin: Math.min(0, VI.V[env.start]), ymax: Math.max(0.01, VI.V[env.start] * 1.1), hline: VI.V[env.start] });
+  }
+  $("cvVI").addEventListener("click", e => { const s = RL.gridHit($("cvVI"), env, e); if (s >= 0) { VS.s = s; renderVI(pVI.t); } });
+  gridKeys($("cvVI"), () => VS.s, s => { VS.s = s; renderVI(pVI.t); });
+
+  const pPI = makePlayer("pi", () => PI.steps.length - 1, renderPI, { label: "이번 평가 끝까지", go: t => { for (let i = t + 1; i < PI.steps.length; i++) if (PI.steps[i].kind === "improve") return i - 1 > t ? i - 1 : i; return PI.steps.length - 1; } });
+  const pVI = makePlayer("vi", () => VI.Vs.length - 1, renderVI);
+
+  /* ---------- 5. 비교 ---------- */
+  let CMP = null;
+  function computeCompare() {
+    const gs = [0.5, 0.7, 0.8, 0.9, 0.95, 0.99], rows = [];
+    gs.forEach(g => { const v = viTrace(g, S.theta), p = piTrace(g, S.theta); rows.push({ g, vi: v.deltas.length, pit: p.iters.length, pis: p.total, v0: v.V[env.start], v0p: p.V[env.start] }); });
+    CMP = rows;
+  }
+  function renderCompare() {
+    const c = C(), nA = ACT.length;
+    let diff = 0; for (const s of ACT) diff = Math.max(diff, Math.abs(PI.V[s] - VI.V[s]));
+    let same = 0, uniq = 0;
+    for (const s of ACT) { const q = qv(VI.V, s, S.gamma), m = Math.max(...q), ties = q.filter(x => Math.abs(x - m) < 1e-9).length; if (ties === 1) { uniq++; if (PI.pol[s] === VI.pol[s]) same++; } }
+    $("cmpHint").textContent = env.name + (env.kind !== "grid" ? (S.slip ? " · 미끄러짐" : " · 미끄러짐 없음") : "") + " · γ = " + S.gamma.toFixed(2) + " · θ = " + S.theta.toExponential(0);
+    $("cmpTable").innerHTML = "<thead><tr><th>방법</th><th>바깥 반복</th><th>sweep 합</th><th>q(s, a) 계산 수 (개선 단계 포함)</th><th>V(시작)</th></tr></thead><tbody>" +
+      '<tr><td><b class="c-act">정책 반복</b></td><td class="n">' + PI.iters.length + '</td><td class="n">' + PI.total + '</td><td class="n">' + (PI.total * nA * 4 + PI.iters.length * nA * 4).toLocaleString() + '</td><td class="n"><b>' + fv(PI.V[env.start]) + "</b></td></tr>" +
+      '<tr><td><b class="c-val">가치 반복</b></td><td class="n">–</td><td class="n">' + VI.deltas.length + '</td><td class="n">' + (VI.deltas.length * nA * 4).toLocaleString() + '</td><td class="n"><b>' + fv(VI.V[env.start]) + "</b></td></tr></tbody>";
+    $("cmpNote").innerHTML = "두 방법의 V 차이 최댓값 = <b>" + diff.toExponential(1) + "</b> · 최선 행동이 하나뿐인 칸 " + uniq + "개 중 " + same + "개에서 같은 행동. 정책 반복은 정책 평가(기대 방정식)를 끝까지 풀고, 가치 반복은 평가를 sweep 한 번으로 줄이고 max를 바로 씁니다 (정책 평가 1 sweep + 개선을 합친 것과 같음)." +
+      (env.kind === "frozenlake" && S.slip && env.rows === 4 ? " FrozenLake 4×4 검산값: γ = 0.90 → <b>0.0689</b>, γ = 0.99 → <b>0.5420</b>." : env.kind === "frozenlake" && S.slip ? " FrozenLake 8×8 검산값: γ = 0.99 → <b>0.4146</b>." : "");
+    grid($("cvCmpPI"), { V: PI.V, policy: PI.pol });
+    grid($("cvCmpVI"), { V: VI.V, policy: VI.pol });
+    if (!CMP) computeCompare();
+    let html = "<thead><tr><th>γ</th><th>가치 반복 sweep</th><th>정책 반복 반복 / sweep</th><th>V(시작)</th></tr></thead><tbody>";
+    CMP.forEach(r => { html += '<tr class="' + (Math.abs(r.g - S.gamma) < 1e-9 ? "hl" : "") + '"><td>' + r.g.toFixed(2) + '</td><td class="n">' + r.vi + '</td><td class="n">' + r.pit + " / " + r.pis + '</td><td class="n">' + fv(r.v0) + "</td></tr>"; });
+    $("gTable").innerHTML = html + "</tbody>";
+    drawGBars();
+  }
+  function drawGBars() {
+    const c = C(), F = fit($("chG"), 230), g = F.g, W = F.w, H = F.h, pl = 44, pr = 10, pt = 16, pb = 30, n = CMP.length;
+    g.clearRect(0, 0, W, H);
+    const mx = Math.max(...CMP.map(r => Math.max(r.vi, r.pis))) * 1.12, Y = v => pt + (H - pt - pb) * (1 - v / mx);
+    g.font = "11px " + c.mono; g.textAlign = "right"; g.strokeStyle = c.line; g.fillStyle = c.faint;
+    for (let i = 0; i <= 4; i++) { const v = mx * i / 4, y = Y(v); g.beginPath(); g.moveTo(pl, y + 0.5); g.lineTo(W - pr, y + 0.5); g.stroke(); g.fillText(Math.round(v), pl - 6, y + 4); }
+    const slot = (W - pl - pr) / n, bw = Math.min(30, slot * 0.32);
+    CMP.forEach((r, i) => {
+      const cx = pl + slot * (i + 0.5);
+      [[r.vi, c.val, -1], [r.pis, c.act, 1]].forEach(([v, col, sgn]) => {
+        const x = cx + (sgn < 0 ? -bw - 2 : 2); g.fillStyle = col; g.fillRect(x, Y(v), bw, Y(0) - Y(v));
+        g.fillStyle = c.text; g.textAlign = "center"; g.font = "600 " + (slot < 50 ? 9.5 : 11) + "px " + c.mono; g.fillText(v, x + bw / 2, Y(v) - 4);
+      });
+      g.fillStyle = Math.abs(r.g - S.gamma) < 1e-9 ? c.act : c.muted; g.font = "700 12px " + c.mono; g.textAlign = "center"; g.fillText("γ " + r.g, cx, H - 10);
+    });
+  }
+
+  /* ---------- 6. 코드 ---------- */
+  function genCode() {
+    const g = S.gamma.toFixed(2), th = S.theta.toExponential(0).replace("e-", "e-");
+    let head;
+    if (env.kind === "frozenlake") {
+      head =
+`import numpy as np
+import gymnasium as gym
+
+env = gym.make("FrozenLake-v1", map_name="${env.rows}x${env.cols}", is_slippery=${S.slip ? "True" : "False"})
+P = env.unwrapped.P          # P[s][a] = [(확률, 다음 상태, 보상, 종료), ...]
+nS, nA = env.observation_space.n, env.action_space.n
+# 주의: Gymnasium 행동 번호 0←, 1↓, 2→, 3↑ (이 시뮬레이터는 0↑ 1→ 2↓ 3←)
+start = 0`;
+    } else {
+      const goals = Object.keys(env.goals).join(", "), holes = env.holes.join(", ") || "", walls = env.walls.join(", ") || "";
+      head =
+`import numpy as np
+
+# GridWorld ${env.rows}×${env.cols} 를 직접 만든 전이 모형 (Gymnasium P 와 같은 형식)
+rows, cols, start = ${env.rows}, ${env.cols}, ${env.start}
+goals, traps, walls = {${goals}}, {${holes}}, {${walls || ""}}   # 목표 +1 · 함정 −1 · 벽
+step_r, slip = ${S.stepR.toFixed(2)}, ${S.slip ? "0.2" : "0.0"}            # 걸음 보상, 옆으로 미끄러질 확률 합
+moves = [(-1, 0), (0, 1), (1, 0), (0, -1)]  # 0↑ 1→ 2↓ 3← (이 시뮬레이터 순서)
+nS, nA = rows * cols, 4
+
+def move(s, a):
+    r, c = divmod(s, cols)
+    nr, nc = r + moves[a][0], c + moves[a][1]
+    n = nr * cols + nc if 0 <= nr < rows and 0 <= nc < cols else s
+    if n in walls: n = s
+    if n in goals: return n, 1.0, True
+    if n in traps: return n, -1.0, True
+    return n, step_r, False
+
+P = {s: {a: [] for a in range(nA)} for s in range(nS)}
+for s in range(nS):
+    for a in range(nA):
+        if s in goals or s in traps or s in walls:
+            P[s][a] = [(1.0, s, 0.0, True)]; continue
+        for b, p in [(a, 1 - slip), ((a + 1) % 4, slip / 2), ((a + 3) % 4, slip / 2)]:
+            if p > 0: P[s][a].append((p, *move(s, b)))`;
+    }
+    const src = head + `
+
+gamma, theta = ${g}, ${th}
+
+def q_values(V, s):
+    """q(s,a) = Σ p · (r + γ·V(s'))  — 종료면 V(s') 대신 0"""
+    return np.array([sum(p * (r + gamma * V[s2] * (not done)) for p, s2, r, done in P[s][a])
+                     for a in range(nA)])
+
+def value_iteration():
+    V, k = np.zeros(nS), 0
+    while True:
+        V_new = np.array([q_values(V, s).max() for s in range(nS)])   # 벨만 최적 백업
+        delta = np.abs(V_new - V).max()
+        V, k = V_new, k + 1
+        if delta < theta:
+            break
+    policy = np.array([q_values(V, s).argmax() for s in range(nS)])
+    return V, policy, k
+
+def policy_iteration():
+    policy = np.ones((nS, nA)) / nA        # 무작위 균등 정책에서 시작
+    V, n_iter, n_sweep = np.zeros(nS), 0, 0
+    while True:
+        n_iter += 1
+        while True:                        # 1) 정책 평가 (벨만 기대 백업)
+            V_new = np.array([policy[s] @ q_values(V, s) for s in range(nS)])
+            delta = np.abs(V_new - V).max()
+            V, n_sweep = V_new, n_sweep + 1
+            if delta < theta:
+                break
+        new_policy = np.eye(nA)[[q_values(V, s).argmax() for s in range(nS)]]   # 2) 정책 개선
+        if np.array_equal(new_policy, policy):
+            return V, new_policy.argmax(axis=1), n_iter, n_sweep
+        policy = new_policy
+
+V, pi, k = value_iteration()
+print(f"가치 반복: {k} sweep, V(시작) = {V[start]:.4f}")   # 시뮬레이터 값: ${fv(VI.V[env.start])}
+Vp, pi_p, it, sw = policy_iteration()
+print(f"정책 반복: {it} 반복 / {sw} sweep, V(시작) = {Vp[start]:.4f}")
+print(V.reshape(${env.rows}, ${env.cols}).round(4))
+`;
+    $("code").innerHTML = hl(src); $("code").dataset.src = src;
+  }
+  function hl(src) {
+    const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return src.split("\n").map(line => {
+      const m = line.match(/^([^#"]*(?:"[^"]*"[^#"]*)*)(#.*)?$/);
+      let code = m ? m[1] : line; const cm = m && m[2] ? m[2] : "";
+      code = esc(code).replace(/\b(import|as|def|return|for|in|if|else|while|break|continue|print|not|True|False|None|and|or)\b/g, '<span class="kw">$1</span>')
+        .replace(/(^|[^\w.])(\d+\.?\d*(?:e-\d+)?)/g, '$1<span class="nu">$2</span>');
+      return code + (cm ? '<span class="cm">' + esc(cm) + "</span>" : "");
+    }).join("\n");
+  }
+  $("copyBtn").onclick = async () => {
+    const t = $("code").dataset.src || "";
+    try { await navigator.clipboard.writeText(t); $("copyBtn").textContent = "복사됨"; }
+    catch (e) { const r = document.createRange(); r.selectNodeContents($("code")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); $("copyBtn").textContent = "선택됨 (Ctrl+C)"; }
+    setTimeout(() => { $("copyBtn").textContent = "복사"; }, 1500);
+  };
+
+  /* ---------- 설정 변경 → 다시 계산 ---------- */
+  function defaultCell() { const gk = Object.keys(env.goals).map(Number)[0]; const left = gk - 1; return gk % env.cols && active(left) ? left : env.start; }
+  function rebuild(keepCells) {
+    const prevKind = env && env.name;
+    env = makeEnv(); ACT = []; for (let s = 0; s < env.nS; s++) if (active(s)) ACT.push(s);
+    if (!keepCells || prevKind !== env.name || MD.s >= env.nS) { MD.s = env.kind === "grid" ? env.start : 0; MD.a = env.kind === "grid" ? 0 : 2; BL.s = defaultCell(); VS.s = defaultCell();
+      $("segAct").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", +x.getAttribute("data-a") === MD.a)); }
+    VI = viTrace(S.gamma, S.theta); PI = piTrace(S.gamma, S.theta); CMP = null;
+    const slipTxt = env.kind === "grid" ? "미끄러짐 (의도 0.8 · 양옆 각 0.1)" : "미끄러짐 (의도·양옆 각 1/3)";
+    $("slipLabel").textContent = slipTxt; $("stepRWrap").hidden = env.kind !== "grid"; $("editWrap").hidden = env.kind !== "grid";
+    $("envNote").innerHTML = env.kind === "frozenlake"
+      ? "<b>" + env.name + "</b> — 얼음판(F)을 건너 목표(G)에 닿으면 보상 1, 구멍(H)에 빠지면 0으로 끝. " + (S.slip ? "미끄러워서 의도한 방향과 양옆으로 각각 1/3 확률로 움직입니다." : "미끄러짐 없음: 의도한 방향으로만 움직입니다.") + " 상태 " + env.nS + "개 · 행동 4개."
+      : "<b>GridWorld 3×4</b> (Russell &amp; Norvig 예제) — +1 목표, −1 함정, 회색 벽, 걸음마다 " + neg(S.stepR.toFixed(2)) + ". " + (S.slip ? "의도한 방향 0.8, 양옆 각 0.1." : "미끄러짐 없음.") + " 1번 탭 편집 모드로 칸을 바꿀 수 있습니다.";
+    pPI.set(Math.min(PI.steps.length - 1, Math.max(0, keepCells ? pPI.t : 0)));
+    pVI.set(keepCells ? Math.min(pVI.t, VI.Vs.length - 1) : Math.min(3, VI.Vs.length - 1));
+    genCode(); redraw();
+  }
+  $("segEnv").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+    $("segEnv").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); S.env = b.getAttribute("data-v"); rebuild(false); });
+  $("chkSlip").onchange = () => { S.slip = $("chkSlip").checked; rebuild(true); };
+  $("gamma").oninput = () => { S.gamma = +$("gamma").value; $("gV").textContent = S.gamma.toFixed(2); rebuild(true); };
+  $("theta").onchange = () => { S.theta = +$("theta").value; rebuild(true); };
+  $("stepR").oninput = () => { S.stepR = +$("stepR").value; $("stepRV").textContent = neg(S.stepR.toFixed(2)); rebuild(true); };
+
+  /* ---------- 안쪽 탭 (URL 해시 연동, ←/→ 키 이동) ---------- */
+  const tabs = [...document.querySelectorAll(".sk-tab")];
+  const current = () => { const t = tabs.find(b => b.getAttribute("aria-selected") === "true"); return t ? t.id.replace("tab-", "") : "model"; };
+  function show(t) {
+    tabs.forEach(b => { const on = b === t; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1;
+      document.getElementById(b.getAttribute("aria-controls")).hidden = !on; });
+    history.replaceState(null, "", "#" + t.id.replace("tab-", ""));
+    Object.values(players).forEach(p => p.stop());
+    redraw();
+  }
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => show(b));
+    b.addEventListener("keydown", e => {
+      const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return;
+      const n = tabs[(i + d + tabs.length) % tabs.length]; show(n); n.focus(); e.preventDefault();
+    });
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    const tg = e.target; if (tg.closest && (tg.closest(".sk-tab") || tg.closest("input,select,textarea,canvas,.dgv"))) return;
+    const pl = { pi: pPI, vi: pVI }[current()]; if (!pl) return;
+    e.preventDefault(); e.key === "ArrowRight" ? pl.next() : pl.prev();
+  });
+  function redraw() {
+    if (!env) return;
+    const cur = current();
+    if (cur === "model") renderModel();
+    else if (cur === "bellman") renderBell();
+    else if (cur === "pi") renderPI(pPI.t);
+    else if (cur === "vi") renderVI(pVI.t);
+    else if (cur === "compare") renderCompare();
+  }
+  RL.onTheme(redraw);
+  let rz = 0; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(redraw, 120); });
+  window.addEventListener("hashchange", () => { const t = document.getElementById("tab-" + location.hash.slice(1)); if (t && t.getAttribute("aria-selected") !== "true") show(t); });
+
+  rebuild(false);
+  const start = document.getElementById("tab-" + location.hash.slice(1)); if (start) show(start);
+})();
+</script>
+</body>
+</html>

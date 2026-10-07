@@ -1,0 +1,1582 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>연속 행동 off-policy (DDPG → TD3 → SAC) | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261007a">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+:root{
+  --sk-accent: var(--cat-rl);
+  --r-state:#2563EB; --r-act:#EA580C; --r-rew:#16A34A; --r-neg:#DC2626; --r-val:#7C3AED; --r-tgt:#DB2777; --r-exp:#B7791F;
+  --a-ddpg:#DB2777; --a-td3:#7C3AED; --a-sac:#0D9488;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --r-state:#79A6F6; --r-act:#F59A5C; --r-rew:#5CCB82; --r-neg:#F07A7A; --r-val:#B597FF; --r-tgt:#F472B6; --r-exp:#E3B455;
+  --a-ddpg:#F472B6; --a-td3:#B597FF; --a-sac:#45CFBF;
+} }
+:root[data-theme="dark"]{
+  --r-state:#79A6F6; --r-act:#F59A5C; --r-rew:#5CCB82; --r-neg:#F07A7A; --r-val:#B597FF; --r-tgt:#F472B6; --r-exp:#E3B455;
+  --a-ddpg:#F472B6; --a-td3:#B597FF; --a-sac:#45CFBF;
+}
+.c-state{color:var(--r-state)} .c-act{color:var(--r-act)} .c-rew{color:var(--r-rew)} .c-neg{color:var(--r-neg)} .c-val{color:var(--r-val)} .c-tgt{color:var(--r-tgt)} .c-exp{color:var(--r-exp)}
+.c-ddpg{color:var(--a-ddpg)} .c-td3{color:var(--a-td3)} .c-sac{color:var(--a-sac)}
+.cv{display:block;width:100%;max-width:100%;border-radius:10px;background:var(--surface-2)}
+.cv--plain{background:transparent}
+.ct-row{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+.ct-nums{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.ct-num{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:7px 11px;min-width:0}
+.ct-num span{display:block;font-size:12px;color:var(--muted);font-weight:600}
+.ct-num b{display:block;font-family:var(--mono);font-size:17px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.ct-calc{font-family:var(--mono);font-size:13px;line-height:1.75;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:9px 12px;color:var(--text);overflow-x:auto;white-space:pre-wrap;overflow-wrap:anywhere}
+.ct-calc b{color:var(--ink)}
+.ct-tri{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:900px){.ct-tri{grid-template-columns:minmax(0,1fr)}}
+.ct-box{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface);display:flex;flex-direction:column;gap:6px;min-width:0}
+.ct-box h3{margin:0;font-size:15px}
+.ct-box p{margin:0;font-size:13.5px;color:var(--text)}
+.ct-box .tag{font-size:12px;font-weight:700;color:var(--muted)}
+.ct-box--td3{border-top:3px solid var(--a-td3)} .ct-box--sac{border-top:3px solid var(--a-sac)} .ct-box--ddpg{border-top:3px solid var(--a-ddpg)}
+.ct-steps{display:flex;gap:6px;flex-wrap:wrap;list-style:none;margin:0;padding:0}
+.ct-steps li{border-radius:8px;padding:6px 10px;font-size:12.5px;font-weight:600;background:var(--surface-2);color:var(--faint);cursor:pointer;border:1px solid transparent}
+.ct-steps li.done{color:var(--muted)}
+.ct-steps li.on{background:var(--ink);color:var(--on-ink)}
+.ct-pend3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:640px){.ct-pend3{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}}
+.ct-pend3 figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+.ct-pend3 figcaption{font-size:12.5px;font-weight:700;color:var(--muted);text-align:center;font-family:var(--mono);overflow-wrap:anywhere}
+.ct-code{margin:0;font-family:var(--mono);font-size:13px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;white-space:pre;color:var(--ink);tab-size:4;max-height:620px}
+.ct-code .cm{color:var(--muted)}
+.ct-svg{display:block;width:100%;height:auto;max-width:100%}
+.ct-svg text{font-family:var(--sans);fill:var(--text)}
+.ct-svg .t-ink{fill:var(--ink);font-weight:700}
+.ct-svg .t-mu{fill:var(--muted)}
+.ct-svg .bx{fill:var(--surface);stroke:var(--line-strong);stroke-width:1.5}
+.ct-svg .bx2{fill:var(--surface-2);stroke:var(--line-strong);stroke-width:1.2}
+.ct-svg .ln{fill:none;stroke-width:2.2}
+.ct-svg .s-state{stroke:var(--r-state)} .ct-svg .f-state{fill:var(--r-state)}
+.ct-svg .s-act{stroke:var(--r-act)} .ct-svg .f-act{fill:var(--r-act)}
+.ct-svg .s-rew{stroke:var(--r-rew)} .ct-svg .f-rew{fill:var(--r-rew)}
+.ct-svg .s-val{stroke:var(--r-val)} .ct-svg .f-val{fill:var(--r-val)}
+.ct-svg .s-tgt{stroke:var(--r-tgt)} .ct-svg .f-tgt{fill:var(--r-tgt)}
+.ct-svg .s-exp{stroke:var(--r-exp)} .ct-svg .f-exp{fill:var(--r-exp)}
+.ct-svg .s-mu{stroke:var(--faint)} .ct-svg .f-mu{fill:var(--faint)}
+.ct-svg .dash{stroke-dasharray:6 5}
+.ct-table td.n b{font-weight:700}
+.ct-badge{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 8px;border:1px solid currentColor;margin-left:6px;vertical-align:1px}
+.ct-badge--mock{color:var(--r-exp)}
+.ct-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--muted)}
+.ct-legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:3px}
+.ct-legend i.d{height:0;border-top:2px dashed currentColor;background:none}
+.sk-slider{min-width:0}
+.ct-sl{min-width:170px;max-width:300px}
+.sk-controls .ct-sl{flex:1 1 170px}
+@media (max-width:520px){ .ct-sl{max-width:none;min-width:0} .ct-num b{font-size:15px} .ct-code{font-size:12px;padding:12px} .ct-calc{font-size:12px} }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+      <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a href="../../index.html#rl" style="--c:var(--cat-rl)" aria-current="page">강화학습</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#rl" style="--c:var(--cat-rl)">강화학습</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">연속 행동 off-policy (DDPG → TD3 → SAC)</h1>
+      <p class="ds-hero__lede">로봇 관절 토크처럼 행동이 연속값이면 Q가 가장 큰 행동을 고를 수 없어서 actor가 행동을 직접 냅니다. DDPG의 결정적 정책 기울기에서 출발해 TD3의 세 가지 보완, 실무에서 가장 많이 쓰는 SAC의 최대 엔트로피까지 숫자로 따라가고, Pendulum에서 세 알고리즘을 브라우저에서 직접 학습시켜 비교합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button class="sk-tab" type="button" role="tab" id="tab-cont" aria-controls="pane-cont" aria-selected="true"><span class="sk-num">1</span>연속 행동이란</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-ddpg" aria-controls="pane-ddpg" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>DDPG</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-td3" aria-controls="pane-td3" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>TD3</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-sac" aria-controls="pane-sac" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>SAC</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-train" aria-controls="pane-train" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>학습 비교</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-mujoco" aria-controls="pane-mujoco" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>MuJoCo·실무</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>코드</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">8</span>알고리즘 구성도</button>
+  </nav>
+
+  <!-- ============ 1. 연속 행동이란 ============ -->
+  <section id="pane-cont" role="tabpanel" aria-labelledby="tab-cont">
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>에이전트–환경 루프</h2><span class="sk-hint">상태 → 행동 → 보상·다음 상태</span></div>
+        <svg class="ct-svg" viewBox="0 0 560 250" role="img" aria-label="에이전트와 환경의 상호작용 루프: 상태 s를 보고 행동 a를 내면 환경이 보상 r과 다음 상태 s′를 돌려준다">
+          <defs>
+            <marker id="mkS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="f-state"/></marker>
+            <marker id="mkA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="f-act"/></marker>
+            <marker id="mkR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="f-rew"/></marker>
+          </defs>
+          <rect class="bx" x="20" y="70" width="190" height="110" rx="14"/>
+          <text x="115" y="104" text-anchor="middle" class="t-ink" font-size="17">에이전트</text>
+          <text x="115" y="130" text-anchor="middle" font-size="13.5" class="f-act">actor μ(s) 또는 π(a|s)</text>
+          <text x="115" y="152" text-anchor="middle" font-size="13" class="t-mu">critic Q(s, a)로 평가</text>
+          <rect class="bx" x="350" y="70" width="190" height="110" rx="14"/>
+          <text x="445" y="104" text-anchor="middle" class="t-ink" font-size="17">환경</text>
+          <text x="445" y="130" text-anchor="middle" font-size="13.5" class="f-state">Pendulum · 로봇 관절</text>
+          <text x="445" y="152" text-anchor="middle" font-size="13" class="t-mu">물리 법칙으로 한 걸음</text>
+          <path class="ln s-act" d="M210 95 C260 40 300 40 350 95" marker-end="url(#mkA)"/>
+          <text x="280" y="38" text-anchor="middle" font-size="14" font-weight="700" class="f-act">행동 a = 토크 (−2 ~ 2, 연속값)</text>
+          <path class="ln s-state" d="M350 150 C300 205 260 205 210 150" marker-end="url(#mkS)"/>
+          <text x="280" y="222" text-anchor="middle" font-size="14" font-weight="700" class="f-state">다음 상태 s′ = (cos θ, sin θ, ω)</text>
+          <path class="ln s-rew dash" d="M350 125 L210 125" marker-end="url(#mkR)"/>
+          <text x="280" y="117" text-anchor="middle" font-size="14" font-weight="700" class="f-rew">보상 r</text>
+        </svg>
+        <p class="sk-note"><b>off-policy</b>: 지나간 경험 (s, a, r, s′)을 재현 버퍼에 쌓아 두고 무작위로 꺼내 여러 번 다시 씁니다. 이 페이지의 세 알고리즘 모두 같은 틀입니다.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>왜 argmax를 못 쓰나</h2><span class="sk-hint">격자로 쪼개 보기</span></div>
+        <p class="sk-lead">DQN은 행동 몇 개의 Q를 모두 계산해 가장 큰 것을 고릅니다. 토크처럼 연속인 행동은 후보가 무한히 많고, 격자로 쪼개면 관절 수만큼 경우의 수가 곱으로 늘어납니다.</p>
+        <canvas id="cvGrid" class="cv" aria-label="연속 행동의 Q 곡선과 격자 후보 중 최댓값"></canvas>
+        <div class="sk-controls">
+          <label class="sk-slider ct-sl"><span class="sk-sl-head">관절당 격자 개수 N <b id="vGridN">5</b></span><input type="range" id="sGridN" min="2" max="41" step="1" value="5"></label>
+        </div>
+        <div class="sk-scroll"><table class="sk-table" id="tbGrid"></table></div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>Pendulum-v1 — 이 페이지의 실험 환경</h2><span class="sk-hint">→ 키: 한 걸음</span></div>
+      <p class="sk-lead">막대를 거꾸로 세워 유지하는 과제입니다. 토크가 최대 2로 약해서 한 번에 올라가지 못하고 좌우로 흔들어 힘을 모아야 합니다(스윙업). 관측은 (cos θ, sin θ, ω)이고 ω는 각속도(θ̇)입니다. 끝나는 조건은 없고 200걸음에서 잘립니다.</p>
+      <div class="sk-side">
+        <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+          <canvas id="cvPend" class="cv" aria-label="진자 애니메이션"></canvas>
+          <div class="sk-seg" role="group" aria-label="토크 정하는 방법" id="segPol">
+            <button type="button" data-v="zero" aria-pressed="false">토크 0</button><button type="button" data-v="manual" aria-pressed="true">수동</button><button type="button" data-v="random" aria-pressed="false">무작위</button><button type="button" data-v="energy" aria-pressed="false">규칙</button>
+          </div>
+          <label class="sk-slider"><span class="sk-sl-head">수동 토크 u <b id="vTorque">1.00</b></span><input type="range" id="sTorque" min="-2" max="2" step="0.05" value="1"></label>
+          <div class="sk-group">
+            <button class="sk-btn" type="button" id="pFirst">처음</button>
+            <button class="sk-btn" type="button" id="pStep">한 걸음 →</button>
+            <button class="sk-btn sk-btn--primary" type="button" id="pPlay">재생</button>
+          </div>
+          <label class="sk-slider"><span class="sk-sl-head">속도 <b id="vPSpeed">×1</b></span><input type="range" id="sPSpeed" min="1" max="4" step="1" value="1"></label>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+          <div class="ct-nums">
+            <div class="ct-num"><span>걸음 t</span><b id="pT">0 / 200</b></div>
+            <div class="ct-num"><span class="c-state">관측 cos θ</span><b id="pCos">–</b></div>
+            <div class="ct-num"><span class="c-state">관측 sin θ</span><b id="pSin">–</b></div>
+            <div class="ct-num"><span class="c-state">관측 ω = θ̇ (각속도)</span><b id="pThd">–</b></div>
+            <div class="ct-num"><span class="c-act">행동 u (토크)</span><b id="pU">–</b></div>
+            <div class="ct-num"><span class="c-rew">누적 보상</span><b id="pRet">0</b></div>
+          </div>
+          <div class="sk-formula">r = −( θ² + 0.1·ω² + 0.001·u² )   (θ는 −π~π로 맞춘 각도, 0 = 똑바로 선 상태)</div>
+          <div class="ct-calc" id="pCalc" aria-live="polite"></div>
+          <canvas id="cvPendR" class="cv cv--plain" aria-label="걸음별 보상 그래프"></canvas>
+          <p class="sk-note">보상은 항상 0 이하입니다. 한 걸음 최저 −(π² + 0.1·8² + 0.001·2²) = <b>−16.27</b>, 똑바로 서서 가만히 있으면 0. 잘 학습된 정책의 200걸음 수익은 대략 −150 안팎이고, 아무것도 안 하면 −1,000 근처까지 내려갑니다. <b>규칙</b> 정책은 비교용 손 설계 규칙(에너지 펌핑 + 위에서 PD 제어)입니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2. DDPG ============ -->
+  <section id="pane-ddpg" role="tabpanel" aria-labelledby="tab-ddpg" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>DDPG 구조 — 결정적 actor + critic + 타깃 네트워크</h2><span class="sk-hint">Deep Deterministic Policy Gradient (2015)</span></div>
+      <div class="sk-scroll">
+        <svg class="ct-svg" viewBox="0 0 980 300" style="min-width:720px" role="img" aria-label="DDPG 구조도: 재현 버퍼에서 꺼낸 경험으로 critic은 목표값 y에 맞추고, actor는 critic의 기울기 방향으로 행동을 바꾸며, 타깃 네트워크는 천천히 따라간다">
+          <defs>
+            <marker id="mkG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="f-mu"/></marker>
+            <marker id="mkA2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="f-act"/></marker>
+            <marker id="mkV" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="f-val"/></marker>
+            <marker id="mkT" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="f-tgt"/></marker>
+          </defs>
+          <rect class="bx2" x="10" y="110" width="150" height="80" rx="12"/>
+          <text x="85" y="142" text-anchor="middle" class="t-ink" font-size="15">재현 버퍼</text>
+          <text x="85" y="164" text-anchor="middle" font-size="12.5" class="t-mu">(s, a, r, s′) 묶음</text>
+          <text x="85" y="180" text-anchor="middle" font-size="12.5" class="t-mu">미니배치로 꺼냄</text>
+          <rect class="bx" x="250" y="20" width="200" height="74" rx="12" style="stroke:var(--r-act)"/>
+          <text x="350" y="50" text-anchor="middle" class="t-ink" font-size="15">actor μθ(s)</text>
+          <text x="350" y="72" text-anchor="middle" font-size="12.5" class="f-act">상태 → 행동 하나 (결정적)</text>
+          <rect class="bx" x="250" y="206" width="200" height="74" rx="12" style="stroke:var(--r-val)"/>
+          <text x="350" y="236" text-anchor="middle" class="t-ink" font-size="15">critic Qφ(s, a)</text>
+          <text x="350" y="258" text-anchor="middle" font-size="12.5" class="f-val">상태·행동 → 가치 하나</text>
+          <rect class="bx" x="560" y="20" width="200" height="74" rx="12" style="stroke:var(--r-tgt)"/>
+          <text x="660" y="50" text-anchor="middle" class="t-ink" font-size="15">타깃 actor μθ′</text>
+          <text x="660" y="72" text-anchor="middle" font-size="12.5" class="f-tgt">a′ = μθ′(s′)</text>
+          <rect class="bx" x="560" y="206" width="200" height="74" rx="12" style="stroke:var(--r-tgt)"/>
+          <text x="660" y="236" text-anchor="middle" class="t-ink" font-size="15">타깃 critic Qφ′</text>
+          <text x="660" y="258" text-anchor="middle" font-size="12.5" class="f-tgt">y = r + γ Qφ′(s′, a′)</text>
+          <rect class="bx2" x="830" y="110" width="140" height="80" rx="12"/>
+          <text x="900" y="142" text-anchor="middle" class="t-ink" font-size="15">환경</text>
+          <text x="900" y="164" text-anchor="middle" font-size="12.5" class="f-exp">a + 탐험 잡음</text>
+          <path class="ln s-mu" d="M160 140 L250 70" marker-end="url(#mkG)"/>
+          <path class="ln s-mu" d="M160 160 L250 236" marker-end="url(#mkG)"/>
+          <path class="ln s-val" d="M350 206 L350 94" marker-end="url(#mkV)"/>
+          <text x="358" y="140" font-size="12.5" font-weight="700" class="f-val">∇a Q · ∇θ μ</text>
+          <text x="358" y="158" font-size="12" class="t-mu">(Q가 커지는 쪽으로)</text>
+          <path class="ln s-tgt" d="M560 243 L450 243" marker-end="url(#mkT)"/>
+          <text x="505" y="234" text-anchor="middle" font-size="12.5" font-weight="700" class="f-tgt">목표 y</text>
+          <path class="ln s-tgt" d="M660 94 L660 206" marker-end="url(#mkT)"/>
+          <path class="ln s-mu dash" d="M450 40 L560 40" marker-end="url(#mkG)"/>
+          <path class="ln s-mu dash" d="M450 272 L560 272" marker-end="url(#mkG)"/>
+          <text x="505" y="32" text-anchor="middle" font-size="12" class="t-mu">τ로 천천히 복사</text>
+          <text x="505" y="292" text-anchor="middle" font-size="12" class="t-mu">τ로 천천히 복사</text>
+          <path class="ln s-act" d="M450 57 C700 110 760 110 830 140" marker-end="url(#mkA2)"/>
+          <path class="ln s-mu" d="M830 175 C600 200 300 200 160 175" marker-end="url(#mkG)" style="opacity:.55"/>
+          <text x="790" y="200" font-size="12" class="t-mu">(s, a, r, s′) 저장</text>
+        </svg>
+      </div>
+      <div class="sk-grid2">
+        <div class="sk-formula">critic:  y = r + γ · Qφ′(s′, μθ′(s′))<br>         L(φ) = 평균[ (Qφ(s, a) − y)² ]</div>
+        <div class="sk-formula">actor:   ∇θ J ≈ 평균[ ∇a Qφ(s, a)|a=μθ(s) · ∇θ μθ(s) ]<br>타깃:    θ′ ← τ·θ + (1 − τ)·θ′   (φ′도 같게)</div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>결정적 정책 기울기 — 한 상태에서 숫자로</h2><span class="sk-hint">설명용 작은 신경망 · RL.MLP 역전파</span></div>
+      <p class="sk-lead">actor가 낸 행동 a = μ(s)에서 critic 곡선의 기울기 ∇a Q를 구하고, 그 값을 actor 파라미터 쪽으로 연쇄 법칙으로 넘깁니다. [actor 갱신]을 누르면 a가 Q 곡선의 꼭대기 쪽으로 이동합니다.</p>
+      <div class="sk-side">
+        <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+          <label class="sk-slider"><span class="sk-sl-head">각도 θ <b id="vDTh">40°</b></span><input type="range" id="sDTh" min="-180" max="180" step="5" value="40"></label>
+          <label class="sk-slider"><span class="sk-sl-head">각속도 ω <b id="vDThd">0.0</b></span><input type="range" id="sDThd" min="-4" max="4" step="0.25" value="0"></label>
+          <label class="sk-slider"><span class="sk-sl-head">actor 학습률 <b id="vDLr">0.020</b></span><input type="range" id="sDLr" min="0.005" max="0.1" step="0.005" value="0.02"></label>
+          <div class="sk-group">
+            <button class="sk-btn sk-btn--primary" type="button" id="dUpd">actor 갱신 1번</button>
+            <button class="sk-btn" type="button" id="dUpd10">10번</button>
+            <button class="sk-btn" type="button" id="dReset">actor 초기화</button>
+          </div>
+          <canvas id="cvDPend" class="cv" aria-label="선택한 상태의 진자"></canvas>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+          <canvas id="cvDQ" class="cv cv--plain" aria-label="행동에 따른 critic 값 곡선과 기울기"></canvas>
+          <div class="ct-nums">
+            <div class="ct-num"><span class="c-act">a = μθ(s)</span><b id="dA">–</b></div>
+            <div class="ct-num"><span class="c-val">Q(s, a)</span><b id="dQ">–</b></div>
+            <div class="ct-num"><span class="c-val">∇a Q (역전파)</span><b id="dG">–</b></div>
+            <div class="ct-num"><span>∇a Q (수치 미분)</span><b id="dGn">–</b></div>
+          </div>
+          <div class="ct-calc" id="dCalc"></div>
+        </div>
+      </div>
+      <p class="sk-note">이 카드의 critic은 학습된 Pendulum critic이 아니라 <b>"기울어진 반대쪽으로 미는 토크가 좋다"</b>는 설명용 함수 Q*(s,a) = −(θ² + 0.1ω²) − 3(a − a*(s))², a*(s) = tanh(−1.2 sin θ − 0.3 ω)에 미리 맞춘 작은 신경망(4→32→1)입니다. 행동 a는 −1~1로 정규화한 값이고 실제 토크는 2a입니다. 기울기 계산은 진짜 역전파입니다.</p>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>DDPG 한 번의 갱신 따라가기</h2><span class="sk-hint">→ 키: 다음 단계</span></div>
+      <ol class="ct-steps" id="stList"></ol>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button class="sk-btn" type="button" id="stFirst">처음</button>
+          <button class="sk-btn" type="button" id="stPrev">이전</button>
+          <button class="sk-btn sk-btn--primary" type="button" id="stNext">다음</button>
+          <button class="sk-btn" type="button" id="stPlay">재생</button>
+        </div>
+        <label class="sk-slider ct-sl"><span class="sk-sl-head">γ <b id="vStG">0.99</b></span><input type="range" id="sStG" min="0.8" max="0.999" step="0.001" value="0.99"></label>
+        <label class="sk-slider ct-sl"><span class="sk-sl-head">τ <b id="vStT">0.005</b></span><input type="range" id="sStT" min="0" max="8" step="1" value="2"></label>
+        <label class="sk-slider ct-sl"><span class="sk-sl-head">탐험 잡음 σ <b id="vStS">0.10</b></span><input type="range" id="sStS" min="0" max="0.5" step="0.05" value="0.1"></label>
+      </div>
+      <div class="sk-grid2">
+        <div class="ct-calc" id="stCalc" aria-live="polite" style="min-height:240px"></div>
+        <canvas id="cvStPend" class="cv" aria-label="현재 전이의 진자 상태"></canvas>
+      </div>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>타깃 네트워크와 soft update τ</h2><span class="sk-hint">목표값이 덜 흔들리게</span></div>
+        <p class="sk-lead">critic은 자기 출력으로 만든 목표 y를 쫓아갑니다. 목표가 매번 같이 움직이면 발산하기 쉬워서, 목표 계산에는 천천히 따라오는 복사본 θ′를 씁니다.</p>
+        <canvas id="cvTau" class="cv cv--plain" aria-label="온라인 파라미터와 타깃 파라미터의 변화"></canvas>
+        <div class="ct-legend"><span><i style="background:var(--faint)"></i>온라인 θ (매 걸음 갱신, 흔들림)</span><span><i style="background:var(--r-tgt)"></i>타깃 θ′</span></div>
+        <label class="sk-slider ct-sl"><span class="sk-sl-head">τ <b id="vTau">0.02</b></span><input type="range" id="sTau" min="0" max="9" step="1" value="4"></label>
+        <div class="ct-calc" id="tauCalc"></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>탐험 잡음 — 가우시안 vs OU</h2><span class="sk-hint">결정적 정책이라 잡음을 따로 더함</span></div>
+        <p class="sk-lead">μ(s)는 같은 상태에서 늘 같은 행동을 내므로 학습 중에는 행동에 잡음을 더해 새 행동을 시도합니다. 원 논문은 시간적으로 이어지는 OU 잡음을 썼고, TD3 이후로는 단순한 가우시안이 흔합니다.</p>
+        <canvas id="cvNoise" class="cv cv--plain" aria-label="가우시안 잡음과 OU 잡음 비교"></canvas>
+        <div class="ct-legend"><span><i style="background:var(--r-exp)"></i>가우시안 N(0, σ²)</span><span><i style="background:var(--r-state)"></i>OU 과정</span></div>
+        <div class="sk-controls">
+          <label class="sk-slider ct-sl"><span class="sk-sl-head">σ <b id="vNz">0.20</b></span><input type="range" id="sNz" min="0.05" max="0.5" step="0.05" value="0.2"></label>
+          <label class="sk-slider ct-sl"><span class="sk-sl-head">OU 복원력 θ <b id="vOu">0.15</b></span><input type="range" id="sOu" min="0.05" max="2" step="0.05" value="0.15"></label>
+          <button class="sk-btn" type="button" id="nzNew">다른 표본</button>
+        </div>
+        <div class="ct-calc" id="nzCalc"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 3. TD3 ============ -->
+  <section id="pane-td3" role="tabpanel" aria-labelledby="tab-td3" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>TD3 — DDPG의 과대평가를 막는 세 가지 보완</h2><span class="sk-hint">Twin Delayed DDPG (2018)</span></div>
+      <div class="ct-tri">
+        <div class="ct-box ct-box--td3"><span class="tag">① Clipped Double Q</span><h3>critic 두 개, 목표는 작은 쪽</h3><p>Q가 가장 크다고 고른 행동은 오차가 위로 튄 곳일 가능성이 큽니다. 독립된 두 critic 중 작은 값을 목표로 써서 과대평가를 누릅니다.</p></div>
+        <div class="ct-box ct-box--td3"><span class="tag">② Delayed Policy Update</span><h3>actor는 천천히</h3><p>critic을 d번(보통 2번) 갱신할 때 actor와 타깃 네트워크는 1번만 갱신합니다. 덜 흔들리는 critic을 보고 정책을 바꿉니다.</p></div>
+        <div class="ct-box ct-box--td3"><span class="tag">③ Target Policy Smoothing</span><h3>목표 행동에 잘린 잡음</h3><p>목표 행동 a′에 작은 잡음을 더해 주변 평균으로 목표를 만듭니다. critic의 뾰족한 오차 봉우리를 actor가 파고드는 것을 막습니다.</p></div>
+      </div>
+      <div class="sk-formula">ã = clip( μθ′(s′) + clip(ε, −c, c), −1, 1 ),   ε ~ N(0, σ̃²)<br>y = r + γ · min( Qφ′₁(s′, ã), Qφ′₂(s′, ã) )      — 두 critic 모두 같은 y에 맞춤<br>actor·타깃 갱신은 d 걸음마다:  ∇θ J = 평균[ ∇a Qφ₁(s, a)|a=μθ(s) · ∇θ μθ(s) ]</div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>① 과대평가 실험 — 오차가 섞인 critic의 최댓값</h2><span class="sk-hint">같은 seed로 반복 표본</span></div>
+      <p class="sk-lead">실제 Q는 회색 곡선입니다. critic 두 개는 각자 다른 오차가 섞인 추정치입니다. actor는 Q₁이 가장 큰 행동 a*를 고르는데, 그 자리의 Q₁은 실제보다 높은 경우가 많습니다.</p>
+      <div class="sk-grid2">
+        <canvas id="cvOver" class="cv cv--plain" aria-label="실제 Q와 두 critic 추정치, 고른 행동"></canvas>
+        <canvas id="cvOverH" class="cv cv--plain" aria-label="반복 표본의 편향 분포"></canvas>
+      </div>
+      <div class="ct-legend"><span><i style="background:var(--faint)"></i>실제 Q</span><span><i style="background:var(--a-ddpg)"></i>Q₁ 추정 (DDPG는 이것 하나)</span><span><i style="background:var(--a-td3)"></i>Q₂ 추정</span><span><i style="background:var(--a-sac)"></i>min(Q₁, Q₂)</span></div>
+      <div class="sk-controls">
+        <label class="sk-slider ct-sl"><span class="sk-sl-head">critic 오차 크기 σ <b id="vOvS">0.30</b></span><input type="range" id="sOvS" min="0" max="1" step="0.05" value="0.3"></label>
+        <button class="sk-btn" type="button" id="ovNew">다른 표본</button>
+        <button class="sk-btn sk-btn--primary" type="button" id="ovMany">2,000번 반복</button>
+      </div>
+      <div class="ct-nums" id="ovNums"></div>
+      <p class="sk-note">편향은 한 번으로 끝나지 않습니다. 목표 y가 다음 목표의 재료가 되므로(부트스트랩), 매 걸음 +b만큼 과대평가되면 누적 편향은 대략 b / (1 − γ) — γ = 0.99에서 b의 <b>100배</b>까지 커질 수 있습니다.</p>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>② 지연된 정책 갱신</h2><span class="sk-hint">critic d번 : actor 1번</span></div>
+        <canvas id="cvDelay" class="cv cv--plain" aria-label="critic 갱신과 actor 갱신 시점 타임라인"></canvas>
+        <label class="sk-slider ct-sl"><span class="sk-sl-head">지연 d (policy_delay) <b id="vDelay">2</b></span><input type="range" id="sDelay" min="1" max="5" step="1" value="2"></label>
+        <p class="sk-note" id="delayNote"></p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>③ 목표 정책 평활화</h2><span class="sk-hint">뾰족한 오차 봉우리 무디게</span></div>
+        <canvas id="cvSmooth" class="cv cv--plain" aria-label="타깃 critic 곡선의 뾰족한 오차와 잡음 평균"></canvas>
+        <div class="sk-controls">
+          <label class="sk-slider ct-sl"><span class="sk-sl-head">목표 잡음 σ̃ <b id="vSmS">0.20</b></span><input type="range" id="sSmS" min="0" max="0.5" step="0.05" value="0.2"></label>
+          <label class="sk-slider ct-sl"><span class="sk-sl-head">잘라내기 c <b id="vSmC">0.50</b></span><input type="range" id="sSmC" min="0.05" max="1" step="0.05" value="0.5"></label>
+        </div>
+        <div class="ct-calc" id="smCalc"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4. SAC ============ -->
+  <section id="pane-sac" role="tabpanel" aria-labelledby="tab-sac" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>SAC — 보상과 함께 엔트로피(무작위성)도 최대화</h2><span class="sk-hint">Soft Actor-Critic (2018) · 실무 기본값</span></div>
+      <p class="sk-lead">SAC는 "보상을 많이 받되, 가능한 한 다양하게 행동하라"를 목표로 삼습니다. 탐험이 목적 함수 안에 들어 있어 따로 잡음을 설계할 필요가 없고, 확률적 actor + 쌍둥이 critic + 자동 온도 α로 seed·하이퍼파라미터에 덜 민감합니다.</p>
+      <div class="sk-formula">목표:      J(π) = Σt E[ r(st, at) + α · H(π(·|st)) ],   H = −E[ log π(a|s) ]<br>actor:     ã = tanh( μθ(s) + σθ(s)·ε ),  ε ~ N(0, 1)        ← 재매개변수화(reparameterization)<br>           log π(ã|s) = log N(u; μ, σ²) − log(1 − tanh²u),  u = μ + σε   ← tanh 보정<br>critic:    y = r + γ · ( min j Qφ′j(s′, ã′) − α · log π(ã′|s′) ),  ã′ ~ π(·|s′)<br>actor 손실: Lπ = E[ α · log π(ã|s) − min j Qφj(s, ã) ]<br>온도 α:    Lα = E[ −log α · ( log π(ã|s) + H̄ ) ],   H̄ = −(행동 차원)  ← 자동 조절</div>
+      <div class="ct-tri">
+        <div class="ct-box ct-box--sac"><span class="tag">DDPG·TD3와 다른 점 1</span><h3>확률적 actor</h3><p>평균 μ와 표준편차 σ를 내고 그 분포에서 행동을 뽑습니다. 평가할 때는 tanh(μ)만 씁니다.</p></div>
+        <div class="ct-box ct-box--sac"><span class="tag">다른 점 2</span><h3>soft 목표값</h3><p>목표 y에 −α·log π가 붙어 "앞으로 받을 엔트로피"까지 가치로 셉니다. 타깃 actor는 없습니다.</p></div>
+        <div class="ct-box ct-box--sac"><span class="tag">다른 점 3</span><h3>α 자동 조절</h3><p>엔트로피가 목표 H̄보다 낮으면 α를 키우고, 높으면 줄입니다. 보상 크기가 달라도 손으로 맞출 필요가 줄어듭니다.</p></div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>tanh-가우시안 actor — 표본 하나를 숫자로</h2><span class="sk-hint">u ~ N(μ, σ²) → a = tanh(u)</span></div>
+      <div class="sk-side">
+        <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+          <label class="sk-slider"><span class="sk-sl-head">평균 μ <b id="vTgM">0.30</b></span><input type="range" id="sTgM" min="-2" max="2" step="0.05" value="0.3"></label>
+          <label class="sk-slider"><span class="sk-sl-head">표준편차 σ <b id="vTgS">0.50</b></span><input type="range" id="sTgS" min="0.05" max="2" step="0.01" value="0.5"></label>
+          <label class="sk-slider"><span class="sk-sl-head">잡음 ε (표본) <b id="vTgE">0.80</b></span><input type="range" id="sTgE" min="-2.5" max="2.5" step="0.05" value="0.8"></label>
+          <div class="ct-nums">
+            <div class="ct-num"><span>actor 출력 log σ</span><b id="tgSig">–</b></div>
+            <div class="ct-num"><span>엔트로피 H (표본 추정)</span><b id="tgH">–</b></div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+          <canvas id="cvTg" class="cv cv--plain" aria-label="u의 정규분포와 tanh로 눌린 행동 분포"></canvas>
+          <div class="ct-legend"><span><i class="d" style="color:var(--faint)"></i>u의 밀도 N(μ, σ²) (가로축 u)</span><span><i style="background:var(--a-sac)"></i>a = tanh(u)의 밀도 (가로축 a)</span><span><i style="background:var(--r-act)"></i>표본 a</span></div>
+          <div class="ct-calc" id="tgCalc"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>자동 온도 α — 한 상태 연속 과제에서 실제로 학습</h2><span class="sk-hint">보상 r(a) = −4(a − 0.6)²</span></div>
+      <p class="sk-lead">상태가 하나뿐인 과제에서 SAC의 actor 손실과 α 손실을 그대로 계산해 경사하강합니다(표본 128개, Adam). 보상만 보면 a = 0.6에 몰리는 게 최선이지만, α가 크면 일부러 넓게 퍼집니다.</p>
+      <div class="sk-controls">
+        <div class="sk-seg" role="group" aria-label="α 방식" id="segAl"><button type="button" data-v="auto" aria-pressed="true">자동 α</button><button type="button" data-v="fixed" aria-pressed="false">고정 α</button></div>
+        <label class="sk-slider ct-sl"><span class="sk-sl-head">목표 엔트로피 H̄ <b id="vAlH">−1.0</b></span><input type="range" id="sAlH" min="-3" max="0.5" step="0.1" value="-1"></label>
+        <label class="sk-slider ct-sl"><span class="sk-sl-head">고정 α <b id="vAlF">0.10</b></span><input type="range" id="sAlF" min="-3" max="0" step="0.1" value="-1"></label>
+        <div class="sk-group">
+          <button class="sk-btn sk-btn--primary" type="button" id="alRun">학습 시작</button>
+          <button class="sk-btn" type="button" id="alReset">초기화</button>
+        </div>
+      </div>
+      <div class="sk-grid3">
+        <div><div class="sk-mat-label">α 궤적</div><canvas id="cvAl" class="cv cv--plain" aria-label="온도 α의 변화"></canvas></div>
+        <div><div class="sk-mat-label">엔트로피 H와 기대 보상 E[r]</div><canvas id="cvAlH" class="cv cv--plain" aria-label="엔트로피와 기대 보상의 변화"></canvas></div>
+        <div><div class="sk-mat-label">현재 정책 π(a)</div><canvas id="cvAlP" class="cv cv--plain" aria-label="현재 정책 분포"></canvas></div>
+      </div>
+      <div class="ct-nums" id="alNums"></div>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>엔트로피 ↔ 보상 맞바꾸기</h2><span class="sk-hint">고정 α마다 끝까지 학습한 결과</span></div>
+        <canvas id="cvTrade" class="cv cv--plain" aria-label="α에 따른 엔트로피와 기대 보상"></canvas>
+        <p class="sk-note">α를 키울수록 정책이 넓어지고(엔트로피 ↑) 기대 보상은 줄어듭니다. 자동 α는 이 곡선 위에서 엔트로피가 H̄가 되는 점을 스스로 찾아갑니다.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>Pendulum 학습 중 실제 α 궤적</h2><span class="sk-hint">학습 비교 탭의 SAC</span></div>
+        <canvas id="cvSacAlpha" class="cv cv--plain" aria-label="Pendulum SAC 학습 중 α와 엔트로피"></canvas>
+                <p class="sk-note" id="sacAlphaNote">[학습 비교] 탭에서 SAC를 학습하면 여기에 실제 α 변화가 그려집니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 5. 학습 비교 ============ -->
+  <section id="pane-train" role="tabpanel" aria-labelledby="tab-train" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>같은 seed로 DDPG · TD3 · SAC 학습</h2><span class="sk-hint">브라우저에서 실제 학습 · 브라우저용 축소 설정</span></div>
+      <div class="sk-controls">
+        <div class="sk-seg" role="group" aria-label="환경" id="segEnv"><button type="button" data-v="pend" aria-pressed="true">Pendulum-v1</button><button type="button" data-v="pm" aria-pressed="false">점 질량 1차원 (빠름)</button></div>
+        <div class="sk-group" role="group" aria-label="알고리즘">
+          <label class="sk-check"><input type="checkbox" id="ckDdpg" checked><span class="c-ddpg"><b>DDPG</b></span></label>
+          <label class="sk-check"><input type="checkbox" id="ckTd3" checked><span class="c-td3"><b>TD3</b></span></label>
+          <label class="sk-check"><input type="checkbox" id="ckSac" checked><span class="c-sac"><b>SAC</b></span></label>
+        </div>
+        <label class="sk-group"><span class="sk-label">seed</span><input class="sk-input" type="number" id="inSeed" value="2" min="1" max="999" style="width:76px"></label>
+        <label class="sk-slider ct-sl"><span class="sk-sl-head">에피소드 수 <b id="vEps">50</b></span><input type="range" id="sEps" min="10" max="100" step="5" value="50"></label>
+        <div class="sk-seg" role="group" aria-label="학습 속도" id="segSpd"><button type="button" data-v="8" aria-pressed="false">보통</button><button type="button" data-v="20" aria-pressed="true">빠르게</button><button type="button" data-v="45" aria-pressed="false">최대</button></div>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button class="sk-btn sk-btn--primary" type="button" id="trRun">학습 시작</button>
+          <button class="sk-btn" type="button" id="trReset">초기화</button>
+          <button class="sk-btn" type="button" id="trDemo" disabled>최종 정책 시연</button>
+        </div>
+        <span class="sk-hint" id="trStatus">준비됨</span>
+      </div>
+      <p class="sk-note" id="trNote"></p>
+      <div class="ct-pend3" id="trPends">
+        <figure><canvas id="cvTrP0" class="cv" aria-label="DDPG 진행 중인 에피소드"></canvas><figcaption id="capP0" class="c-ddpg">DDPG</figcaption></figure>
+        <figure><canvas id="cvTrP1" class="cv" aria-label="TD3 진행 중인 에피소드"></canvas><figcaption id="capP1" class="c-td3">TD3</figcaption></figure>
+        <figure><canvas id="cvTrP2" class="cv" aria-label="SAC 진행 중인 에피소드"></canvas><figcaption id="capP2" class="c-sac">SAC</figcaption></figure>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>에피소드 수익</h2><span class="sk-hint">옅은 선 = 그대로 · 진한 선 = 최근 10회 이동평균</span></div>
+        <canvas id="cvTrCurve" class="cv cv--plain" aria-label="알고리즘별 에피소드 수익 학습 곡선"></canvas>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>TD3: min이 목표값에서 깎아 낸 양</h2><span class="sk-hint">에피소드별 미니배치 평균 Q′₁ − min(Q′₁, Q′₂)</span></div>
+        <canvas id="cvTrQ" class="cv cv--plain" aria-label="TD3 학습 중 목표값 비교"></canvas>
+        <p class="sk-hint" id="trQNote">TD3를 학습하면 Q′₁만 썼을 때보다 목표값이 얼마나 낮아졌는지가 그려집니다.</p>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>결과 표</h2><span class="sk-hint" id="trTblHint">평가 = 잡음 없는 정책으로 시작 상태 10개 평균</span></div>
+      <div class="sk-scroll"><table class="sk-table ct-table" id="tbTrain"></table></div>
+    </div>
+  </section>
+
+  <!-- ============ 6. MuJoCo·실무 ============ -->
+  <section id="pane-mujoco" role="tabpanel" aria-labelledby="tab-mujoco" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>MuJoCo 로봇 제어 — HalfCheetah<span class="ct-badge ct-badge--mock">개념 설명</span></h2><span class="sk-hint">브라우저에서 돌리지 않는 큰 과제</span></div>
+      <div class="sk-grid2">
+        <svg class="ct-svg" viewBox="0 0 520 260" role="img" aria-label="HalfCheetah 도식: 몸통과 앞뒤 다리 각 3관절, 관절마다 토크 하나씩 모두 6개의 연속 행동">
+          <line x1="20" y1="226" x2="500" y2="226" class="ln s-mu" style="stroke-width:2"/>
+          <path d="M140 100 L360 88" class="ln" style="stroke:var(--ink);stroke-width:12;stroke-linecap:round"/>
+          <circle cx="388" cy="78" r="16" style="fill:var(--surface);stroke:var(--ink);stroke-width:3"/>
+          <path d="M140 100 L120 150 L150 192 L128 222" class="ln s-state" style="stroke-width:6;stroke-linecap:round;stroke-linejoin:round"/>
+          <path d="M360 88 L380 142 L352 186 L376 222" class="ln s-state" style="stroke-width:6;stroke-linecap:round;stroke-linejoin:round"/>
+          <g class="f-act"><circle cx="140" cy="100" r="7"/><circle cx="120" cy="150" r="7"/><circle cx="150" cy="192" r="7"/><circle cx="360" cy="88" r="7"/><circle cx="380" cy="142" r="7"/><circle cx="352" cy="186" r="7"/></g>
+          <g font-size="13" font-weight="700" class="f-act">
+            <text x="96" y="96">a₁</text><text x="86" y="154">a₂</text><text x="160" y="198">a₃</text>
+            <text x="336" y="76">a₄</text><text x="394" y="146">a₅</text><text x="318" y="190">a₆</text>
+          </g>
+          <text x="22" y="30" font-size="14" class="t-ink">행동 6차원: 뒷다리(허벅지·정강이·발) + 앞다리(허벅지·정강이·발) 토크, 각 −1~1</text>
+          <text x="22" y="52" font-size="13" class="f-state">상태 17차원: 관절·몸통 위치 8개 + 속도 9개</text>
+          <text x="440" y="214" font-size="13" class="f-rew" text-anchor="end">→ 앞으로 달릴수록 보상</text>
+        </svg>
+        <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+          <div class="sk-formula">보상 r = (앞쪽 속도) − 0.1 · Σ aᵢ²     (HalfCheetah-v4, 1,000걸음)</div>
+          <p class="sk-note">Pendulum은 행동 1개·상태 3개라 격자로 쪼개도 DQN을 쓸 수 있지만, HalfCheetah처럼 관절이 6개면 관절당 11칸만 나눠도 11⁶ = 1,771,561개 조합이 됩니다. 그래서 로봇 제어는 actor가 행동 벡터를 바로 내는 이 페이지의 알고리즘들을 씁니다.</p>
+          <p class="sk-note sk-note--warn">이 탭의 숫자는 브라우저에서 계산한 값이 아니라 <b>개념 설명용 대략값</b>입니다. 실제 점수는 구현·하이퍼파라미터·seed·환경 버전(v4/v5)에 따라 크게 달라집니다.</p>
+        </div>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>대표 연속 제어 환경의 크기</h2><span class="sk-hint">Gymnasium 기준</span></div>
+        <div class="sk-scroll"><table class="sk-table">
+          <thead><tr><th>환경</th><th>상태 차원</th><th>행동 차원</th><th>성격</th></tr></thead>
+          <tbody>
+            <tr><td>Pendulum-v1</td><td class="n">3</td><td class="n">1</td><td>스윙업 · 이 페이지 실험</td></tr>
+            <tr><td>MountainCarContinuous-v0</td><td class="n">2</td><td class="n">1</td><td>보상이 드묾 · 탐험 어려움</td></tr>
+            <tr><td>LunarLanderContinuous-v3</td><td class="n">8</td><td class="n">2</td><td>착륙 · 주·측면 엔진</td></tr>
+            <tr><td>BipedalWalker-v3</td><td class="n">24</td><td class="n">4</td><td>두 다리 보행</td></tr>
+            <tr><td>Hopper-v4</td><td class="n">11</td><td class="n">3</td><td>한 다리 뛰기 · 넘어지면 종료</td></tr>
+            <tr><td>HalfCheetah-v4</td><td class="n">17</td><td class="n">6</td><td>달리기 · 종료 없음</td></tr>
+            <tr><td>Walker2d-v4</td><td class="n">17</td><td class="n">6</td><td>두 다리 걷기</td></tr>
+            <tr><td>Ant-v4</td><td class="n">27</td><td class="n">8</td><td>네 다리 (접촉력 제외 기준)</td></tr>
+            <tr><td>Humanoid-v4</td><td class="n">376</td><td class="n">17</td><td>사람형 · 가장 어려움</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>1백만 걸음 학습 후 수익 (대략)<span class="ct-badge ct-badge--mock">개념용 대략값</span></h2></div>
+        <canvas id="cvMj" class="cv cv--plain" aria-label="MuJoCo 과제별 알고리즘 수익 대략값 막대그래프"></canvas>
+        <div class="ct-legend"><span><i style="background:var(--a-ddpg)"></i>DDPG</span><span><i style="background:var(--a-td3)"></i>TD3</span><span><i style="background:var(--a-sac)"></i>SAC</span><span>막대 = 대표값, 가는 선 = 보고된 범위</span></div>
+        <p class="sk-hint">TD3·SAC 원 논문과 공개 벤치마크에서 흔히 보고되는 수준을 반올림한 값입니다. 경향(DDPG &lt; TD3 ≈ SAC, 고차원일수록 차이 큼)만 읽으세요.</p>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>실무에서 무엇을 고를까</h2><span class="sk-hint">현장 경험칙</span></div>
+      <div class="sk-scroll"><table class="sk-table">
+        <thead><tr><th></th><th class="c-ddpg">DDPG</th><th class="c-td3">TD3</th><th class="c-sac">SAC</th></tr></thead>
+        <tbody>
+          <tr><td>정책</td><td>결정적 μ(s)</td><td>결정적 μ(s)</td><td>확률적 tanh-가우시안</td></tr>
+          <tr><td>critic</td><td>1개</td><td>2개, 목표는 min</td><td>2개, 목표는 min − α log π</td></tr>
+          <tr><td>탐험</td><td>행동에 잡음 (OU·가우시안)</td><td>행동에 가우시안 잡음</td><td>정책 자체의 무작위성 + 엔트로피 보너스</td></tr>
+          <tr><td>타깃 네트워크</td><td>actor·critic</td><td>actor·critic (d걸음마다)</td><td>critic만</td></tr>
+          <tr><td>주요 설정</td><td>잡음 크기, lr</td><td>잡음, d, σ̃, c</td><td>대부분 기본값으로 동작 (α 자동)</td></tr>
+          <tr><td>안정성</td><td>seed·설정에 민감</td><td>안정적</td><td>안정적 · 표본 효율 좋음</td></tr>
+          <tr><td>언제</td><td>개념 학습 · 기준선</td><td>결정적 정책이 필요할 때, 빠른 추론</td><td><b>연속 제어의 첫 선택</b> (로봇·제어·시뮬레이터)</td></tr>
+        </tbody>
+      </table></div>
+      <p class="sk-note">실무 순서: <b>SAC로 시작</b> → 학습이 불안정하면 보상 크기·관측 정규화부터 점검 → 결정적 정책이 꼭 필요하면 TD3. 실제 로봇에서는 시뮬레이터에서 학습 후 옮기는(sim-to-real) 경우가 많고, 안전 제약과 사람의 감독이 필요합니다.</p>
+    </div>
+  </section>
+
+  <!-- ============ 7. 코드 ============ -->
+  <section id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>stable-baselines3 코드</h2><span class="sk-hint" id="codeHint"></span></div>
+      <div class="sk-controls">
+        <div class="sk-seg" role="group" aria-label="알고리즘" id="segCode"><button type="button" data-v="ddpg" aria-pressed="false">DDPG</button><button type="button" data-v="td3" aria-pressed="false">TD3</button><button type="button" data-v="sac" aria-pressed="true">SAC</button></div>
+        <label class="sk-group"><span class="sk-label">환경</span>
+          <select class="sk-select" id="selCodeEnv">
+            <option value="Pendulum-v1">Pendulum-v1 (이 화면 설정)</option>
+            <option value="HalfCheetah-v4">HalfCheetah-v4</option>
+            <option value="Hopper-v4">Hopper-v4</option>
+            <option value="Walker2d-v4">Walker2d-v4</option>
+          </select></label>
+        <button type="button" class="sk-btn sk-btn--primary sk-btn--sm" id="copyBtn">복사</button>
+      </div>
+      <pre class="ct-code" id="code" tabindex="0" aria-label="파이썬 코드"></pre>
+      <p class="sk-note" id="codeNote"></p>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>핵심 손실만 PyTorch로</h2><span class="sk-hint">직접 구현할 때 뼈대</span></div>
+      <div class="sk-controls"><button type="button" class="sk-btn sk-btn--sm" id="copyBtn2">복사</button></div>
+      <pre class="ct-code" id="code2" tabindex="0" aria-label="PyTorch 손실 코드"></pre>
+    </div>
+  </section>
+
+  <!-- ============ 8. 알고리즘 구성도 ============ -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">강의 도식 4장 · DDPG / TD3 / SAC / 비교와 선택</span></div><div data-ds-diagrams="ddpg-td3-sac"></div></section>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20261007a"></script>
+<script src="../../assets/js/rl-kit.js?v=20261007a"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261007a"></script>
+<script src="../../assets/diagrams/ddpg-td3-sac.js?v=20261007a"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const RM = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const C = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const MONO = () => C("--mono") || "monospace", SANS = () => C("--sans") || "sans-serif";
+  const ANG = RL.Pendulum.angleNorm;
+  const clip = (x, lo, hi) => x < lo ? lo : x > hi ? hi : x;
+  const f2 = v => fmtN(v, 2), f3 = v => fmtN(v, 3), f4 = v => fmtN(v, 4);
+  function fmtN(v, d) { if (!isFinite(v)) return "–"; const s = Math.abs(v) < 0.5 * Math.pow(10, -d) ? (0).toFixed(d) : v.toFixed(d); return s.replace("-", "−"); }
+  const fmtInt = v => Math.round(v).toLocaleString("ko-KR").replace("-", "−");
+  const par = v => v < 0 ? "(" + fmtN(v, 3) + ")" : fmtN(v, 3);
+  function segInit(id, cb) {
+    const el = $(id); el.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+      el.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false")); cb(b.dataset.v); });
+    return () => el.querySelector('[aria-pressed="true"]').dataset.v;
+  }
+
+  /* ---------------- 공용 차트 ---------------- */
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo || 1, raw = span / (n || 4), mag = Math.pow(10, Math.floor(Math.log10(raw))), m = raw / mag;
+    const step = (m < 1.5 ? 1 : m < 3 ? 2 : m < 7 ? 5 : 10) * mag, out = [];
+    for (let v = Math.ceil(lo / step - 1e-9) * step; v <= hi + 1e-9; v += step) out.push(Math.abs(v) < step * 1e-9 ? 0 : v);
+    return out;
+  }
+  function tickFmt(v) { const a = Math.abs(v); return (a >= 1000 ? fmtInt(v) : a >= 10 || a === 0 ? fmtN(v, 0) : a >= 1 ? fmtN(v, 1) : fmtN(v, 2)); }
+  /* o: {w,h,x0,x1,y0,y1,pl,pr,pt,pb,xt,yt,xfmt,yfmt,xlabel,ylabel,draw(g,X,Y,info)} */
+  function plot(cv, o) {
+    const f = RL.fitCanvas(cv, o.w || 560, o.h || 240), g = f.g, W = f.w, H = f.h;
+    const pl = o.pl == null ? 46 : o.pl, pr = o.pr == null ? 12 : o.pr, pt = o.pt == null ? 12 : o.pt, pb = o.pb == null ? 30 : o.pb;
+    g.clearRect(0, 0, W, H);
+    const X = v => pl + (W - pl - pr) * (v - o.x0) / (o.x1 - o.x0), Y = v => pt + (H - pt - pb) * (1 - (v - o.y0) / (o.y1 - o.y0));
+    g.lineWidth = 1; g.font = "11px " + MONO();
+    const yt = o.yt || niceTicks(o.y0, o.y1, 4), xt = o.xt || niceTicks(o.x0, o.x1, 5);
+    g.strokeStyle = C("--line"); g.fillStyle = C("--faint"); g.textAlign = "right";
+    yt.forEach(v => { const y = Y(v); g.beginPath(); g.moveTo(pl, y); g.lineTo(W - pr, y); g.stroke(); g.fillText((o.yfmt || tickFmt)(v), pl - 6, y + 4); });
+    g.textAlign = "center";
+    xt.forEach(v => { const x = X(v); g.fillText((o.xfmt || tickFmt)(v), x, H - pb + 15); });
+    g.strokeStyle = C("--line-strong"); g.beginPath(); g.moveTo(pl, pt); g.lineTo(pl, H - pb); g.lineTo(W - pr, H - pb); g.stroke();
+    g.font = "600 11.5px " + SANS(); g.fillStyle = C("--muted");
+    if (o.xlabel) { g.textAlign = "right"; g.fillText(o.xlabel, W - pr, H - 2); }
+    if (o.ylabel) { g.textAlign = "left"; g.fillText(o.ylabel, pl + 4, pt + 10); }
+    g.save(); g.beginPath(); g.rect(pl, pt - 2, W - pl - pr, H - pt - pb + 4); g.clip();
+    if (o.draw) o.draw(g, X, Y, { W, H, pl, pr, pt, pb });
+    g.restore();
+    if (o.after) o.after(g, X, Y, { W, H, pl, pr, pt, pb });
+    return { g, X, Y, W, H };
+  }
+  function polyline(g, xs, ys, X, Y, color, width, dash) {
+    g.strokeStyle = color; g.lineWidth = width || 2; g.setLineDash(dash || []); g.beginPath();
+    for (let i = 0; i < xs.length; i++) { const x = X(xs[i]), y = Y(ys[i]); if (i) g.lineTo(x, y); else g.moveTo(x, y); }
+    g.stroke(); g.setLineDash([]);
+  }
+  function dot(g, x, y, r, fill, stroke) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fillStyle = fill; g.fill(); if (stroke) { g.strokeStyle = stroke; g.lineWidth = 2; g.stroke(); } }
+  function label(g, x, y, t, color, align, bold) {
+    g.font = (bold ? "700 " : "600 ") + "12px " + SANS(); g.textAlign = align || "left";
+    const w = g.measureText(t).width, x0 = align === "right" ? x - w : align === "center" ? x - w / 2 : x;
+    g.globalAlpha = 0.78; g.fillStyle = C("--surface"); g.fillRect(x0 - 3, y - 12, w + 6, 16); g.globalAlpha = 1;
+    g.fillStyle = color; g.fillText(t, x, y);
+  }
+  function vline(g, x, y0, y1, color, dash) { g.strokeStyle = color; g.lineWidth = 1.5; g.setLineDash(dash || [4, 4]); g.beginPath(); g.moveTo(x, y0); g.lineTo(x, y1); g.stroke(); g.setLineDash([]); }
+  const linspace = (a, b, n) => Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1));
+
+  /* ---------------- 안쪽 탭 (해시 동기화, ←/→) ---------------- */
+  const TABS = ["cont", "ddpg", "td3", "sac", "train", "mujoco", "code", "diagram"];
+  const tabs = TABS.map(t => $("tab-" + t));
+  let curTab = "cont";
+  const DRAW = {};
+  function showTab(name, focus) {
+    if (TABS.indexOf(name) < 0) name = "cont";
+    curTab = name;
+    tabs.forEach(b => { const on = b.id === "tab-" + name; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1;
+      $(b.getAttribute("aria-controls")).hidden = !on; if (on && focus) b.focus(); });
+    history.replaceState(null, "", "#" + name);
+    redraw();
+  }
+  function redraw() { (DRAW[curTab] || []).forEach(fn => { try { fn(); } catch (e) { console.error(e); } }); }
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => showTab(TABS[i]));
+    b.addEventListener("keydown", e => {
+      const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return;
+      showTab(TABS[(i + d + TABS.length) % TABS.length], true); e.preventDefault();
+    });
+  });
+  RL.onTheme(redraw);
+  let rsT = 0; window.addEventListener("resize", () => { clearTimeout(rsT); rsT = setTimeout(redraw, 120); });
+  /* 화면의 → 키: 진자 한 걸음 / DDPG 단계 다음 */
+  document.addEventListener("keydown", e => {
+    if (e.key !== "ArrowRight" || e.altKey || e.ctrlKey || e.metaKey) return;
+    const t = e.target; if (t && (t.closest(".sk-tabs") || /INPUT|SELECT|TEXTAREA/.test(t.tagName) || t.closest(".dgv"))) return;
+    if (curTab === "cont") { pendStep(); e.preventDefault(); }
+    else if (curTab === "ddpg") { stNext(); e.preventDefault(); }
+  });
+
+  /* =====================================================================
+     1. 연속 행동이란
+     ===================================================================== */
+  /* 격자 argmax: 설명용 Q(s, a) 곡선 (토크 −2~2) */
+  const qCurve = a => 1.2 * Math.exp(-(a - 0.73) * (a - 0.73) / 0.5) + 0.45 * Math.exp(-(a + 1.25) * (a + 1.25) / 0.18) - 0.08 * a * a;
+  const QA = linspace(-2, 2, 801), QV = QA.map(qCurve);
+  let qBest = 0; QV.forEach((v, i) => { if (v > QV[qBest]) qBest = i; });
+  function drawGrid() {
+    const N = +$("sGridN").value; $("vGridN").textContent = N;
+    const ga = linspace(-2, 2, N), gv = ga.map(qCurve); let bi = 0; gv.forEach((v, i) => { if (v > gv[bi]) bi = i; });
+    plot($("cvGrid"), { w: 560, h: 220, x0: -2, x1: 2, y0: -0.4, y1: 1.75, xlabel: "행동 a (토크)", ylabel: "Q(s, a)",
+      draw(g, X, Y, I) {
+        polyline(g, QA, QV, X, Y, C("--r-val"), 2.4);
+        ga.forEach((a, i) => { vline(g, X(a), Y(gv[i]), I.H - I.pb, C("--line-strong"), [2, 3]); dot(g, X(a), Y(gv[i]), i === bi ? 6 : 4, i === bi ? C("--r-act") : C("--surface"), i === bi ? null : C("--r-act")); });
+        dot(g, X(QA[qBest]), Y(QV[qBest]), 5, C("--r-val"));
+        label(g, I.pl + 10, I.pt + 26, "참 최댓값 a = " + f2(QA[qBest]) + ",  Q = " + f3(QV[qBest]), C("--r-val"), "left", true);
+        label(g, I.pl + 10, I.pt + 44, "격자 " + N + "칸 최선 a = " + f2(ga[bi]) + ",  Q 손실 " + f3(QV[qBest] - gv[bi]), C("--r-act"), "left", true);
+      } });
+    const rows = [["Pendulum", 1], ["Hopper", 3], ["HalfCheetah", 6], ["Humanoid", 17]];
+    const big = n => { const lg = Math.log10(N) * n; return lg < 9 ? fmtInt(Math.pow(N, n)) : (Math.pow(10, lg % 1)).toFixed(2) + " × 10^" + Math.floor(lg); };
+    $("tbGrid").innerHTML = "<thead><tr><th>환경</th><th>행동 차원 d</th><th>격자 조합 N^d</th></tr></thead><tbody>" +
+      rows.map(r => `<tr><td>${r[0]}</td><td class="n">${r[1]}</td><td class="n"><b>${big(r[1])}</b></td></tr>`).join("") + "</tbody>";
+  }
+  $("sGridN").addEventListener("input", drawGrid);
+
+  /* 진자 직접 움직여 보기 */
+  const pend = { env: new RL.Pendulum(RL.rng(7)), rew: [], ret: 0, pol: "manual", u: 0, playing: false, last: null, acc: 0, rng: RL.rng(5) };
+  function pendReset() { pend.env.reset(); pend.env.th = Math.PI; pend.env.thd = 0; pend.env.t = 0; pend.rew = []; pend.ret = 0; pend.u = 0; pend.last = null; pendRender(); }
+  function ruleTorque(env) {
+    const th = ANG(env.th), thd = env.thd;
+    if (Math.cos(th) > 0.92) return clip(-(10 * th + 2 * thd), -2, 2);
+    if (Math.abs(thd) < 1e-3) return 2;
+    const E = 0.5 * thd * thd + 15 * Math.cos(th);
+    return E < 15 ? 2 * Math.sign(thd) : 0;
+  }
+  function pendTorque() {
+    const p = pend.pol;
+    if (p === "zero") return 0;
+    if (p === "manual") return +$("sTorque").value;
+    if (p === "random") return pend.rng.uniform(-2, 2);
+    return ruleTorque(pend.env);
+  }
+  function pendStep() {
+    const e = pend.env; if (e.t >= 200) { pendPause(); return; }
+    const u = pendTorque(), th = ANG(e.th), thd = e.thd, o = e.step(u);
+    pend.u = u; pend.rew.push(o.r); pend.ret += o.r; pend.last = { th, thd, u, r: o.r };
+    if (o.truncated) pendPause();
+    pendRender();
+  }
+  function pendRender() {
+    const e = pend.env, ob = e.obs();
+    RL.drawPendulum($("cvPend"), e.th, { w: 300, h: 260, torque: pend.u, label: "θ = " + f2(ANG(e.th)) + " rad" });
+    $("pT").textContent = e.t + " / 200"; $("pCos").textContent = f3(ob[0]); $("pSin").textContent = f3(ob[1]); $("pThd").textContent = f3(ob[2]);
+    $("pU").textContent = pend.last ? f2(pend.last.u) : "–"; $("pRet").textContent = f2(pend.ret);
+    const L = pend.last;
+    $("pCalc").innerHTML = L ? `방금 걸음 (걸음 ${e.t}) — 행동하기 전 상태로 보상 계산\n` +
+      `θ = ${f3(L.th)},  ω = ${f3(L.thd)},  u = ${f2(L.u)}\n` +
+      `r = −( ${par(L.th)}² + 0.1·${par(L.thd)}² + 0.001·${par(L.u)}² )\n  = −( ${f3(L.th * L.th)} + ${f3(0.1 * L.thd * L.thd)} + ${f4(0.001 * L.u * L.u)} ) = <b class="${L.r < -1e-9 ? "c-neg" : "c-rew"}">${f3(L.r)}</b>`
+      : "[한 걸음 →]을 누르면 보상 계산이 여기에 나옵니다. 시작 자세: 아래로 매달린 상태 (θ = π, ω = 0).";
+    RL.lineChart($("cvPendR"), [{ data: pend.rew.length ? pend.rew : [0], color: C("--r-rew"), label: "걸음별 보상 r" }], { w: 560, h: 150, ymin: -16.5, ymax: 0 });
+    $("pPlay").textContent = pend.playing ? "멈춤" : "재생";
+  }
+  function pendPause() { pend.playing = false; $("pPlay").textContent = "재생"; }
+  function pendLoop(ts) {
+    if (!pend.playing) return;
+    if (pend.lastTs == null) pend.lastTs = ts;
+    pend.acc += (ts - pend.lastTs) / 1000 * 20 * +$("sPSpeed").value; pend.lastTs = ts;
+    let n = 0; while (pend.acc >= 1 && n < 8 && pend.playing) { pend.acc -= 1; n++; const e = pend.env; if (e.t >= 200) { pendPause(); break; }
+      const u = pendTorque(), th = ANG(e.th), thd = e.thd, o = e.step(u); pend.u = u; pend.rew.push(o.r); pend.ret += o.r; pend.last = { th, thd, u, r: o.r }; if (o.truncated) pendPause(); }
+    if (n) pendRender();
+    requestAnimationFrame(pendLoop);
+  }
+  $("pFirst").onclick = () => { pendPause(); pendReset(); };
+  $("pStep").onclick = () => { pendPause(); pendStep(); };
+  $("pPlay").onclick = () => {
+    if (pend.playing) { pendPause(); return; }
+    if (pend.env.t >= 200) pendReset();
+    if (RM) { pendStep(); return; }
+    pend.playing = true; pend.lastTs = null; pend.acc = 1; $("pPlay").textContent = "멈춤"; requestAnimationFrame(pendLoop);
+  };
+  $("sTorque").addEventListener("input", () => { $("vTorque").textContent = f2(+$("sTorque").value); });
+  $("sPSpeed").addEventListener("input", () => { $("vPSpeed").textContent = "×" + $("sPSpeed").value; });
+  segInit("segPol", v => { pend.pol = v; $("sTorque").disabled = v !== "manual"; });
+  pendReset();
+  DRAW.cont = [drawGrid, pendRender];
+
+  /* =====================================================================
+     2. DDPG
+     ===================================================================== */
+  /* 설명용 critic: Q*(s,a) = −(θ² + 0.1ω²) − 3(a − a*(s))², a*(s) = tanh(−1.2 sinθ − 0.3ω) 에 맞춘 4→32→1 신경망 */
+  const aStar = (th, thd) => Math.tanh(-1.2 * Math.sin(th) - 0.3 * thd);
+  const qStar = (th, thd, a) => { const t = ANG(th), d = a - aStar(th, thd); return -(t * t + 0.1 * thd * thd) - 3 * d * d; };
+  const ILL = { critic: new RL.MLP([4, 32, 1], { act: "tanh", rng: RL.rng(12) }), actor0: new RL.MLP([3, 16, 1], { act: "tanh", out: "tanh", rng: RL.rng(11), lastScale: 0.3 }), it: 0, ready: false, cbs: [] };
+  ILL.actor = ILL.actor0.clone();
+  (function fitCritic() {
+    const B = 64, ws = new BWS(ILL.critic, B), opt = new RL.Adam(ILL.critic, { lr: 0.01 }), r = RL.rng(13), TOTAL = 3000;
+    function chunk() {
+      const t0 = performance.now();
+      while (ILL.it < TOTAL && performance.now() - t0 < 12) {
+        for (let k = 0; k < 10 && ILL.it < TOTAL; k++, ILL.it++) {
+          const y = new Float64Array(B);
+          for (let b = 0; b < B; b++) { const th = r.uniform(-Math.PI, Math.PI), thd = r.uniform(-4, 4), a = r.uniform(-1, 1);
+            ws.H[0][b * 4] = Math.cos(th); ws.H[0][b * 4 + 1] = Math.sin(th); ws.H[0][b * 4 + 2] = thd; ws.H[0][b * 4 + 3] = a; y[b] = qStar(th, thd, a) / 10; }
+          const q = bForward(ILL.critic, ws, B);
+          for (let b = 0; b < B; b++) ws.D[2][b] = 2 * (q[b] - y[b]) / B;
+          bBackward(ILL.critic, ws, B, false); opt.step();
+          if (ILL.it === 2100) opt.lr = 0.003;
+        }
+      }
+      if (ILL.it < TOTAL) setTimeout(chunk, 0);
+      else { const Lc = ILL.critic.W.length - 1; ILL.critic.W[Lc].forEach((v, i, w) => { w[i] = v * 10; }); ILL.critic.b[Lc][0] *= 10; /* 목표를 1/10로 맞췄으므로 출력층만 10배 → Q를 그대로 출력 */
+        ILL.ready = true; stInit(); ILL.cbs.forEach(f => f()); if (curTab === "ddpg") redraw(); }
+    }
+    setTimeout(chunk, 30);
+  })();
+  const dState = () => { const th = +$("sDTh").value * Math.PI / 180, thd = +$("sDThd").value; return { th, thd, s: [Math.cos(th), Math.sin(th), thd] }; };
+  const Qc = (net, s, a) => net.predict([s[0], s[1], s[2], a])[0];
+  function dGrad(net, s, a) { const f = net.forward([s[0], s[1], s[2], a]); const dx = net.backward(f.cache, [1]); net.zeroGrad(); return { q: f.y[0], g: dx[3] }; }
+  /* actor 파라미터 기울기 벡터 (∂μ/∂θ) */
+  function actorParamGrad(actor, s) { const f = actor.forward(s); actor.zeroGrad(); actor.backward(f.cache, [1]); const gb = actor.gb[actor.gb.length - 1][0]; const n = actor.gradNorm(); return { mu: f.y[0], dmu_db: gb, norm: n }; }
+  const dTrail = [];
+  let dLastMsg = "";
+  function drawDdpg() {
+    const st = dState();
+    $("vDTh").textContent = $("sDTh").value + "°"; $("vDThd").textContent = f2(st.thd); $("vDLr").textContent = f3(+$("sDLr").value);
+    RL.drawPendulum($("cvDPend"), st.th, { w: 300, h: 220, label: "선택한 상태 s" });
+    if (!ILL.ready) { $("dCalc").textContent = "설명용 critic을 맞추는 중입니다 … (" + Math.round(ILL.it / 30) + "%)"; return; }
+    const s = st.s, ap = actorParamGrad(ILL.actor, s), a = ap.mu, dg = dGrad(ILL.critic, s, a), h = 1e-4;
+    const gn = (Qc(ILL.critic, s, a + h) - Qc(ILL.critic, s, a - h)) / (2 * h);
+    const xs = linspace(-1, 1, 161), ys = xs.map(x => Qc(ILL.critic, s, x));
+    let bi = 0; ys.forEach((v, i) => { if (v > ys[bi]) bi = i; });
+    const lo = Math.min.apply(null, ys), hi = Math.max.apply(null, ys), pad = (hi - lo) * 0.12 + 0.05;
+    plot($("cvDQ"), { w: 600, h: 240, x0: -1, x1: 1, y0: lo - pad, y1: hi + pad, xlabel: "행동 a (정규화, 토크 = 2a)", ylabel: "Q(s, a)",
+      draw(g, X, Y, I) {
+        polyline(g, xs, ys, X, Y, C("--r-val"), 2.4);
+        vline(g, X(xs[bi]), I.pt, I.H - I.pb, C("--r-val"), [3, 4]);
+        label(g, X(xs[bi]) + (xs[bi] > 0.2 ? -6 : 6), I.H - I.pb - 22, "Q 최대 a = " + f2(xs[bi]), C("--r-val"), xs[bi] > 0.2 ? "right" : "left", true);
+        dTrail.forEach((p, i) => dot(g, X(p), Y(Qc(ILL.critic, s, p)), 3, C("--faint")));
+        const tl = 0.35; g.strokeStyle = C("--r-tgt"); g.lineWidth = 2; g.beginPath(); g.moveTo(X(a - tl), Y(dg.q - tl * dg.g)); g.lineTo(X(a + tl), Y(dg.q + tl * dg.g)); g.stroke();
+        dot(g, X(a), Y(dg.q), 6, C("--r-act"), C("--surface"));
+        const dir = dg.g > 0 ? 1 : -1; g.strokeStyle = C("--r-act"); g.fillStyle = C("--r-act"); g.lineWidth = 2.5; const ay = I.H - I.pb - 10;
+        g.beginPath(); g.moveTo(X(a), ay); g.lineTo(X(a + dir * 0.18), ay); g.stroke(); g.beginPath(); g.moveTo(X(a + dir * 0.18) + dir * 7, ay); g.lineTo(X(a + dir * 0.18), ay - 5); g.lineTo(X(a + dir * 0.18), ay + 5); g.fill();
+        label(g, X(a) + (a > 0.3 ? -8 : 8), Y(dg.q) + 22, "a = μ(s) = " + f3(a), C("--r-act"), a > 0.3 ? "right" : "left", true);
+      } });
+    $("dA").textContent = f4(a); $("dQ").textContent = f4(dg.q); $("dG").textContent = f4(dg.g); $("dGn").textContent = f4(gn);
+    $("dCalc").innerHTML =
+      `s = (cos θ, sin θ, ω) = (${f3(s[0])}, ${f3(s[1])}, ${f3(s[2])})\n` +
+      `<span class="c-val">∇a Q(s, a)|a=μ(s) = <b>${f4(dg.g)}</b></span>   (수치 미분 ${f4(gn)}과 일치)\n` +
+      `<span class="c-act">∂μ/∂b (actor 출력층 편향) = 1 − a² = 1 − ${par(a)}² = <b>${f4(ap.dmu_db)}</b></span>\n` +
+      `∂J/∂b = ∇a Q · ∂μ/∂b = ${par(dg.g)} × ${f4(ap.dmu_db)} = <b>${f4(dg.g * ap.dmu_db)}</b>\n` +
+      `actor 파라미터 ${ILL.actor.nParams()}개 전체: ‖∇θ μ‖ = ${f4(ap.norm)} → ‖∇θ J‖ = |∇a Q|·‖∇θ μ‖ = ${f4(Math.abs(dg.g) * ap.norm)}\n` +
+      `갱신 θ ← θ + lr·∇a Q·∇θ μ  →  1차 근사로 a 변화 ≈ lr·∇a Q·‖∇θ μ‖² = ${f4(+$("sDLr").value * dg.g * ap.norm * ap.norm)}` +
+      (dLastMsg ? "\n" + dLastMsg : "");
+  }
+  function dUpdate(n) {
+    if (!ILL.ready) return;
+    const s = dState().s, lr = +$("sDLr").value; let a0 = null, a1 = 0, pred = 0;
+    for (let k = 0; k < n; k++) {
+      const f = ILL.actor.forward(s), a = f.y[0], dg = dGrad(ILL.critic, s, a);
+      if (a0 === null) { a0 = a; const ap = actorParamGrad(ILL.actor, s); pred = a + lr * dg.g * ap.norm * ap.norm; }
+      dTrail.push(a); if (dTrail.length > 40) dTrail.shift();
+      ILL.actor.zeroGrad(); ILL.actor.backward(f.cache, [dg.g]);   /* 경사 상승: θ += lr · ∇aQ · ∇θμ */
+      for (let l = 0; l < ILL.actor.W.length; l++) { const W = ILL.actor.W[l], G = ILL.actor.gW[l], b = ILL.actor.b[l], gb = ILL.actor.gb[l];
+        for (let i = 0; i < W.length; i++) W[i] += lr * G[i]; for (let i = 0; i < b.length; i++) b[i] += lr * gb[i]; }
+      ILL.actor.zeroGrad();
+    }
+    a1 = ILL.actor.predict(s)[0];
+    dLastMsg = n === 1 ? `방금 갱신: a ${f4(a0)} → ${f4(a1)}  (1차 근사 예측 ${f4(pred)})` : `방금 ${n}번 갱신: a ${f4(a0)} → ${f4(a1)}`;
+    drawDdpg();
+  }
+  $("dUpd").onclick = () => dUpdate(1);
+  $("dUpd10").onclick = () => dUpdate(10);
+  $("dReset").onclick = () => { ILL.actor = ILL.actor0.clone(); dTrail.length = 0; dLastMsg = ""; drawDdpg(); };
+  ["sDTh", "sDThd"].forEach(id => $(id).addEventListener("input", () => { dTrail.length = 0; dLastMsg = ""; drawDdpg(); }));
+  $("sDLr").addEventListener("input", drawDdpg);
+
+  /* ---- DDPG 한 번의 갱신 따라가기 ---- */
+  const TAUS = [0, 0.001, 0.005, 0.01, 0.02, 0.05, 0.1, 0.5, 1];
+  const ST_NAMES = ["상태 s", "행동 a", "환경 r, s′", "목표 y", "critic 갱신", "actor 갱신", "타깃 soft update"];
+  const ST = { k: 0, n: 0, rec: null, playing: false, timer: 0 };
+  function stInit() {
+    ST.actor = ILL.actor0.clone(); ST.critic = ILL.critic.clone(); ST.actorT = ST.actor.clone(); ST.criticT = ST.critic.clone();
+    ST.env = new RL.Pendulum(RL.rng(21)); ST.env.reset(); ST.env.th = 2.4; ST.env.thd = 0.5; ST.rng = RL.rng(22); ST.n = 0; ST.k = 0;
+    stTransition();
+  }
+  function stTransition() {
+    const gam = +$("sStG").value, tau = TAUS[+$("sStT").value], sig = +$("sStS").value, lrA = 0.01;
+    const e = ST.env, s = e.obs(), th = ANG(e.th), thd = e.thd;
+    const mu = ST.actor.predict(s)[0], eps = ST.rng.normal(0, 1) * sig, a = clip(mu + eps, -1, 1), u = 2 * a;
+    const o = e.step(u), s2 = o.s;
+    const a2 = ST.actorT.predict(s2)[0], q2 = Qc(ST.criticT, s2, a2), y = o.r + gam * q2;
+    /* critic: SGD 한 번 (단일 표본) */
+    const fq = ST.critic.forward([s[0], s[1], s[2], a]), q = fq.y[0], dlt = q - y;
+    ST.critic.zeroGrad(); ST.critic.backward(fq.cache, [1]); const gq2 = Math.pow(ST.critic.gradNorm(), 2); ST.critic.zeroGrad();
+    const lrC = 0.25 / gq2;   /* 1차 근사로 오차의 절반만큼 움직이는 학습률 */
+    ST.critic.backward(fq.cache, [2 * dlt]);
+    for (let l = 0; l < ST.critic.W.length; l++) { const W = ST.critic.W[l], G = ST.critic.gW[l], b = ST.critic.b[l], gb = ST.critic.gb[l];
+      for (let i = 0; i < W.length; i++) W[i] -= lrC * G[i]; for (let i = 0; i < b.length; i++) b[i] -= lrC * gb[i]; }
+    ST.critic.zeroGrad();
+    const qAfter = Qc(ST.critic, s, a);
+    /* actor: ∇aQ · ∇θμ 로 경사 상승 한 번 */
+    const fa = ST.actor.forward(s), muNow = fa.y[0], dg = dGrad(ST.critic, s, muNow);
+    ST.actor.zeroGrad(); ST.actor.backward(fa.cache, [dg.g]);
+    for (let l = 0; l < ST.actor.W.length; l++) { const W = ST.actor.W[l], G = ST.actor.gW[l], b = ST.actor.b[l], gb = ST.actor.gb[l];
+      for (let i = 0; i < W.length; i++) W[i] += lrA * G[i]; for (let i = 0; i < b.length; i++) b[i] += lrA * gb[i]; }
+    ST.actor.zeroGrad();
+    const muAfter = ST.actor.predict(s)[0], qMuAfter = Qc(ST.critic, s, muAfter);
+    /* 타깃 soft update — critic 출력층 편향 하나를 예로 */
+    const L = ST.critic.b.length - 1, bOn = ST.critic.b[L][0], bT = ST.criticT.b[L][0];
+    ST.actorT.softUpdate(ST.actor, tau); ST.criticT.softUpdate(ST.critic, tau);
+    ST.rec = { s, th, thd, mu, eps, a, u, r: o.r, s2, th2: ANG(e.th), a2, q2, y, gam, q, dlt, qAfter, lrC, gq2, lrA, muNow, g: dg.g, qMu: dg.q, muAfter, qMuAfter, tau, bOn, bT, bNew: ST.criticT.b[L][0], sig };
+    ST.n++;
+    if (e.t >= 200) { e.reset(); }
+  }
+  function stRender() {
+    $("vStG").textContent = (+$("sStG").value).toFixed(3); $("vStT").textContent = String(TAUS[+$("sStT").value]); $("vStS").textContent = f2(+$("sStS").value);
+    $("stList").innerHTML = ST_NAMES.map((n, i) => `<li class="${i === ST.k ? "on" : i < ST.k ? "done" : ""}" data-i="${i}">${i + 1}. ${n}</li>`).join("");
+    if (!ILL.ready || !ST.rec) { $("stCalc").textContent = "설명용 신경망을 준비하는 중입니다 …"; return; }
+    const R = ST.rec, k = ST.k, lines = [];
+    lines.push(`<b>전이 #${ST.n}</b>  (γ = ${R.gam.toFixed(3)}, τ = ${R.tau}, σ = ${f2(R.sig)})`);
+    lines.push(`<span class="c-state">① s = (cos θ, sin θ, ω) = (${f3(R.s[0])}, ${f3(R.s[1])}, ${f3(R.s[2])})   [θ = ${f2(R.th)} rad]</span>`);
+    if (k >= 1) lines.push(`<span class="c-act">② μ(s) = ${f4(R.mu)},  잡음 ε = ${f4(R.eps)}  →  a = clip(μ + ε) = <b>${f4(R.a)}</b>  (토크 u = 2a = ${f3(R.u)})</span>`);
+    if (k >= 2) lines.push(`<span class="c-rew">③ r = −(θ² + 0.1ω² + 0.001u²) = −(${f3(R.th * R.th)} + ${f3(0.1 * R.thd * R.thd)} + ${f4(0.001 * R.u * R.u)}) = <b>${f3(R.r)}</b>\n   s′ = (${f3(R.s2[0])}, ${f3(R.s2[1])}, ${f3(R.s2[2])})</span>`);
+    if (k >= 3) lines.push(`<span class="c-tgt">④ a′ = μθ′(s′) = ${f4(R.a2)},  Qφ′(s′, a′) = ${f4(R.q2)}\n   y = r + γ·Q′ = ${f3(R.r)} + ${R.gam.toFixed(3)} × ${par(R.q2)} = <b>${f4(R.y)}</b></span>`);
+    if (k >= 4) lines.push(`<span class="c-val">⑤ Q(s, a) = ${f4(R.q)},  δ = Q − y = ${f4(R.dlt)},  손실 δ² = ${f4(R.dlt * R.dlt)}\n   경사하강 1번 (lr = 0.25 / ‖∇φQ‖² = 0.25 / ${f3(R.gq2)} = ${fmtN(R.lrC, 5)}, 1차 근사로 오차 절반)\n   → Q(s, a) = <b>${f4(R.qAfter)}</b>,  |Q − y|: ${f3(Math.abs(R.dlt))} → ${f3(Math.abs(R.qAfter - R.y))}</span>`);
+    if (k >= 5) lines.push(`<span class="c-act">⑥ ∇a Q(s, μ(s)) = ${f4(R.g)},  ∂μ/∂b = 1 − μ² = ${f4(1 - R.muNow * R.muNow)}\n   경사 상승(lr ${R.lrA}) 후 μ(s): ${f4(R.muNow)} → <b>${f4(R.muAfter)}</b>,  Q(s, μ(s)): ${f4(R.qMu)} → ${f4(R.qMuAfter)}</span>`);
+    if (k >= 6) lines.push(`<span class="c-tgt">⑦ θ′ ← τθ + (1 − τ)θ′ — 예: critic 출력층 편향\n   b′ = ${R.tau} × ${par(R.bOn)} + ${(1 - R.tau).toFixed(3)} × ${par(R.bT)} = <b>${f4(R.bNew)}</b>  (모든 가중치에 똑같이)</span>`);
+    $("stCalc").innerHTML = lines.join("\n");
+    RL.drawPendulum($("cvStPend"), k >= 2 ? Math.atan2(R.s2[1], R.s2[0]) : Math.atan2(R.s[1], R.s[0]), { w: 300, h: 240, torque: k >= 1 ? R.u : 0, label: k >= 2 ? "s′ (토크 적용 후)" : "s" });
+  }
+  function stNext() { if (!ILL.ready) return; if (ST.k < 6) ST.k++; else { stTransition(); ST.k = 0; } stRender(); }
+  function stStopPlay() { ST.playing = false; clearInterval(ST.timer); $("stPlay").textContent = "재생"; }
+  $("stNext").onclick = () => { stStopPlay(); stNext(); };
+  $("stPrev").onclick = () => { stStopPlay(); if (ST.k > 0) ST.k--; stRender(); };
+  $("stFirst").onclick = () => { stStopPlay(); if (ILL.ready) stInit(); stRender(); };
+  $("stPlay").onclick = () => { if (ST.playing) { stStopPlay(); return; } ST.playing = true; $("stPlay").textContent = "멈춤"; ST.timer = setInterval(stNext, RM ? 1600 : 900); };
+  $("stList").addEventListener("click", e => { const li = e.target.closest("li"); if (!li) return; stStopPlay(); ST.k = +li.dataset.i; stRender(); });
+  ["sStG", "sStT", "sStS"].forEach(id => $(id).addEventListener("input", () => { $("vStG").textContent = (+$("sStG").value).toFixed(3); $("vStT").textContent = String(TAUS[+$("sStT").value]); $("vStS").textContent = f2(+$("sStS").value); }));
+  ["sStG", "sStT", "sStS"].forEach(id => $(id).addEventListener("change", () => { if (ILL.ready) { stTransition(); ST.k = 0; } stRender(); }));
+
+  /* ---- 타깃 네트워크 τ ---- */
+  const TAU2 = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1];
+  const tauNoise = (() => { const r = RL.rng(31); return Array.from({ length: 400 }, () => r.normal(0, 0.3)); })();
+  function drawTau() {
+    const tau = TAU2[+$("sTau").value]; $("vTau").textContent = String(tau);
+    const on = [], tg = []; let t2 = 0;
+    for (let t = 0; t < 400; t++) { const base = t < 200 ? 1 - Math.exp(-t / 40) : -0.5 + 1.5 * Math.exp(-(t - 200) / 40); on.push(base + tauNoise[t]); tg.push(t2); t2 = tau * on[t] + (1 - tau) * t2; }
+    const xs = linspace(0, 399, 400);
+    plot($("cvTau"), { w: 560, h: 200, x0: 0, x1: 399, y0: -1.3, y1: 2, xlabel: "학습 걸음", ylabel: "파라미터 값",
+      draw(g, X, Y) { polyline(g, xs, on, X, Y, C("--faint"), 1.2); polyline(g, xs, tg, X, Y, C("--r-tgt"), 2.6); vline(g, X(200), 0, 999, C("--line-strong")); } });
+    const sd = a => { let m = 0, v = 0; for (let i = 1; i < a.length; i++) m += a[i] - a[i - 1]; m /= a.length - 1; for (let i = 1; i < a.length; i++) v += Math.pow(a[i] - a[i - 1] - m, 2); return Math.sqrt(v / (a.length - 2)); };
+    const t = 100;
+    $("tauCalc").innerHTML = `걸음 ${t}:  θ′ ← τ·θ + (1 − τ)·θ′ = ${tau} × ${f3(on[t])} + ${(1 - tau).toFixed(3)} × ${f3(tg[t])} = <b>${f3(tg[t + 1])}</b>\n` +
+      `걸음당 변화의 표준편차: 온라인 ${f3(sd(on))} → 타깃 <b>${f3(sd(tg))}</b>   · 실효 기억 길이 ≈ 1/τ = ${fmtInt(1 / tau)}걸음\n` +
+      `걸음 200에서 값이 바뀐 뒤 타깃이 따라오는 데 걸리는 시간도 약 1/τ — τ가 너무 작으면 학습이 느려짐 (DDPG·TD3·SAC 기본 0.005)`;
+  }
+  $("sTau").addEventListener("input", drawTau);
+
+  /* ---- 탐험 잡음 ---- */
+  let nzSeed = 41;
+  function drawNoise() {
+    const sig = +$("sNz").value, th = +$("sOu").value, dt = 0.01; $("vNz").textContent = f2(sig); $("vOu").textContent = f2(th);
+    const r = RL.rng(nzSeed), gs = [], ou = []; let x = 0;
+    for (let t = 0; t < 200; t++) { const e1 = r.normal(), e2 = r.normal(); gs.push(sig * e1); x = x + th * (0 - x) * dt + sig * Math.sqrt(dt) * e2; ou.push(x); }
+    const xs = linspace(0, 199, 200), m = Math.max(0.3, ...gs.map(Math.abs), ...ou.map(Math.abs)) * 1.1;
+    plot($("cvNoise"), { w: 560, h: 200, x0: 0, x1: 199, y0: -m, y1: m, xlabel: "걸음 t", ylabel: "잡음 (정규화 행동 단위)",
+      draw(g, X, Y) { polyline(g, xs, gs, X, Y, C("--r-exp"), 1.4); polyline(g, xs, ou, X, Y, C("--r-state"), 2.4); } });
+    const ac = a => { let m0 = a.reduce((p, q) => p + q, 0) / a.length, num = 0, den = 0; for (let i = 0; i < a.length; i++) { den += (a[i] - m0) * (a[i] - m0); if (i) num += (a[i] - m0) * (a[i - 1] - m0); } return num / den; };
+    $("nzCalc").innerHTML = `가우시안  n_t = σ·ε_t  → 바로 옆 걸음과의 상관 <b>${f2(ac(gs))}</b> (매번 새로 뽑음)\n` +
+      `OU       x_{t+1} = x_t + θ(0 − x_t)·dt + σ·√dt·ε_t  (dt = ${dt}, stable-baselines3 기본값)\n` +
+      `         → 바로 옆 걸음과의 상관 <b>${f2(ac(ou))}</b> (한 방향으로 한동안 계속 밀어 줌)\n` +
+      `학습할 때만 a = clip(μ(s) + 잡음, −1, 1) · 평가할 때는 잡음 없이 μ(s)`;
+  }
+  ["sNz", "sOu"].forEach(id => $(id).addEventListener("input", drawNoise));
+  $("nzNew").onclick = () => { nzSeed++; drawNoise(); };
+  DRAW.ddpg = [drawDdpg, stRender, drawTau, drawNoise];
+
+  /* =====================================================================
+     3. TD3
+     ===================================================================== */
+  const OVA = linspace(-1, 1, 101), qTrue = a => 1 - 1.5 * (a - 0.2) * (a - 0.2), OVT = OVA.map(qTrue);
+  /* 매끄러운 무작위 오차 곡선 (분산 ≈ 1) */
+  function errCurve(r) { const K = 6, c = [], w = [], p = []; for (let k = 0; k < K; k++) { c.push(r.normal()); w.push(r.uniform(2, 12)); p.push(r.uniform(0, 2 * Math.PI)); }
+    return OVA.map(a => { let s = 0; for (let k = 0; k < K; k++) s += c[k] * Math.sin(w[k] * a + p[k]); return s / Math.sqrt(K / 2); }); }
+  function overDraw(r, sig) {
+    const e1 = errCurve(r), e2 = errCurve(r), q1 = OVT.map((v, i) => v + sig * e1[i]), q2 = OVT.map((v, i) => v + sig * e2[i]);
+    let bi = 0; q1.forEach((v, i) => { if (v > q1[bi]) bi = i; });
+    return { q1, q2, bi, b1: q1[bi] - OVT[bi], bm: Math.min(q1[bi], q2[bi]) - OVT[bi], b2: q2[bi] - OVT[bi] };
+  }
+  const OV = { seed: 51, one: null, many: null };
+  function ovOne() { OV.one = overDraw(RL.rng(OV.seed), +$("sOvS").value); }
+  function ovMany() { const r = RL.rng(1000 + Math.round(+$("sOvS").value * 100)), sig = +$("sOvS").value, b1 = [], bm = [];
+    for (let i = 0; i < 2000; i++) { const d = overDraw(r, sig); b1.push(d.b1); bm.push(d.bm); } OV.many = { b1, bm, sig }; }
+  function drawOver() {
+    const sig = +$("sOvS").value; $("vOvS").textContent = f2(sig);
+    if (!OV.one) ovOne(); if (!OV.many || OV.many.sig !== sig) ovMany();
+    const d = OV.one, qm = d.q1.map((v, i) => Math.min(v, d.q2[i])), all = d.q1.concat(d.q2, OVT);
+    const lo = Math.min(...all) - 0.1, hi = Math.max(...all) + 0.25;
+    plot($("cvOver"), { w: 560, h: 240, x0: -1, x1: 1, y0: lo, y1: hi, xlabel: "행동 a", ylabel: "Q(s′, a)",
+      draw(g, X, Y, I) {
+        polyline(g, OVA, OVT, X, Y, C("--faint"), 3);
+        polyline(g, OVA, d.q1, X, Y, C("--a-ddpg"), 1.6); polyline(g, OVA, d.q2, X, Y, C("--a-td3"), 1.6); polyline(g, OVA, qm, X, Y, C("--a-sac"), 2.2, [5, 3]);
+        const a = OVA[d.bi]; vline(g, X(a), I.pt, I.H - I.pb, C("--r-act"));
+        dot(g, X(a), Y(d.q1[d.bi]), 5, C("--a-ddpg")); dot(g, X(a), Y(Math.min(d.q1[d.bi], d.q2[d.bi])), 5, C("--a-sac")); dot(g, X(a), Y(OVT[d.bi]), 5, C("--faint"));
+        label(g, X(a) + (a > 0.4 ? -6 : 6), I.pt + 12, "a* = argmax Q₁ = " + f2(a), C("--r-act"), a > 0.4 ? "right" : "left", true);
+      } });
+    const M = OV.many, mean = v => v.reduce((p, q) => p + q, 0) / v.length;
+    const m1 = mean(M.b1), mm = mean(M.bm), lo2 = Math.min(...M.b1, ...M.bm), hi2 = Math.max(...M.b1, ...M.bm), nb = 40;
+    const span = Math.max(0.05, hi2 - lo2), bw = span / nb, h1 = new Array(nb).fill(0), hm = new Array(nb).fill(0);
+    M.b1.forEach(v => h1[Math.min(nb - 1, Math.floor((v - lo2) / bw))]++); M.bm.forEach(v => hm[Math.min(nb - 1, Math.floor((v - lo2) / bw))]++);
+    const ymax = Math.max(...h1, ...hm) * 1.15;
+    plot($("cvOverH"), { w: 560, h: 240, x0: lo2 - bw, x1: hi2 + bw, y0: 0, y1: ymax, xlabel: "편향 = 목표에 쓴 값 − 실제 Q(a*)", ylabel: "2,000번 중 횟수",
+      draw(g, X, Y, I) {
+        for (let i = 0; i < nb; i++) { const x0 = X(lo2 + i * bw), x1 = X(lo2 + (i + 1) * bw);
+          g.globalAlpha = 0.45; g.fillStyle = C("--a-ddpg"); g.fillRect(x0, Y(h1[i]), x1 - x0 - 1, Y(0) - Y(h1[i]));
+          g.fillStyle = C("--a-sac"); g.fillRect(x0, Y(hm[i]), x1 - x0 - 1, Y(0) - Y(hm[i])); g.globalAlpha = 1; }
+        vline(g, X(0), I.pt, I.H - I.pb, C("--ink"), [2, 2]);
+        vline(g, X(m1), I.pt, I.H - I.pb, C("--a-ddpg"), []); vline(g, X(mm), I.pt, I.H - I.pb, C("--a-sac"), []);
+        label(g, X(m1) + 5, I.pt + 12, "Q₁ 평균 " + (m1 >= 0 ? "+" : "") + f3(m1), C("--a-ddpg"), "left", true);
+        label(g, X(mm) - 5, I.pt + 28, "min 평균 " + (mm >= 0 ? "+" : "") + f3(mm), C("--a-sac"), "right", true);
+      } });
+    $("ovNums").innerHTML =
+      `<div class="ct-num"><span class="c-ddpg">이번 표본 Q₁(a*) − Q(a*)</span><b>${(d.b1 >= 0 ? "+" : "") + f3(d.b1)}</b></div>` +
+      `<div class="ct-num"><span class="c-sac">이번 표본 min − Q(a*)</span><b>${(d.bm >= 0 ? "+" : "") + f3(d.bm)}</b></div>` +
+      `<div class="ct-num"><span class="c-ddpg">2,000번 평균 (DDPG식)</span><b>${(m1 >= 0 ? "+" : "") + f3(m1)}</b></div>` +
+      `<div class="ct-num"><span class="c-sac">2,000번 평균 (TD3식)</span><b>${(mm >= 0 ? "+" : "") + f3(mm)}</b></div>` +
+      `<div class="ct-num"><span>과대평가 비율 DDPG식 / TD3식</span><b>${fmtN(100 * M.b1.filter(v => v > 0).length / 2000, 0)}% / ${fmtN(100 * M.bm.filter(v => v > 0).length / 2000, 0)}%</b></div>`;
+  }
+  $("sOvS").addEventListener("input", () => { ovOne(); drawOver(); });
+  $("ovNew").onclick = () => { OV.seed++; ovOne(); drawOver(); };
+  $("ovMany").onclick = () => { OV.many = null; drawOver(); };
+
+  function drawDelay() {
+    const d = +$("sDelay").value, n = 16; $("vDelay").textContent = d;
+    const f = RL.fitCanvas($("cvDelay"), 560, 150), g = f.g, W = f.w, H = f.h; g.clearRect(0, 0, W, H);
+    const x0 = 118, cw = (W - x0 - 10) / n, rows = [["critic Q₁·Q₂", C("--r-val"), () => true], ["actor μ", C("--r-act"), t => t % d === 0], ["타깃 soft update", C("--r-tgt"), t => t % d === 0]];
+    g.font = "600 12px " + SANS(); g.textAlign = "left";
+    rows.forEach((r, ri) => { const y = 22 + ri * 38; g.fillStyle = C("--muted"); g.fillText(r[0], 4, y + 14);
+      for (let t = 1; t <= n; t++) { const x = x0 + (t - 1) * cw; g.fillStyle = r[2](t) ? r[1] : C("--surface-2"); g.fillRect(x + 2, y, cw - 4, 20); } });
+    g.fillStyle = C("--faint"); g.font = "11px " + MONO(); g.textAlign = "center";
+    for (let t = 1; t <= n; t++) g.fillText(String(t), x0 + (t - 0.5) * cw, H - 6);
+    $("delayNote").innerHTML = `d = ${d}: 16걸음 동안 critic <b>16번</b>, actor·타깃 <b>${Math.floor(n / d)}번</b>. ` +
+      (d === 1 ? "d = 1이면 DDPG처럼 매번 함께 갱신합니다." : "critic이 몇 번 더 맞춰진 뒤의 덜 흔들리는 ∇aQ로 actor를 움직입니다. 원 논문 기본값 d = 2.");
+  }
+  $("sDelay").addEventListener("input", drawDelay);
+
+  const SMA = linspace(-1, 1, 401), aP = 0.35;
+  const qSm = a => 0.6 - 0.8 * (a + 0.1) * (a + 0.1) + 1.2 * Math.exp(-(a - aP) * (a - aP) / (2 * 0.025 * 0.025));
+  const qSmTrue = a => 0.6 - 0.8 * (a + 0.1) * (a + 0.1);
+  function drawSmooth() {
+    const sg = +$("sSmS").value, c = +$("sSmC").value; $("vSmS").textContent = f2(sg); $("vSmC").textContent = f2(c);
+    /* E[Q′(clip(a′ + clip(ε, −c, c), −1, 1))] — 구간 [−c, c] 수치 적분 + 양 끝 잘린 확률 질량 */
+    let ev = 0, dens = [];
+    if (sg < 1e-9) ev = qSm(aP);
+    else {
+      const M = 600, h = 2 * c / M, pdf = e => Math.exp(-e * e / (2 * sg * sg)) / (sg * Math.sqrt(2 * Math.PI));
+      let mass = 0;
+      for (let i = 0; i < M; i++) { const e = -c + (i + 0.5) * h, p = pdf(e) * h; mass += p; ev += p * qSm(clip(aP + e, -1, 1)); }
+      const tail = (1 - mass) / 2; ev += tail * (qSm(clip(aP - c, -1, 1)) + qSm(clip(aP + c, -1, 1)));
+      dens = SMA.map(a => { const e = a - aP; return Math.abs(e) <= c ? pdf(e) : 0; });
+    }
+    const ys = SMA.map(qSm), yt = SMA.map(qSmTrue);
+    plot($("cvSmooth"), { w: 560, h: 220, x0: -1, x1: 1, y0: -0.8, y1: 2.1, xlabel: "목표 행동 ã", ylabel: "Qφ′(s′, ã)",
+      draw(g, X, Y, I) {
+        if (dens.length) { const dm = Math.max(...dens); g.globalAlpha = 0.25; g.fillStyle = C("--r-exp"); g.beginPath(); g.moveTo(X(-1), Y(-0.8));
+          SMA.forEach((a, i) => g.lineTo(X(a), Y(-0.8 + 0.9 * dens[i] / dm))); g.lineTo(X(1), Y(-0.8)); g.fill(); g.globalAlpha = 1; }
+        polyline(g, SMA, yt, X, Y, C("--faint"), 1.5, [5, 4]);
+        polyline(g, SMA, ys, X, Y, C("--r-val"), 2.4);
+        vline(g, X(aP), I.pt, I.H - I.pb, C("--r-act"));
+        dot(g, X(aP), Y(qSm(aP)), 5, C("--a-ddpg"));
+        g.strokeStyle = C("--a-td3"); g.lineWidth = 2.4; g.beginPath(); g.moveTo(X(aP - 0.3), Y(ev)); g.lineTo(X(aP + 0.3), Y(ev)); g.stroke();
+        label(g, X(aP) - 8, Y(qSm(aP)) + 4, "오차 봉우리 Q′(a′) = " + f3(qSm(aP)), C("--a-ddpg"), "right", true);
+        label(g, X(aP + 0.32), Y(ev) + 4, "평활화 " + f3(ev), C("--a-td3"), "left", true);
+        if (c < 0.98 && sg > 0) { vline(g, X(aP - c), Y(-0.8), Y(-0.3), C("--r-exp"), [2, 2]); vline(g, X(aP + c), Y(-0.8), Y(-0.3), C("--r-exp"), [2, 2]); }
+      } });
+    $("smCalc").innerHTML = `a′ = μθ′(s′) = ${f2(aP)} — actor가 critic의 뾰족한 오차 봉우리 위에 올라가 있음\n` +
+      `잡음 없음 (DDPG):   Q′(s′, a′) = <b class="c-ddpg">${f3(qSm(aP))}</b>\n` +
+      `평활화 (TD3):       E[Q′(s′, clip(a′ + clip(ε, −${f2(c)}, ${f2(c)})))] = <b class="c-td3">${f3(ev)}</b>,  ε ~ N(0, ${f2(sg)}²)\n` +
+      `봉우리가 없을 때의 값(점선): ${f3(qSmTrue(aP))} → 평활화가 오차를 ${fmtN(100 * (1 - (ev - qSmTrue(aP)) / (qSm(aP) - qSmTrue(aP))), 0)}% 줄임\n` +
+      `학습에서는 평균을 직접 구하지 않고 미니배치마다 ε를 하나씩 뽑아 같은 효과를 냄 (노란 띠 = ã 분포)`;
+  }
+  ["sSmS", "sSmC"].forEach(id => $(id).addEventListener("input", drawSmooth));
+  DRAW.td3 = [drawOver, drawDelay, drawSmooth];
+
+  /* =====================================================================
+     4. SAC
+     ===================================================================== */
+  const LOG2PI_H = 0.9189385332046727;
+  const TG_EPS = (() => { const r = RL.rng(61); return Array.from({ length: 4000 }, () => r.normal()); })();
+  function tgEntropy(mu, ls) { const sd = Math.exp(ls); let s = 0; for (const e of TG_EPS) { const a = Math.tanh(mu + sd * e); s += -0.5 * e * e - ls - LOG2PI_H - Math.log(1 - a * a + 1e-12); } return -s / TG_EPS.length; }
+  function drawTg() {
+    const mu = +$("sTgM").value, sd = +$("sTgS").value, ls = Math.log(sd), e = +$("sTgE").value;
+    $("vTgM").textContent = f2(mu); $("vTgS").textContent = f2(sd); $("vTgE").textContent = f2(e);
+    const u = mu + sd * e, a = Math.tanh(u), lN = -0.5 * e * e - ls - LOG2PI_H, corr = Math.log(1 - a * a), lp = lN - corr;
+    const H = tgEntropy(mu, ls); $("tgSig").textContent = f3(ls); $("tgH").textContent = f3(H);
+    const us = linspace(-3, 3, 601), pu = us.map(x => Math.exp(-(x - mu) * (x - mu) / (2 * sd * sd)) / (sd * Math.sqrt(2 * Math.PI)));
+    const as = linspace(-0.999, 0.999, 500), pa = as.map(x => { const uu = 0.5 * Math.log((1 + x) / (1 - x)); return Math.exp(-(uu - mu) * (uu - mu) / (2 * sd * sd)) / (sd * Math.sqrt(2 * Math.PI)) / (1 - x * x); });
+    const ymax = Math.min(4, Math.max(...pu, ...pa.slice(5, -5)) * 1.15);
+    plot($("cvTg"), { w: 600, h: 230, x0: -3, x1: 3, y0: 0, y1: ymax, xlabel: "u (점선) · a = tanh(u) (실선, −1~1)", ylabel: "밀도",
+      draw(g, X, Y, I) {
+        g.fillStyle = C("--surface-2"); g.fillRect(X(-1), I.pt, X(1) - X(-1), I.H - I.pb - I.pt);
+        polyline(g, us, pu, X, Y, C("--faint"), 1.8, [5, 4]);
+        polyline(g, as, pa.map(v => Math.min(v, ymax * 1.5)), X, Y, C("--a-sac"), 2.6);
+        vline(g, X(u), I.pt, I.H - I.pb, C("--faint"), [2, 3]);
+        g.strokeStyle = C("--r-act"); g.lineWidth = 2; g.beginPath(); g.moveTo(X(u), Y(ymax * 0.82)); g.quadraticCurveTo((X(u) + X(a)) / 2, Y(ymax * 0.98), X(a), Y(ymax * 0.82)); g.stroke();
+        dot(g, X(u), Y(ymax * 0.82), 4, C("--faint")); dot(g, X(a), Y(ymax * 0.82), 6, C("--r-act"));
+        label(g, X(a) + (a > 0 ? -8 : 8), Y(ymax * 0.82) + 18, "a = " + f3(a), C("--r-act"), a > 0 ? "right" : "left", true);
+        label(g, X(u) + (u > 0 ? 6 : -6), Y(ymax * 0.82) - 8, "u = " + f3(u), C("--muted"), u > 0 ? "left" : "right", true);
+      } });
+    $("tgCalc").innerHTML = `u = μ + σ·ε = ${f2(mu)} + ${f3(sd)} × ${par(e)} = <b>${f4(u)}</b>\n` +
+      `<span class="c-act">a = tanh(u) = <b>${f4(a)}</b>   (토크 2a = ${f3(2 * a)})</span>\n` +
+      `log N(u; μ, σ²) = −ε²/2 − log σ − ½log 2π = ${f4(-0.5 * e * e)} − ${par(ls)} − 0.9189 = ${f4(lN)}\n` +
+      `tanh 보정: −log(1 − a²) = −log(1 − ${f4(a * a)}) = ${(-corr >= 0 ? "+" : "") + f4(-corr)}\n` +
+      `<b>log π(a|s) = ${f4(lN)} ${-corr >= 0 ? "+" : "−"} ${f4(Math.abs(corr))} = ${f4(lp)}</b>\n` +
+      `재매개변수화: ∂a/∂μ = 1 − a² = ${f4(1 - a * a)},  ∂a/∂log σ = (1 − a²)·σ·ε = ${f4((1 - a * a) * sd * e)}  → ε는 고정, 기울기가 μ·σ로 흐름\n` +
+      `엔트로피: u는 ½log(2πeσ²) = ${f3(0.5 * Math.log(2 * Math.PI * Math.E * sd * sd))}, tanh로 누른 a는 ${f3(H)} (최대 log 2 = 0.693, −1~1 균등분포)`;
+  }
+  ["sTgM", "sTgS", "sTgE"].forEach(id => $(id).addEventListener("input", drawTg));
+
+  /* ---- 자동 α 실험: 상태 하나, r(a) = −4(a − 0.6)² ---- */
+  const A0 = 0.6, rA = a => -4 * (a - A0) * (a - A0), drA = a => -8 * (a - A0);
+  function adam2() { return { m: 0, v: 0, t: 0, step(p, g, lr) { this.t++; this.m = 0.9 * this.m + 0.1 * g; this.v = 0.999 * this.v + 0.001 * g * g;
+    return p - lr * (this.m / (1 - Math.pow(0.9, this.t))) / (Math.sqrt(this.v / (1 - Math.pow(0.999, this.t))) + 1e-8); } }; }
+  function sacIter(P, alpha, Hbar, auto, B, rng) {
+    let gm = 0, gl = 0, ga = 0, Hs = 0, Rs = 0; const sd = Math.exp(P.ls);
+    for (let i = 0; i < B; i++) {
+      const e = rng.normal(), a = Math.tanh(P.mu + sd * e), g1 = 1 - a * a, se = sd * e, lp = -0.5 * e * e - P.ls - LOG2PI_H - Math.log(g1 + 1e-6), dr = drA(a);
+      gm += alpha * 2 * a - dr * g1; gl += alpha * (-1 + 2 * a * se) - dr * g1 * se; ga += -(lp + Hbar); Hs += -lp; Rs += rA(a);
+    }
+    P.mu = P.om.step(P.mu, gm / B, 0.02); P.ls = clip(P.ol.step(P.ls, gl / B, 0.02), -5, 2);
+    if (auto) P.la = P.oa.step(P.la, ga / B, 0.02);
+    return { H: Hs / B, R: Rs / B };
+  }
+  const AL = { P: null, hist: [], running: false };
+  const alAuto = segInit("segAl", () => { alReset(); });
+  function alReset() { AL.P = { mu: 0, ls: 0, la: Math.log(0.2), om: adam2(), ol: adam2(), oa: adam2() }; AL.rng = RL.rng(71); AL.hist = []; AL.it = 0; AL.running = false; $("alRun").textContent = "학습 시작"; drawAl(); }
+  function alAlpha() { return alAuto() === "auto" ? Math.exp(AL.P.la) : Math.pow(10, +$("sAlF").value); }
+  function alLoop() {
+    if (!AL.running) return;
+    for (let k = 0; k < 4; k++) { const al = alAlpha(), o = sacIter(AL.P, al, +$("sAlH").value, alAuto() === "auto", 128, AL.rng); AL.it++; AL.hist.push({ a: al, H: o.H, R: o.R }); }
+    if (AL.it >= 800) { AL.running = false; $("alRun").textContent = "다시 학습"; }
+    drawAl(); if (AL.running) requestAnimationFrame(alLoop);
+  }
+  $("alRun").onclick = () => {
+    if (AL.running) { AL.running = false; $("alRun").textContent = "이어서 학습"; return; }
+    if (AL.it >= 800) alReset();
+    if (RM) { for (let k = 0; k < 800; k++) { const al = alAlpha(), o = sacIter(AL.P, al, +$("sAlH").value, alAuto() === "auto", 128, AL.rng); AL.it++; AL.hist.push({ a: al, H: o.H, R: o.R }); } $("alRun").textContent = "다시 학습"; drawAl(); return; }
+    AL.running = true; $("alRun").textContent = "멈춤"; requestAnimationFrame(alLoop);
+  };
+  $("alReset").onclick = alReset;
+  $("sAlH").addEventListener("input", () => { $("vAlH").textContent = f2(+$("sAlH").value).replace(/0$/, ""); drawAl(); });
+  $("sAlF").addEventListener("input", () => { $("vAlF").textContent = fmtN(Math.pow(10, +$("sAlF").value), 3); drawAl(); });
+  function drawAl() {
+    if (!AL.P) return;
+    const h = AL.hist, n = Math.max(h.length, 2), xs = h.map((_, i) => i), Hbar = +$("sAlH").value;
+    const al = h.map(o => o.a), alMax = Math.max(0.25, ...al) * 1.1;
+    plot($("cvAl"), { w: 400, h: 200, x0: 0, x1: Math.max(800, n), y0: 0, y1: alMax, xlabel: "반복", draw(g, X, Y) { if (h.length) polyline(g, xs, al, X, Y, C("--a-sac"), 2.2); } });
+    const Hs = RL.movingAvg(h.map(o => o.H), 20), Rs = RL.movingAvg(h.map(o => o.R), 20);
+    plot($("cvAlH"), { w: 400, h: 200, x0: 0, x1: Math.max(800, n), y0: -3.5, y1: 1, xlabel: "반복",
+      draw(g, X, Y, I) { vline(g, I.pl, Y(Hbar), Y(Hbar), C("--r-exp")); g.strokeStyle = C("--r-exp"); g.setLineDash([5, 4]); g.lineWidth = 1.5; g.beginPath(); g.moveTo(I.pl, Y(Hbar)); g.lineTo(I.W - I.pr, Y(Hbar)); g.stroke(); g.setLineDash([]);
+        label(g, I.W - I.pr - 4, Y(Hbar) - 5, "목표 H̄", C("--r-exp"), "right", true);
+        if (h.length) { polyline(g, xs, Hs, X, Y, C("--a-sac"), 2.2); polyline(g, xs, Rs, X, Y, C("--r-rew"), 2.2); }
+        label(g, I.pl + 6, I.pt + 12, "H", C("--a-sac"), "left", true); label(g, I.pl + 24, I.pt + 12, "E[r]", C("--r-rew"), "left", true); } });
+    const P = AL.P, sd = Math.exp(P.ls), as = linspace(-0.995, 0.995, 400);
+    const pa = as.map(x => { const uu = 0.5 * Math.log((1 + x) / (1 - x)); return Math.exp(-(uu - P.mu) * (uu - P.mu) / (2 * sd * sd)) / (sd * Math.sqrt(2 * Math.PI)) / (1 - x * x); });
+    const pm = Math.min(8, Math.max(1, ...pa) * 1.1);
+    plot($("cvAlP"), { w: 400, h: 200, x0: -1, x1: 1, y0: 0, y1: pm, xlabel: "행동 a",
+      draw(g, X, Y, I) { polyline(g, as, as.map(a => pm * (1 + rA(a) / 4.5)), X, Y, C("--r-rew"), 1.5, [5, 4]); polyline(g, as, pa.map(v => Math.min(v, pm * 1.5)), X, Y, C("--a-sac"), 2.4); vline(g, X(A0), I.pt, I.H - I.pb, C("--r-rew"), [2, 3]);
+        label(g, X(A0) - 6, I.pt + 12, "보상 최대 0.6", C("--r-rew"), "right", true); } });
+    const H = tgEntropy(P.mu, P.ls); let Er = 0; for (const e of TG_EPS) Er += rA(Math.tanh(P.mu + sd * e)); Er /= TG_EPS.length;
+    $("alNums").innerHTML = `<div class="ct-num"><span>반복</span><b>${AL.it}</b></div><div class="ct-num"><span class="c-sac">α</span><b>${f4(alAlpha())}</b></div>` +
+      `<div class="ct-num"><span>엔트로피 H (목표 ${fmtN(Hbar, 1)})</span><b>${f3(H)}</b></div><div class="ct-num"><span class="c-rew">기대 보상 E[r]</span><b>${f4(Er)}</b></div>` +
+      `<div class="ct-num"><span>정책 tanh(μ), σ</span><b>${f3(Math.tanh(P.mu))}, ${f3(sd)}</b></div>`;
+    AL.cur = { H, Er };
+    drawTrade();
+  }
+  /* 엔트로피 ↔ 보상: 고정 α마다 끝까지 학습 */
+  let TRADE = null;
+  function computeTrade() {
+    TRADE = linspace(-3, 0.3, 12).map(lg => { const al = Math.pow(10, lg), P = { mu: 0, ls: 0, la: 0, om: adam2(), ol: adam2(), oa: adam2() }, r = RL.rng(81);
+      for (let k = 0; k < 600; k++) sacIter(P, al, 0, false, 128, r);
+      const sd = Math.exp(P.ls); let Er = 0; for (const e of TG_EPS) Er += rA(Math.tanh(P.mu + sd * e)); return { al, H: tgEntropy(P.mu, P.ls), R: Er / TG_EPS.length }; });
+  }
+  function drawTrade() {
+    if (!TRADE) computeTrade();
+    const ymin = Math.min(...TRADE.map(o => o.R)) - 0.1;
+    plot($("cvTrade"), { w: 560, h: 230, x0: -3.5, x1: 0.8, y0: ymin, y1: 0.05, xlabel: "엔트로피 H (넓게 퍼질수록 →)", ylabel: "기대 보상 E[r]",
+      draw(g, X, Y) {
+        polyline(g, TRADE.map(o => o.H), TRADE.map(o => o.R), X, Y, C("--a-sac"), 2);
+        TRADE.forEach((o, i) => { dot(g, X(o.H), Y(o.R), 4, C("--a-sac")); if (i === 0) label(g, X(o.H) - 4, Y(o.R) + 18, "α " + o.al.toFixed(3), C("--muted"), "left"); else if (i === TRADE.length - 1) label(g, X(o.H) - 8, Y(o.R) + 4, "α " + o.al.toFixed(1), C("--muted"), "right"); else if (i === 6 || i === 9) label(g, X(o.H) + 6, Y(o.R) + 16, "α " + (o.al < 0.01 ? o.al.toFixed(3) : o.al < 1 ? o.al.toFixed(2) : o.al.toFixed(1)), C("--muted"), "left"); });
+        if (AL.cur && AL.it > 0) { dot(g, X(AL.cur.H), Y(AL.cur.Er), 6, C("--r-act"), C("--surface")); label(g, X(AL.cur.H) - 8, Y(AL.cur.Er) + 16, "지금 정책", C("--r-act"), "right", true); }
+      } });
+  }
+  DRAW.sac = [drawTg, drawAl, drawSacAlpha];
+  alReset();
+
+  /* =====================================================================
+     5. 학습 비교 — DDPG / TD3 / SAC 실제 학습
+     네트워크 파라미터·Adam·soft update는 RL.MLP / RL.Adam 그대로 쓰고,
+     미니배치 순전파·역전파만 이 페이지에서 배치 단위로 빠르게 계산 (RL.MLP와 결과 동일)
+     ===================================================================== */
+  function BWS(net, B) {
+    this.H = net.sizes.map(n => new Float64Array(B * n)); this.D = net.sizes.map(n => new Float64Array(B * n));
+    let mx = 0; for (let l = 0; l < net.W.length; l++) mx = Math.max(mx, net.W[l].length);
+    const mz = Math.max.apply(null, net.sizes); this.WT = new Float64Array(mx); this.T1 = new Float64Array(B * mz); this.T2 = new Float64Array(B * mz);
+  }
+  /* ws.H[0]에 B×입력을 넣고 호출 → 출력 배열 */
+  function bForward(net, ws, B) {
+    const L = net.W.length, sz = net.sizes, WT = ws.WT, relu = net.act === "relu";
+    for (let l = 0; l < L; l++) {
+      const nI = sz[l], nO = sz[l + 1], W = net.W[l], bb = net.b[l], inp = ws.H[l], out = ws.H[l + 1], last = l === L - 1;
+      for (let i = 0; i < nI; i++) for (let j = 0; j < nO; j++) WT[j * nI + i] = W[i * nO + j];
+      for (let s = 0; s < B; s++) {
+        const ib = s * nI, ob = s * nO;
+        for (let j = 0; j < nO; j++) {
+          let acc = bb[j]; const wb = j * nI;
+          for (let i = 0; i < nI; i++) acc += inp[ib + i] * WT[wb + i];
+          if (!last) acc = relu ? (acc > 0 ? acc : 0) : Math.tanh(acc);
+          else if (net.out === "tanh") acc = Math.tanh(acc);
+          out[ob + j] = acc;
+        }
+      }
+    }
+    return ws.H[L];
+  }
+  /* ws.D[L]에 출력 기울기를 넣고 호출. noParam이면 파라미터 기울기 생략, needDx면 ws.D[0]에 입력 기울기 */
+  function bBackward(net, ws, B, needDx, noParam) {
+    const L = net.W.length, sz = net.sizes, dL = ws.D[L], y = ws.H[L], relu = net.act === "relu", T1 = ws.T1, T2 = ws.T2;
+    if (net.out === "tanh") for (let s = 0; s < B * sz[L]; s++) dL[s] *= 1 - y[s] * y[s];
+    for (let l = L - 1; l >= 0; l--) {
+      const nI = sz[l], nO = sz[l + 1], W = net.W[l], gW = net.gW[l], gb = net.gb[l], inp = ws.H[l], d = ws.D[l + 1], dp = ws.D[l];
+      if (!noParam) {
+        for (let s = 0; s < B; s++) { for (let i = 0; i < nI; i++) T1[i * B + s] = inp[s * nI + i]; for (let j = 0; j < nO; j++) T2[j * B + s] = d[s * nO + j]; }
+        for (let j = 0; j < nO; j++) { let acc = 0; for (let s = 0; s < B; s++) acc += T2[j * B + s]; gb[j] += acc; }
+        for (let i = 0; i < nI; i++) { const ib = i * B; for (let j = 0; j < nO; j++) { let acc = 0; const jb = j * B; for (let s = 0; s < B; s++) acc += T1[ib + s] * T2[jb + s]; gW[i * nO + j] += acc; } }
+      }
+      if (l > 0 || needDx) {
+        for (let s = 0; s < B; s++) {
+          const ob = s * nO, ib2 = s * nI;
+          for (let i = 0; i < nI; i++) {
+            if (l > 0 && relu && inp[ib2 + i] <= 0) { dp[ib2 + i] = 0; continue; }
+            let acc = 0; const wb = i * nO; for (let j = 0; j < nO; j++) acc += W[wb + j] * d[ob + j];
+            dp[ib2 + i] = l > 0 && !relu ? acc * (1 - inp[ib2 + i] * inp[ib2 + i]) : acc;
+          }
+        }
+      }
+    }
+  }
+  function Replay(cap, sd) { this.cap = cap; this.n = 0; this.i = 0; this.sd = sd; this.S = new Float64Array(cap * sd); this.A = new Float64Array(cap); this.R = new Float64Array(cap); this.S2 = new Float64Array(cap * sd); }
+  Replay.prototype.add = function (s, a, r, s2) { const i = this.i, sd = this.sd; for (let k = 0; k < sd; k++) { this.S[i * sd + k] = s[k]; this.S2[i * sd + k] = s2[k]; } this.A[i] = a; this.R[i] = r; this.i = (i + 1) % this.cap; this.n = Math.min(this.n + 1, this.cap); };
+
+  /* 행동 a는 −1~1로 정규화 (Pendulum 토크 = 2a). cfg: algo, seed, sd, hidden, batch, warmup … */
+  function Agent(cfg) {
+    const c = this.cfg = Object.assign({ algo: "td3", seed: 1, sd: 3, hidden: 32, lrA: 1e-3, lrC: 1e-3, gamma: 0.99, tau: 0.005, batch: 64, noise: 0.1,
+      policyDelay: 2, targetNoise: 0.2, noiseClip: 0.5, alphaInit: 0.2, targetEntropy: -1, lrAlpha: 3e-3, warmup: 1000, bufCap: 30000 }, cfg);
+    const h = c.hidden, sac = c.algo === "sac", sd = c.sd, B = c.batch, netRng = RL.rng(c.seed * 7919 + 13);
+    this.rng = RL.rng(c.seed);
+    this.actor = new RL.MLP([sd, h, h, sac ? 2 : 1], { act: "relu", out: sac ? "linear" : "tanh", rng: netRng, lastScale: 0.1 });
+    this.q1 = new RL.MLP([sd + 1, h, h, 1], { act: "relu", rng: netRng });
+    this.twin = c.algo !== "ddpg";
+    this.q2 = this.twin ? new RL.MLP([sd + 1, h, h, 1], { act: "relu", rng: netRng }) : null;
+    this.actorT = sac ? null : this.actor.clone();
+    this.q1T = this.q1.clone(); this.q2T = this.q2 ? this.q2.clone() : null;
+    this.optA = new RL.Adam(this.actor, { lr: c.lrA }); this.optQ1 = new RL.Adam(this.q1, { lr: c.lrC }); this.optQ2 = this.q2 ? new RL.Adam(this.q2, { lr: c.lrC }) : null;
+    this.logAlpha = Math.log(c.alphaInit); this.aM = 0; this.aV = 0; this.aT = 0;
+    this.buf = new Replay(c.bufCap, sd);
+    this.wsA = new BWS(this.actor, B); this.wsQ1 = new BWS(this.q1, B); this.wsQ2 = this.q2 ? new BWS(this.q2, B) : null; this.wsAT = new BWS(this.actor, B); this.wsQT = new BWS(this.q1, B);
+    this.idx = new Int32Array(B); this.y = new Float64Array(B); this.eps = new Float64Array(B); this.a2 = new Float64Array(B); this.logp2 = new Float64Array(B); this.gA = new Float64Array(B); this.useQ2 = new Uint8Array(B);
+    this.updates = 0; this.lastQ = 0; this.lastEnt = 0; this.lastQ1n = 0; this.lastQminN = 0;
+  }
+  Agent.prototype.alpha = function () { return Math.exp(this.logAlpha); };
+  Agent.prototype.act = function (s, explore) {
+    const c = this.cfg;
+    if (explore && this.buf.n < c.warmup) return this.rng.uniform(-1, 1);
+    const o = this.actor.predict(s);
+    if (c.algo === "sac") { if (!explore) return Math.tanh(o[0]); return Math.tanh(o[0] + Math.exp(clip(o[1], -5, 2)) * this.rng.normal()); }
+    return explore ? clip(o[0] + this.rng.normal(0, c.noise), -1, 1) : o[0];
+  };
+  Agent.prototype.observe = function (s, a, r, s2) { this.buf.add(s, a, r, s2); };
+  Agent.prototype.update = function () {
+    const c = this.cfg, B = c.batch, rng = this.rng, buf = this.buf, sac = c.algo === "sac", sd = c.sd, sd1 = sd + 1;
+    if (buf.n < Math.max(B, c.warmup)) return false;
+    const alpha = this.alpha(), idx = this.idx, y = this.y, a2 = this.a2;
+    let b, k;
+    for (b = 0; b < B; b++) idx[b] = rng.int(buf.n);
+    /* 목표값 y */
+    const X = sac ? this.wsA.H[0] : this.wsAT.H[0];
+    for (b = 0; b < B; b++) for (k = 0; k < sd; k++) X[b * sd + k] = buf.S2[idx[b] * sd + k];
+    const O = bForward(sac ? this.actor : this.actorT, sac ? this.wsA : this.wsAT, B);
+    for (b = 0; b < B; b++) {
+      if (sac) { const ls = clip(O[b * 2 + 1], -5, 2), e = rng.normal(), a = Math.tanh(O[b * 2] + Math.exp(ls) * e); a2[b] = a; this.logp2[b] = -0.5 * e * e - ls - LOG2PI_H - Math.log(1 - a * a + 1e-6); }
+      else { let aa = O[b]; if (c.algo === "td3") aa = clip(aa + clip(rng.normal(0, c.targetNoise), -c.noiseClip, c.noiseClip), -1, 1); a2[b] = aa; }
+    }
+    const XT = this.wsQT.H[0];
+    for (b = 0; b < B; b++) { for (k = 0; k < sd; k++) XT[b * sd1 + k] = buf.S2[idx[b] * sd + k]; XT[b * sd1 + sd] = a2[b]; }
+    const q1n = Float64Array.from(bForward(this.q1T, this.wsQT, B)), qn2 = this.twin ? bForward(this.q2T, this.wsQT, B) : null;
+    let s1 = 0, sm = 0;
+    for (b = 0; b < B; b++) { const qn = this.twin ? Math.min(q1n[b], qn2[b]) : q1n[b]; s1 += q1n[b]; sm += qn; y[b] = buf.R[idx[b]] + c.gamma * (qn - (sac ? alpha * this.logp2[b] : 0)); }
+    this.lastQ1n = s1 / B; this.lastQminN = sm / B;
+    /* critic */
+    let sumQ = 0;
+    const crit = [[this.q1, this.wsQ1, this.optQ1], [this.q2, this.wsQ2, this.optQ2]];
+    for (let ti = 0; ti < 2; ti++) {
+      const t = crit[ti]; if (!t[0]) continue;
+      const H0 = t[1].H[0];
+      for (b = 0; b < B; b++) { for (k = 0; k < sd; k++) H0[b * sd1 + k] = buf.S[idx[b] * sd + k]; H0[b * sd1 + sd] = buf.A[idx[b]]; }
+      const q = bForward(t[0], t[1], B), D = t[1].D[t[0].W.length];
+      for (b = 0; b < B; b++) { D[b] = 2 * (q[b] - y[b]) / B; if (!ti) sumQ += q[b]; }
+      bBackward(t[0], t[1], B, false); t[2].step();
+    }
+    this.lastQ = sumQ / B; this.updates++;
+    if (c.algo === "td3" && this.updates % c.policyDelay !== 0) return true;
+    /* actor */
+    const XA = this.wsA.H[0], eps = this.eps, act = this.a2, gA = this.gA, useQ2 = this.useQ2;
+    for (b = 0; b < B; b++) for (k = 0; k < sd; k++) XA[b * sd + k] = buf.S[idx[b] * sd + k];
+    const OA = bForward(this.actor, this.wsA, B);
+    for (b = 0; b < B; b++) { if (sac) { eps[b] = rng.normal(); act[b] = Math.tanh(OA[b * 2] + Math.exp(clip(OA[b * 2 + 1], -5, 2)) * eps[b]); } else act[b] = OA[b]; }
+    const H1 = this.wsQ1.H[0];
+    for (b = 0; b < B; b++) { for (k = 0; k < sd; k++) H1[b * sd1 + k] = XA[b * sd + k]; H1[b * sd1 + sd] = act[b]; }
+    const qa1 = Float64Array.from(bForward(this.q1, this.wsQ1, B));
+    useQ2.fill(0);
+    if (sac) { this.wsQ2.H[0].set(H1); const qa2 = bForward(this.q2, this.wsQ2, B); for (b = 0; b < B; b++) useQ2[b] = qa2[b] < qa1[b] ? 1 : 0; }
+    const D1 = this.wsQ1.D[this.q1.W.length]; for (b = 0; b < B; b++) D1[b] = useQ2[b] ? 0 : 1;
+    bBackward(this.q1, this.wsQ1, B, true, true);
+    for (b = 0; b < B; b++) gA[b] = this.wsQ1.D[0][b * sd1 + sd];
+    if (sac) { const D2 = this.wsQ2.D[this.q2.W.length]; for (b = 0; b < B; b++) D2[b] = useQ2[b]; bBackward(this.q2, this.wsQ2, B, true, true); for (b = 0; b < B; b++) if (useQ2[b]) gA[b] = this.wsQ2.D[0][b * sd1 + sd]; }
+    const DA = this.wsA.D[this.actor.W.length]; let sumLp = 0, gAl = 0;
+    for (b = 0; b < B; b++) {
+      if (sac) {
+        const raw = OA[b * 2 + 1], ls = clip(raw, -5, 2), sdv = Math.exp(ls), ee = eps[b], at = act[b], g = 1 - at * at, se = sdv * ee;
+        const lp = -0.5 * ee * ee - ls - LOG2PI_H - Math.log(g + 1e-6); sumLp += lp; gAl += -(lp + c.targetEntropy);
+        DA[b * 2] = (alpha * 2 * at - gA[b] * g) / B;
+        DA[b * 2 + 1] = (raw < -5 || raw > 2) ? 0 : (alpha * (-1 + 2 * at * se) - gA[b] * g * se) / B;
+      } else DA[b] = -gA[b] / B;
+    }
+    bBackward(this.actor, this.wsA, B, false); this.optA.step();
+    if (sac) {
+      this.lastEnt = -sumLp / B;
+      const gg = gAl / B; this.aT++; this.aM = 0.9 * this.aM + 0.1 * gg; this.aV = 0.999 * this.aV + 0.001 * gg * gg;
+      this.logAlpha -= c.lrAlpha * (this.aM / (1 - Math.pow(0.9, this.aT))) / (Math.sqrt(this.aV / (1 - Math.pow(0.999, this.aT))) + 1e-8);
+    } else this.actorT.softUpdate(this.actor, c.tau);
+    this.q1T.softUpdate(this.q1, c.tau); if (this.q2T) this.q2T.softUpdate(this.q2, c.tau);
+    return true;
+  };
+
+  /* 점 질량 1차원: 위치 x를 목표 0으로 옮겨 멈추기. 관측 (x, v), 힘 a ∈ [−1, 1], 50걸음 */
+  function PointMass(rng) { this.rng = rng; this.maxSteps = 50; this.reset(); }
+  PointMass.prototype.reset = function () { this.x = this.rng.uniform(-1, 1); this.v = 0; this.t = 0; this.lastU = 0; return this.obs(); };
+  PointMass.prototype.obs = function () { return [this.x, this.v]; };
+  PointMass.prototype.step = function (a) {
+    a = clip(a, -1, 1); const cost = this.x * this.x + 0.1 * this.v * this.v + 0.01 * a * a;
+    this.v = clip(this.v + 0.2 * a, -2, 2); this.x = clip(this.x + 0.1 * this.v, -1.5, 1.5); if (Math.abs(this.x) >= 1.5) this.v = 0;
+    this.t++; this.lastU = a; return { s: this.obs(), r: -cost, done: false, truncated: this.t >= this.maxSteps };
+  };
+  function drawPM(cv, env, lab) {
+    const f = RL.fitCanvas(cv, 260, 240), g = f.g, W = f.w, H = f.h; g.clearRect(0, 0, W, H); g.fillStyle = C("--surface-2"); g.fillRect(0, 0, W, H);
+    const X = x => W / 2 + x / 1.6 * (W / 2 - 10), y = H * 0.6;
+    g.strokeStyle = C("--line-strong"); g.lineWidth = 3; g.beginPath(); g.moveTo(X(-1.5), y); g.lineTo(X(1.5), y); g.stroke();
+    g.strokeStyle = C("--r-rew"); g.lineWidth = 2; g.beginPath(); g.moveTo(X(0), y + 18); g.lineTo(X(0), y - 50); g.stroke();
+    g.fillStyle = C("--r-rew"); g.beginPath(); g.moveTo(X(0), y - 50); g.lineTo(X(0) + 18, y - 43); g.lineTo(X(0), y - 36); g.fill();
+    if (env.lastU) { const L = env.lastU * 40; g.strokeStyle = C("--r-act"); g.fillStyle = C("--r-act"); g.lineWidth = 3; g.beginPath(); g.moveTo(X(env.x), y - 30); g.lineTo(X(env.x) + L, y - 30); g.stroke();
+      g.beginPath(); const d = Math.sign(L); g.moveTo(X(env.x) + L + d * 7, y - 30); g.lineTo(X(env.x) + L, y - 35); g.lineTo(X(env.x) + L, y - 25); g.fill(); }
+    dot(g, X(env.x), y, 12, C("--r-state"), C("--surface"));
+    label(g, 8, 16, lab || "", C("--muted"), "left", true);
+  }
+  function drawEnvCanvas(cv, env, kind, lab) { if (kind === "pend") RL.drawPendulum(cv, env.th, { w: 260, h: 240, torque: env.lastU, label: lab }); else drawPM(cv, env, lab); }
+
+  const ALGS = [{ key: "ddpg", name: "DDPG", col: "--a-ddpg", ck: "ckDdpg" }, { key: "td3", name: "TD3", col: "--a-td3", ck: "ckTd3" }, { key: "sac", name: "SAC", col: "--a-sac", ck: "ckSac" }];
+  const TR = { kind: "pend", runs: null, running: false, demo: null };
+  const envKind = segInit("segEnv", v => { TR.kind = v; $("sEps").value = v === "pend" ? 50 : 30; trReset(); });
+  segInit("segSpd", () => {});
+  const spd = () => +document.querySelector("#segSpd [aria-pressed='true']").dataset.v;
+  function newEnv(kind, seed) { return kind === "pend" ? new RL.Pendulum(RL.rng(seed + 100)) : new PointMass(RL.rng(seed + 100)); }
+  function trReset() {
+    TR.running = false; TR.demo = null; $("trRun").textContent = "학습 시작";
+    const seed = Math.max(1, Math.round(+$("inSeed").value) || 2), kind = TR.kind;
+    $("vEps").textContent = $("sEps").value;
+    TR.runs = ALGS.map(A => {
+      const env = newEnv(kind, seed), agent = new Agent({ algo: A.key, seed, sd: kind === "pend" ? 3 : 2, warmup: kind === "pend" ? 1000 : 300 });
+      return { A, on: $(A.ck).checked, agent, env, s: env.reset(), epR: 0, ep: 0, steps: 0, rets: [], timeMs: 0, solved: -1, q1n: [], qmin: [], alpha: [], ent: [], acc: { q1: 0, qm: 0, al: 0, en: 0, n: 0 }, ev: null };
+    });
+    TR.seed = seed; TR.eps = +$("sEps").value;
+    $("trNote").innerHTML = kind === "pend"
+      ? `<b>브라우저용 축소 설정</b> — 은닉층 32·32 (ReLU), 배치 64, 재현 버퍼 30,000, 처음 1,000걸음은 무작위 행동, 매 걸음 1번 갱신, Adam lr 0.001, γ 0.99, τ 0.005. DDPG·TD3 탐험 잡음 σ 0.1, TD3 d = 2, σ̃ = 0.2, c = 0.5, SAC 자동 α(시작 0.2, H̄ = −1). 같은 seed면 세 알고리즘이 같은 시작 상태 순서와 같은 초기 critic 가중치로 출발합니다. 실무 기본값은 은닉층 256·256, 버퍼 100만 걸음입니다. 50 에피소드(10,000걸음) 학습에 세 알고리즘 합쳐 일반 노트북에서 대략 <b>1분 안팎</b> 걸립니다.`
+      : `<b>점 질량 1차원</b> — 파란 점(관측: 위치 x, 속도 v)을 힘 a(−1~1)로 밀어 초록 목표 0에 세우는 작은 연속 제어 과제입니다. r = −(x² + 0.1v² + 0.01a²), 50걸음. 무작위 행동 300걸음 뒤 같은 설정으로 학습하며 수 초 안에 끝납니다. Pendulum이 느린 컴퓨터용 대안입니다.`;
+    trRender(); drawSacAlpha();
+  }
+  function stepRun(r) {
+    const ag = r.agent, env = r.env, a = ag.act(r.s, true), o = env.step(TR.kind === "pend" ? 2 * a : a);
+    ag.observe(r.s, a, o.r, o.s);
+    if (ag.update()) { r.acc.n++; r.acc.q1 += ag.lastQ1n; r.acc.qm += ag.lastQminN; if (ag.cfg.algo === "sac") { r.acc.al += ag.alpha(); r.acc.en += ag.lastEnt; } }
+    r.epR += o.r; r.s = o.s; r.steps++;
+    if (o.truncated || o.done) {
+      r.rets.push(r.epR); r.ep++; r.epR = 0; r.s = env.reset();
+      if (r.acc.n) { r.q1n.push(r.acc.q1 / r.acc.n); r.qmin.push(r.acc.qm / r.acc.n); if (ag.cfg.algo === "sac") { r.alpha.push(r.acc.al / r.acc.n); r.ent.push(r.acc.en / r.acc.n); } }
+      r.acc = { q1: 0, qm: 0, al: 0, en: 0, n: 0 };
+      const thr = TR.kind === "pend" ? -300 : -5;
+      if (r.solved < 0 && r.rets.length >= 5) { const m = r.rets.slice(-5).reduce((p, q) => p + q, 0) / 5; if (m > thr) r.solved = r.ep; }
+      if (r.ep >= TR.eps) r.ev = evaluate(r);
+    }
+  }
+  function evaluate(r) {
+    const env = newEnv(TR.kind, TR.seed + 400); let tot = 0;
+    for (let k = 0; k < 10; k++) { let s = env.reset(), R = 0; for (let t = 0; t < env.maxSteps; t++) { const a = r.agent.act(s, false), o = env.step(TR.kind === "pend" ? 2 * a : a); R += o.r; s = o.s; } tot += R; }
+    return tot / 10;
+  }
+  function trTick() {
+    if (!TR.running) return;
+    const t0 = performance.now(), budget = spd();
+    const act = TR.runs.filter(r => r.on && r.ep < TR.eps);
+    if (!act.length) { trFinish(); return; }
+    while (performance.now() - t0 < budget) {
+      let any = false;
+      for (const r of act) { if (r.ep >= TR.eps) continue; any = true; const s0 = performance.now(); for (let k = 0; k < 4 && r.ep < TR.eps; k++) stepRun(r); r.timeMs += performance.now() - s0; }
+      if (!any) break;
+    }
+    trRender();
+    requestAnimationFrame(trTick);
+  }
+  function trFinish() { TR.running = false; $("trRun").textContent = "학습 시작"; trRender(); drawSacAlpha(); }
+  function trRender() {
+    if (!TR.runs) return;
+    const kind = TR.kind, on = TR.runs.filter(r => r.on);
+    TR.runs.forEach((r, i) => {
+      const cv = $("cvTrP" + i), demo = TR.demo && TR.demo.items[i];
+      const env = demo ? demo.env : r.env;
+      drawEnvCanvas(cv, env, kind, "");
+      $("capP" + i).textContent = !r.on ? r.A.name + " · 꺼짐" : demo ? `${r.A.name} · 시연 ${demo.t}걸음 · 수익 ${fmtInt(demo.R)}` :
+        `${r.A.name} · ep ${Math.min(r.ep + (r.ep < TR.eps ? 1 : 0), TR.eps)}/${TR.eps}` + (r.ep < TR.eps ? ` · ${fmtInt(r.epR)}` : " · 완료");
+    });
+    const series = on.map(r => ({ data: r.rets.length ? r.rets : [kind === "pend" ? -1200 : -10], color: C(r.A.col), label: r.A.name, smooth: 10 }));
+    RL.lineChart($("cvTrCurve"), series, { w: 600, h: 260, ymin: kind === "pend" ? -1800 : -60, ymax: 0, xlabel: "에피소드" });
+    const td = TR.runs[1];
+    const gap = td.q1n.map((v, i) => v - td.qmin[i]);
+    RL.lineChart($("cvTrQ"), [{ data: gap.length ? gap : [0], color: C("--a-td3"), label: "Q′₁ − min(Q′₁, Q′₂)" }], { w: 600, h: 260, ymin: 0, xlabel: "에피소드 (학습 시작 후)" });
+    if (gap.length) { const m = gap.reduce((p, q) => p + q, 0) / gap.length, qm = td.qmin.reduce((p, q) => p + q, 0) / td.qmin.length;
+      $("trQNote").innerHTML = `평균 <b>${f3(m)}</b>만큼 낮춘 목표를 썼습니다 (같은 기간 목표 Q 평균 ${f2(qm)}). 걸음마다는 작아 보여도 부트스트랩으로 누적되는 과대평가를 막는 몫입니다.`; }
+    const tot = on.reduce((p, r) => p + r.timeMs, 0) / 1000;
+    $("trStatus").textContent = TR.running ? `학습 중 · 경과 ${tot.toFixed(1)}초 (계산 시간 합)` : on.some(r => r.ep > 0) ? `멈춤 · 계산 시간 합 ${tot.toFixed(1)}초` : "준비됨";
+    const ths = TR.kind === "pend" ? "−300" : "−5";
+    $("tbTrain").innerHTML = `<thead><tr><th>알고리즘</th><th>에피소드</th><th>걸음</th><th>마지막 수익</th><th>최근 10회 평균</th><th>최근 5회 평균 &gt; ${ths} 도달</th><th>평가 (잡음 없음)</th><th>계산 시간</th><th>걸음/초</th></tr></thead><tbody>` +
+      TR.runs.map(r => { const l10 = r.rets.slice(-10), m10 = l10.length ? l10.reduce((p, q) => p + q, 0) / l10.length : NaN;
+        return `<tr><td><b class="c-${r.A.key}">${r.A.name}</b>${r.on ? "" : " (꺼짐)"}</td><td class="n">${r.ep}</td><td class="n">${fmtInt(r.steps)}</td><td class="n">${r.rets.length ? f2(r.rets[r.rets.length - 1]) : "–"}</td>` +
+          `<td class="n"><b>${isFinite(m10) ? f2(m10) : "–"}</b></td><td class="n">${r.solved > 0 ? r.solved + "번째" : "–"}</td><td class="n"><b>${r.ev != null ? f2(r.ev) : "–"}</b></td>` +
+          `<td class="n">${(r.timeMs / 1000).toFixed(1)}초</td><td class="n">${r.timeMs > 0 ? fmtInt(r.steps / r.timeMs * 1000) : "–"}</td></tr>`; }).join("") + "</tbody>";
+    $("trDemo").disabled = TR.running || !TR.runs.some(r => r.on && r.agent.updates > 0);
+  }
+  $("trRun").onclick = () => {
+    if (TR.running) { TR.running = false; $("trRun").textContent = "이어서 학습"; trRender(); drawSacAlpha(); return; }
+    if (!TR.runs || TR.runs.every(r => !r.on || r.ep >= TR.eps)) { if (TR.runs && TR.runs.some(r => r.ep > 0)) trReset(); }
+    TR.runs.forEach(r => { r.on = $(r.A.ck).checked; });
+    if (!TR.runs.some(r => r.on)) { $("trStatus").textContent = "알고리즘을 하나 이상 고르세요"; return; }
+    TR.demo = null; TR.running = true; $("trRun").textContent = "멈춤"; requestAnimationFrame(trTick);
+  };
+  $("trReset").onclick = trReset;
+  ["ckDdpg", "ckTd3", "ckSac"].forEach(id => $(id).addEventListener("change", () => { if (!TR.running && TR.runs && TR.runs.every(r => r.ep === 0)) trReset(); else if (TR.runs) { TR.runs.forEach(r => { if (r.ep === 0) r.on = $(r.A.ck).checked; }); trRender(); } }));
+  $("inSeed").addEventListener("change", trReset);
+  $("sEps").addEventListener("input", () => { $("vEps").textContent = $("sEps").value; if (TR.runs && !TR.runs.some(r => r.ep > 0)) TR.eps = +$("sEps").value; else if (TR.runs) { TR.eps = Math.max(+$("sEps").value, ...TR.runs.map(r => r.ep)); } });
+  /* 최종 정책 시연: 아래로 매달린 상태(점 질량은 x = −1)에서 잡음 없이 */
+  $("trDemo").onclick = () => {
+    const items = TR.runs.map(r => { const env = newEnv(TR.kind, 1); env.reset(); if (TR.kind === "pend") { env.th = Math.PI; env.thd = 0; } else { env.x = -1; env.v = 0; } return { env, R: 0, t: 0, s: env.obs(), r }; });
+    TR.demo = { items }; let last = null, acc = 0;
+    const steps = TR.kind === "pend" ? 200 : 50;
+    function loop(ts) {
+      if (!TR.demo || TR.demo.items !== items) return;
+      if (last == null) last = ts; acc += (ts - last) / 1000 * (TR.kind === "pend" ? 30 : 15); last = ts;
+      let n = RM ? steps : 0; while (acc >= 1 && n < 6) { acc -= 1; n++; }
+      for (let k = 0; k < n; k++) items.forEach(it => { if (!it.r.on || it.t >= steps) return; const a = it.r.agent.act(it.s, false), o = it.env.step(TR.kind === "pend" ? 2 * a : a); it.R += o.r; it.s = o.s; it.t++; });
+      trRender();
+      if (items.some(it => it.r.on && it.t < steps)) requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  };
+  function drawSacAlpha() {
+    const r = TR.runs && TR.runs[2];
+    const data = r && r.alpha.length ? r.alpha : null;
+    RL.lineChart($("cvSacAlpha"), [{ data: data || [0.2], color: C("--a-sac"), label: "α (에피소드 평균)" }], { w: 560, h: 220, ymin: 0, xlabel: "에피소드 (학습 시작 후)" });
+    $("sacAlphaNote").innerHTML = data ? `에피소드 ${r.ep}까지: α ${f3(data[0])} → <b>${f3(data[data.length - 1])}</b>, 정책 엔트로피 ${f2(r.ent[0])} → <b>${f2(r.ent[r.ent.length - 1])}</b> (목표 H̄ = −1). 엔트로피가 목표 H̄보다 높으면 α가 줄고(보상에 집중), 낮아지면 α가 커져(더 퍼지게) 엔트로피를 목표 근처로 끌어당깁니다.`
+      : "[학습 비교] 탭에서 SAC를 학습하면 여기에 실제 α 변화가 그려집니다.";
+  }
+  DRAW.train = [trRender];
+
+  /* =====================================================================
+     6. MuJoCo (개념용 대략값)
+     ===================================================================== */
+  const MJ = [["HalfCheetah", [5000, 3300, 8600], [9600, 9000, 10500], [10500, 9500, 12000]], ["Hopper", [2000, 1800, 2500], [3500, 3200, 3600], [3300, 2800, 3600]],
+    ["Walker2d", [2500, 1800, 3100], [4700, 4000, 5000], [4600, 3900, 5500]], ["Ant", [900, 500, 1000], [4400, 3500, 4800], [4000, 3000, 5500]]];
+  function drawMj() {
+    plot($("cvMj"), { w: 560, h: 260, x0: 0, x1: 4, y0: 0, y1: 12500, xt: [], ylabel: "에피소드 수익 (대략)",
+      draw(g, X, Y, I) {
+        MJ.forEach((m, gi) => { ["--a-ddpg", "--a-td3", "--a-sac"].forEach((cn, k) => {
+          const v = m[k + 1], x0 = X(gi + 0.14 + k * 0.24), x1 = X(gi + 0.14 + (k + 1) * 0.24) - 3;
+          g.fillStyle = C(cn); g.globalAlpha = 0.85; g.fillRect(x0, Y(v[0]), x1 - x0, Y(0) - Y(v[0])); g.globalAlpha = 1;
+          g.strokeStyle = C("--ink"); g.lineWidth = 1.2; const xc = (x0 + x1) / 2; g.beginPath(); g.moveTo(xc, Y(v[1])); g.lineTo(xc, Y(v[2])); g.moveTo(xc - 4, Y(v[1])); g.lineTo(xc + 4, Y(v[1])); g.moveTo(xc - 4, Y(v[2])); g.lineTo(xc + 4, Y(v[2])); g.stroke(); }); });
+      },
+      after(g, X, Y, I) { MJ.forEach((m, gi) => label(g, X(gi + 0.5), I.H - I.pb + 16, m[0], C("--muted"), "center", true)); } });
+  }
+  DRAW.mujoco = [drawMj];
+
+  /* =====================================================================
+     7. 코드
+     ===================================================================== */
+  const codeAlg = segInit("segCode", () => drawCode());
+  $("selCodeEnv").addEventListener("change", () => drawCode());
+  function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function hl(src) { return src.split("\n").map(l => { const k = l.indexOf("#"); return k >= 0 ? esc(l.slice(0, k)) + '<span class="cm">' + esc(l.slice(k)) + "</span>" : esc(l); }).join("\n"); }
+  function drawCode() {
+    const alg = codeAlg(), env = $("selCodeEnv").value, pend = env === "Pendulum-v1", A = alg.toUpperCase();
+    const seed = TR.seed || 2, eps = TR.eps || 50, steps = eps * 200;
+    const L = [];
+    L.push("# pip install stable-baselines3 gymnasium" + (pend ? "" : "[mujoco]"));
+    L.push("import gymnasium as gym", "import numpy as np", `from stable_baselines3 import ${A}`);
+    if (alg !== "sac") L.push("from stable_baselines3.common.noise import " + (alg === "ddpg" ? "NormalActionNoise, OrnsteinUhlenbeckActionNoise" : "NormalActionNoise"));
+    L.push("from stable_baselines3.common.evaluation import evaluate_policy", "");
+    L.push(`env = gym.make("${env}")`, "n_act = env.action_space.shape[0]" + (pend ? "              # Pendulum: 1 (토크 −2~2)" : `              # ${env.split("-")[0]}: ${env.startsWith("Hopper") ? 3 : 6}`));
+    if (alg !== "sac") {
+      L.push("", "# 탐험 잡음 — SB3는 행동을 −1~1로 정규화한 공간에 더함 (이 화면과 같음)");
+      if (alg === "ddpg") L.push("action_noise = NormalActionNoise(mean=np.zeros(n_act), sigma=0.1 * np.ones(n_act))", "# action_noise = OrnsteinUhlenbeckActionNoise(mean=np.zeros(n_act), sigma=0.2 * np.ones(n_act), theta=0.15, dt=1e-2)");
+      else L.push("action_noise = NormalActionNoise(mean=np.zeros(n_act), sigma=0.1 * np.ones(n_act))");
+    }
+    L.push("", `model = ${A}(`, '    "MlpPolicy", env,');
+    if (pend) {
+      L.push("    learning_rate=1e-3,", "    buffer_size=30_000,", "    learning_starts=1_000,        # 처음 1,000걸음은 무작위 행동", "    batch_size=64,", "    tau=0.005, gamma=0.99,", "    train_freq=1, gradient_steps=1,");
+    } else {
+      L.push(alg === "sac" ? "    learning_rate=3e-4," : "    learning_rate=1e-3,", "    buffer_size=1_000_000,", "    learning_starts=10_000,", alg === "sac" ? "    batch_size=256," : "    batch_size=256,", "    tau=0.005, gamma=0.99,");
+    }
+    if (alg === "ddpg") L.push("    action_noise=action_noise,           # critic 1개, 지연·평활화 없음");
+    if (alg === "td3") L.push("    action_noise=action_noise,", "    policy_delay=2,                      # ② 지연된 정책 갱신 d", "    target_policy_noise=0.2,             # ③ 목표 정책 평활화 σ̃", "    target_noise_clip=0.5,               #    잘라내기 c  (① critic 2개는 기본)");
+    if (alg === "sac") L.push('    ent_coef="auto",                     # 자동 α (시작값 1.0, "auto_0.2"면 0.2에서 시작)', '    target_entropy="auto",               # H̄ = −(행동 차원)');
+    L.push(pend ? "    policy_kwargs=dict(net_arch=[32, 32]),   # 이 화면의 축소 크기 (기본 256·256)" : (alg === "sac" ? "    policy_kwargs=dict(net_arch=[256, 256])," : "    policy_kwargs=dict(net_arch=[400, 300]),   # TD3 논문 크기"));
+    L.push(`    seed=${pend ? seed : 0}, verbose=1,`, ")");
+    L.push(`model.learn(total_timesteps=${pend ? fmtInt(steps).replace(/,/g, "_") : "1_000_000"})` + (pend ? `   # ${eps} 에피소드 × 200걸음` : "   # GPU 없이 수 시간"));
+    L.push("", "mean_r, std_r = evaluate_policy(model, env, n_eval_episodes=10, deterministic=True)", 'print(f"평가 수익 {mean_r:.1f} ± {std_r:.1f}")', `model.save("${alg}_${env.split("-")[0].toLowerCase()}")`);
+    if (pend) L.push("", "# 사람이 보는 시연", 'env_h = gym.make("Pendulum-v1", render_mode="human")', "obs, _ = env_h.reset(seed=0)", "for _ in range(200):", "    action, _ = model.predict(obs, deterministic=True)   # SAC는 tanh(μ)", "    obs, r, terminated, truncated, _ = env_h.step(action)");
+    const src = L.join("\n");
+    $("code").innerHTML = hl(src); $("code")._t = src;
+    $("codeHint").textContent = { ddpg: "DDPG = TD3에서 critic 1개·d = 1·평활화 없음", td3: "policy_delay · target_policy_noise · target_noise_clip", sac: "ent_coef='auto' · target_entropy='auto'" }[alg];
+    $("codeNote").innerHTML = pend ? `현재 [학습 비교] 설정(seed ${seed}, ${eps} 에피소드 = ${fmtInt(steps)}걸음)을 반영했습니다. SB3는 PyTorch 난수를 쓰므로 이 화면과 같은 seed라도 곡선은 똑같지 않습니다. SB3의 SAC는 ent_coef="auto"면 α를 1.0에서 시작합니다(이 화면은 0.2).`
+      : `${env}는 MuJoCo 물리 엔진이 필요합니다. 1백만 걸음은 CPU에서 수 시간 걸리므로 보통 GPU 서버나 여러 환경을 병렬로 씁니다. 결과는 seed마다 크게 달라 3~5개 seed 평균으로 비교합니다.`;
+    const P = {
+      ddpg: ["# DDPG 한 번의 갱신 (s, a, r, s2, done: 미니배치 텐서)", "with torch.no_grad():", "    y = r + gamma * (1 - done) * critic_t(s2, actor_t(s2))", "critic_loss = F.mse_loss(critic(s, a), y)", "critic_opt.zero_grad(); critic_loss.backward(); critic_opt.step()", "", "actor_loss = -critic(s, actor(s)).mean()        # ∇a Q · ∇θ μ 를 autograd가 계산", "actor_opt.zero_grad(); actor_loss.backward(); actor_opt.step()", "", "for p, p_t in zip(critic.parameters(), critic_t.parameters()):", "    p_t.data.mul_(1 - tau).add_(tau * p.data)     # soft update (actor_t도 같게)"],
+      td3: ["# TD3 한 번의 갱신 (it: 갱신 횟수)", "with torch.no_grad():", "    noise = (torch.randn_like(a) * 0.2).clamp(-0.5, 0.5)          # ③ 평활화", "    a2 = (actor_t(s2) + noise).clamp(-1, 1)", "    q_t = torch.min(critic1_t(s2, a2), critic2_t(s2, a2))           # ① clipped double Q", "    y = r + gamma * (1 - done) * q_t", "critic_loss = F.mse_loss(critic1(s, a), y) + F.mse_loss(critic2(s, a), y)", "critic_opt.zero_grad(); critic_loss.backward(); critic_opt.step()", "", "if it % 2 == 0:                                                     # ② 지연 d = 2", "    actor_loss = -critic1(s, actor(s)).mean()", "    actor_opt.zero_grad(); actor_loss.backward(); actor_opt.step()", "    soft_update(actor_t, actor, tau); soft_update(critic1_t, critic1, tau); soft_update(critic2_t, critic2, tau)"],
+      sac: ["# SAC 한 번의 갱신", "def sample(s):                                   # tanh-가우시안 + 재매개변수화", "    mu, log_std = actor(s).chunk(2, dim=-1)", "    log_std = log_std.clamp(-5, 2); std = log_std.exp()", "    u = mu + std * torch.randn_like(mu)              # rsample: 기울기가 mu, std로 흐름", "    a = torch.tanh(u)", "    logp = Normal(mu, std).log_prob(u) - torch.log(1 - a.pow(2) + 1e-6)   # tanh 보정", "    return a, logp.sum(-1, keepdim=True)", "", "alpha = log_alpha.exp()", "with torch.no_grad():", "    a2, logp2 = sample(s2)", "    q_t = torch.min(critic1_t(s2, a2), critic2_t(s2, a2)) - alpha * logp2", "    y = r + gamma * (1 - done) * q_t", "critic_loss = F.mse_loss(critic1(s, a), y) + F.mse_loss(critic2(s, a), y)", "critic_opt.zero_grad(); critic_loss.backward(); critic_opt.step()", "", "a_new, logp = sample(s)", "actor_loss = (alpha.detach() * logp - torch.min(critic1(s, a_new), critic2(s, a_new))).mean()", "actor_opt.zero_grad(); actor_loss.backward(); actor_opt.step()", "", "alpha_loss = -(log_alpha * (logp.detach() + target_entropy)).mean()   # target_entropy = -n_act", "alpha_opt.zero_grad(); alpha_loss.backward(); alpha_opt.step()", "soft_update(critic1_t, critic1, tau); soft_update(critic2_t, critic2, tau)       # 타깃 actor 없음"]
+    }[alg];
+    const src2 = "import torch, torch.nn.functional as F\nfrom torch.distributions import Normal\n\n" + P.join("\n");
+    $("code2").innerHTML = hl(src2); $("code2")._t = src2;
+  }
+  function copyTo(btn, pre) {
+    $(btn).onclick = async () => {
+      const t = $(pre)._t || "";
+      try { await navigator.clipboard.writeText(t); $(btn).textContent = "복사됨"; }
+      catch (e) { const r = document.createRange(); r.selectNodeContents($(pre)); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); $(btn).textContent = "선택됨 (Ctrl+C)"; }
+      setTimeout(() => { $(btn).textContent = "복사"; }, 1500);
+    };
+  }
+  copyTo("copyBtn", "code"); copyTo("copyBtn2", "code2");
+  DRAW.code = [drawCode];
+  DRAW.diagram = [];
+
+  /* ---------------- 시작 ---------------- */
+  trReset();
+  showTab(location.hash.slice(1) || "cont");
+})();
+
+</script>
+</body>
+</html>

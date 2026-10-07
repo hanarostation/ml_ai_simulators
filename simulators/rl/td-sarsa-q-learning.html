@@ -1,0 +1,925 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TD(0) → SARSA → Q-learning | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261007a">
+<style>
+/* ===== TD(0) → SARSA → Q-learning 전용 스타일 ===== */
+:root{
+  --sk-accent: var(--cat-rl);
+  --rl-s:#2563EB; --rl-a:#EA580C; --rl-r:#16A34A; --rl-rneg:#DC2626; --rl-v:#7C3AED; --rl-tgt:#DB2777; --rl-exp:#B7791F;
+  --c1:#0D9488; --c2:#C026D3; --c3:#4F46E5;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --rl-s:#79A6F6; --rl-a:#F59A5C; --rl-r:#5CCB82; --rl-rneg:#F07A7A; --rl-v:#B597FF; --rl-tgt:#F472B6; --rl-exp:#E3B455;
+  --c1:#45CFBF; --c2:#E879F9; --c3:#A5B4FC; } }
+:root[data-theme="dark"]{
+  --rl-s:#79A6F6; --rl-a:#F59A5C; --rl-r:#5CCB82; --rl-rneg:#F07A7A; --rl-v:#B597FF; --rl-tgt:#F472B6; --rl-exp:#E3B455;
+  --c1:#45CFBF; --c2:#E879F9; --c3:#A5B4FC; }
+
+.td-split{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:start}
+.td-split--even{grid-template-columns:repeat(2,minmax(0,1fr))}
+.td-box{min-width:0;display:flex;flex-direction:column;gap:10px}
+.td-cap{font-size:13px;font-weight:700;color:var(--muted);line-height:1.5}
+.td-cap i{display:inline-block;width:12px;height:4px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.td-cv{display:block;width:100%;max-width:100%;border-radius:8px}
+.td-cvwrap{min-width:0;width:100%}
+@media (max-width:900px){ .td-split,.td-split--even{grid-template-columns:minmax(0,1fr)} }
+
+.td-formula{font-family:var(--sans);font-size:14.5px;line-height:1.85}
+.td-formula .tg{background:color-mix(in srgb,var(--rl-tgt) 14%,transparent);border:1.5px solid var(--rl-tgt);border-radius:6px;padding:1px 5px}
+.td-formula .mut{color:var(--muted);font-size:13px}
+.k-s{color:var(--rl-s);font-weight:700} .k-a{color:var(--rl-a);font-weight:700} .k-r{color:var(--rl-r);font-weight:700}
+.k-rn{color:var(--rl-rneg);font-weight:700} .k-v{color:var(--rl-v);font-weight:700} .k-t{color:var(--rl-tgt);font-weight:700}
+.k-x{color:var(--rl-exp);font-weight:700} .k-1{color:var(--c1);font-weight:700} .k-2{color:var(--c2);font-weight:700} .k-3{color:var(--c3);font-weight:700}
+.td-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.td-chip{display:inline-flex;flex-direction:column;align-items:center;min-width:58px;padding:4px 9px;border-radius:9px;border:1.5px solid currentColor;font-weight:700;font-size:14px;line-height:1.25}
+.td-chip small{font-size:11px;font-weight:600;opacity:.85}
+.td-chip--s{color:var(--rl-s)} .td-chip--a{color:var(--rl-a)} .td-chip--r{color:var(--rl-r)} .td-chip--rn{color:var(--rl-rneg)}
+.td-qrow{display:grid;grid-template-columns:auto repeat(4,minmax(0,1fr));gap:4px;font-family:var(--mono);font-size:13px;align-items:center}
+.td-qrow > span{padding:4px 6px;border-radius:6px;background:var(--surface-2);text-align:center;border:1.5px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.td-qrow > span.h{background:none;font-family:var(--sans);font-weight:700;color:var(--muted);text-align:left;font-size:12.5px}
+.td-qrow > span.mx{border-color:var(--rl-tgt);color:var(--rl-tgt);font-weight:700}
+.td-qrow > span.pk{border-color:var(--rl-a);color:var(--rl-a);font-weight:700}
+.td-qrow > span.pk.mx{border-color:var(--rl-tgt);box-shadow:inset 0 0 0 1.5px var(--rl-a)}
+.td-tablewrap{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.td-table td,.td-table th{text-align:center}
+.td-table tr.cur td{background:color-mix(in srgb,var(--rl-tgt) 12%,var(--surface))}
+.td-small{font-size:12.5px;color:var(--muted);margin:0}
+.td-pre{white-space:pre;margin:0;max-height:620px;overflow:auto;font-size:12.5px;line-height:1.6}
+.td-flash{font-size:12.5px;color:var(--muted)}
+.td-calc{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px 12px}
+.td-calc label{display:flex;flex-direction:column;gap:3px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.td-calc .sk-input,.td-calc .sk-select{width:100%}
+.td-res{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.td-res > div{border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface-2);min-width:0}
+.td-res h3{margin:0 0 4px;font-size:14px}
+.td-res p{margin:0;font-size:13.5px;line-height:1.7;overflow-wrap:anywhere}
+@media (max-width:900px){ .td-res{grid-template-columns:minmax(0,1fr)} }
+.td-statsrow .sk-stat{min-width:104px}
+.td-statsrow .sk-stat b{font-size:18px}
+@media (max-width:520px){ .td-statsrow .sk-stat{min-width:0;flex:1 1 40%} .sk-slider{min-width:140px} }
+.td-loop{width:100%;max-width:520px;height:auto;display:block}
+.td-loop .bx{fill:var(--surface-2);stroke-width:2}
+.td-loop text{font-family:var(--sans);font-size:14px;fill:var(--ink)}
+.td-loop .sm{font-size:12.5px;fill:var(--muted)}
+.td-loop .s{stroke:var(--rl-s)} .td-loop .a{stroke:var(--rl-a)} .td-loop .r{stroke:var(--rl-r)}
+.td-loop .ts{fill:var(--rl-s);font-weight:700} .td-loop .ta{fill:var(--rl-a);font-weight:700} .td-loop .tr{fill:var(--rl-r);font-weight:700}
+.td-loop path{fill:none;stroke-width:2.2}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+      <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a href="../../index.html#rl" style="--c:var(--cat-rl)" aria-current="page">강화학습</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#rl" style="--c:var(--cat-rl)">강화학습</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">TD(0) → SARSA → Q-learning</h1>
+      <p class="ds-hero__lede">에피소드가 끝나기를 기다리지 않고 한 걸음마다 “보상 + 다음 상태의 추정값”으로 갱신하는 부트스트래핑을 숫자로 따라가고, 같은 TD 갱신이 타깃 하나 차이로 on-policy(SARSA)와 off-policy(Q-learning)로 갈리는 모습을 CliffWalking에서 나란히 비교합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button class="sk-tab" role="tab" id="tab-td0" aria-controls="pane-td0" aria-selected="true"><span class="sk-num">1</span>TD(0) 예측</button>
+    <button class="sk-tab" role="tab" id="tab-sarsa" aria-controls="pane-sarsa" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>SARSA</button>
+    <button class="sk-tab" role="tab" id="tab-qlearn" aria-controls="pane-qlearn" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>Q-learning</button>
+    <button class="sk-tab" role="tab" id="tab-cliff" aria-controls="pane-cliff" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>CliffWalking 비교</button>
+    <button class="sk-tab" role="tab" id="tab-frozen" aria-controls="pane-frozen" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>FrozenLake 실습</button>
+    <button class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>코드</button>
+    <button class="sk-tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>알고리즘 구성도</button>
+  </nav>
+
+  <!-- ========== 1. TD(0) 예측 ========== -->
+  <section id="pane-td0" role="tabpanel" aria-labelledby="tab-td0">
+    <div class="sk-card">
+      <div class="sk-head"><h2>TD(0) — 한 걸음 뒤의 추정값을 빌려 와 바로 갱신 (부트스트래핑)</h2><span class="sk-hint">→ 키 또는 [한 걸음]</span></div>
+      <p class="sk-lead">무작위 걷기(Random Walk) 5상태: 가운데 C에서 시작해 왼쪽·오른쪽으로 반반 확률로 움직이고, 오른쪽 끝에 닿으면 보상 +1, 왼쪽 끝은 0입니다. 참값은 V(A..E) = 1/6, 2/6, …, 5/6. 모든 V를 0.5로 시작해 <span class="k-v">TD(0)</span>은 매 걸음, <span class="k-1">MC</span>는 에피소드가 끝난 뒤 같은 에피소드로 갱신합니다 (γ = 1).</p>
+      <div class="td-split">
+        <div class="td-box">
+          <div class="td-cvwrap"><canvas class="td-cv" id="rwCv" aria-label="무작위 걷기 5상태와 TD, MC 가치 막대"></canvas></div>
+          <div class="sk-controls">
+            <div class="sk-slider"><div class="sk-sl-head"><span>학습률 α</span><b id="rwAv">0.10</b></div><input type="range" id="rwA" min="0.01" max="0.5" step="0.01" value="0.1" aria-label="학습률 알파"></div>
+            <label class="sk-group"><span class="sk-label">seed</span><input class="sk-input" id="rwSeed" type="number" value="27" min="1" max="9999" style="width:76px"></label>
+            <button class="sk-btn" type="button" id="rwReset">처음으로 (V = 0.5)</button>
+          </div>
+          <div class="sk-controls">
+            <div class="sk-group">
+              <button class="sk-btn sk-btn--primary" type="button" id="rwStep">한 걸음</button>
+              <button class="sk-btn" type="button" id="rwEp">에피소드 끝까지</button>
+              <button class="sk-btn" type="button" id="rwPlay">재생</button>
+              <button class="sk-btn" type="button" id="rwAdd10">+10 에피소드</button>
+              <button class="sk-btn" type="button" id="rwAdd100">+100</button>
+            </div>
+          </div>
+          <div class="sk-stats td-statsrow" id="rwStats"></div>
+        </div>
+        <div class="td-box">
+          <div class="sk-formula td-formula" id="rwFormula" aria-live="polite"></div>
+          <div class="td-cap">이번 에피소드의 TD(0) 갱신</div>
+          <div class="td-tablewrap"><table class="sk-table td-table" id="rwTable"></table></div>
+          <div class="sk-formula td-formula" id="rwMc"></div>
+        </div>
+      </div>
+      <div class="td-split">
+        <div class="td-box">
+          <div class="td-cap">RMS 오차 (5상태 평균, 100번 반복 평균) — Sutton &amp; Barto 그림 6.2 재현</div>
+          <div class="td-cvwrap"><canvas class="td-cv" id="rwChart" aria-label="에피소드에 따른 TD와 MC의 RMS 오차"></canvas></div>
+          <div class="sk-legend" id="rwLegend"></div>
+        </div>
+        <div class="td-box">
+          <p class="sk-note"><b>MC 타깃</b> = 실제 리턴 G<sub>t</sub> (에피소드 끝까지 기다림, 편향 없음, 분산 큼)<br><b>TD 타깃</b> = R<sub>t+1</sub> + γ·V(S<sub>t+1</sub>) (한 걸음만 보고 나머지는 추정값을 빌림, 처음엔 편향 있음, 분산 작음)<br>TD 오차 δ<sub>t</sub> = 타깃 − V(S<sub>t</sub>) 가 0이 되도록 V를 조금씩 옮깁니다.</p>
+          <p class="sk-note">첫 에피소드에서 TD는 마지막 상태 E만 바뀝니다. 다른 칸은 “다음 칸도 0.5”라 δ = 0이기 때문입니다. 보상 정보는 에피소드가 거듭될수록 한 칸씩 뒤로 전파됩니다. MC는 첫 에피소드부터 지나온 모든 칸을 바꿉니다.</p>
+          <p class="sk-note sk-note--warn">α가 크면 TD 곡선이 빨리 내려가지만 바닥이 높아지고(진동), 작으면 느리지만 더 정확해집니다. 이 예제에서는 같은 계산량에서 TD가 MC보다 대체로 빨리 정확해집니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 2. SARSA ========== -->
+  <section id="pane-sarsa" role="tabpanel" aria-labelledby="tab-sarsa" hidden>
+    <div class="sk-card" id="saCard"></div>
+  </section>
+
+  <!-- ========== 3. Q-learning ========== -->
+  <section id="pane-qlearn" role="tabpanel" aria-labelledby="tab-qlearn" hidden>
+    <div class="sk-card" id="qlCard"></div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>타깃 세 가지를 같은 숫자로 비교</h2><span class="sk-hint">값을 바꿔 보세요</span></div>
+      <p class="sk-lead">같은 전이 (s, a, r, s′)에서 SARSA는 실제로 고른 다음 행동 a′의 Q, Q-learning은 다음 상태의 최댓값, Expected SARSA는 ε-탐욕 정책의 기댓값을 타깃에 씁니다. 기본값은 절벽 바로 위 칸(아래로 가면 −100)의 예시이고, SARSA의 a′는 탐험으로 ↑가 뽑힌 경우입니다.</p>
+      <div class="td-calc" id="calc">
+        <label>보상 r<input class="sk-input" type="number" step="0.1" id="cR" value="-1"></label>
+        <label>γ<input class="sk-input" type="number" step="0.01" min="0" max="1" id="cG" value="1"></label>
+        <label>α<input class="sk-input" type="number" step="0.05" min="0" max="1" id="cA" value="0.5"></label>
+        <label>ε (탐험)<input class="sk-input" type="number" step="0.05" min="0" max="1" id="cE" value="0.1"></label>
+        <label>Q(s, a) 현재<input class="sk-input" type="number" step="0.1" id="cQ" value="-9"></label>
+        <label>Q(s′, ↑)<input class="sk-input" type="number" step="0.1" id="cQ0" value="-9.5"></label>
+        <label>Q(s′, →)<input class="sk-input" type="number" step="0.1" id="cQ1" value="-8"></label>
+        <label>Q(s′, ↓)<input class="sk-input" type="number" step="0.1" id="cQ2" value="-100"></label>
+        <label>Q(s′, ←)<input class="sk-input" type="number" step="0.1" id="cQ3" value="-10.2"></label>
+        <label>SARSA의 a′<select class="sk-select" id="cAp"><option value="0" selected>↑ 위</option><option value="1">→ 오른쪽</option><option value="2">↓ 아래</option><option value="3">← 왼쪽</option></select></label>
+      </div>
+      <div class="td-res" id="calcOut"></div>
+    </div>
+  </section>
+
+  <!-- ========== 4. CliffWalking 비교 ========== -->
+  <section id="pane-cliff" role="tabpanel" aria-labelledby="tab-cliff" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>CliffWalking — SARSA는 안전한 길, Q-learning은 절벽 끝 길</h2><span class="sk-hint">같은 seed · 같은 ε · 같은 α로 나란히 학습</span></div>
+      <p class="sk-lead">매 걸음 −1, 아래쪽 절벽(빨간 칸)에 떨어지면 −100을 받고 시작점으로 돌아갑니다. <span class="k-2">Q-learning</span>은 탐욕 정책의 가치를 배우므로 최단 경로(절벽 바로 위, 13걸음)를 찾지만, 학습 중엔 ε 때문에 자주 떨어집니다. <span class="k-1">SARSA</span>는 탐험까지 포함한 실제 행동의 가치를 배우므로 절벽에서 떨어진 위쪽 길을 택하고, 학습 중 리턴이 더 높습니다.</p>
+      <div class="sk-controls">
+        <div class="sk-slider"><div class="sk-sl-head"><span>학습률 α</span><b id="clAv">0.50</b></div><input type="range" id="clA" min="0.05" max="1" step="0.05" value="0.5" aria-label="학습률 알파"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><span>탐험 ε</span><b id="clEv">0.10</b></div><input type="range" id="clE" min="0" max="0.3" step="0.01" value="0.1" aria-label="탐험률 엡실론"></div>
+        <label class="sk-group"><span class="sk-label">에피소드</span><select class="sk-select" id="clN"><option value="200">200</option><option value="500" selected>500</option><option value="1000">1,000</option></select></label>
+        <label class="sk-group"><span class="sk-label">seed</span><input class="sk-input" id="clSeed" type="number" value="1" min="1" max="9999" style="width:76px"></label>
+        <label class="sk-check"><input type="checkbox" id="clExp">Expected SARSA도 함께</label>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button class="sk-btn sk-btn--primary" type="button" id="clRun">학습 시작</button>
+          <button class="sk-btn" type="button" id="clFinish">즉시 끝까지</button>
+          <button class="sk-btn" type="button" id="clReset">초기화</button>
+        </div>
+        <div class="sk-slider" style="min-width:160px"><div class="sk-sl-head"><span>속도 (에피소드/프레임)</span><b id="clSpv">2</b></div><input type="range" id="clSp" min="0" max="4" step="1" value="1" aria-label="학습 속도"></div>
+        <label class="sk-group"><span class="sk-label">격자</span><div class="sk-seg" id="clView"><button type="button" data-v="path" aria-pressed="true">탐욕 경로</button><button type="button" data-v="sarsa" aria-pressed="false">SARSA의 Q</button><button type="button" data-v="q" aria-pressed="false">Q-learning의 Q</button><button type="button" data-v="exp" aria-pressed="false">Expected의 Q</button></div></label>
+      </div>
+      <div class="td-cvwrap"><canvas class="td-cv" id="clCv" aria-label="CliffWalking 격자와 두 알고리즘의 탐욕 경로"></canvas></div>
+      <div class="sk-legend" id="clLegend"></div>
+      <div class="sk-scroll"><table class="sk-table" id="clTable"></table></div>
+      <div class="td-split--even td-split">
+        <div class="td-box">
+          <div class="td-cap">학습 중 에피소드 리턴 (ε-탐욕 행동 그대로, 이동평균 10, −100 아래는 자름)</div>
+          <div class="td-cvwrap"><canvas class="td-cv" id="clCurve" aria-label="에피소드 리턴 학습 곡선"></canvas></div>
+        </div>
+        <div class="td-box">
+          <div class="td-cap">ε에 따른 차이 — 마지막 100 에피소드 평균 리턴 (seed 5개 평균)</div>
+          <div class="td-cvwrap"><canvas class="td-cv" id="clSweep" aria-label="엡실론에 따른 최근 100 평균 리턴"></canvas></div>
+          <p class="td-small" id="clSweepTxt"></p>
+        </div>
+      </div>
+      <p class="sk-note" id="clNote"></p>
+    </div>
+  </section>
+
+  <!-- ========== 5. FrozenLake 실습 ========== -->
+  <section id="pane-frozen" role="tabpanel" aria-labelledby="tab-frozen" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>FrozenLake 실습 — 미끄러운 얼음 위에서 TD 제어</h2><span class="sk-hint">표 기반 · 브라우저에서 실제 학습</span></div>
+      <p class="sk-lead">미끄러지면 의도한 방향과 양옆으로 각 1/3 확률로 움직입니다. 목표(G)에 닿으면 +1, 구멍(H)에 빠지면 0으로 종료. ε을 1에서 0.05까지 줄이며 학습하고, 탐욕 정책의 실제 가치를 env.P로 계산한 V*와 비교합니다.</p>
+      <div class="sk-controls">
+        <label class="sk-group"><span class="sk-label">지도</span><select class="sk-select" id="fzMap"><option value="4x4">4×4</option><option value="8x8">8×8</option></select></label>
+        <label class="sk-check"><input type="checkbox" id="fzSlip" checked>미끄러짐</label>
+        <div class="sk-group"><span class="sk-label">알고리즘</span><div class="sk-seg" id="fzAlgo"><button type="button" data-v="sarsa" aria-pressed="false">SARSA</button><button type="button" data-v="q" aria-pressed="true">Q-learning</button><button type="button" data-v="exp" aria-pressed="false">Expected SARSA</button></div></div>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-slider"><div class="sk-sl-head"><span>학습률 α</span><b id="fzAv">0.10</b></div><input type="range" id="fzA" min="0.01" max="0.5" step="0.01" value="0.1" aria-label="학습률 알파"></div>
+        <div class="sk-slider"><div class="sk-sl-head"><span>할인율 γ</span><b id="fzGv">0.99</b></div><input type="range" id="fzG" min="0.8" max="1" step="0.01" value="0.99" aria-label="할인율 감마"></div>
+        <label class="sk-group"><span class="sk-label">에피소드</span><select class="sk-select" id="fzN"><option value="2000">2,000</option><option value="5000" selected>5,000</option><option value="20000">20,000</option></select></label>
+        <label class="sk-group"><span class="sk-label">seed</span><input class="sk-input" id="fzSeed" type="number" value="1" min="1" max="9999" style="width:76px"></label>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button class="sk-btn sk-btn--primary" type="button" id="fzRun">학습 시작</button>
+          <button class="sk-btn" type="button" id="fzReset">초기화</button>
+          <button class="sk-btn" type="button" id="fzTest">탐욕 정책 1,000번 시험</button>
+        </div>
+        <div class="sk-slider" style="min-width:160px"><div class="sk-sl-head"><span>속도 (에피소드/프레임)</span><b id="fzSpv">50</b></div><input type="range" id="fzSp" min="0" max="4" step="1" value="2" aria-label="학습 속도"></div>
+      </div>
+      <div class="sk-stats td-statsrow" id="fzStats"></div>
+      <div class="td-split">
+        <div class="td-box">
+          <div class="td-cap">max<sub>a</sub> Q(s, a) 색 + 탐욕 정책 화살표</div>
+          <div class="td-cvwrap"><canvas class="td-cv" id="fzCv" aria-label="FrozenLake Q 값과 탐욕 정책"></canvas></div>
+        </div>
+        <div class="td-box">
+          <div class="td-cap">목표 도달 비율 (이동평균 100, 학습 중 ε-탐욕 행동)</div>
+          <div class="td-cvwrap"><canvas class="td-cv" id="fzCurve" aria-label="성공률 학습 곡선"></canvas></div>
+          <div class="td-cap">탐욕 정책의 실제 가치 V<sup>π</sup>(s₀) (env.P로 계산) vs 최적 V*(s₀)</div>
+          <div class="td-cvwrap"><canvas class="td-cv" id="fzErr" aria-label="탐욕 정책 가치와 최적 가치 비교"></canvas></div>
+        </div>
+      </div>
+      <p class="sk-note" id="fzNote"></p>
+    </div>
+  </section>
+
+  <!-- ========== 6. 코드 ========== -->
+  <section id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>Gymnasium + numpy 코드 (현재 설정 반영)</h2>
+        <div class="sk-group"><button class="sk-btn sk-btn--primary sk-btn--sm" type="button" id="codeCopy">복사</button><span class="td-flash" id="codeMsg" role="status"></span></div></div>
+      <p class="sk-lead">[CliffWalking 비교] 탭의 α·ε·에피소드 수·seed와 [FrozenLake 실습] 탭의 지도·알고리즘·α·γ가 그대로 들어갑니다. <span class="sk-mono">pip install gymnasium numpy</span></p>
+      <p class="sk-note"><b>행동 번호 주의</b> — 이 시뮬레이터의 격자 행동은 0↑ 1→ 2↓ 3← 입니다. Gymnasium <b>CliffWalking은 0↑ 1→ 2↓ 3←로 같지만</b>, <b>FrozenLake는 0← 1↓ 2→ 3↑</b>로 다릅니다. 코드는 Gymnasium 번호를 그대로 씁니다.</p>
+      <div class="sk-controls">
+        <label class="sk-check"><input type="checkbox" id="codeRW" checked>TD(0) 무작위 걷기 예측 포함</label>
+        <label class="sk-check"><input type="checkbox" id="codeCliff" checked>CliffWalking 비교 포함</label>
+        <label class="sk-check"><input type="checkbox" id="codeFL" checked>FrozenLake 실습 포함</label>
+      </div>
+      <pre class="sk-formula td-pre" id="codeOut" tabindex="0" aria-label="파이썬 코드"></pre>
+    </div>
+  </section>
+
+  <!-- ========== 7. 알고리즘 구성도 ========== -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">TD(0) 부트스트래핑 · SARSA와 Q-learning의 타깃 · CliffWalking 비교 · 세 알고리즘 정리를 강의 슬라이드로</span></div><div data-ds-diagrams="td-sarsa-q-learning"></div></section>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20261007a"></script>
+<script src="../../assets/js/rl-kit.js?v=20261007a"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261007a"></script>
+<script src="../../assets/diagrams/td-sarsa-q-learning.js?v=20261007a"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const COL = () => ({ s: cssv("--rl-s"), a: cssv("--rl-a"), r: cssv("--rl-r"), rn: cssv("--rl-rneg"), v: cssv("--rl-v"), t: cssv("--rl-tgt"), x: cssv("--rl-exp"),
+    c1: cssv("--c1"), c2: cssv("--c2"), c3: cssv("--c3"), ink: cssv("--ink"), text: cssv("--text"), muted: cssv("--muted"), faint: cssv("--faint"), line: cssv("--line"), bg: cssv("--surface"), bg2: cssv("--surface-2") });
+  const nf = (v, d) => { if (!isFinite(v)) return "—"; let s = Math.abs(v).toFixed(d == null ? 4 : d); if (s.indexOf(".") >= 0) s = s.replace(/0+$/, "").replace(/\.$/, ""); return (v < 0 && +s !== 0 ? "−" : "") + s; };
+  const nfp = (v, d) => v < 0 && +Math.abs(v).toFixed(d == null ? 4 : d) !== 0 ? "(" + nf(v, d) + ")" : nf(v, d);
+  const ARW = RL.ACTIONS, ANM = RL.ACTION_NAMES;
+  const ALG = { sarsa: { name: "SARSA", col: "--c1", k: "k-1" }, q: { name: "Q-learning", col: "--c2", k: "k-2" }, exp: { name: "Expected SARSA", col: "--c3", k: "k-3" } };
+
+  /* ================= DP (검산용, env.P 사용) ================= */
+  function qsa(env, V, s, a, g) { let q = 0; for (const [p, s2, r, d] of env.P[s][a]) q += p * (r + (d ? 0 : g * V[s2])); return q; }
+  function policyEval(env, pol, g, tol, maxIt) {
+    const V = new Array(env.nS).fill(0); tol = tol || 1e-8; maxIt = maxIt || 5000; let d = 1;
+    for (let it = 0; it < maxIt && d > tol; it++) { d = 0;
+      for (let s = 0; s < env.nS; s++) { if (env.terminal[s]) continue; const v = qsa(env, V, s, pol[s], g); d = Math.max(d, Math.abs(v - V[s])); V[s] = v; } }
+    return V;
+  }
+  function valueIter(env, g) {
+    const V = new Array(env.nS).fill(0);
+    for (let it = 0; it < 20000; it++) { let d = 0;
+      for (let s = 0; s < env.nS; s++) { if (env.terminal[s]) continue; let b = -Infinity; for (let a = 0; a < 4; a++) b = Math.max(b, qsa(env, V, s, a, g)); d = Math.max(d, Math.abs(b - V[s])); V[s] = b; }
+      if (d < 1e-10) break; }
+    return V;
+  }
+
+  /* ================= 그리기 도구 ================= */
+  function drawGridFit(cv, env, opts, maxCell) {
+    const pw = (cv.parentNode && cv.parentNode.clientWidth) || 320;
+    const size = Math.max(16, Math.min(maxCell || 84, Math.floor(pw / env.cols)));
+    return RL.drawGrid(cv, env, Object.assign({ size }, opts));
+  }
+  function niceStep(range, n) { const raw = range / Math.max(1, n), p = Math.pow(10, Math.floor(Math.log10(raw))), m = raw / p; return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p; }
+  function tickLabel(v) { const a = Math.abs(v); const s = a >= 1000 ? String(+(a / 1000).toPrecision(3)) + "k" : String(+a.toPrecision(3)); return (v < 0 && a > 0 ? "−" : "") + s; }
+  function plot(cv, o) {
+    const C = COL(), f = RL.fitCanvas(cv, Math.max(260, (cv.parentNode && cv.parentNode.clientWidth) || 640), o.h || 240), g = f.g, W = f.w, H = f.h;
+    const leg = o.series.filter(s => s.label).length + (o.hlines || []).filter(h => h.label).length;
+    const pl = 50, pr = 14, pt = leg ? 26 : 12, pb = 32;
+    g.clearRect(0, 0, W, H);
+    let x0 = o.xmin, x1 = o.xmax, y0 = o.ymin, y1 = o.ymax;
+    if (x0 == null || x1 == null || y0 == null || y1 == null) {
+      let ax = Infinity, bx = -Infinity, ay = Infinity, by = -Infinity;
+      o.series.forEach(s => { for (let i = 0; i < s.y.length; i++) { const xv = s.x[i], yv = s.y[i]; if (!isFinite(yv)) continue; if (xv < ax) ax = xv; if (xv > bx) bx = xv; if (yv < ay) ay = yv; if (yv > by) by = yv; } });
+      (o.hlines || []).forEach(h => { ay = Math.min(ay, h.y); by = Math.max(by, h.y); });
+      if (x0 == null) x0 = isFinite(ax) ? ax : 0; if (x1 == null) x1 = isFinite(bx) ? bx : 1;
+      const pad = ((isFinite(by) ? by : 1) - (isFinite(ay) ? ay : 0)) * 0.06 || 0.5;
+      if (y0 == null) y0 = (isFinite(ay) ? ay : 0) - (o.ymax == null ? pad : 0); if (y1 == null) y1 = (isFinite(by) ? by : 1) + pad;
+    }
+    if (x1 <= x0) x1 = x0 + 1; if (y1 <= y0) y1 = y0 + 1;
+    const X = v => pl + (W - pl - pr) * (v - x0) / (x1 - x0), Y = v => pt + (H - pt - pb) * (1 - (v - y0) / (y1 - y0));
+    g.font = "11px " + cssv("--mono"); g.lineWidth = 1;
+    const ys = niceStep(y1 - y0, 4); g.textAlign = "right"; g.textBaseline = "middle";
+    for (let v = Math.ceil(y0 / ys) * ys; v <= y1 + 1e-9; v += ys) { const yy = Y(v); g.strokeStyle = C.line; g.beginPath(); g.moveTo(pl, yy); g.lineTo(W - pr, yy); g.stroke(); g.fillStyle = C.faint; g.fillText(tickLabel(Math.abs(v) < 1e-12 ? 0 : v), pl - 6, yy); }
+    g.textAlign = "center"; g.textBaseline = "alphabetic";
+    if (o.xticks) o.xticks.forEach(t => { g.fillStyle = C.faint; g.fillText(t.l, X(t.x), H - pb + 15); });
+    else { const xs = niceStep(x1 - x0, Math.max(3, Math.floor((W - pl - pr) / 80))); for (let v = Math.ceil(x0 / xs) * xs; v <= x1 + 1e-9; v += xs) { g.fillStyle = C.faint; g.fillText(tickLabel(v), X(v), H - pb + 15); } }
+    if (o.xlabel) { g.fillStyle = C.muted; g.font = "600 11.5px " + cssv("--sans"); g.textAlign = "right"; g.fillText(o.xlabel, W - pr, H - 4); }
+    g.save(); g.beginPath(); g.rect(pl, pt - 2, W - pl - pr, H - pt - pb + 4); g.clip();
+    (o.hlines || []).forEach(h => { g.strokeStyle = h.color || C.muted; g.lineWidth = 1.5; g.setLineDash(h.dash || [6, 4]); g.beginPath(); g.moveTo(pl, Y(h.y)); g.lineTo(W - pr, Y(h.y)); g.stroke(); g.setLineDash([]); });
+    o.series.forEach(s => {
+      g.strokeStyle = s.color; g.lineWidth = s.width || 2; g.globalAlpha = s.alpha == null ? 1 : s.alpha; if (s.dash) g.setLineDash(s.dash);
+      g.beginPath(); let on = false;
+      for (let i = 0; i < s.y.length; i++) { const yv = s.y[i]; if (!isFinite(yv)) { on = false; continue; } const xx = X(s.x[i]), yy = Y(Math.max(y0 - (y1 - y0), Math.min(y1 + (y1 - y0), yv))); if (on) g.lineTo(xx, yy); else { g.moveTo(xx, yy); on = true; } }
+      g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
+      if (s.dots) { g.fillStyle = s.color; for (let i = 0; i < s.y.length; i++) { if (!isFinite(s.y[i])) continue; g.beginPath(); g.arc(X(s.x[i]), Y(s.y[i]), 3.2, 0, 7); g.fill(); } }
+    });
+    g.restore();
+    g.strokeStyle = C.faint; g.lineWidth = 1; g.beginPath(); g.moveTo(pl, pt - 2); g.lineTo(pl, H - pb); g.lineTo(W - pr, H - pb); g.stroke();
+    let lx = pl + 4; g.font = "600 11.5px " + cssv("--sans"); g.textAlign = "left"; g.textBaseline = "middle";
+    o.series.concat((o.hlines || []).map(h => ({ color: h.color || C.muted, label: h.label, dash: h.dash || [6, 4] }))).forEach(s => {
+      if (!s.label) return; const w = g.measureText(s.label).width; if (lx + w + 26 > W) return;
+      g.strokeStyle = s.color; g.lineWidth = 2.5; if (s.dash) g.setLineDash(s.dash); g.beginPath(); g.moveTo(lx, 12); g.lineTo(lx + 14, 12); g.stroke(); g.setLineDash([]);
+      g.fillStyle = C.text; g.fillText(s.label, lx + 18, 12); lx += w + 34; });
+  }
+  function seg(id, cb) {
+    const el = $(id); el.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+      el.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false")); cb(b.dataset.v); });
+  }
+  const segVal = id => $(id).querySelector('[aria-pressed="true"]').dataset.v;
+  function stat(label, val, cls) { return '<div class="sk-stat"><b' + (cls ? ' class="' + cls + '"' : "") + ">" + val + "</b><span>" + label + "</span></div>"; }
+  const visible = el => el && el.offsetParent !== null;
+  const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN;
+
+  /* ================= 표 기반 TD 에이전트 (SARSA · Q-learning · Expected SARSA) =================
+     행동 선택은 에이전트 rng, 전이는 환경 rng (CliffWalking은 결정적). */
+  function Agent(algo, env, seed) {
+    this.algo = algo; this.env = env; this.Q = Array.from({ length: env.nS }, () => [0, 0, 0, 0]);
+    this.rng = RL.rng(seed); this.erng = RL.rng(seed * 7919 + 13);
+    this.ep = 0; this.rets = []; this.falls = []; this.a = null; this.s = null; this.G = 0; this.t = 0; this.fell = 0; this.path = [];
+  }
+  Agent.prototype.pick = function (s, eps) { const ex = this.rng.random() < eps; return { a: ex ? this.rng.int(4) : RL.argmax(this.Q[s], this.rng), ex }; };
+  Agent.prototype.begin = function (eps) { this.s = this.env.reset(); const p = this.pick(this.s, eps); this.a = p.a; this.aEx = p.ex; this.G = 0; this.t = 0; this.fell = 0; this.path = [this.s]; };
+  /* 한 걸음: 기록 객체 반환 */
+  Agent.prototype.step = function (alpha, gamma, eps) {
+    if (this.s == null) this.begin(eps);
+    const env = this.env, Q = this.Q, s = this.s, a = this.a, aEx = this.aEx;
+    const o = env.step(a, this.erng);
+    const qs2 = Q[o.s].slice(), old = Q[s][a];
+    let a2 = null, a2Ex = false, boot;
+    if (this.algo === "sarsa") { if (!o.done) { const p = this.pick(o.s, eps); a2 = p.a; a2Ex = p.ex; } boot = o.done ? 0 : Q[o.s][a2]; }
+    else if (this.algo === "q") boot = o.done ? 0 : Math.max(...qs2);
+    else { if (o.done) boot = 0; else { const b = RL.argmax(qs2); boot = 0; for (let k = 0; k < 4; k++) boot += (eps / 4 + (k === b ? 1 - eps : 0)) * qs2[k]; } }
+    const target = o.r + gamma * boot, delta = target - old;
+    Q[s][a] = old + alpha * delta;
+    if (this.algo !== "sarsa" && !o.done && !o.truncated) { const p = this.pick(o.s, eps); a2 = p.a; a2Ex = p.ex; }
+    this.G += o.r; this.t++; if (o.fellCliff) this.fell++;
+    const rec = { s, a, aEx, r: o.r, s2: o.s, done: o.done, trunc: o.truncated, fell: o.fellCliff, qs2, old, a2, a2Ex, boot, target, delta, nw: Q[s][a], t: this.t, ep: this.ep + 1 };
+    if (o.done || o.truncated) { this.ep++; this.rets.push(this.G); this.falls.push(this.fell); rec.G = this.G; this.s = null; this.lastPath = this.path.concat([o.s]); }
+    else { this.s = o.s; this.a = a2; this.aEx = a2Ex; this.path.push(o.s); }
+    this.last = rec; return rec;
+  };
+  Agent.prototype.episode = function (alpha, gamma, eps) { let r; do { r = this.step(alpha, gamma, eps); } while (!(r.done || r.trunc)); return r; };
+  Agent.prototype.greedyPath = function (limit) {
+    const env = this.env, seen = {}; let s = env.start; const p = [s]; let G = 0, ok = false;
+    for (let i = 0; i < (limit || 100); i++) { const a = RL.argmax(this.Q[s]); const o = env._move(s, a); G += o[1]; s = o[0]; p.push(s); if (o[2]) { ok = true; break; } if (seen[s] > 2) break; seen[s] = (seen[s] || 0) + 1; }
+    return { path: p, steps: p.length - 1, G, ok };
+  };
+  /* 절벽 칸에 찍힌 0.0 가치 글자를 가리고 −100 표시 */
+  function paintCliff(cv, env) {
+    if (env.kind !== "cliff") return;
+    const th = RL.theme(), g = cv.getContext("2d"), cell = cv.clientWidth / env.cols;
+    env.cliff.forEach(s => { const rc = env.rc(s), x = rc[1] * cell, y = rc[0] * cell;
+      g.fillStyle = th.cliff; g.fillRect(x + 1.5, y + cell * 0.55, cell - 3, cell * 0.4);
+      g.fillStyle = th.red; g.font = "700 " + Math.max(9, Math.round(cell * 0.2)) + "px " + cssv("--mono"); g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("−100", x + cell / 2, y + cell * 0.72); });
+  }
+  function makeEnv(kind, slip) {
+    if (kind === "cliff") return RL.CliffWalking();
+    return RL.FrozenLake({ map: kind === "fl8" ? "8x8" : "4x4", slippery: slip });
+  }
+
+  /* ================================================================
+     1. TD(0) 무작위 걷기
+     ================================================================ */
+  const NAMES = ["왼쪽 끝", "A", "B", "C", "D", "E", "오른쪽 끝"], TRUE = [0, 1 / 6, 2 / 6, 3 / 6, 4 / 6, 5 / 6, 0];
+  const RW = { timer: 0 };
+  function rwReset() {
+    rwStop(); RW.V = [0, .5, .5, .5, .5, .5, 0]; RW.Vmc = [0, .5, .5, .5, .5, .5, 0];
+    RW.rng = RL.rng(Math.max(1, +$("rwSeed").value || 1)); RW.ep = 0; RW.steps = 0; RW.hist = [rms(RW.V)]; RW.histMc = [rms(RW.Vmc)]; RW.mcRows = null; RW.last = null;
+    rwBegin(); rwRender();
+  }
+  function rms(V) { let e = 0; for (let i = 1; i <= 5; i++) e += (V[i] - TRUE[i]) ** 2; return Math.sqrt(e / 5); }
+  function rwBegin() { RW.cur = { s: 3, path: [3], rows: [], done: false }; }
+  function rwStep() {
+    if (RW.cur.done) { rwBegin(); RW.mcRows = null; RW.last = null; return; }
+    const al = +$("rwA").value, s = RW.cur.s, s2 = s + (RW.rng.random() < 0.5 ? 1 : -1), r = s2 === 6 ? 1 : 0, term = s2 === 0 || s2 === 6;
+    const vs2 = term ? 0 : RW.V[s2], target = r + vs2, old = RW.V[s], delta = target - old;
+    RW.V[s] = old + al * delta; RW.steps++;
+    const row = { t: RW.cur.rows.length, s, s2, r, vs2, target, old, delta, nw: RW.V[s], term };
+    RW.cur.rows.push(row); RW.cur.s = s2; RW.cur.path.push(s2); RW.last = row;
+    if (term) {
+      RW.cur.done = true; RW.ep++;
+      /* 같은 에피소드로 MC (첫 방문, 고정 α, γ = 1 → 모든 방문 상태의 G = 마지막 보상) */
+      const G = r, seen = {}; RW.mcRows = [];
+      RW.cur.path.slice(0, -1).forEach(st => { if (seen[st]) return; seen[st] = 1; const o = RW.Vmc[st]; RW.Vmc[st] = o + al * (G - o); RW.mcRows.push({ s: st, old: o, G, nw: RW.Vmc[st] }); });
+      RW.hist.push(rms(RW.V)); RW.histMc.push(rms(RW.Vmc));
+    }
+  }
+  function rwEpisode() { if (RW.cur.done) rwStep(); while (!RW.cur.done) rwStep(); }
+  function rwStop() { if (RW.timer) { clearInterval(RW.timer); RW.timer = 0; $("rwPlay").textContent = "재생"; } }
+  function rwDraw() {
+    const cv = $("rwCv"), C = COL(), pw = Math.max(280, (cv.parentNode && cv.parentNode.clientWidth) || 640), f = RL.fitCanvas(cv, Math.min(640, pw), pw < 520 ? 270 : 300), g = f.g, W = f.w, H = f.h;
+    g.clearRect(0, 0, W, H);
+    const n = 7, gap = W / n, cy = H - 56, base = cy - 40, top = 24, bh = base - top, rad = Math.min(24, gap * 0.3);
+    const X = i => gap * (i + 0.5);
+    /* 참값 선 */
+    g.strokeStyle = C.ink; g.setLineDash([5, 4]); g.lineWidth = 1.6;
+    for (let i = 1; i <= 5; i++) { const y = base - bh * TRUE[i]; g.beginPath(); g.moveTo(X(i) - gap * 0.4, y); g.lineTo(X(i) + gap * 0.4, y); g.stroke(); }
+    g.setLineDash([]);
+    g.strokeStyle = C.line; g.beginPath(); g.moveTo(X(1) - gap * 0.45, base + 0.5); g.lineTo(X(5) + gap * 0.45, base + 0.5); g.stroke();
+    const bw = Math.min(30, gap * 0.32), fs = Math.max(9, Math.min(11, bw * 0.4));
+    for (let i = 1; i <= 5; i++) {
+      [[RW.V[i], C.v, -1], [RW.Vmc[i], C.c1, 1]].forEach(([v, col, side]) => {
+        const x = X(i) + side * (bw / 2 + 3) - bw / 2, h = bh * Math.max(0, Math.min(1, v));
+        g.fillStyle = col; g.globalAlpha = 0.8; g.fillRect(x, base - h, bw, h); g.globalAlpha = 1;
+        if (gap >= 70) { g.fillStyle = col; g.font = "600 " + fs + "px " + cssv("--mono"); g.textAlign = "center"; g.fillText(v.toFixed(3).replace(/^0/, ""), x + bw / 2, base - h - 5); }
+      });
+    }
+    /* 이동 화살표 */
+    const L = RW.last;
+    if (L) { const x1 = X(L.s), x2 = X(L.s2), y = cy - rad - 8; g.strokeStyle = C.a; g.fillStyle = C.a; g.lineWidth = 2.5;
+      g.beginPath(); g.moveTo(x1, y); g.quadraticCurveTo((x1 + x2) / 2, y - 22, x2, y); g.stroke();
+      const d = Math.sign(x2 - x1); g.beginPath(); g.moveTo(x2, y); g.lineTo(x2 - d * 9, y - 9); g.lineTo(x2 - d * 11, y + 2); g.closePath(); g.fill(); }
+    /* 상태 노드 */
+    for (let i = 0; i < n; i++) {
+      const x = X(i), term = i === 0 || i === 6, cur = RW.cur && RW.cur.s === i && !RW.cur.done;
+      g.lineWidth = 2;
+      if (term) { g.fillStyle = C.bg2; g.strokeStyle = C.faint; g.fillRect(x - rad, cy - rad * 0.8, rad * 2, rad * 1.6); g.strokeRect(x - rad, cy - rad * 0.8, rad * 2, rad * 1.6); }
+      else { g.fillStyle = C.bg; g.strokeStyle = C.s; g.beginPath(); g.arc(x, cy, rad, 0, 7); g.fill(); g.stroke(); }
+      if (cur || (RW.cur && RW.cur.done && RW.cur.s === i)) { g.strokeStyle = C.x; g.lineWidth = 4; g.beginPath(); g.arc(x, cy, rad + 5, 0, 7); g.stroke(); }
+      g.fillStyle = term ? C.muted : C.s; g.font = "700 " + (term ? 12 : 15) + "px " + cssv("--sans"); g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText(term ? "끝" : NAMES[i], x, cy); g.textBaseline = "alphabetic";
+      g.font = "600 11.5px " + cssv("--sans");
+      if (i === 0) { g.fillStyle = C.muted; g.fillText("r = 0", x, cy + rad + 18); }
+      else if (i === 6) { g.fillStyle = C.r; g.fillText("r = +1", x, cy + rad + 18); }
+      else { g.fillStyle = C.faint; g.fillText((gap >= 70 ? "참값 " : "") + i + "/6", x, cy + rad + 18); }
+    }
+    g.font = "600 11.5px " + cssv("--sans"); g.textAlign = "left";
+    g.fillStyle = C.v; g.fillRect(8, 8, 10, 10); g.fillStyle = C.text; g.fillText("TD(0)", 22, 17);
+    g.fillStyle = C.c1; g.fillRect(70, 8, 10, 10); g.fillStyle = C.text; g.fillText("MC (같은 에피소드)", 84, 17);
+    g.strokeStyle = C.ink; g.setLineDash([5, 4]); g.beginPath(); g.moveTo(206, 13); g.lineTo(224, 13); g.stroke(); g.setLineDash([]); g.fillText("참값", 228, 17);
+  }
+  function rwRender() {
+    if (!visible($("pane-td0"))) return;
+    rwDraw();
+    const al = +$("rwA").value, L = RW.last, as = al.toFixed(2).replace(/0$/, "");
+    let f;
+    if (!L) f = "에피소드 " + (RW.ep + 1) + " 시작: 에이전트는 C에 있습니다. [한 걸음]을 누르면 왼쪽·오른쪽 중 하나로 움직이고 바로 V(C)를 갱신합니다.<br><span class='mut'>TD(0): V(S<sub>t</sub>) ← V(S<sub>t</sub>) + α [ R<sub>t+1</sub> + γ·V(S<sub>t+1</sub>) − V(S<sub>t</sub>) ]</span>";
+    else {
+      f = "<span class='k-s'>" + NAMES[L.s] + "</span> → <span class='k-s'>" + NAMES[L.s2] + "</span>, 보상 <span class='" + (L.r > 0 ? "k-r" : "") + "'>" + L.r + "</span><br>" +
+        "타깃 = <span class='tg'>R + γ·V(" + (L.term ? "끝" : NAMES[L.s2]) + ") = " + L.r + " + 1 × " + nf(L.vs2) + (L.term ? " (종료 상태 = 0)" : "") + " = " + nf(L.target) + "</span><br>" +
+        "TD 오차 δ = 타깃 − V(" + NAMES[L.s] + ") = " + nf(L.target) + " − " + nf(L.old) + " = <span class='k-t'>" + nf(L.delta) + "</span><br>" +
+        "V(" + NAMES[L.s] + ") ← " + nf(L.old) + " + " + as + " × " + nfp(L.delta) + " = <span class='k-v'>" + nf(L.nw) + "</span>" +
+        (Math.abs(L.delta) < 1e-12 ? "<br><span class='mut'>δ = 0 → 아무것도 바뀌지 않음 (다음 칸 추정값이 지금 칸과 같음)</span>" : "");
+    }
+    $("rwFormula").innerHTML = f;
+    let h = "<thead><tr><th>t</th><th>S → S′</th><th>R</th><th>V(S′)</th><th>타깃</th><th>δ</th><th>V(S) 새 값</th></tr></thead><tbody>";
+    RW.cur.rows.forEach((r, i) => { h += "<tr" + (i === RW.cur.rows.length - 1 ? " class='cur'" : "") + "><td class='n'>" + r.t + "</td><td class='k-s'>" + NAMES[r.s] + " → " + (r.term ? "끝" : NAMES[r.s2]) + "</td><td class='n'>" + r.r + "</td><td class='n'>" + nf(r.vs2) + "</td><td class='n k-t'>" + nf(r.target) + "</td><td class='n'>" + nf(r.delta) + "</td><td class='n k-v'>" + nf(r.nw) + "</td></tr>"; });
+    if (!RW.cur.rows.length) h += "<tr><td colspan='7' class='td-small'>아직 움직이지 않았습니다.</td></tr>";
+    $("rwTable").innerHTML = h + "</tbody>";
+    const cw = $("rwTable").closest(".td-tablewrap"); cw.scrollTop = cw.scrollHeight;
+    if (RW.cur.done && RW.mcRows) {
+      $("rwMc").innerHTML = "<b>에피소드 " + RW.ep + " 끝</b> (리턴 G = " + RW.cur.rows[RW.cur.rows.length - 1].r + ") — 이제서야 <span class='k-1'>MC</span>가 지나온 상태를 한꺼번에 갱신:<br>" +
+        RW.mcRows.map(m => "V(" + NAMES[m.s] + ") ← " + nf(m.old) + " + " + as + " × (" + m.G + " − " + nf(m.old) + ") = <span class='k-1'>" + nf(m.nw) + "</span>").join("<br>") +
+        "<br><span class='mut'>[한 걸음]을 다시 누르면 새 에피소드가 C에서 시작합니다.</span>";
+    } else $("rwMc").innerHTML = "<span class='mut'><span class='k-1'>MC</span>는 에피소드가 끝날 때까지 기다립니다. 지금까지 지나온 상태: " + RW.cur.path.filter(s => s > 0 && s < 6).map(s => NAMES[s]).join(" → ") + "</span>";
+    $("rwStats").innerHTML = stat("끝난 에피소드", RW.ep) + stat("전체 걸음", RW.steps) + stat("RMS 오차 TD", rms(RW.V).toFixed(3), "k-v") + stat("RMS 오차 MC", rms(RW.Vmc).toFixed(3), "k-1");
+    rwChart();
+  }
+  /* 그림 6.2: 100번 반복 평균 */
+  let RWB = null;
+  function rwBatch() {
+    const runs = 100, E = 100, cfg = [["td", 0.05], ["td", 0.1], ["td", 0.15], ["mc", 0.01], ["mc", 0.02], ["mc", 0.03], ["mc", 0.04]];
+    RWB = cfg.map(([kind, al]) => {
+      const acc = new Array(E + 1).fill(0);
+      for (let r = 0; r < runs; r++) {
+        const rng = RL.rng(1000 + r), V = [0, .5, .5, .5, .5, .5, 0]; acc[0] += rms(V);
+        for (let e = 1; e <= E; e++) {
+          let s = 3; const path = [3]; let last = 0;
+          while (s > 0 && s < 6) { const s2 = s + (rng.random() < 0.5 ? 1 : -1), r2 = s2 === 6 ? 1 : 0;
+            if (kind === "td") V[s] += al * (r2 + ((s2 === 0 || s2 === 6) ? 0 : V[s2]) - V[s]); s = s2; path.push(s); last = r2; }
+          if (kind === "mc") { const seen = {}; path.slice(0, -1).forEach(st => { if (seen[st]) return; seen[st] = 1; V[st] += al * (last - V[st]); }); }
+          acc[e] += rms(V);
+        }
+      }
+      return { kind, al, y: acc.map(v => v / runs) };
+    });
+  }
+  function rwChart() {
+    if (!RWB) rwBatch();
+    const C = COL(), xs = RWB[0].y.map((_, i) => i);
+    const tdA = [0.45, 0.75, 1], mcA = [0.35, 0.55, 0.75, 1];
+    const series = RWB.map((b, i) => ({ x: xs, y: b.y, color: b.kind === "td" ? C.v : C.c1, width: 2, alpha: b.kind === "td" ? tdA[i] : mcA[i - 3], dash: b.kind === "mc" ? [6, 3] : null }));
+    const me = { x: RW.hist.map((_, i) => i), y: RW.hist, color: C.t, width: 2.5 }, meM = { x: RW.histMc.map((_, i) => i), y: RW.histMc, color: C.x, width: 2.5, dash: [3, 3] };
+    plot($("rwChart"), { series: series.concat(RW.hist.length > 1 ? [me, meM] : []), xmin: 0, xmax: 100, ymin: 0, ymax: 0.25, xlabel: "에피소드", h: 250 });
+    if (!$("rwLegend").innerHTML) {
+      $("rwLegend").innerHTML = RWB.map((b, i) => "<span><i style='background:var(" + (b.kind === "td" ? "--rl-v" : "--c1") + ");opacity:" + (b.kind === "td" ? tdA[i] : mcA[i - 3]) + "'></i>" + (b.kind === "td" ? "TD" : "MC") + " α=" + b.al + "</span>").join("") +
+        "<span><i style='background:var(--rl-tgt)'></i>지금 내 실행 TD (1회)</span><span><i style='background:var(--rl-exp)'></i>지금 내 실행 MC</span>";
+    }
+  }
+  $("rwStep").onclick = () => { rwStop(); rwStep(); rwRender(); };
+  $("rwEp").onclick = () => { rwStop(); rwEpisode(); rwRender(); };
+  $("rwAdd10").onclick = () => { rwStop(); for (let i = 0; i < 10; i++) rwEpisode(); rwRender(); };
+  $("rwAdd100").onclick = () => { rwStop(); for (let i = 0; i < 100; i++) rwEpisode(); rwRender(); };
+  $("rwPlay").onclick = () => { if (RW.timer) { rwStop(); return; } $("rwPlay").textContent = "멈춤"; RW.timer = setInterval(() => { rwStep(); rwRender(); }, reduce ? 900 : 450); };
+  $("rwReset").onclick = rwReset; $("rwSeed").onchange = rwReset;
+  $("rwA").oninput = () => { $("rwAv").textContent = (+$("rwA").value).toFixed(2); };
+  $("rwA").onchange = rwReset;
+
+  /* ================================================================
+     2·3. SARSA / Q-learning 한 걸음씩
+     ================================================================ */
+  function stepperMarkup(p, algo) {
+    const sarsa = algo === "sarsa";
+    return '<div class="sk-head"><h2>' + (sarsa ? "SARSA — 실제로 할 다음 행동 a′의 Q로 타깃 (on-policy)" : "Q-learning — 다음 상태의 최댓값으로 타깃 (off-policy)") + '</h2><span class="sk-hint">→ 키 또는 [한 걸음]</span></div>' +
+      '<p class="sk-lead">' + (sarsa
+        ? "한 번의 갱신에 (S, A, R, S′, A′) 다섯 개가 필요해서 SARSA입니다. 타깃의 a′는 <b>지금 행동하는 ε-탐욕 정책이 실제로 고른 행동</b>이므로, 탐험 때문에 가끔 하는 실수까지 가치에 반영됩니다(on-policy)."
+        : "타깃에 다음 상태의 <b>max<sub>a′</sub> Q(s′, a′)</b>를 씁니다. 행동은 ε-탐욕으로 하지만(행동 정책), 배우는 것은 탐욕 정책의 가치입니다(목표 정책) — 행동과 학습 대상이 달라서 off-policy입니다.") + "</p>" +
+      '<div class="sk-controls">' +
+        '<label class="sk-group"><span class="sk-label">환경</span><select class="sk-select" id="' + p + 'Env"><option value="cliff">CliffWalking 4×12</option><option value="fl4">FrozenLake 4×4</option></select></label>' +
+        '<label class="sk-check" id="' + p + 'SlipW"><input type="checkbox" id="' + p + 'Slip" checked>미끄러짐</label>' +
+        '<div class="sk-slider"><div class="sk-sl-head"><span>α</span><b id="' + p + 'Av">0.50</b></div><input type="range" id="' + p + 'A" min="0.05" max="1" step="0.05" value="0.5" aria-label="학습률 알파"></div>' +
+        '<div class="sk-slider"><div class="sk-sl-head"><span>γ</span><b id="' + p + 'Gv">1.00</b></div><input type="range" id="' + p + 'G" min="0.8" max="1" step="0.01" value="1" aria-label="할인율 감마"></div>' +
+        '<div class="sk-slider"><div class="sk-sl-head"><span>ε</span><b id="' + p + 'Ev">0.10</b></div><input type="range" id="' + p + 'E" min="0" max="0.5" step="0.01" value="0.1" aria-label="탐험률 엡실론"></div>' +
+        '<label class="sk-group"><span class="sk-label">seed</span><input class="sk-input" id="' + p + 'Seed" type="number" value="1" min="1" max="9999" style="width:76px"></label>' +
+      "</div>" +
+      '<div class="sk-controls"><div class="sk-group">' +
+        '<button class="sk-btn sk-btn--primary" type="button" id="' + p + 'Step">한 걸음</button>' +
+        '<button class="sk-btn" type="button" id="' + p + 'Ep">에피소드 끝까지</button>' +
+        '<button class="sk-btn" type="button" id="' + p + 'Play">재생</button>' +
+        '<button class="sk-btn" type="button" id="' + p + 'Add">+100 에피소드</button>' +
+        '<button class="sk-btn" type="button" id="' + p + 'Reset">초기화 (Q = 0)</button></div>' +
+        '<div class="sk-stats td-statsrow" id="' + p + 'Stats"></div></div>' +
+      '<div class="td-split"><div class="td-box">' +
+        '<div class="td-cap">max<sub>a</sub> Q 색 + 탐욕 화살표 · <span style="color:var(--rl-tgt)">분홍 = 방금 갱신한 s</span> · <span style="color:var(--rl-s)">파랑 = s′</span> · 주황 선 = 이번 에피소드 경로</div>' +
+        '<div class="td-cvwrap"><canvas class="td-cv" id="' + p + 'Cv" aria-label="격자 환경과 Q 값"></canvas></div>' +
+        '<div class="td-cap">에피소드 리턴 (이동평균 10)</div><div class="td-cvwrap"><canvas class="td-cv" id="' + p + 'Curve" aria-label="에피소드 리턴 곡선"></canvas></div>' +
+      '</div><div class="td-box">' +
+        '<div class="td-chips" id="' + p + 'Chips"></div>' +
+        '<div class="sk-formula td-formula" id="' + p + 'Formula" aria-live="polite"></div>' +
+        '<div id="' + p + 'Qs"></div>' +
+        '<p class="sk-note" id="' + p + 'Note"></p>' +
+      "</div></div>";
+  }
+  function makeStepper(p, algo) {
+    $(p === "sa" ? "saCard" : "qlCard").innerHTML = stepperMarkup(p, algo);
+    const S = { timer: 0 };
+    const opt = () => ({ al: +$(p + "A").value, g: +$(p + "G").value, eps: +$(p + "E").value });
+    function reset(pre) {
+      stop(); const kind = $(p + "Env").value;
+      S.env = makeEnv(kind, $(p + "Slip").checked); S.ag = new Agent(algo, S.env, Math.max(1, +$(p + "Seed").value || 1));
+      $(p + "SlipW").style.display = kind === "cliff" ? "none" : "";
+      const o = opt(); for (let i = 0; i < (pre || 0); i++) S.ag.episode(o.al, o.g, o.eps);
+      S.ag.last = null; S.ag.begin(o.eps); render();
+    }
+    function step() { const o = opt(); S.ag.step(o.al, o.g, o.eps); if (S.ag.s == null) S.ag.begin(o.eps); }
+    function stop() { if (S.timer) { clearInterval(S.timer); S.timer = 0; $(p + "Play").textContent = "재생"; } }
+    function render() {
+      if (!visible($(p + "Cv"))) return;
+      const env = S.env, ag = S.ag, L = ag.last, C = COL(), fl = env.kind === "frozenlake", o = opt();
+      const hl = {}; if (L) { hl[L.s2] = C.s; hl[L.s] = C.t; }
+      drawGridFit($(p + "Cv"), env, { Q: ag.Q, path: ag.path, agent: ag.s, highlight: hl, fmt: v => fl ? v.toFixed(2) : (Math.abs(v) >= 10 ? v.toFixed(0) : v.toFixed(1)) }, fl ? 84 : 64);
+      paintCliff($(p + "Cv"), env);
+      const ma = RL.movingAvg(ag.rets, 10);
+      plot($(p + "Curve"), { series: [{ x: ma.map((_, i) => i + 1), y: ma.map(v => Math.max(v, fl ? 0 : -150)), color: C[algo === "sarsa" ? "c1" : "c2"] }], ymin: fl ? 0 : -150, ymax: fl ? 1 : 0, xmin: 0, xmax: Math.max(10, ag.rets.length), xlabel: "에피소드", h: 170 });
+      $(p + "Stats").innerHTML = stat("에피소드", ag.ep + (ag.s != null || L ? " → " + (ag.ep + 1) + " 진행" : "")) + stat("이번 걸음 수", ag.t) + stat("이번 리턴", ag.G, ag.G < 0 ? "k-rn" : "") +
+        stat("최근 10 평균 리턴", ag.rets.length ? mean(ag.rets.slice(-10)).toFixed(1) : "—");
+      const as = o.al.toFixed(2).replace(/0$/, ""), gs = o.g === 1 ? "1" : o.g.toFixed(2);
+      if (!L) {
+        $(p + "Chips").innerHTML = "";
+        $(p + "Formula").innerHTML = "에이전트가 시작 칸 <span class='k-s'>" + ag.s + "</span>에 있습니다. " + (algo === "sarsa" ? "SARSA는 시작할 때 첫 행동 a도 미리 ε-탐욕으로 고릅니다: <span class='k-a'>" + ARW[ag.a] + " " + ANM[ag.a] + "</span>" : "") +
+          " [한 걸음]을 누르면 한 번의 전이와 한 번의 갱신이 숫자로 나옵니다.<br><span class='mut'>" + (algo === "sarsa" ? "Q(s,a) ← Q(s,a) + α [ r + γ·<b>Q(s′, a′)</b> − Q(s,a) ]" : "Q(s,a) ← Q(s,a) + α [ r + γ·<b>max<sub>a′</sub> Q(s′, a′)</b> − Q(s,a) ]") + "</span>";
+        $(p + "Qs").innerHTML = ""; $(p + "Note").innerHTML = noteText(); return;
+      }
+      const chip = (cls, lab, val) => "<span class='td-chip " + cls + "'><small>" + lab + "</small>" + val + "</span>";
+      $(p + "Chips").innerHTML = chip("td-chip--s", "S", L.s) + chip("td-chip--a", "A", ARW[L.a] + (L.aEx ? " 탐험" : "")) + chip(L.r < 0 ? "td-chip--rn" : "td-chip--r", "R", nf(L.r, 0)) + chip("td-chip--s", "S′", L.s2 + (L.done ? " 종료" : "")) +
+        (algo === "sarsa" ? chip("td-chip--a", "A′", L.a2 == null ? "없음" : ARW[L.a2] + (L.a2Ex ? " 탐험" : "")) : "") + (L.fell ? "<span class='k-rn'>절벽 추락 → 시작점으로</span>" : "");
+      const term = L.done ? " (종료 → 0)" : "";
+      let bootTxt;
+      if (algo === "sarsa") bootTxt = L.done ? "0" + term : "Q(" + L.s2 + ", " + ARW[L.a2] + ") = " + nf(L.boot);
+      else bootTxt = L.done ? "0" + term : "max(" + L.qs2.map(v => nf(v)).join(", ") + ") = " + nf(L.boot);
+      let f = "타깃 = r + γ · " + (algo === "sarsa" ? "Q(s′, a′)" : "max<sub>a′</sub> Q(s′, a′)") + " = <span class='tg'>" + nfp(L.r) + " + " + gs + " × " + nfp(L.boot) + " = " + nf(L.target) + "</span><br>" +
+        "<span class='mut'>" + bootTxt + "</span><br>" +
+        "δ = 타깃 − Q(" + L.s + ", " + ARW[L.a] + ") = " + nf(L.target) + " − " + nfp(L.old) + " = <span class='k-t'>" + nf(L.delta) + "</span><br>" +
+        "Q(" + L.s + ", " + ARW[L.a] + ") ← " + nf(L.old) + " + " + as + " × " + nfp(L.delta) + " = <span class='k-v'>" + nf(L.nw) + "</span>";
+      if (!L.done) {
+        const alt = algo === "sarsa" ? L.r + o.g * Math.max(...L.qs2) : (L.a2 != null ? L.r + o.g * L.qs2[L.a2] : NaN);
+        if (isFinite(alt)) f += "<br><span class='mut'>" + (algo === "sarsa" ? "Q-learning이었다면 타깃 = r + γ·max Q(s′,·) = " : "SARSA였다면 타깃 = r + γ·Q(s′, a′=" + ARW[L.a2] + ") = ") + nf(alt) + (Math.abs(alt - L.target) < 1e-12 ? " (같음)" : " (다름)") + "</span>";
+      }
+      if (L.G != null) f += "<br><b>에피소드 " + L.ep + " 끝</b> · 리턴 " + nf(L.G, 0) + (L.trunc ? " (걸음 한도로 잘림)" : "");
+      $(p + "Formula").innerHTML = f;
+      const row = (lab, q, mark) => "<div class='td-qrow'><span class='h'>" + lab + "</span>" + q.map((v, k) => "<span class='" + mark(k) + "'>" + ARW[k] + " " + nf(v, 2) + "</span>").join("") + "</div>";
+      const mx = Math.max(...L.qs2);
+      $(p + "Qs").innerHTML = "<div class='td-cap'>다음 상태 s′ = " + L.s2 + "의 Q 값 (갱신 전)</div>" +
+        row("Q(s′,·)", L.qs2, k => [L.done ? "" : (algo !== "sarsa" && Math.abs(L.qs2[k] - mx) < 1e-12 ? "mx" : ""), L.a2 === k ? "pk" : ""].join(" ").trim()) +
+        "<p class='td-small'>" + (L.done ? "s′가 종료 상태라 타깃에는 Q(s′,·) 대신 0을 씁니다." : algo === "sarsa" ? "<span style='color:var(--rl-a)'>주황 테두리</span> = SARSA가 고른 a′ (타깃에 들어감)" : "<span style='color:var(--rl-tgt)'>분홍 테두리</span> = 타깃에 쓰인 최댓값 · <span style='color:var(--rl-a)'>주황</span> = 실제로 다음에 할 행동 (타깃엔 안 쓰임)") + "</p>" +
+        "<div class='td-cap'>방금 갱신한 s = " + L.s + "의 Q 값 (갱신 후)</div>" + row("Q(s,·)", S.ag.Q[L.s], k => k === L.a ? "pk" : "");
+      $(p + "Note").innerHTML = noteText();
+    }
+    function noteText() {
+      return algo === "sarsa"
+        ? "<b>on-policy</b>: 배우는 정책 = 행동하는 정책(ε-탐욕). 절벽 옆 칸에서는 ε 확률로 아래로 떨어질 수 있으므로 그 위험이 Q에 들어가, 결국 절벽에서 한 줄 떨어진 길을 고릅니다. ε → 0으로 줄이면 최적 경로로 수렴합니다."
+        : "<b>off-policy</b>: 행동은 ε-탐욕(행동 정책), 타깃은 탐욕(목표 정책). 그래서 탐험 중 떨어진 경험이 있어도 “앞으로는 최선만 한다”고 가정한 가치를 배워 최단 경로(절벽 끝)를 찾습니다. 경험 재사용(DQN의 리플레이 버퍼)이 가능한 이유도 off-policy이기 때문입니다.";
+    }
+    $(p + "Step").onclick = () => { stop(); step(); render(); };
+    $(p + "Ep").onclick = () => { stop(); const o = opt(); if (S.ag.s == null) S.ag.begin(o.eps); let r; do { r = S.ag.step(o.al, o.g, o.eps); } while (!(r.done || r.trunc)); render(); S.ag.begin(o.eps); };
+    $(p + "Add").onclick = () => { stop(); const o = opt(); if (S.ag.s != null && S.ag.t > 0) S.ag.episode(o.al, o.g, o.eps); for (let i = 0; i < 100; i++) S.ag.episode(o.al, o.g, o.eps); S.ag.last = null; S.ag.begin(o.eps); render(); };
+    $(p + "Play").onclick = () => { if (S.timer) { stop(); return; } $(p + "Play").textContent = "멈춤"; S.timer = setInterval(() => { step(); render(); }, reduce ? 700 : 260); };
+    $(p + "Reset").onclick = () => reset(0);
+    [p + "Env", p + "Slip", p + "Seed"].forEach(id => $(id).addEventListener("change", () => {
+      if (id === p + "Env") { const fl = $(p + "Env").value !== "cliff"; $(p + "A").value = fl ? 0.1 : 0.5; $(p + "G").value = fl ? 0.99 : 1; ["A", "G"].forEach(k => { $(p + k + "v").textContent = (+$(p + k).value).toFixed(2); }); }
+      reset(20); }));
+    ["A", "G", "E"].forEach(k => { $(p + k).oninput = () => { $(p + k + "v").textContent = (+$(p + k).value).toFixed(2); }; });
+    reset(20);
+    return { render, stop, step };
+  }
+  const SA = makeStepper("sa", "sarsa"), QL = makeStepper("ql", "q");
+
+  /* 타깃 계산기 */
+  function calc() {
+    const v = id => +$(id).value || 0, r = v("cR"), g = v("cG"), al = v("cA"), eps = Math.min(1, Math.max(0, v("cE"))), q = v("cQ"), qs = [0, 1, 2, 3].map(k => v("cQ" + k)), ap = +$("cAp").value;
+    const b = RL.argmax(qs), mx = Math.max(...qs), pi = qs.map((_, k) => eps / 4 + (k === b ? 1 - eps : 0)), ex = pi.reduce((s, p2, k) => s + p2 * qs[k], 0);
+    const box = (title, cls, boot, bootTxt) => { const t = r + g * boot, d = t - q, nw = q + al * d;
+      return "<div><h3 class='" + cls + "'>" + title + "</h3><p>" + bootTxt + "<br>타깃 = " + nfp(r) + " + " + nf(g) + " × " + nfp(boot) + " = <b class='k-t'>" + nf(t) + "</b><br>δ = " + nf(t) + " − " + nfp(q) + " = " + nf(d) + "<br>새 Q(s, a) = " + nf(q) + " + " + nf(al) + " × " + nfp(d) + " = <b class='k-v'>" + nf(nw) + "</b></p></div>"; };
+    $("calcOut").innerHTML = box("SARSA", "k-1", qs[ap], "Q(s′, a′=" + ARW[ap] + ") = " + nf(qs[ap])) +
+      box("Q-learning", "k-2", mx, "max Q(s′,·) = Q(s′, " + ARW[RL.argmax(qs)] + ") = " + nf(mx)) +
+      box("Expected SARSA", "k-3", ex, "Σ π(a′|s′) Q(s′,a′) = " + pi.map((p2, k) => nf(p2, 3) + "×" + nfp(qs[k], 2)).join(" + ") + " = " + nf(ex));
+  }
+  document.querySelectorAll("#calc input, #calc select").forEach(el => el.addEventListener("input", calc));
+
+  /* ================================================================
+     4. CliffWalking 비교
+     ================================================================ */
+  const CL = { timer: 0 }, CSPEED = [1, 2, 5, 20, 100];
+  function clReset() {
+    clStop(); const seed = Math.max(1, +$("clSeed").value || 1);
+    CL.algos = ["sarsa", "q"].concat($("clExp").checked ? ["exp"] : []);
+    CL.ag = {}; CL.algos.forEach(a => { CL.ag[a] = new Agent(a, RL.CliffWalking(), seed); });
+    CL.N = +$("clN").value; CL.done = false;
+    document.querySelector('#clView [data-v="exp"]').style.display = $("clExp").checked ? "" : "none";
+    if (segVal("clView") === "exp" && !$("clExp").checked) document.querySelector('#clView [data-v="path"]').click();
+    $("clRun").textContent = "학습 시작"; clRender();
+  }
+  function clTick(n) {
+    const al = +$("clA").value, eps = +$("clE").value; let ep = 0;
+    for (let i = 0; i < n; i++) { CL.algos.forEach(a => { const ag = CL.ag[a]; if (ag.ep < CL.N) ag.episode(al, 1, eps); }); }
+    return CL.ag.sarsa.ep;
+  }
+  function clStop() { if (CL.timer) { cancelAnimationFrame(CL.timer); CL.timer = 0; $("clRun").textContent = CL.ag && CL.ag.sarsa.ep >= CL.N ? "학습 완료" : "이어서 학습"; } }
+  function clLoop() { const ep = clTick(CSPEED[+$("clSp").value]); clRender(); if (ep >= CL.N) { clStop(); return; } CL.timer = requestAnimationFrame(clLoop); }
+  function clRender() {
+    if (!visible($("pane-cliff"))) return;
+    const C = COL(), env = CL.ag.sarsa.env, view = segVal("clView"), algos = CL.algos;
+    const gp = {}; algos.forEach(a => { gp[a] = CL.ag[a].greedyPath(80); });
+    const offs = { sarsa: -5, q: 5, exp: 0 };
+    if (view === "path") drawGridFit($("clCv"), env, { paths: algos.map(a => ({ path: gp[a].path, color: C[ALG[a].col.replace("--", "")], offset: offs[a] })), labels: false }, 80);
+    else { const ag = CL.ag[view] || CL.ag.sarsa; drawGridFit($("clCv"), env, { Q: ag.Q, paths: [{ path: gp[view] ? gp[view].path : [], color: C[ALG[view].col.replace("--", "")], offset: 0 }], fmt: v => Math.abs(v) >= 10 ? v.toFixed(0) : v.toFixed(1) }, 80); paintCliff($("clCv"), env); }
+    $("clLegend").innerHTML = algos.map(a => "<span><i style='background:var(" + ALG[a].col + ")'></i>" + ALG[a].name + " 탐욕 경로</span>").join("") + "<span><i style='background:" + RL.theme().cliff + "'></i>절벽 (−100, 시작점으로)</span>";
+    let h = "<thead><tr><th>알고리즘</th><th>에피소드</th><th>최근 100 평균 리턴</th><th>탐욕 경로</th><th>탐욕 경로 리턴</th><th>절벽 추락 (전체)</th><th>추락 (최근 100)</th></tr></thead><tbody>";
+    algos.forEach(a => { const ag = CL.ag[a], g = gp[a], r100 = ag.rets.slice(-100), f100 = ag.falls.slice(-100);
+      h += "<tr><td class='" + ALG[a].k + "'>" + ALG[a].name + "</td><td class='n'>" + ag.ep + "</td><td class='n'>" + (r100.length ? mean(r100).toFixed(1) : "—") + "</td><td class='n'>" + (g.ok ? g.steps + "걸음" : "목표 못 감") + "</td><td class='n'>" + (g.ok ? g.G : "—") +
+        "</td><td class='n'>" + ag.falls.reduce((x, y) => x + y, 0) + "</td><td class='n'>" + f100.reduce((x, y) => x + y, 0) + "</td></tr>"; });
+    $("clTable").innerHTML = h + "</tbody>";
+    const series = algos.map(a => { const ma = RL.movingAvg(CL.ag[a].rets, 10); return { x: ma.map((_, i) => i + 1), y: ma, color: C[ALG[a].col.replace("--", "")], label: ALG[a].name }; });
+    plot($("clCurve"), { series, ymin: -100, ymax: 0, xmin: 0, xmax: CL.N, hlines: [{ y: -13, color: C.faint, label: "최적 −13", dash: [3, 4] }], xlabel: "에피소드", h: 250 });
+    clSweepDraw();
+    const s = CL.ag.sarsa, q = CL.ag.q;
+    $("clNote").innerHTML = s.ep >= 100
+      ? "현재 설정에서 최근 100 에피소드 평균 리턴: <span class='k-1'>SARSA " + mean(s.rets.slice(-100)).toFixed(1) + "</span> vs <span class='k-2'>Q-learning " + mean(q.rets.slice(-100)).toFixed(1) + "</span>. 탐욕 경로는 SARSA " + (gp.sarsa.ok ? gp.sarsa.steps + "걸음" : "미완성") + ", Q-learning " + (gp.q.ok ? gp.q.steps + "걸음" : "미완성") + ". " +
+        "<b>검산</b> — α = 0.5, ε = 0.1, 500 에피소드, seed 1이면 Q-learning 탐욕 경로 = 절벽 끝 13걸음(−13), 최근 100 평균은 SARSA −28.2 vs Q-learning −50.1입니다. 학습이 끝난 뒤 ε을 0으로 두고 시험하면 Q-learning의 −13이 더 좋습니다 — 학습 중 성적과 최종 정책의 성적은 다른 문제입니다."
+      : "[학습 시작]을 누르면 두 에이전트가 같은 seed로 한 에피소드씩 번갈아 학습합니다. 각 에이전트는 자기 난수열을 쓰므로 서로 영향을 주지 않습니다.";
+  }
+  /* ε 스윕 */
+  let SW = null;
+  function clSweep() {
+    const al = +$("clA").value, N = +$("clN").value, seed = Math.max(1, +$("clSeed").value || 1), E = [0, 0.01, 0.025, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3], algos = ["sarsa", "q"].concat($("clExp").checked ? ["exp"] : []);
+    const res = {}; algos.forEach(a => { res[a] = E.map(eps => { let s = 0; for (let k = 0; k < 5; k++) { const ag = new Agent(a, RL.CliffWalking(), seed + k); for (let i = 0; i < N; i++) ag.episode(al, 1, eps); s += mean(ag.rets.slice(-100)); } return s / 5; }); });
+    SW = { E, res, algos, key: [al, N, seed, algos.join()].join("|") };
+  }
+  function clSweepDraw() {
+    const C = COL(), key = [+$("clA").value, +$("clN").value, Math.max(1, +$("clSeed").value || 1), CL.algos.join()].join("|");
+    if (!SW || SW.key !== key) clSweep();
+    const series = SW.algos.map(a => ({ x: SW.E, y: SW.res[a], color: C[ALG[a].col.replace("--", "")], label: ALG[a].name, dots: true }));
+    plot($("clSweep"), { series, xmin: 0, xmax: 0.3, ymin: Math.min(-100, ...series.map(s => Math.min(...s.y))) , ymax: 0, xticks: [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3].map(x => ({ x, l: String(x) })), xlabel: "ε", h: 250 });
+    const i0 = SW.E.indexOf(0), i1 = SW.E.indexOf(0.1), i3 = SW.E.indexOf(0.3);
+    const gap = i => (SW.res.sarsa[i] - SW.res.q[i]).toFixed(1);
+    $("clSweepTxt").innerHTML = "SARSA − Q-learning 차이: ε = 0.3 → <b>" + gap(i3) + "</b>, ε = 0.1 → <b>" + gap(i1) + "</b>, ε = 0 → <b>" + gap(i0) + "</b>. ε가 0에 가까울수록 두 타깃(Q(s′,a′)와 max Q)이 같아져 차이가 사라집니다.";
+  }
+  $("clRun").onclick = () => { if (CL.timer) { clStop(); return; } if (CL.ag.sarsa.ep >= CL.N) clReset(); $("clRun").textContent = "멈춤"; CL.timer = requestAnimationFrame(clLoop); };
+  $("clFinish").onclick = () => { clStop(); clTick(CL.N); clStop(); clRender(); };
+  $("clReset").onclick = clReset;
+  ["clSeed", "clN", "clExp"].forEach(id => $(id).addEventListener("change", clReset));
+  $("clA").oninput = () => { $("clAv").textContent = (+$("clA").value).toFixed(2); }; $("clA").onchange = clReset;
+  $("clE").oninput = () => { $("clEv").textContent = (+$("clE").value).toFixed(2); }; $("clE").onchange = clReset;
+  $("clSp").oninput = () => { $("clSpv").textContent = CSPEED[+$("clSp").value]; };
+  seg("clView", () => clRender());
+
+  /* ================================================================
+     5. FrozenLake 실습
+     ================================================================ */
+  const FZ = { timer: 0 }, FSPEED = [5, 20, 50, 200, 1000];
+  function fzReset() {
+    fzStop(); FZ.env = makeEnv($("fzMap").value === "8x8" ? "fl8" : "fl4", $("fzSlip").checked);
+    FZ.algo = segVal("fzAlgo"); FZ.ag = new Agent(FZ.algo, FZ.env, Math.max(1, +$("fzSeed").value || 1));
+    FZ.N = +$("fzN").value; FZ.g = +$("fzG").value; FZ.Vs = valueIter(FZ.env, FZ.g); FZ.ex = [0]; FZ.ev = [0]; FZ.test = null;
+    $("fzRun").textContent = "학습 시작"; fzRender();
+  }
+  const fzEps = () => Math.max(0.05, 1 - 0.95 * FZ.ag.ep / (FZ.N * 0.6));
+  function fzEval() { const pol = FZ.ag.Q.map(q => RL.argmax(q)); FZ.ex.push(FZ.ag.ep); FZ.ev.push(policyEval(FZ.env, pol, FZ.g, 1e-7, 3000)[FZ.env.start]); }
+  function fzTick(n) { const al = +$("fzA").value, every = Math.max(10, Math.round(FZ.N / 150));
+    for (let i = 0; i < n && FZ.ag.ep < FZ.N; i++) { FZ.ag.episode(al, FZ.g, fzEps()); if (FZ.ag.ep % every === 0 || FZ.ag.ep === FZ.N) fzEval(); } }
+  function fzStop() { if (FZ.timer) { cancelAnimationFrame(FZ.timer); FZ.timer = 0; $("fzRun").textContent = FZ.ag && FZ.ag.ep >= FZ.N ? "학습 완료" : "이어서 학습"; } }
+  function fzLoop() { fzTick(FSPEED[+$("fzSp").value]); fzRender(); if (FZ.ag.ep >= FZ.N) { fzStop(); return; } FZ.timer = requestAnimationFrame(fzLoop); }
+  function fzRender() {
+    if (!visible($("pane-frozen"))) return;
+    const C = COL(), ag = FZ.ag, env = FZ.env, seen = s => ag.Q[s].some(v => v !== 0);
+    drawGridFit($("fzCv"), env, { V: ag.Q.map(q => Math.max(...q)), policy: ag.Q.map((q, s) => seen(s) ? RL.argmax(q) : null), fmt: v => v.toFixed(2) }, 84);
+    const succ = ag.rets.map(v => v > 0 ? 1 : 0), ma = RL.movingAvg(succ, 100), st = Math.max(1, Math.floor(ma.length / 600)), sx = [], sy = [];
+    for (let i = 0; i < ma.length; i += st) { sx.push(i + 1); sy.push(ma[i]); }
+    plot($("fzCurve"), { series: [{ x: sx, y: sy, color: C.r, label: "성공률 (ε-탐욕)" }], ymin: 0, ymax: 1, xmin: 0, xmax: FZ.N, xlabel: "에피소드", h: 190 });
+    const v0 = FZ.Vs[env.start];
+    plot($("fzErr"), { series: [{ x: FZ.ex, y: FZ.ev, color: C[ALG[FZ.algo].col.replace("--", "")], label: "V^π(s₀) 탐욕 정책" }], hlines: [{ y: v0, color: C.ink, label: "V*(s₀) " + v0.toFixed(4) }], ymin: 0, ymax: Math.max(0.1, v0 * 1.2), xmin: 0, xmax: FZ.N, xlabel: "에피소드", h: 190 });
+    const last = FZ.ev[FZ.ev.length - 1];
+    $("fzStats").innerHTML = stat("에피소드", ag.ep.toLocaleString() + " / " + FZ.N.toLocaleString()) + stat("현재 ε", fzEps().toFixed(3), "k-x") +
+      stat("최근 100 성공률", ag.rets.length ? (mean(succ.slice(-100)) * 100).toFixed(0) + "%" : "—") + stat("탐욕 V^π(s₀)", last.toFixed(4), ALG[FZ.algo].k) + stat("최적 V*(s₀)", v0.toFixed(4)) +
+      (FZ.test ? stat("시험 성공률 (ε = 0)", (FZ.test * 100).toFixed(1) + "%") : "");
+    $("fzNote").innerHTML = "<b>검산</b> — 미끄러운 4×4, γ = 0.99의 V*(s₀) = 0.5420, 8×8은 0.4146 (가치 반복, env.P). 학습 곡선의 성공률은 탐험 중 행동이라 시험 성공률(ε = 0)보다 낮습니다. 미끄러운 얼음에서는 최적 정책도 매번 성공하지 못합니다(V*는 할인된 성공 확률). " +
+      "표 기반 TD 세 방법 모두 ε을 줄이며 학습하면 V*에 가까워지지만, 8×8은 보상이 드물어 2만 에피소드가 필요합니다.";
+  }
+  function fzTestRun() {
+    const env = makeEnv($("fzMap").value === "8x8" ? "fl8" : "fl4", $("fzSlip").checked), rng = RL.rng(4242), pol = FZ.ag.Q.map(q => RL.argmax(q)); let ok = 0;
+    for (let i = 0; i < 1000; i++) { let s = env.reset(); for (;;) { const o = env.step(pol[s], rng); s = o.s; if (o.done || o.truncated) { if (o.r > 0) ok++; break; } } }
+    FZ.test = ok / 1000; fzRender();
+  }
+  $("fzRun").onclick = () => { if (FZ.timer) { fzStop(); return; } if (FZ.ag.ep >= FZ.N) fzReset(); $("fzRun").textContent = "멈춤"; FZ.timer = requestAnimationFrame(fzLoop); };
+  $("fzReset").onclick = fzReset; $("fzTest").onclick = fzTestRun;
+  ["fzMap", "fzSlip", "fzN", "fzSeed"].forEach(id => $(id).addEventListener("change", () => { if (id === "fzMap") $("fzN").value = $("fzMap").value === "8x8" ? "20000" : "5000"; fzReset(); }));
+  $("fzA").oninput = () => { $("fzAv").textContent = (+$("fzA").value).toFixed(2); }; $("fzA").onchange = fzReset;
+  $("fzG").oninput = () => { $("fzGv").textContent = (+$("fzG").value).toFixed(2); }; $("fzG").onchange = fzReset;
+  $("fzSp").oninput = () => { $("fzSpv").textContent = FSPEED[+$("fzSp").value]; };
+  seg("fzAlgo", () => fzReset());
+
+  /* ================================================================
+     6. 코드
+     ================================================================ */
+  function genCode() {
+    const al = (+$("clA").value).toFixed(2), eps = (+$("clE").value).toFixed(2), N = $("clN").value, seed = $("clSeed").value;
+    const fmap = $("fzMap").value, fslip = $("fzSlip").checked ? "True" : "False", falgo = segVal("fzAlgo"), fal = (+$("fzA").value).toFixed(2), fg = (+$("fzG").value).toFixed(2), fN = $("fzN").value, fseed = $("fzSeed").value;
+    const L = ["import numpy as np", "import gymnasium as gym", ""];
+    if ($("codeRW").checked) {
+      L.push("# ---------- 1) TD(0) 예측: 무작위 걷기 5상태 (A~E, 오른쪽 끝 +1) ----------",
+        "def td0_random_walk(n_episodes=100, alpha=" + (+$("rwA").value).toFixed(2) + ", seed=" + $("rwSeed").value + "):", "    rng = np.random.default_rng(seed)",
+        "    V = np.array([0, .5, .5, .5, .5, .5, 0])     # 0, 6 = 종료 상태", "    for _ in range(n_episodes):", "        s = 3                                      # C에서 시작",
+        "        while s not in (0, 6):", "            s2 = s + (1 if rng.random() < 0.5 else -1)", "            r = 1.0 if s2 == 6 else 0.0",
+        "            V[s] += alpha * (r + V[s2] - V[s])       # γ = 1, 종료 상태 V = 0", "            s = s2", "    return V[1:6]", "",
+        "print(\"TD(0) V(A..E):\", td0_random_walk().round(3), \" 참값:\", (np.arange(1, 6) / 6).round(3))", "");
+    }
+    L.push("# ---------- 2) 공통: ε-탐욕과 세 가지 TD 제어 ----------",
+      "def eps_greedy(Q, s, eps, rng):", "    if rng.random() < eps:", "        return int(rng.integers(Q.shape[1]))", "    best = np.flatnonzero(Q[s] == Q[s].max())", "    return int(rng.choice(best))", "",
+      "def train(env, algo, n_episodes, alpha, gamma, eps_fn, seed):", "    rng = np.random.default_rng(seed)", "    Q = np.zeros((env.observation_space.n, env.action_space.n))", "    returns = []",
+      "    for ep in range(n_episodes):", "        eps = eps_fn(ep)", "        s, _ = env.reset(seed=seed + ep)", "        a = eps_greedy(Q, s, eps, rng)", "        G, done = 0.0, False",
+      "        while not done:", "            s2, r, term, trunc, _ = env.step(a)", "            G += r; done = term or trunc",
+      "            if algo == \"sarsa\":", "                a2 = eps_greedy(Q, s2, eps, rng)", "                boot = Q[s2, a2]                           # 실제로 할 다음 행동 (on-policy)",
+      "            elif algo == \"q\":", "                boot = Q[s2].max()                         # 다음 상태의 최댓값 (off-policy)",
+      "            else:                                          # Expected SARSA", "                pi = np.full(Q.shape[1], eps / Q.shape[1]); pi[Q[s2].argmax()] += 1 - eps",
+      "                boot = pi @ Q[s2]", "            target = r + (0.0 if term else gamma * boot)", "            Q[s, a] += alpha * (target - Q[s, a])",
+      "            s = s2", "            a = a2 if algo == \"sarsa\" else eps_greedy(Q, s, eps, rng)", "        returns.append(G)", "    return Q, returns", "");
+    if ($("codeCliff").checked) {
+      L.push("# ---------- 3) CliffWalking: SARSA vs Q-learning (행동 0↑ 1→ 2↓ 3←, 시뮬레이터와 같음) ----------",
+        "cliff = gym.make(\"CliffWalking-v1\")", "def greedy_path(Q, start=36, goal=47, limit=60):", "    path, s = [start], start",
+        "    for _ in range(limit):", "        r, c = divmod(s, 12); a = int(Q[s].argmax())", "        r, c = r + [-1, 0, 1, 0][a], c + [0, 1, 0, -1][a]",
+        "        r, c = min(max(r, 0), 3), min(max(c, 0), 11); s = r * 12 + c", "        if 37 <= s <= 46: s = start                 # 절벽", "        path.append(s)", "        if s == goal: break", "    return path", "");
+      L.push("for algo in [\"sarsa\", \"q\"]:",
+        "    Q, rets = train(cliff, algo, n_episodes=" + N + ", alpha=" + al + ", gamma=1.0, eps_fn=lambda ep: " + eps + ", seed=" + seed + ")",
+        "    p = greedy_path(Q)", "    print(f\"{algo:6s} 최근 100 평균 리턴 {np.mean(rets[-100:]):7.1f} | 탐욕 경로 {len(p) - 1}걸음\")",
+        "# 학습 중 리턴은 SARSA가 높고(안전한 길), 탐욕 경로는 Q-learning이 13걸음(절벽 끝 최단 경로)", "");
+    }
+    if ($("codeFL").checked) {
+      L.push("# ---------- 4) FrozenLake 실습 (Gymnasium 행동 0← 1↓ 2→ 3↑ — 시뮬레이터와 다름) ----------",
+        "lake = gym.make(\"FrozenLake-v1\", map_name=\"" + fmap + "\", is_slippery=" + fslip + ")", "n_ep = " + fN,
+        "Q, rets = train(lake, \"" + falgo + "\", n_episodes=n_ep, alpha=" + fal + ", gamma=" + fg + ",",
+        "                eps_fn=lambda ep: max(0.05, 1 - 0.95 * ep / (0.6 * n_ep)), seed=" + fseed + ")",
+        "print(np.array(list('←↓→↑'))[Q.argmax(1)].reshape(" + (fmap === "8x8" ? "8, 8" : "4, 4") + "))", "",
+        "# 탐욕 정책의 실제 가치 (env.P로 정책 평가) vs V* (가치 반복)", "P, nS = lake.unwrapped.P, lake.observation_space.n", "gamma = " + fg,
+        "q = lambda V, s, a: sum(p * (r + (0 if d else gamma * V[s2])) for p, s2, r, d in P[s][a])",
+        "V_star, V_pi, pol = np.zeros(nS), np.zeros(nS), Q.argmax(1)", "for _ in range(3000):",
+        "    V_star = np.array([max(q(V_star, s, a) for a in range(4)) for s in range(nS)])", "    V_pi = np.array([q(V_pi, s, pol[s]) for s in range(nS)])",
+        "print(\"V*(0) =\", V_star[0].round(4), \" 탐욕 V^π(0) =\", V_pi[0].round(4))");
+    }
+    return L.join("\n");
+  }
+  function renderCode() { $("codeOut").textContent = genCode(); }
+  ["codeRW", "codeCliff", "codeFL"].forEach(id => $(id).addEventListener("change", renderCode));
+  async function copyText(txt, msgEl) {
+    let ok = false;
+    try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(txt); ok = true; } } catch (e) { ok = false; }
+    if (!ok) { try { const ta = document.createElement("textarea"); ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); ok = document.execCommand("copy"); ta.remove(); } catch (e) { ok = false; } }
+    msgEl.textContent = ok ? "복사했습니다" : "복사하지 못했습니다. 직접 선택해 복사하세요"; setTimeout(() => { msgEl.textContent = ""; }, 2200);
+  }
+  $("codeCopy").onclick = () => copyText($("codeOut").textContent, $("codeMsg"));
+
+  /* ================= 탭 · 렌더링 ================= */
+  const tabs = [...document.querySelectorAll(".sk-tab")];
+  const activeTab = () => (tabs.find(b => b.getAttribute("aria-selected") === "true") || tabs[0]).id.replace("tab-", "");
+  function render() {
+    const t = activeTab();
+    try { (({ td0: rwRender, sarsa: SA.render, qlearn: () => { QL.render(); calc(); }, cliff: clRender, frozen: fzRender, code: renderCode })[t] || function () {})(); }
+    catch (err) { console.error(err); }
+  }
+  function show(t) {
+    tabs.forEach(b => { const on = b === t; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1; $(b.getAttribute("aria-controls")).hidden = !on; });
+    history.replaceState(null, "", "#" + t.id.replace("tab-", ""));
+    rwStop(); SA.stop(); QL.stop(); if (t.id !== "tab-cliff") clStop(); if (t.id !== "tab-frozen") fzStop();
+    render();
+    if (t.id === "tab-frozen" && !FZ.auto) { FZ.auto = true; if (FZ.ag.ep === 0) { if (reduce) { fzTick(FZ.N); fzRender(); } else $("fzRun").click(); } }
+    if (t.id === "tab-cliff" && !CL.auto) { CL.auto = true; if (CL.ag.sarsa.ep === 0) { if (reduce) $("clFinish").click(); else $("clRun").click(); } }
+  }
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => show(b));
+    b.addEventListener("keydown", e => { const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return;
+      const n = tabs[(i + d + tabs.length) % tabs.length]; show(n); n.focus(); e.preventDefault(); });
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key !== "ArrowRight") return; const tg = e.target;
+    if (tg && (/^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName) || tg.getAttribute("role") === "tab" || tg.isContentEditable || tg.closest(".dgv"))) return;
+    const t = activeTab();
+    if (t === "td0") { $("rwStep").click(); e.preventDefault(); } else if (t === "sarsa") { $("saStep").click(); e.preventDefault(); } else if (t === "qlearn") { $("qlStep").click(); e.preventDefault(); }
+  });
+  let rz = 0; window.addEventListener("resize", () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(render); });
+  RL.onTheme(render);
+
+  /* 초기화: 무작위 걷기는 강의 예제(seed 27)의 첫 에피소드를 끝낸 상태로 시작 */
+  rwReset(); rwEpisode(); clReset(); fzReset();
+  const start = $("tab-" + location.hash.slice(1)); if (start) show(start); else render();
+})();
+</script>
+</body>
+</html>

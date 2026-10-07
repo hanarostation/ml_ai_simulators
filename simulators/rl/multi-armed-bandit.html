@@ -1,0 +1,913 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Multi-armed Bandit (ε-greedy · UCB · Thompson Sampling) | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261007a">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 강화학습 공통 색: 상태·환경 파랑 · 행동·정책 주황 · 보상 초록(음수 빨강) · 가치 보라 · 목표값 분홍 · 탐험 황토 */
+:root{
+  --sk-accent: var(--cat-rl);
+  --c-state:#2563EB; --c-act:#EA580C; --c-rew:#16A34A; --c-neg:#DC2626; --c-val:#7C3AED; --c-tgt:#DB2777; --c-exp:#B7791F; --c-ts:#0D9488; --c-gray:#5B6578;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --c-state:#79A6F6; --c-act:#F59A5C; --c-rew:#5CCB82; --c-neg:#F07A7A; --c-val:#B597FF; --c-tgt:#F472B6; --c-exp:#E3B455; --c-ts:#45CFBF; --c-gray:#A3ACBD;
+} }
+:root[data-theme="dark"]{
+  --c-state:#79A6F6; --c-act:#F59A5C; --c-rew:#5CCB82; --c-neg:#F07A7A; --c-val:#B597FF; --c-tgt:#F472B6; --c-exp:#E3B455; --c-ts:#45CFBF; --c-gray:#A3ACBD;
+}
+.mb-env{display:flex;flex-wrap:wrap;gap:12px 22px;align-items:end}
+.mb-env .sk-slider{min-width:160px}
+.mb-seed{width:84px}
+.mb-ptrue{font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+.c-state{color:var(--c-state)} .c-act{color:var(--c-act)} .c-rew{color:var(--c-rew)} .c-neg{color:var(--c-neg)} .c-val{color:var(--c-val)} .c-exp{color:var(--c-exp)} .c-ts{color:var(--c-ts)} .c-tgt{color:var(--c-tgt)}
+.mb-loop{width:100%;max-width:560px;height:auto;display:block;margin:0 auto}
+.mb-loop .bx{fill:var(--surface-2);stroke-width:2}
+.mb-loop .t{fill:var(--ink);font-family:var(--sans);font-size:15px;font-weight:700}
+.mb-loop .s{fill:var(--muted);font-family:var(--sans);font-size:12.5px}
+.mb-loop .ag{stroke:var(--c-act)} .mb-loop .en{stroke:var(--c-state)}
+.mb-loop .la{stroke:var(--c-act);fill:none;stroke-width:2.4} .mb-loop .ha{fill:var(--c-act)}
+.mb-loop .lr{stroke:var(--c-rew);fill:none;stroke-width:2.4} .mb-loop .hr{fill:var(--c-rew)}
+.mb-loop .ta{fill:var(--c-act);font-family:var(--sans);font-size:13px;font-weight:700}
+.mb-loop .tr{fill:var(--c-rew);font-family:var(--sans);font-size:13px;font-weight:700}
+.mb-loop .tc{fill:var(--c-state);font-family:var(--sans);font-size:13px;font-weight:700}
+.mb-arms{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px}
+.mb-arm{appearance:none;font:inherit;text-align:left;border:1.5px solid var(--line-strong);background:var(--surface);color:var(--ink);border-radius:12px;padding:10px 11px;cursor:pointer;display:flex;flex-direction:column;gap:4px;min-width:0}
+.mb-arm:hover{background:var(--surface-2)}
+.mb-arm:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.mb-arm.last{border-color:var(--c-act)}
+.mb-arm .nm{font-weight:700;font-size:14px}
+.mb-arm .q{font-family:var(--mono);font-size:20px;font-weight:600;color:var(--c-val);line-height:1.2}
+.mb-arm .cnt{font-size:12px;color:var(--muted);font-family:var(--mono)}
+.mb-arm .bar{height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden;position:relative}
+.mb-arm .bar i{position:absolute;left:0;top:0;bottom:0;background:var(--c-val)}
+.mb-arm .bar b{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink)}
+.mb-arm .pt{font-size:12px;color:var(--faint);font-family:var(--mono)}
+.mb-arm .res{font-size:12px;font-weight:700;min-height:16px}
+.mb-log{font-family:var(--mono);font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 10px;min-height:20px}
+.mb-log span b{font-weight:700}
+.mb-player{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.mb-player .sk-group{gap:6px}
+.mb-tnow{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--ink);min-width:110px}
+.mb-cv{display:block;width:100%}
+.mb-step{display:flex;flex-direction:column;gap:10px}
+.mb-step ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.mb-step ol li::marker{font-weight:700;color:var(--muted)}
+.mb-tag{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:1px 8px;border:1px solid currentColor;margin-right:4px}
+.mb-tbl td.hl,.mb-tbl tr.hl td{background:color-mix(in srgb,var(--c-act) 12%,var(--surface))}
+.mb-tbl tr.hl td:first-child{box-shadow:inset 3px 0 0 var(--c-act)}
+.mb-legend i.dash{background:none;border-top:2px dashed var(--ink);height:0;border-radius:0;vertical-align:3px}
+.mb-prog{height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden;flex:1 1 160px;max-width:300px}
+.mb-prog i{display:block;height:100%;width:0;background:var(--sk-accent)}
+.mb-code{margin:0;font-family:var(--mono);font-size:13px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;white-space:pre;color:var(--ink);tab-size:4;max-height:640px}
+.mb-code .cm{color:var(--muted)}
+.mb-code .kw{color:var(--c-state);font-weight:600}
+.mb-code .nu{color:var(--c-act)}
+.mb-algos{display:flex;flex-wrap:wrap;gap:6px 16px}
+.mb-algos i{display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:4px;margin-right:2px}
+@media (max-width:520px){
+  .mb-code{font-size:12px;padding:12px}
+  .mb-arms{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mb-env .sk-slider{min-width:140px}
+}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+      <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a href="../../index.html#rl" style="--c:var(--cat-rl)" aria-current="page">강화학습</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#rl" style="--c:var(--cat-rl)">강화학습</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">Multi-armed Bandit (ε-greedy · UCB · Thompson Sampling)</h1>
+      <p class="ds-hero__lede">성공률을 모르는 여러 치료법(팔) 가운데 하나를 매번 골라 결과를 보고 배우는 문제입니다. 세 가지 알고리즘이 탐험과 활용의 균형을 어떻게 잡는지 한 걸음씩 따라가고, 여러 번 반복한 누적 후회로 비교합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <section class="sk-card" aria-label="환경 설정">
+    <div class="sk-head"><h2>환경 설정</h2><span class="sk-hint">모든 탭이 같은 환경을 씁니다 · 바꾸면 처음부터 다시 계산</span></div>
+    <div class="mb-env">
+      <div class="sk-group"><span class="sk-label">상황</span>
+        <div class="sk-seg" role="group" aria-label="상황 선택" id="segScen">
+          <button type="button" data-v="treat" aria-pressed="true">치료법 5종</button>
+          <button type="button" data-v="msg" aria-pressed="false">알림 문구 10종</button>
+          <button type="button" data-v="rand" aria-pressed="false">무작위 k개</button>
+        </div>
+      </div>
+      <label class="sk-slider" id="kRandWrap" hidden><span class="sk-sl-head">팔 개수 k <b id="kRandV">6</b></span><input type="range" id="kRand" min="2" max="10" step="1" value="6"></label>
+      <label class="sk-slider"><span class="sk-sl-head">한 실험의 걸음 수 T <b id="TV">500</b></span><input type="range" id="Tsl" min="100" max="2000" step="100" value="500"></label>
+      <div class="sk-group"><span class="sk-label">seed</span><input class="sk-input mb-seed" type="number" id="seed" value="7" min="1" max="99999" aria-label="seed"><button class="sk-btn sk-btn--sm" type="button" id="btnSeed">새 seed</button></div>
+    </div>
+    <p class="sk-note" id="envNote"></p>
+  </section>
+
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button class="sk-tab" type="button" role="tab" id="tab-problem" aria-controls="pane-problem" aria-selected="true"><span class="sk-num">1</span>문제 정의</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-egreedy" aria-controls="pane-egreedy" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>ε-greedy</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-ucb" aria-controls="pane-ucb" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>UCB</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-thompson" aria-controls="pane-thompson" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>Thompson Sampling</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-compare" aria-controls="pane-compare" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>비교 실험</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>코드</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>알고리즘 구성도</button>
+  </nav>
+
+  <!-- 1. 문제 정의 -->
+  <section id="pane-problem" role="tabpanel" aria-labelledby="tab-problem">
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>에이전트–환경 루프</h2><span class="sk-hint">상태가 하나뿐인 강화학습</span></div>
+        <svg class="mb-loop" viewBox="0 0 560 230" role="img" aria-label="에이전트가 팔을 고르면 환경이 0 또는 1의 보상을 돌려주는 루프">
+          <defs>
+            <marker id="mbHa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ha" d="M0 0L10 5L0 10z"/></marker>
+            <marker id="mbHr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="hr" d="M0 0L10 5L0 10z"/></marker>
+          </defs>
+          <rect class="bx ag" x="16" y="66" width="170" height="96" rx="12"/>
+          <text class="t" x="101" y="102" text-anchor="middle">에이전트</text>
+          <text class="s" x="101" y="124" text-anchor="middle">추정값 Q(a) · 횟수 N(a)</text>
+          <text class="s" x="101" y="143" text-anchor="middle">또는 사후분포 Beta(α, β)</text>
+          <rect class="bx en" x="372" y="66" width="172" height="96" rx="12"/>
+          <text class="t" x="458" y="102" text-anchor="middle">환경 (팔 k개)</text>
+          <text class="s" x="458" y="124" text-anchor="middle">실제 성공률 p₁ … p_k</text>
+          <text class="s" x="458" y="143" text-anchor="middle">에이전트에게는 숨김</text>
+          <path class="la" d="M186 88 C 260 30, 300 30, 370 88" marker-end="url(#mbHa)"/>
+          <text class="ta" x="278" y="34" text-anchor="middle">행동 aₜ = 팔(치료법) 하나 선택</text>
+          <path class="lr" d="M372 142 C 300 200, 260 200, 188 142" marker-end="url(#mbHr)"/>
+          <text class="tr" x="278" y="214" text-anchor="middle">보상 rₜ ∈ {0 실패, 1 성공} ~ Bernoulli(p_a)</text>
+          <text class="tc" x="278" y="120" text-anchor="middle">t = 1, 2, …, T</text>
+        </svg>
+        <dl class="sk-kv">
+          <dt>목표</dt><dd>T번 동안 누적 보상 Σ rₜ 최대</dd>
+          <dt>가치</dt><dd>q*(a) = E[r | a] = p_a</dd>
+          <dt>후회(regret)</dt><dd>T·p* − Σ p_aₜ</dd>
+        </dl>
+        <p class="sk-note"><b>탐험(Exploration)</b>: 덜 해 본 팔을 당겨 정보를 모은다. <b>활용(Exploitation)</b>: 지금까지 가장 좋아 보이는 팔을 당긴다. 한 번 당길 때 둘 중 하나만 할 수 있으므로 균형이 필요합니다.</p>
+        <p class="sk-note sk-note--warn">적응형 임상시험(adaptive trial)을 단순화한 교육용 예시입니다. 실제 환자 배정에는 윤리 심의, 사전 등록된 통계 설계, 안전성 중간 분석이 필요합니다.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>직접 당겨 보기</h2><span class="sk-hint">카드를 누르면 그 팔을 한 번 당깁니다</span></div>
+        <div class="mb-arms" id="arms"></div>
+        <div class="sk-controls">
+          <button class="sk-btn" type="button" id="btnEach">한 번씩 당겨 보기</button>
+          <button class="sk-btn" type="button" id="btnRand20">무작위로 20번</button>
+          <button class="sk-btn" type="button" id="btnGreedy20">가장 좋아 보이는 팔로 20번</button>
+          <button class="sk-btn" type="button" id="btnManReset">처음부터</button>
+          <label class="sk-check"><input type="checkbox" id="chkReveal">실제 성공률 공개</label>
+        </div>
+        <div class="sk-stats" id="manStats"></div>
+        <div><div class="sk-mat-label">최근 기록</div><div class="mb-log" id="manLog" aria-live="polite"></div></div>
+        <p class="sk-note" id="manNote">표본 평균 Q(a) = 성공 수 / 시도 수. 몇 번만 당기면 운에 크게 흔들립니다. 성공률을 공개해 추정이 얼마나 빗나가는지 확인해 보세요.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. ε-greedy -->
+  <section id="pane-egreedy" role="tabpanel" aria-labelledby="tab-egreedy" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>ε-greedy — 확률 ε로 탐험, 나머지는 활용</h2><span class="sk-hint">→ 키: 다음 걸음</span></div>
+      <div class="sk-formula">aₜ = <span class="c-exp">무작위 팔</span> (확률 ε) · <span class="c-act">argmax<sub>a</sub> Q(a)</span> (확률 1 − ε)<br>N(a) ← N(a) + 1 ,  <span class="c-val">Q(a) ← Q(a) + ( r − Q(a) ) / N(a)</span>   <span class="c-gray" style="color:var(--muted)">… 표본 평균을 저장 없이 한 번에 갱신 (증분 평균)</span></div>
+      <div class="sk-controls">
+        <label class="sk-slider"><span class="sk-sl-head">ε (탐험 확률) <b id="epsV">0.10</b></span><input type="range" id="eps" min="0" max="1" step="0.01" value="0.10"></label>
+        <label class="sk-check"><input type="checkbox" id="chkDecay">ε 감쇠 εₜ = max(0.01, ε·dᵗ) (켜면 ε = 1에서 시작)</label>
+        <label class="sk-slider" id="decayWrap" hidden><span class="sk-sl-head">감쇠율 d <b id="decayV">0.990</b></span><input type="range" id="decay" min="0.95" max="0.999" step="0.001" value="0.99"></label>
+      </div>
+      <div class="mb-player" data-player="e"></div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h3>팔별 추정값 Q(a)</h3><span class="sk-legend mb-legend"><span><i style="background:var(--c-val)"></i>Q(a)</span><span><i class="dash"></i>실제 p (에이전트는 모름)</span><span><i style="background:var(--c-act)"></i>이번 선택</span></span></div>
+        <div><canvas class="mb-cv" id="cvE" aria-label="팔별 추정값 막대그래프"></canvas></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h3 id="stepTitleE">이번 걸음</h3></div>
+        <div class="mb-step" id="stepE"></div>
+        <div class="sk-stats" id="statsE"></div>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card"><div class="sk-head"><h3>누적 평균 보상</h3><span class="sk-hint">점선 = 최적 팔의 성공률 p*</span></div><div><canvas class="mb-cv" id="chE1" aria-label="누적 평균 보상 곡선"></canvas></div></div>
+      <div class="sk-card"><div class="sk-head"><h3>누적 후회</h3><span class="sk-hint">Σ (p* − p_aₜ) · 낮을수록 좋음</span></div><div><canvas class="mb-cv" id="chE2" aria-label="누적 후회 곡선"></canvas></div></div>
+    </div>
+  </section>
+
+  <!-- 3. UCB -->
+  <section id="pane-ucb" role="tabpanel" aria-labelledby="tab-ucb" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>UCB — 불확실한 팔에 보너스를 얹어 낙관적으로 고른다</h2><span class="sk-hint">→ 키: 다음 걸음</span></div>
+      <div class="sk-formula">aₜ = argmax<sub>a</sub> [ <span class="c-val">Q(a)</span> + <span class="c-exp">c · √( ln t / N(a) )</span> ] ,  N(a) = 0 이면 보너스 = ∞ (먼저 한 번씩)<br><span style="color:var(--muted)">많이 당긴 팔일수록 N(a)가 커져 보너스가 줄고, 오래 안 당긴 팔은 ln t가 자라며 보너스가 다시 커진다</span></div>
+      <div class="sk-controls">
+        <label class="sk-slider"><span class="sk-sl-head">c (탐험 세기) <b id="cV">0.50</b></span><input type="range" id="cUcb" min="0" max="3" step="0.01" value="0.50"></label>
+        <span class="sk-hint">이론값은 c = √2 ≈ 1.41 (UCB1) — 실제로는 더 작은 c가 잘 맞는 경우가 많음 · c = 0 이면 탐욕(greedy)</span>
+      </div>
+      <div class="mb-player" data-player="u"></div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h3>이번 걸음에서 비교한 값 (갱신 전)</h3><span class="sk-legend mb-legend"><span><i style="background:var(--c-val)"></i>Q(a)</span><span><i style="background:var(--c-exp)"></i>보너스</span><span><i class="dash"></i>실제 p</span></span></div>
+        <div><canvas class="mb-cv" id="cvU" aria-label="UCB 값을 Q와 보너스로 나눈 막대그래프"></canvas></div>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h3 id="stepTitleU">이번 걸음</h3></div>
+        <div class="mb-step" id="stepU"></div>
+        <div class="sk-stats" id="statsU"></div>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card"><div class="sk-head"><h3>팔별 선택 횟수 N(a)</h3><span class="sk-hint">좋은 팔에 몰리지만 다른 팔도 가끔 확인</span></div><div><canvas class="mb-cv" id="chU1" aria-label="팔별 선택 횟수"></canvas></div></div>
+      <div class="sk-card"><div class="sk-head"><h3>누적 후회</h3><span class="sk-hint">Σ (p* − p_aₜ)</span></div><div><canvas class="mb-cv" id="chU2" aria-label="누적 후회 곡선"></canvas></div></div>
+    </div>
+  </section>
+
+  <!-- 4. Thompson Sampling -->
+  <section id="pane-thompson" role="tabpanel" aria-labelledby="tab-thompson" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>Thompson Sampling — 사후분포에서 하나씩 뽑아 가장 큰 팔을 고른다</h2><span class="sk-hint">→ 키: 다음 걸음</span></div>
+      <div class="sk-formula">사전분포 p_a ~ Beta(1, 1) (균등) · 매 걸음 <span class="c-exp">θ̃_a ~ Beta(α_a, β_a)</span> 를 뽑아 aₜ = argmax<sub>a</sub> θ̃_a<br>보상을 보면 <span class="c-val">α_a ← α_a + r ,  β_a ← β_a + (1 − r)</span>   <span style="color:var(--muted)">… 성공은 α, 실패는 β에 1씩 더함 · 평균 = α / (α + β)</span></div>
+      <div class="mb-player" data-player="t"></div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h3>팔별 사후분포 Beta(α, β)</h3><span class="sk-legend mb-legend"><span><i style="background:var(--c-val)"></i>갱신 전</span><span><i style="background:var(--c-act)"></i>선택한 팔의 갱신 후</span><span><i style="background:var(--c-exp)"></i>뽑은 θ̃</span><span><i class="dash"></i>실제 p</span></span></div>
+        <div><canvas class="mb-cv" id="cvT" aria-label="팔별 베타 사후분포 곡선"></canvas></div>
+        <p class="sk-hint" style="margin:0">곡선 높이는 칸마다 맞춤. 많이 당긴 팔일수록 곡선이 좁아져 뽑는 값이 실제 p 근처에 모입니다.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h3 id="stepTitleT">이번 걸음</h3></div>
+        <div class="mb-step" id="stepT"></div>
+        <div class="sk-stats" id="statsT"></div>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card"><div class="sk-head"><h3>최적 팔 선택 비율 (누적)</h3><span class="sk-hint">지금까지 최적 팔을 고른 비율</span></div><div><canvas class="mb-cv" id="chT1" aria-label="최적 팔 선택 비율 곡선"></canvas></div></div>
+      <div class="sk-card"><div class="sk-head"><h3>누적 후회</h3><span class="sk-hint">Σ (p* − p_aₜ)</span></div><div><canvas class="mb-cv" id="chT2" aria-label="누적 후회 곡선"></canvas></div></div>
+    </div>
+  </section>
+
+  <!-- 5. 비교 실험 -->
+  <section id="pane-compare" role="tabpanel" aria-labelledby="tab-compare" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>비교 실험 — 같은 환경에서 여러 번 반복해 평균</h2><span class="sk-hint">한 번의 실험은 운에 흔들리므로 반복 평균으로 비교</span></div>
+      <p class="sk-lead">반복마다 보상 난수를 새로 뽑되, 같은 반복 안에서는 모든 알고리즘이 같은 난수표를 씁니다(공정 비교). ε·감쇠율·c는 2~3번 탭의 설정을 그대로 씁니다.</p>
+      <div class="sk-controls">
+        <label class="sk-slider"><span class="sk-sl-head">반복 횟수 <b id="runsV">200</b></span><input type="range" id="runs" min="20" max="1000" step="20" value="200"></label>
+        <label class="sk-slider"><span class="sk-sl-head">걸음 수 T <b id="cTV">1000</b></span><input type="range" id="cT" min="100" max="3000" step="100" value="1000"></label>
+        <button class="sk-btn sk-btn--primary" type="button" id="btnCmp">실험 실행</button>
+        <div class="mb-prog" aria-hidden="true"><i id="cmpProg"></i></div>
+        <span class="sk-hint" id="cmpMsg"></span>
+      </div>
+      <div class="mb-algos" id="algoChecks"></div>
+      <p class="sk-hint" id="cmpParams" style="margin:0"></p>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card"><div class="sk-head"><h3>평균 누적 후회</h3><span class="sk-hint">직선으로 자라면 끝까지 손해 · 꺾이면 학습 성공</span></div><div><canvas class="mb-cv" id="chC1" aria-label="알고리즘별 평균 누적 후회"></canvas></div></div>
+      <div class="sk-card"><div class="sk-head"><h3>최적 팔 선택 비율</h3><span class="sk-hint">걸음마다 반복 평균 (20걸음 이동평균)</span></div><div><canvas class="mb-cv" id="chC2" aria-label="알고리즘별 최적 팔 선택 비율"></canvas></div></div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h3>결과 요약</h3><span class="sk-hint" id="cmpSumHint"></span></div>
+      <div class="sk-scroll"><table class="sk-table mb-tbl" id="cmpTable"></table></div>
+      <p class="sk-note" id="cmpNote"></p>
+    </div>
+  </section>
+
+  <!-- 6. 코드 -->
+  <section id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>파이썬 코드 (numpy)</h2>
+        <div class="sk-group"><span class="sk-hint">현재 설정이 반영됩니다</span><button class="sk-btn sk-btn--primary sk-btn--sm" type="button" id="copyBtn">복사</button></div>
+      </div>
+      <pre class="mb-code" id="code" tabindex="0" aria-label="파이썬 코드"></pre>
+      <p class="sk-note">밴딧은 상태가 하나라 Gymnasium 환경 없이 numpy만으로 충분합니다. 큰 규모에서는 맥락(환자 특성)을 함께 쓰는 Contextual Bandit(LinUCB 등)으로 확장합니다.</p>
+    </div>
+  </section>
+
+  <!-- 7. 알고리즘 구성도 -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">문제 정의 · ε-greedy → UCB · Thompson → 비교 실험 순서의 강의 슬라이드</span></div><div data-ds-diagrams="multi-armed-bandit"></div></section>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20261007a"></script>
+<script src="../../assets/js/rl-kit.js?v=20261007a"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261007a"></script>
+<script src="../../assets/diagrams/multi-armed-bandit.js?v=20261007a"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const reduced = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const f2 = v => (Math.round(v * 100) / 100).toFixed(2), f3 = v => v.toFixed(3);
+  const fmtS = v => String(v).replace("-", "−");
+
+  /* ---------- 색 (CSS 변수) ---------- */
+  function C() {
+    const s = getComputedStyle(document.documentElement), g = n => s.getPropertyValue(n).trim();
+    return { ink: g("--ink"), text: g("--text"), muted: g("--muted"), faint: g("--faint"), line: g("--line"), surface: g("--surface"), surface2: g("--surface-2"),
+      act: g("--c-act"), rew: g("--c-rew"), neg: g("--c-neg"), val: g("--c-val"), exp: g("--c-exp"), state: g("--c-state"), ts: g("--c-ts"), gray: g("--c-gray"),
+      sans: g("--sans") || "sans-serif", mono: g("--mono") || "monospace" };
+  }
+  function fit(cv, h) {
+    const dpr = window.devicePixelRatio || 1, w = Math.max(240, (cv.parentNode && cv.parentNode.clientWidth) || 600);
+    cv.style.width = "100%"; cv.style.height = h + "px"; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); return { g, w, h };
+  }
+  function chart(cv, series, o) {
+    o = o || {}; const w = Math.max(240, cv.parentNode.clientWidth || 560);
+    RL.lineChart(cv, series, Object.assign({ w, h: o.h || 210 }, o));
+  }
+
+  /* ---------- 환경 ---------- */
+  const SCEN = {
+    treat: { unit: "치료법", short: ["A", "B", "C", "D", "E"], p: [0.30, 0.55, 0.45, 0.70, 0.60] },
+    msg: { unit: "문구", short: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"], p: [0.12, 0.18, 0.25, 0.22, 0.30, 0.28, 0.15, 0.33, 0.20, 0.26] }
+  };
+  const S = { scen: "treat", seed: 7, kRand: 6, T: 500 };
+  let env = null;
+  function buildEnv() {
+    let p, short, unit;
+    if (S.scen === "rand") {
+      const r = RL.rng(S.seed * 977 + 11);
+      p = Array.from({ length: S.kRand }, () => Math.round(r.uniform(0.05, 0.85) * 100) / 100);
+      short = p.map((_, i) => String(i + 1)); unit = "팔";
+    } else { p = SCEN[S.scen].p.slice(); short = SCEN[S.scen].short; unit = SCEN[S.scen].unit; }
+    let best = 0; p.forEach((v, i) => { if (v > p[best]) best = i; });
+    env = { k: p.length, p, short, unit, best, pstar: p[best], name: i => unit + " " + short[i] };
+    const desc = S.scen === "treat" ? "치료법 5종 — 차례로 오는 환자에게 하나를 배정하고 호전(1)·무반응(0)을 관찰"
+      : S.scen === "msg" ? "알림 문구 10종 — 복약 알림 문구별 응답률 비교 (차이가 작아 더 어려움)"
+      : "무작위 k개 — seed로 성공률 0.05~0.85를 무작위 생성";
+    $("envNote").innerHTML = "<b>" + desc + "</b><br><span class=\"mb-ptrue\">팔 " + p.length + "개 · 실제 성공률은 숨겨져 있습니다 (1번 탭에서 공개, 2~4번 탭 막대의 점선)</span>";
+  }
+  /* 보상 난수표: R[t·k + a] = 1(성공) / 0 — 같은 seed면 모든 알고리즘이 같은 운을 겪음 */
+  function makeRewards(seed, T, p) {
+    const k = p.length, R = new Uint8Array(T * k), r = RL.rng(seed);
+    for (let t = 0; t < T; t++) for (let a = 0; a < k; a++) R[t * k + a] = r.random() < p[a] ? 1 : 0;
+    return R;
+  }
+  /* 동점이면 무작위 (∞끼리도 동점 처리) */
+  function argmaxR(arr, k, rng) {
+    let best = -Infinity, idx = 0, cnt = 0;
+    for (let i = 0; i < k; i++) {
+      const v = arr[i];
+      if (v > best + 1e-12) { best = v; idx = i; cnt = 1; }
+      else if (v >= best - 1e-12) { cnt++; if (rng.random() * cnt < 1) idx = i; }
+    }
+    return idx;
+  }
+
+  /* ---------- 에이전트 실행 ---------- */
+  /* kind: random · greedy · eps · epsd · ucb · ts. full=true 이면 걸음마다 상태를 저장 (한 걸음씩 보기용) */
+  function runAgent(kind, R, T, prm, rng, full) {
+    const k = env.k, Q = new Float64Array(k), N = new Float64Array(k), A = new Float64Array(k).fill(1), B = new Float64Array(k).fill(1), tmp = new Float64Array(k);
+    const arms = new Int16Array(T), rs = new Uint8Array(T);
+    let rec = null;
+    if (full) {
+      rec = { u: new Float64Array(T), eps: new Float64Array(T), explore: new Uint8Array(T), Qs: new Float64Array((T + 1) * k), Ns: new Float64Array((T + 1) * k),
+        As: new Float64Array((T + 1) * k), Bs: new Float64Array((T + 1) * k), dec: new Float64Array(T * k) };
+      rec.As.fill(1, 0, k); rec.Bs.fill(1, 0, k);
+    }
+    for (let t = 0; t < T; t++) {
+      let a;
+      if (kind === "random") a = rng.int(k);
+      else if (kind === "greedy" || kind === "eps" || kind === "epsd") {
+        const e = kind === "greedy" ? 0 : kind === "eps" ? prm.eps : Math.max(0.01, (prm.eps0 == null ? prm.eps : prm.eps0) * Math.pow(prm.decay, t));
+        const u = rng.random(), ex = u < e;
+        a = ex ? rng.int(k) : argmaxR(Q, k, rng);
+        if (full) { rec.u[t] = u; rec.eps[t] = e; rec.explore[t] = ex ? 1 : 0; }
+      } else if (kind === "ucb") {
+        const lt = Math.log(t + 1);
+        for (let i = 0; i < k; i++) tmp[i] = N[i] === 0 ? Infinity : Q[i] + prm.c * Math.sqrt(lt / N[i]);
+        a = argmaxR(tmp, k, rng);
+        if (full) rec.dec.set(tmp, t * k);
+      } else {
+        for (let i = 0; i < k; i++) tmp[i] = rng.beta(A[i], B[i]);
+        a = argmaxR(tmp, k, rng);
+        if (full) rec.dec.set(tmp, t * k);
+      }
+      const r = R[t * k + a];
+      arms[t] = a; rs[t] = r; N[a] += 1; Q[a] += (r - Q[a]) / N[a]; A[a] += r; B[a] += 1 - r;
+      if (full) { rec.Qs.set(Q, (t + 1) * k); rec.Ns.set(N, (t + 1) * k); rec.As.set(A, (t + 1) * k); rec.Bs.set(B, (t + 1) * k); }
+    }
+    return { arms, rs, rec };
+  }
+  function cumulate(run, T) {
+    const cR = new Float64Array(T + 1), cG = new Float64Array(T + 1), cO = new Float64Array(T + 1);
+    for (let t = 0; t < T; t++) { const a = run.arms[t]; cR[t + 1] = cR[t] + run.rs[t]; cG[t + 1] = cG[t] + (env.pstar - env.p[a]); cO[t + 1] = cO[t] + (env.p[a] === env.pstar ? 1 : 0); }
+    run.cR = cR; run.cG = cG; run.cO = cO; return run;
+  }
+
+  /* ---------- 공통 그리기 ---------- */
+  /* 팔별 막대: Q (보라) + 보너스(황토, UCB) · 실제 p 점선 · 이번 선택 주황 테 */
+  function drawBars(cv, o) {
+    const c = C(), F = fit(cv, o.h || 260), g = F.g, W = F.w, H = F.h, pl = 40, pr = 10, pt = 24, pb = 44, k = env.k;
+    g.clearRect(0, 0, W, H);
+    let ymax = 1;
+    if (o.bonus) { let m = 1; for (let a = 0; a < k; a++) { const v = o.Q[a] + o.bonus[a]; if (isFinite(v)) m = Math.max(m, v); } ymax = Math.min(4, Math.ceil(m * 1.12 * 4) / 4); }
+    const Y = v => pt + (H - pt - pb) * (1 - Math.min(Math.max(v, 0), ymax) / ymax);
+    const stp = ymax <= 1 ? 0.25 : ymax <= 2 ? 0.5 : 1;
+    g.font = "11px " + c.mono; g.textAlign = "right"; g.lineWidth = 1;
+    for (let v = 0; v <= ymax + 1e-9; v += stp) { const y = Y(v); g.strokeStyle = c.line; g.beginPath(); g.moveTo(pl, y + 0.5); g.lineTo(W - pr, y + 0.5); g.stroke(); g.fillStyle = c.faint; g.fillText(v.toFixed(2), pl - 6, y + 4); }
+    const slot = (W - pl - pr) / k, bw = Math.min(54, slot * 0.56);
+    for (let a = 0; a < k; a++) {
+      const cx = pl + slot * (a + 0.5), x0 = cx - bw / 2, q = Math.max(0, o.Q[a]);
+      g.fillStyle = c.val; g.globalAlpha = 0.85; g.fillRect(x0, Y(q), bw, Y(0) - Y(q)); g.globalAlpha = 1;
+      let top = Y(q), lab = f3(o.Q[a]);
+      if (o.bonus) {
+        const b = o.bonus[a];
+        if (!isFinite(b)) { g.fillStyle = c.exp; g.globalAlpha = 0.3; g.fillRect(x0, pt, bw, Y(q) - pt); g.globalAlpha = 1; top = pt; lab = "∞"; }
+        else { g.fillStyle = c.exp; g.globalAlpha = 0.8; g.fillRect(x0, Y(q + b), bw, Y(q) - Y(q + b)); g.globalAlpha = 1; top = Y(q + b); lab = f3(q + b); }
+      }
+      if (o.p) { g.strokeStyle = c.ink; g.lineWidth = 1.6; g.setLineDash([5, 3]); g.beginPath(); g.moveTo(cx - Math.min(slot * 0.42, bw * 0.9), Y(o.p[a])); g.lineTo(cx + Math.min(slot * 0.42, bw * 0.9), Y(o.p[a])); g.stroke(); g.setLineDash([]); }
+      if (a === o.chosen) { g.strokeStyle = c.act; g.lineWidth = 3; g.strokeRect(x0 - 3, top - 3, bw + 6, Y(0) - top + 3); }
+      g.fillStyle = a === o.chosen ? c.act : c.ink; g.font = "600 " + (slot < 44 ? 10.5 : 12) + "px " + c.mono; g.textAlign = "center";
+      g.fillText(lab, cx, Math.max(12, top - 7));
+      g.fillStyle = a === o.chosen ? c.act : c.text; g.font = "700 12.5px " + c.sans; g.fillText(env.short[a], cx, H - pb + 17);
+      g.fillStyle = c.muted; g.font = (slot < 44 ? 10 : 11) + "px " + c.mono; g.fillText("n=" + o.N[a], cx, H - pb + 33);
+    }
+  }
+  /* 베타 분포 */
+  function lgamma(x) {
+    const cf = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+    if (x < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * x)) - lgamma(1 - x);
+    x -= 1; let s = cf[0]; const t = x + 7.5; for (let i = 1; i < 9; i++) s += cf[i] / (x + i);
+    return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(s);
+  }
+  function betaPdf(x, a, b) { return Math.exp((a - 1) * Math.log(x) + (b - 1) * Math.log(1 - x) - (lgamma(a) + lgamma(b) - lgamma(a + b))); }
+  function drawRidge(cv, o) {
+    const c = C(), k = env.k, rowH = k <= 5 ? 50 : 34, pl = 34, pr = 14, pt = 8, pb = 26, H = pt + k * rowH + pb;
+    const F = fit(cv, H), g = F.g, W = F.w; g.clearRect(0, 0, W, H);
+    const X = x => pl + (W - pl - pr) * x, NPT = 160;
+    g.strokeStyle = c.line; g.lineWidth = 1; g.fillStyle = c.faint; g.font = "11px " + c.mono; g.textAlign = "center";
+    [0, 0.25, 0.5, 0.75, 1].forEach(v => { g.beginPath(); g.moveTo(X(v) + 0.5, pt); g.lineTo(X(v) + 0.5, H - pb); g.stroke(); g.fillText(v.toFixed(2), X(v), H - 8); });
+    for (let a = 0; a < k; a++) {
+      const y0 = pt + (a + 1) * rowH - 3, hh = rowH - 8, al = o.A[a], be = o.B[a];
+      const xs = [], ys = [], ys2 = [];
+      for (let i = 0; i <= NPT; i++) { const x = 0.002 + 0.996 * i / NPT; xs.push(x); ys.push(betaPdf(x, al, be)); }
+      const isCh = a === o.chosen && o.A2;
+      if (isCh) for (let i = 0; i <= NPT; i++) ys2.push(betaPdf(xs[i], o.A2[a], o.B2[a]));
+      const m = Math.max(...ys, ...(isCh ? ys2 : [0])) || 1;
+      g.strokeStyle = c.line; g.beginPath(); g.moveTo(pl, y0 + 0.5); g.lineTo(W - pr, y0 + 0.5); g.stroke();
+      g.beginPath(); g.moveTo(X(xs[0]), y0); xs.forEach((x, i) => g.lineTo(X(x), y0 - hh * ys[i] / m)); g.lineTo(X(xs[NPT]), y0); g.closePath();
+      g.fillStyle = c.val; g.globalAlpha = 0.2; g.fill(); g.globalAlpha = 1; g.strokeStyle = c.val; g.lineWidth = 1.6; g.stroke();
+      if (isCh) { g.strokeStyle = c.act; g.lineWidth = 2; g.setLineDash([5, 3]); g.beginPath(); xs.forEach((x, i) => { const yy = y0 - hh * ys2[i] / m; if (i) g.lineTo(X(x), yy); else g.moveTo(X(x), yy); }); g.stroke(); g.setLineDash([]); }
+      if (o.p) { g.strokeStyle = c.ink; g.lineWidth = 1.5; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(X(o.p[a]), y0 - hh - 1); g.lineTo(X(o.p[a]), y0 + 1); g.stroke(); g.setLineDash([]); }
+      if (o.theta) { const tx = X(o.theta[a]); g.fillStyle = c.exp; g.strokeStyle = c.surface; g.lineWidth = 1.5; g.beginPath(); g.arc(tx, y0 - 1, a === o.chosen ? 6 : 4.5, 0, Math.PI * 2); g.fill(); g.stroke(); }
+      g.fillStyle = a === o.chosen ? c.act : c.text; g.font = "700 12.5px " + c.sans; g.textAlign = "right"; g.fillText(env.short[a], pl - 8, y0 - 4);
+    }
+  }
+
+  /* ---------- 한 걸음씩 재생기 ---------- */
+  const players = {};
+  function makePlayer(id, getT, render) {
+    const host = document.querySelector('[data-player="' + id + '"]');
+    host.innerHTML =
+      '<div class="sk-group"><button class="sk-btn sk-btn--sm" type="button" data-a="first">처음</button><button class="sk-btn sk-btn--sm" type="button" data-a="prev">이전</button>' +
+      '<button class="sk-btn sk-btn--sm sk-btn--primary" type="button" data-a="next">다음</button><button class="sk-btn sk-btn--sm" type="button" data-a="play">▶ 재생</button>' +
+      '<button class="sk-btn sk-btn--sm" type="button" data-a="last">끝으로</button></div>' +
+      '<label class="sk-slider" style="min-width:150px"><span class="sk-sl-head">속도 (걸음/초) <b data-o="spv">' + (reduced ? 5 : 20) + '</b></span><input type="range" data-o="sp" min="1" max="200" step="1" value="' + (reduced ? 5 : 20) + '"></label>' +
+      '<span class="mb-tnow" data-o="now"></span>';
+    const P = { t: 0, playing: false, acc: 0, last: 0 };
+    const btnPlay = host.querySelector('[data-a="play"]'), sp = host.querySelector('[data-o="sp"]'), now = host.querySelector('[data-o="now"]');
+    sp.oninput = () => { host.querySelector('[data-o="spv"]').textContent = sp.value; };
+    function set(t) { P.t = Math.max(0, Math.min(getT(), t)); now.textContent = "t = " + P.t + " / " + getT(); render(P.t); }
+    function stop() { P.playing = false; btnPlay.textContent = "▶ 재생"; }
+    function loop(ts) {
+      if (!P.playing) return;
+      P.acc += (ts - P.last) / 1000 * +sp.value; P.last = ts;
+      const n = Math.floor(P.acc); if (n > 0) { P.acc -= n; set(P.t + n); }
+      if (P.t >= getT()) { stop(); return; }
+      requestAnimationFrame(loop);
+    }
+    function play() { if (P.t >= getT()) set(0); P.playing = true; btnPlay.textContent = "❚❚ 멈춤"; P.last = performance.now(); P.acc = 1; requestAnimationFrame(loop); }
+    host.addEventListener("click", e => {
+      const b = e.target.closest("[data-a]"); if (!b) return; const a = b.getAttribute("data-a");
+      if (a === "play") { P.playing ? stop() : play(); return; }
+      stop();
+      if (a === "first") set(0); else if (a === "prev") set(P.t - 1); else if (a === "next") set(P.t + 1); else if (a === "last") set(getT());
+    });
+    const api = { set, stop, get t() { return P.t; }, next: () => { stop(); set(P.t + 1); }, prev: () => { stop(); set(P.t - 1); } };
+    players[id] = api; return api;
+  }
+
+  /* ---------- 1. 문제 정의: 직접 당겨 보기 ---------- */
+  const M = { N: [], S: [], log: [], rng: null, last: -1, lastR: 0, regret: 0 };
+  function manReset() {
+    M.N = new Array(env.k).fill(0); M.S = new Array(env.k).fill(0); M.log = []; M.rng = RL.rng(S.seed * 31 + 7); M.last = -1; M.regret = 0;
+    $("arms").innerHTML = env.p.map((_, a) =>
+      '<button type="button" class="mb-arm" data-arm="' + a + '"><span class="nm">' + env.name(a) + '</span><span class="q" data-q></span>' +
+      '<span class="bar"><i data-bar></i><b data-pb hidden></b></span><span class="cnt" data-cnt></span><span class="pt" data-pt></span><span class="res" data-res></span></button>').join("");
+    manRender();
+  }
+  function manPull(a) {
+    const r = M.rng.random() < env.p[a] ? 1 : 0;
+    M.N[a]++; M.S[a] += r; M.last = a; M.lastR = r; M.regret += env.pstar - env.p[a];
+    M.log.unshift({ a, r, t: M.N.reduce((x, y) => x + y, 0) }); if (M.log.length > 12) M.log.pop();
+  }
+  function manRender() {
+    const reveal = $("chkReveal").checked, c = C();
+    document.querySelectorAll("#arms .mb-arm").forEach(el => {
+      const a = +el.getAttribute("data-arm"), n = M.N[a], q = n ? M.S[a] / n : 0;
+      el.querySelector("[data-q]").textContent = n ? "Q = " + q.toFixed(2) : "Q = ?";
+      el.querySelector("[data-bar]").style.width = (q * 100) + "%";
+      const pb = el.querySelector("[data-pb]"); pb.hidden = !reveal; pb.style.left = "calc(" + (env.p[a] * 100) + "% - 1px)";
+      el.querySelector("[data-cnt]").textContent = "시도 " + n + " · 성공 " + M.S[a];
+      el.querySelector("[data-pt]").textContent = reveal ? "실제 p = " + env.p[a].toFixed(2) + (a === env.best ? " (최적)" : "") : "실제 p = ?";
+      const res = el.querySelector("[data-res]");
+      if (a === M.last) { res.textContent = M.lastR ? "방금: 성공 (r = 1)" : "방금: 실패 (r = 0)"; res.style.color = M.lastR ? c.rew : c.neg; } else res.textContent = "";
+      el.classList.toggle("last", a === M.last);
+      el.setAttribute("aria-label", env.name(a) + " 당기기, 시도 " + n + ", 성공 " + M.S[a]);
+    });
+    const tot = M.N.reduce((x, y) => x + y, 0), sum = M.S.reduce((x, y) => x + y, 0);
+    $("manStats").innerHTML =
+      '<div class="sk-stat"><b>' + tot + '</b><span>총 시도</span></div>' +
+      '<div class="sk-stat"><b class="c-rew">' + sum + '</b><span>누적 보상</span></div>' +
+      '<div class="sk-stat"><b>' + (tot ? (sum / tot).toFixed(3) : "–") + '</b><span>평균 보상</span></div>' +
+      '<div class="sk-stat"><b class="c-neg">' + (reveal ? M.regret.toFixed(2) : "?") + '</b><span>후회 (공개 시 계산)</span></div>' +
+      '<div class="sk-stat"><b>' + (reveal ? (tot * env.pstar).toFixed(1) : "?") + '</b><span>최적 팔만 당겼다면 (기댓값)</span></div>';
+    $("manLog").innerHTML = M.log.length ? M.log.map(l => '<span>#' + l.t + ' ' + env.short[l.a] + ' → <b style="color:' + (l.r ? c.rew : c.neg) + '">' + (l.r ? "성공" : "실패") + "</b></span>").join("") : "<span>아직 당기지 않았습니다</span>";
+  }
+  $("arms").addEventListener("click", e => { const b = e.target.closest("[data-arm]"); if (!b) return; manPull(+b.getAttribute("data-arm")); manRender(); });
+  $("btnEach").onclick = () => { for (let a = 0; a < env.k; a++) manPull(a); manRender(); };
+  $("btnRand20").onclick = () => { for (let i = 0; i < 20; i++) manPull(M.rng.int(env.k)); manRender(); };
+  $("btnGreedy20").onclick = () => {
+    for (let i = 0; i < 20; i++) { const q = M.N.map((n, a) => n ? M.S[a] / n : 0); manPull(argmaxR(q, env.k, M.rng)); }
+    manRender();
+  };
+  $("btnManReset").onclick = () => manReset();
+  $("chkReveal").onchange = manRender;
+
+  /* ---------- 2~4. 알고리즘 탭 ---------- */
+  const P = { eps: 0.10, decayOn: false, decay: 0.99, c: 0.50 };
+  const RUN = {};
+  function computeRuns() {
+    const R = makeRewards(S.seed * 7919 + 17, S.T, env.p);
+    RUN.e = cumulate(runAgent(P.decayOn ? "epsd" : "eps", R, S.T, P, RL.rng(S.seed * 104729 + 3), true), S.T);
+    RUN.u = cumulate(runAgent("ucb", R, S.T, P, RL.rng(S.seed * 104729 + 5), true), S.T);
+    RUN.t = cumulate(runAgent("ts", R, S.T, P, RL.rng(S.seed * 104729 + 9), true), S.T);
+  }
+  const snap = (arr, t) => Array.from(arr.subarray(t * env.k, (t + 1) * env.k));
+  function statsHtml(run, t) {
+    return '<div class="sk-stat"><b class="c-rew">' + run.cR[t] + '</b><span>누적 보상</span></div>' +
+      '<div class="sk-stat"><b>' + (t ? (run.cR[t] / t).toFixed(3) : "–") + '</b><span>평균 보상 (p* = ' + env.pstar.toFixed(2) + ')</span></div>' +
+      '<div class="sk-stat"><b>' + (t ? (100 * run.cO[t] / t).toFixed(1) + "%" : "–") + '</b><span>최적 팔 선택 비율</span></div>' +
+      '<div class="sk-stat"><b class="c-neg">' + run.cG[t].toFixed(2) + '</b><span>누적 후회</span></div>';
+  }
+  function resultLi(a, r) {
+    return '<li>결과: ' + env.name(a) + ' → <b class="' + (r ? "c-rew" : "c-neg") + '">보상 r = ' + r + (r ? " (성공)" : " (실패)") + "</b></li>";
+  }
+  function updLi(run, t, a, r) {
+    const k = env.k, n = run.rec.Ns[t * k + a], q0 = run.rec.Qs[(t - 1) * k + a], q1 = run.rec.Qs[t * k + a];
+    return '<li>갱신: N(' + env.short[a] + ') = ' + n + ' → <span class="sk-mono c-val">Q(' + env.short[a] + ') ← ' + f3(q0) + " + (" + r + " − " + f3(q0) + ") / " + n + " = <b>" + f3(q1) + "</b></span></li>";
+  }
+  function padSeries(T) { return { data: new Array(T + 1).fill(0), color: "rgba(0,0,0,0)", width: 0.01 }; }
+
+  function renderE(t) {
+    const run = RUN.e, k = env.k, c = C(), a = t ? run.arms[t - 1] : -1;
+    drawBars($("cvE"), { Q: snap(run.rec.Qs, t), N: snap(run.rec.Ns, t), p: env.p, chosen: a });
+    $("stepTitleE").textContent = t ? "이번 걸음 (t = " + t + ")" : "시작 전 (t = 0)";
+    if (!t) $("stepE").innerHTML = '<p class="sk-note">모든 팔이 Q = 0, N = 0에서 시작합니다. 동점이면 무작위로 고릅니다. [다음]을 누르세요.</p>';
+    else {
+      const i = t - 1, e = run.rec.eps[i], u = run.rec.u[i], ex = run.rec.explore[i], r = run.rs[i];
+      const qb = snap(run.rec.Qs, i), mx = Math.max(...qb), r0 = run.rec.Ns.subarray(i * k, (i + 1) * k);
+      const dec = ex
+        ? '<li>결정: 난수 u = ' + f3(u) + ' &lt; ε = ' + f3(e) + ' → <span class="mb-tag c-exp">탐험</span> 무작위로 <b class="c-act">' + env.name(a) + "</b></li>"
+        : '<li>결정: 난수 u = ' + f3(u) + ' ≥ ε = ' + f3(e) + ' → <span class="mb-tag c-act">활용</span> Q가 가장 큰 팔 (max Q = ' + f3(mx) + (qb.filter(v => Math.abs(v - mx) < 1e-12).length > 1 ? ", 동점 중 무작위" : "") + ') → <b class="c-act">' + env.name(a) + "</b></li>";
+      $("stepE").innerHTML = "<ol>" + dec + resultLi(a, r) + updLi(run, t, a, r) + "</ol>" +
+        '<p class="sk-hint" style="margin:0">갱신 전 N(' + env.short[a] + ') = ' + r0[a] + (P.decayOn ? " · 감쇠 ε = max(0.01, " + P.eps.toFixed(2) + " × " + P.decay.toFixed(3) + "^" + i + ")" : "") + "</p>";
+    }
+    $("statsE").innerHTML = statsHtml(run, t);
+    const avg = Array.from(run.cR.subarray(1, t + 1), (v, i) => v / (i + 1));
+    chart($("chE1"), [padSeries(S.T), { data: avg, color: c.act, label: "ε-greedy 평균 보상" }], { ymin: 0, ymax: 1, hline: env.pstar });
+    chart($("chE2"), [padSeries(S.T), { data: Array.from(run.cG.subarray(0, t + 1)), color: c.neg, label: "누적 후회" }], { ymin: 0, ymax: Math.max(1, run.cG[S.T] * 1.05) });
+  }
+  function renderU(t) {
+    const run = RUN.u, k = env.k, c = C();
+    const i = t ? t - 1 : 0, a = t ? run.arms[i] : -1;
+    const Q = snap(run.rec.Qs, i), N = snap(run.rec.Ns, i);
+    const vals = t ? snap(run.rec.dec, i) : new Array(k).fill(Infinity);
+    const bonus = vals.map((v, j) => isFinite(v) ? v - Q[j] : Infinity);
+    drawBars($("cvU"), { Q, N, p: env.p, chosen: a, bonus });
+    $("stepTitleU").textContent = t ? "이번 걸음 (t = " + t + ")" : "시작 전 (t = 0)";
+    let rows = '<thead><tr><th>팔</th><th>N(a)</th><th>Q(a)</th><th>보너스 c√(ln t / N)</th><th>UCB</th></tr></thead><tbody>';
+    for (let j = 0; j < k; j++) rows += '<tr class="' + (j === a ? "hl" : "") + '"><td>' + env.short[j] + '</td><td class="n">' + N[j] + '</td><td class="n">' + f3(Q[j]) + '</td><td class="n">' + (isFinite(bonus[j]) ? f3(bonus[j]) : "∞") + '</td><td class="n"><b>' + (isFinite(vals[j]) ? f3(vals[j]) : "∞") + "</b></td></tr>";
+    rows += "</tbody>";
+    if (!t) $("stepU").innerHTML = '<p class="sk-note">아직 한 번도 안 당긴 팔은 보너스가 ∞라서 처음 k걸음은 모든 팔을 한 번씩 당깁니다. [다음]을 누르세요.</p><div class="sk-scroll"><table class="sk-table mb-tbl">' + rows + "</table></div>";
+    else {
+      const r = run.rs[i], lt = Math.log(t);
+      const why = !isFinite(vals[a]) ? "아직 안 당긴 팔(N = 0 → 보너스 ∞) — 먼저 한 번씩"
+        : '<span class="sk-mono">UCB(' + env.short[a] + ") = " + f3(Q[a]) + " + " + P.c.toFixed(2) + " × √(ln " + t + " / " + N[a] + ") = " + f3(Q[a]) + " + " + P.c.toFixed(2) + " × √(" + lt.toFixed(3) + " / " + N[a] + ") = <b>" + f3(vals[a]) + "</b></span> (가장 큼)";
+      $("stepU").innerHTML = "<ol><li>결정: " + why + " → <b class=\"c-act\">" + env.name(a) + "</b></li>" + resultLi(a, r) + updLi(run, t, a, r) + "</ol>" +
+        '<div class="sk-scroll"><table class="sk-table mb-tbl">' + rows + "</table></div>";
+    }
+    $("statsU").innerHTML = statsHtml(run, t);
+    /* 팔별 선택 횟수 곡선 (최적 팔 강조) */
+    const series = [padSeries(S.T)];
+    const cols = [c.gray, c.state, c.ts, c.exp, c.val, c.neg, c.act, c.ink, c.muted, c.faint];
+    let maxN = 1;
+    for (let j = 0; j < k; j++) {
+      const d = []; let n = 0; for (let s = 0; s < t; s++) { if (run.arms[s] === j) n++; d.push(n); } d.unshift(0);
+      maxN = Math.max(maxN, n);
+      series.push({ data: d, color: j === env.best ? c.rew : cols[j % cols.length], width: j === env.best ? 3 : 1.5, label: k <= 5 || j === env.best ? env.short[j] + (j === env.best ? " (최적)" : "") : null });
+    }
+    chart($("chU1"), series, { ymin: 0, ymax: Math.max(10, run.rec.Ns[S.T * k + env.best]) });
+    chart($("chU2"), [padSeries(S.T), { data: Array.from(run.cG.subarray(0, t + 1)), color: c.neg, label: "누적 후회" }], { ymin: 0, ymax: Math.max(1, run.cG[S.T] * 1.05) });
+  }
+  function renderT(t) {
+    const run = RUN.t, k = env.k, c = C(), i = t ? t - 1 : 0, a = t ? run.arms[i] : -1;
+    const A = snap(run.rec.As, i), B = snap(run.rec.Bs, i), A2 = snap(run.rec.As, t), B2 = snap(run.rec.Bs, t);
+    const th = t ? snap(run.rec.dec, i) : null;
+    drawRidge($("cvT"), { A, B, A2: t ? A2 : null, B2: t ? B2 : null, theta: th, p: env.p, chosen: a });
+    $("stepTitleT").textContent = t ? "이번 걸음 (t = " + t + ")" : "시작 전 (t = 0)";
+    let rows = '<thead><tr><th>팔</th><th>α</th><th>β</th><th>평균 α/(α+β)</th><th>뽑은 θ̃</th></tr></thead><tbody>';
+    for (let j = 0; j < k; j++) rows += '<tr class="' + (j === a ? "hl" : "") + '"><td>' + env.short[j] + '</td><td class="n">' + A[j] + '</td><td class="n">' + B[j] + '</td><td class="n">' + f3(A[j] / (A[j] + B[j])) + '</td><td class="n"><b>' + (th ? f3(th[j]) : "–") + "</b></td></tr>";
+    rows += "</tbody>";
+    if (!t) $("stepT").innerHTML = '<p class="sk-note">모든 팔이 Beta(1, 1) = 균등분포에서 시작합니다. 아무것도 모르니 0~1 어디든 같은 확률. [다음]을 누르세요.</p><div class="sk-scroll"><table class="sk-table mb-tbl">' + rows + "</table></div>";
+    else {
+      const r = run.rs[i];
+      $("stepT").innerHTML = "<ol><li>결정: 팔마다 θ̃ ~ Beta(α, β)를 하나씩 뽑음 → 가장 큰 θ̃ = <b>" + f3(th[a]) + '</b> → <b class="c-act">' + env.name(a) + "</b></li>" + resultLi(a, r) +
+        '<li>갱신: <span class="sk-mono c-val">Beta(' + A[a] + ", " + B[a] + ") → Beta(" + A2[a] + ", " + B2[a] + ")</span> · 평균 " + f3(A[a] / (A[a] + B[a])) + " → <b>" + f3(A2[a] / (A2[a] + B2[a])) + "</b></li></ol>" +
+        '<div class="sk-scroll"><table class="sk-table mb-tbl">' + rows + "</table></div>";
+    }
+    $("statsT").innerHTML = statsHtml(run, t);
+    const opt = Array.from(run.cO.subarray(1, t + 1), (v, j) => v / (j + 1));
+    chart($("chT1"), [padSeries(S.T), { data: opt, color: c.ts, label: "Thompson 최적 팔 비율" }], { ymin: 0, ymax: 1 });
+    chart($("chT2"), [padSeries(S.T), { data: Array.from(run.cG.subarray(0, t + 1)), color: c.neg, label: "누적 후회" }], { ymin: 0, ymax: Math.max(1, run.cG[S.T] * 1.05) });
+  }
+  const pE = makePlayer("e", () => S.T, renderE), pU = makePlayer("u", () => S.T, renderU), pT = makePlayer("t", () => S.T, renderT);
+
+  $("eps").oninput = () => { P.eps = +$("eps").value; $("epsV").textContent = P.eps.toFixed(2); recompute(["e"]); };
+  $("chkDecay").onchange = () => { P.decayOn = $("chkDecay").checked; $("decayWrap").hidden = !P.decayOn;
+    if (P.decayOn && P.eps < 0.5) { P.eps = 1; $("eps").value = 1; } else if (!P.decayOn && P.eps > 0.5) { P.eps = 0.1; $("eps").value = 0.1; }
+    $("epsV").textContent = P.eps.toFixed(2); recompute(["e"]); };
+  $("decay").oninput = () => { P.decay = +$("decay").value; $("decayV").textContent = P.decay.toFixed(3); recompute(["e"]); };
+  $("cUcb").oninput = () => { P.c = +$("cUcb").value; $("cV").textContent = P.c.toFixed(2); recompute(["u"]); };
+  function recompute(which) {
+    const R = makeRewards(S.seed * 7919 + 17, S.T, env.p);
+    if (which.includes("e")) { RUN.e = cumulate(runAgent(P.decayOn ? "epsd" : "eps", R, S.T, P, RL.rng(S.seed * 104729 + 3), true), S.T); pE.set(pE.t); }
+    if (which.includes("u")) { RUN.u = cumulate(runAgent("ucb", R, S.T, P, RL.rng(S.seed * 104729 + 5), true), S.T); pU.set(pU.t); }
+    cmpParams(); genCode();
+  }
+
+  /* ---------- 5. 비교 실험 ---------- */
+  const ALGOS = [
+    { id: "random", name: "무작위", col: "gray", on: true },
+    { id: "greedy", name: "탐욕 (ε = 0)", col: "neg", on: true },
+    { id: "eps", name: "ε-greedy", col: "act", on: true },
+    { id: "epsd", name: "ε 감쇠", col: "exp", on: true },
+    { id: "ucb", name: "UCB", col: "state", on: true },
+    { id: "ts", name: "Thompson", col: "ts", on: true }
+  ];
+  $("algoChecks").innerHTML = ALGOS.map(a => '<label class="sk-check"><input type="checkbox" data-al="' + a.id + '" checked><i style="background:var(--c-' + a.col + ')"></i>' + a.name + "</label>").join("");
+  $("algoChecks").addEventListener("change", e => { const al = ALGOS.find(a => a.id === e.target.getAttribute("data-al")); if (al) { al.on = e.target.checked; drawCmp(); } });
+  function cmpParams() {
+    $("cmpParams").textContent = "현재 설정: ε-greedy ε = " + (P.decayOn ? 0.1 : P.eps).toFixed(2) + " · ε 감쇠 = max(0.01, 1 × " + P.decay.toFixed(3) + "ᵗ) · UCB c = " + P.c.toFixed(2) + " · Thompson 사전분포 Beta(1, 1)";
+  }
+  let cmpTok = 0, CMP = null;
+  function runCompare() {
+    const tok = ++cmpTok, RUNS = +$("runs").value, T = +$("cT").value, k = env.k;
+    const acc = {}; ALGOS.forEach(a => { acc[a.id] = { reg: new Float64Array(T), opt: new Float64Array(T), rew: 0 }; });
+    let run = 0; $("btnCmp").disabled = true; $("cmpMsg").textContent = "계산 중…";
+    const prm = { eps: P.decayOn ? 0.1 : P.eps, eps0: 1, decay: P.decay, c: P.c };
+    (function chunk() {
+      if (tok !== cmpTok) return;
+      const t0 = performance.now();
+      while (run < RUNS && performance.now() - t0 < 28) {
+        const R = makeRewards(S.seed * 100003 + run * 7 + 1, T, env.p);
+        ALGOS.forEach((al, ai) => {
+          const res = runAgent(al.id, R, T, prm, RL.rng(S.seed * 1009 + run * 31 + ai * 7 + 3), false), A = acc[al.id];
+          let g = 0;
+          for (let t = 0; t < T; t++) { const a = res.arms[t]; g += env.pstar - env.p[a]; A.reg[t] += g; if (env.p[a] === env.pstar) A.opt[t] += 1; A.rew += res.rs[t]; }
+        });
+        run++;
+      }
+      $("cmpProg").style.width = (100 * run / RUNS) + "%";
+      if (run < RUNS) { setTimeout(chunk, 0); return; }
+      ALGOS.forEach(al => { const A = acc[al.id]; for (let t = 0; t < T; t++) { A.reg[t] /= RUNS; A.opt[t] /= RUNS; } A.rew /= RUNS; });
+      CMP = { acc, RUNS, T };
+      $("btnCmp").disabled = false; $("cmpMsg").textContent = RUNS + "회 × " + T + "걸음 완료";
+      drawCmp();
+    })();
+  }
+  function drawCmp() {
+    if (!CMP) return;
+    const c = C(), on = ALGOS.filter(a => a.on), T = CMP.T;
+    const s1 = on.map(a => ({ data: [0].concat(Array.from(CMP.acc[a.id].reg)), color: c[a.col], label: a.name, width: 2.2 }));
+    const s2 = on.map(a => ({ data: Array.from(CMP.acc[a.id].opt), color: c[a.col], label: a.name, smooth: 20, raw: false, width: 2.2 }));
+    chart($("chC1"), s1.length ? s1 : [padSeries(T)], { ymin: 0, h: 260 });
+    chart($("chC2"), s2.length ? s2 : [padSeries(T)], { ymin: 0, ymax: 1, h: 260, hline: 1 / env.k });
+    const last = Math.min(100, T);
+    let html = "<thead><tr><th>알고리즘</th><th>최종 누적 후회</th><th>최적 팔 비율 (전체)</th><th>최적 팔 비율 (마지막 " + last + "걸음)</th><th>평균 총 보상</th><th>최적 대비</th></tr></thead><tbody>";
+    const rank = ALGOS.slice().sort((x, y) => CMP.acc[x.id].reg[T - 1] - CMP.acc[y.id].reg[T - 1]);
+    ALGOS.forEach(a => {
+      const A = CMP.acc[a.id]; let o = 0, ol = 0; for (let t = 0; t < T; t++) { o += A.opt[t]; if (t >= T - last) ol += A.opt[t]; }
+      html += '<tr class="' + (rank[0] === a ? "hl" : "") + '"><td><i style="display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:4px;margin-right:6px;background:var(--c-' + a.col + ')"></i>' + a.name + '</td><td class="n">' + A.reg[T - 1].toFixed(1) +
+        '</td><td class="n">' + (100 * o / T).toFixed(1) + '%</td><td class="n">' + (100 * ol / last).toFixed(1) + '%</td><td class="n">' + A.rew.toFixed(1) + '</td><td class="n">' + (100 * A.rew / (T * env.pstar)).toFixed(1) + "%</td></tr>";
+    });
+    $("cmpTable").innerHTML = html + "</tbody>";
+    $("cmpSumHint").textContent = CMP.RUNS + "회 반복 평균 · 최적 팔만 당겼을 때 기대 총 보상 = " + (T * env.pstar).toFixed(1);
+    $("cmpNote").innerHTML = "<b>읽는 법</b> — 무작위는 후회가 직선으로 계속 자랍니다(배우지 않음). 탐욕은 초반 운에 따라 나쁜 팔에 갇히는 반복이 있어 역시 직선에 가깝습니다. ε-greedy는 배우지만 끝까지 ε만큼 무작위로 당겨 기울기가 남습니다. ε 감쇠·UCB·Thompson은 초반에 충분히 탐험한 뒤 활용으로 옮겨 가 후회 곡선이 꺾입니다(이론상 log T). 팔 사이 차이가 작으면(알림 문구 10종) T가 짧을 때 순위가 바뀔 수 있으니 T·c를 바꿔 보세요. 가장 낮은 행: <b>" + rank[0].name + "</b>.";
+  }
+  $("runs").oninput = () => { $("runsV").textContent = $("runs").value; };
+  $("cT").oninput = () => { $("cTV").textContent = $("cT").value; };
+  $("btnCmp").onclick = runCompare;
+
+  /* ---------- 6. 코드 ---------- */
+  function genCode() {
+    const p = env.p.map(v => v.toFixed(2)).join(", ");
+    const names = env.short.map(s => '"' + env.unit + " " + s + '"').join(", ");
+    const src =
+`import numpy as np
+
+# 환경: 팔(${env.unit})마다 실제 성공률 — 에이전트는 모른다
+p = np.array([${p}])
+names = [${names}]
+k, T = len(p), ${S.T}
+rng = np.random.default_rng(${S.seed})
+
+def pull(a):
+    """베르누이 보상: 성공 1, 실패 0"""
+    return float(rng.random() < p[a])
+
+def argmax_tie(x):
+    """최댓값이 여러 개면 그중 무작위"""
+    return rng.choice(np.flatnonzero(x == x.max()))
+
+def eps_greedy(eps=${P.eps.toFixed(2)}, decay=${P.decayOn ? P.decay.toFixed(3) : "None"}):
+    Q, N = np.zeros(k), np.zeros(k)
+    arms = []
+    for t in range(T):
+        e = max(0.01, eps * decay**t) if decay else eps
+        a = rng.integers(k) if rng.random() < e else argmax_tie(Q)   # 탐험 / 활용
+        r = pull(a)
+        N[a] += 1
+        Q[a] += (r - Q[a]) / N[a]          # 표본 평균 증분 갱신
+        arms.append(a)
+    return np.array(arms)
+
+def ucb(c=${P.c.toFixed(2)}):
+    Q, N = np.zeros(k), np.zeros(k)
+    arms = []
+    for t in range(1, T + 1):
+        if (N == 0).any():                 # 안 당긴 팔 먼저 (보너스 = 무한대)
+            a = rng.choice(np.flatnonzero(N == 0))
+        else:
+            a = argmax_tie(Q + c * np.sqrt(np.log(t) / N))
+        r = pull(a)
+        N[a] += 1
+        Q[a] += (r - Q[a]) / N[a]
+        arms.append(a)
+    return np.array(arms)
+
+def thompson():
+    alpha, beta = np.ones(k), np.ones(k)   # 사전분포 Beta(1, 1)
+    arms = []
+    for t in range(T):
+        theta = rng.beta(alpha, beta)      # 팔마다 사후분포에서 하나씩 뽑기
+        a = argmax_tie(theta)
+        r = pull(a)
+        alpha[a] += r                      # 성공 → α + 1
+        beta[a] += 1 - r                   # 실패 → β + 1
+        arms.append(a)
+    return np.array(arms)
+
+def regret(arms):
+    """누적 후회 = Σ (p* − p[a_t])"""
+    return np.cumsum(p.max() - p[arms])
+
+# 여러 번 반복해 평균 (비교 실험 탭과 같은 방식)
+runs = ${+$("runs").value}
+for name, algo in [("ε-greedy", eps_greedy), ("UCB", ucb), ("Thompson", thompson)]:
+    R = np.mean([regret(algo())[-1] for _ in range(runs)])
+    print(f"{name:10s} 평균 누적 후회 (T={T}) = {R:.1f}")
+`;
+    $("code").innerHTML = hl(src);
+    $("code").dataset.src = src;
+  }
+  function hl(src) {
+    const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return src.split("\n").map(line => {
+      const m = line.match(/^([^#"]*(?:"[^"]*"[^#"]*)*)(#.*)?$/);
+      let code = m ? m[1] : line, cm = m && m[2] ? m[2] : "";
+      code = esc(code).replace(/\b(import|as|def|return|for|in|if|else|range|print|float|None|and|or|not)\b/g, '<span class="kw">$1</span>')
+        .replace(/(^|[^\w.])(\d+\.?\d*)/g, '$1<span class="nu">$2</span>');
+      return code + (cm ? '<span class="cm">' + esc(cm) + "</span>" : "");
+    }).join("\n");
+  }
+  $("copyBtn").onclick = async () => {
+    const t = $("code").dataset.src || "";
+    try { await navigator.clipboard.writeText(t); $("copyBtn").textContent = "복사됨"; }
+    catch (e) { const r = document.createRange(); r.selectNodeContents($("code")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); $("copyBtn").textContent = "선택됨 (Ctrl+C)"; }
+    setTimeout(() => { $("copyBtn").textContent = "복사"; }, 1500);
+  };
+
+  /* ---------- 환경 설정 ---------- */
+  function resetAll() {
+    buildEnv(); manReset(); computeRuns();
+    const t0 = Math.min(25, S.T); pE.set(t0); pU.set(t0); pT.set(t0);
+    cmpParams(); genCode(); CMP = null; $("cmpTable").innerHTML = ""; $("cmpNote").textContent = ""; $("cmpMsg").textContent = ""; $("cmpProg").style.width = "0";
+    if (current() === "compare") runCompare();
+  }
+  $("segScen").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    $("segScen").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
+    S.scen = b.getAttribute("data-v"); $("kRandWrap").hidden = S.scen !== "rand"; resetAll();
+  });
+  $("kRand").oninput = () => { S.kRand = +$("kRand").value; $("kRandV").textContent = S.kRand; resetAll(); };
+  $("Tsl").oninput = () => { S.T = +$("Tsl").value; $("TV").textContent = S.T; resetAll(); };
+  $("seed").onchange = () => { S.seed = Math.max(1, Math.floor(+$("seed").value) || 1); $("seed").value = S.seed; resetAll(); };
+  $("btnSeed").onclick = () => { S.seed = 1 + Math.floor(Math.random() * 99999); $("seed").value = S.seed; resetAll(); };
+
+  /* ---------- 안쪽 탭 (URL 해시 연동, ←/→ 키 이동) ---------- */
+  const tabs = [...document.querySelectorAll(".sk-tab")];
+  const current = () => { const t = tabs.find(b => b.getAttribute("aria-selected") === "true"); return t ? t.id.replace("tab-", "") : "problem"; };
+  function show(t) {
+    tabs.forEach(b => { const on = b === t; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1;
+      document.getElementById(b.getAttribute("aria-controls")).hidden = !on; });
+    history.replaceState(null, "", "#" + t.id.replace("tab-", ""));
+    Object.values(players).forEach(p => p.stop());
+    redraw();
+    if (current() === "compare" && !CMP) runCompare();
+  }
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => show(b));
+    b.addEventListener("keydown", e => {
+      const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return;
+      const n = tabs[(i + d + tabs.length) % tabs.length]; show(n); n.focus(); e.preventDefault();
+    });
+  });
+  /* → / ← : 보이는 탭의 한 걸음 앞/뒤 (입력칸·탭 버튼에 포커스가 있을 때는 제외) */
+  document.addEventListener("keydown", e => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    const tg = e.target; if (tg.closest && (tg.closest(".sk-tab") || tg.closest("input,select,textarea,.dgv"))) return;
+    const pl = { egreedy: pE, ucb: pU, thompson: pT }[current()]; if (!pl) return;
+    e.preventDefault(); e.key === "ArrowRight" ? pl.next() : pl.prev();
+  });
+  function redraw() {
+    const cur = current();
+    if (cur === "problem") manRender();
+    else if (cur === "egreedy") renderE(pE.t);
+    else if (cur === "ucb") renderU(pU.t);
+    else if (cur === "thompson") renderT(pT.t);
+    else if (cur === "compare") drawCmp();
+  }
+  RL.onTheme(redraw);
+  let rz = 0; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(redraw, 120); });
+
+  resetAll();
+  const start = document.getElementById("tab-" + location.hash.slice(1)); if (start) show(start); else redraw();
+  window.addEventListener("hashchange", () => { const t = document.getElementById("tab-" + location.hash.slice(1)); if (t && t.getAttribute("aria-selected") !== "true") show(t); });
+})();
+</script>
+</body>
+</html>

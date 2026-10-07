@@ -1,0 +1,1003 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Offline RL (CQL · IQL) | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261007a">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+:root{
+  --sk-accent: var(--cat-rl);
+  --rl-state:#2563EB; --rl-action:#EA580C; --rl-reward:#16A34A; --rl-neg:#DC2626; --rl-value:#7C3AED; --rl-target:#DB2777; --rl-explore:#B7791F;
+  --m-beh:#B7791F; --m-bc:#5B6578; --m-naive:#DC2626; --m-cql:#2563EB; --m-iql:#0D9488;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --rl-state:#79A6F6; --rl-action:#F59A5C; --rl-reward:#5CCB82; --rl-neg:#F07A7A; --rl-value:#B597FF; --rl-target:#F472B6; --rl-explore:#E3B455;
+  --m-beh:#E3B455; --m-bc:#A3ACBD; --m-naive:#F07A7A; --m-cql:#79A6F6; --m-iql:#45CFBF;
+} }
+:root[data-theme="dark"]{
+  --rl-state:#79A6F6; --rl-action:#F59A5C; --rl-reward:#5CCB82; --rl-neg:#F07A7A; --rl-value:#B597FF; --rl-target:#F472B6; --rl-explore:#E3B455;
+  --m-beh:#E3B455; --m-bc:#A3ACBD; --m-naive:#F07A7A; --m-cql:#79A6F6; --m-iql:#45CFBF;
+}
+.ol-split{ display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:18px; align-items:start; }
+@media (max-width:960px){ .ol-split{ grid-template-columns:minmax(0,1fr); } }
+.ol-cv{ display:block; width:100%; max-width:100%; }
+.ol-col{ display:flex; flex-direction:column; gap:12px; min-width:0; }
+.ol-cur{ display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; font-size:13px; color:var(--muted); background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:8px 12px; }
+.ol-cur b{ color:var(--ink); }
+.ol-cur .sk-btn{ margin-left:auto; }
+.ol-code{ font-family:var(--mono); font-size:12.5px; line-height:1.6; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:12px 14px; overflow-x:auto; white-space:pre; margin:0; color:var(--ink); max-width:100%; }
+.ol-log{ max-height:230px; overflow:auto; font-family:var(--mono); font-size:12.5px; border:1px solid var(--line); border-radius:8px; }
+.ol-log table{ width:100%; }
+.sk-table td.ood, .ol-ood{ color:var(--rl-neg); font-weight:700; }
+.sk-table tr.is-sel td{ background:color-mix(in srgb, var(--sk-accent) 12%, var(--surface)); }
+.sk-table tr.pick{ cursor:pointer; }
+.ol-legend i.dash{ background:none; border:1.5px dashed var(--rl-neg); }
+.ol-legend i.hat{ background:repeating-linear-gradient(135deg, var(--surface-2) 0 3px, var(--line-strong) 3px 4px); border:1px solid var(--line); }
+.ol-chip{ display:inline-block; font-size:12px; font-weight:700; padding:1px 8px; border-radius:999px; border:1px solid currentColor; }
+.ol-chip.in{ color:var(--rl-reward); } .ol-chip.out{ color:var(--rl-neg); }
+.c-state{ color:var(--rl-state); } .c-action{ color:var(--rl-action); } .c-reward{ color:var(--rl-reward); } .c-neg{ color:var(--rl-neg); }
+.c-value{ color:var(--rl-value); } .c-target{ color:var(--rl-target); } .c-explore{ color:var(--rl-explore); }
+.sk-formula b{ font-weight:700; }
+.ol-loop{ min-width:640px; width:100%; height:auto; display:block; }
+.ol-loop .bx{ fill:var(--surface-2); stroke:var(--line-strong); stroke-width:1.5; }
+.ol-loop .t{ fill:var(--ink); font-size:14px; font-weight:700; font-family:var(--sans); }
+.ol-loop .s{ fill:var(--muted); font-size:12px; font-family:var(--sans); }
+.ol-loop .ln{ fill:none; stroke-width:2; }
+.ol-loop .hd{ stroke:none; }
+.ol-loop .st{ stroke:var(--rl-state); } .ol-loop .hd.st{ fill:var(--rl-state); }
+.ol-loop .ac{ stroke:var(--rl-action); } .ol-loop .hd.ac{ fill:var(--rl-action); }
+.ol-loop .rw{ stroke:var(--rl-reward); } .ol-loop .hd.rw{ fill:var(--rl-reward); }
+.ol-loop .vl{ stroke:var(--rl-value); } .ol-loop .hd.vl{ fill:var(--rl-value); }
+.ol-loop .ng{ stroke:var(--rl-neg); stroke-dasharray:6 5; } .ol-loop .hd.ng{ fill:var(--rl-neg); }
+.ol-loop .lb-st{ fill:var(--rl-state); } .ol-loop .lb-ac{ fill:var(--rl-action); } .ol-loop .lb-rw{ fill:var(--rl-reward); } .ol-loop .lb-ng{ fill:var(--rl-neg); } .ol-loop .lb-vl{ fill:var(--rl-value); }
+.ol-loop .tag{ fill:var(--muted); font-size:12.5px; font-weight:700; font-family:var(--sans); }
+.ol-bars{ display:block; width:100%; }
+.ol-num{ font-family:var(--mono); font-variant-numeric:tabular-nums; }
+.ol-two{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+@media (max-width:820px){ .ol-two{ grid-template-columns:minmax(0,1fr); } }
+.ol-progress{ font-size:13px; color:var(--muted); }
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+      <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a href="../../index.html#rl" style="--c:var(--cat-rl)" aria-current="page">강화학습</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#rl" style="--c:var(--cat-rl)">강화학습</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">Offline RL (CQL · IQL)</h1>
+      <p class="ds-hero__lede">새로 실험할 수 없을 때, 이미 쌓인 기록(과거 진료 로그)만으로 정책을 학습합니다. 데이터에 없는 행동을 과대평가하는 분포 이동 문제를 직접 보고, CQL·IQL이 데이터 범위 안에 머무르며 이를 피하는 과정을 숫자로 따라갑니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button class="sk-tab" type="button" role="tab" id="tab-data" aria-controls="pane-data" aria-selected="true"><span class="sk-num">1</span>기록 데이터</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-shift" aria-controls="pane-shift" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>분포 이동</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-cql" aria-controls="pane-cql" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>CQL</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-iql" aria-controls="pane-iql" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>IQL</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-compare" aria-controls="pane-compare" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>성능 비교</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>파이썬 코드</button>
+    <button class="sk-tab" type="button" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>알고리즘 구성도</button>
+  </nav>
+
+  <!-- 1. 기록 데이터 -->
+  <section id="pane-data" role="tabpanel" aria-labelledby="tab-data">
+    <div class="sk-card">
+      <div class="sk-head"><h2>온라인 RL과 오프라인 RL</h2><span class="sk-hint">상태 = 파랑 · 행동 = 주황 · 보상 = 초록 · 가치 = 보라</span></div>
+      <div class="sk-scroll">
+        <svg class="ol-loop" viewBox="0 0 900 240" role="img" aria-label="온라인 강화학습은 에이전트가 환경과 직접 주고받으며 배우고, 오프라인 강화학습은 과거 기록 데이터셋만으로 학습하며 환경에 접근하지 않는다">
+          <defs>
+            <marker id="mSt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="hd st" d="M0 0L10 5L0 10z"/></marker>
+            <marker id="mAc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="hd ac" d="M0 0L10 5L0 10z"/></marker>
+            <marker id="mRw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="hd rw" d="M0 0L10 5L0 10z"/></marker>
+            <marker id="mVl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="hd vl" d="M0 0L10 5L0 10z"/></marker>
+            <marker id="mNg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="hd ng" d="M0 0L10 5L0 10z"/></marker>
+          </defs>
+          <text class="tag" x="10" y="22">온라인 RL — 직접 시도하며 배운다</text>
+          <rect class="bx" x="40" y="40" width="170" height="64" rx="10"/><text class="t" x="125" y="68" text-anchor="middle">에이전트 π</text><text class="s" x="125" y="88" text-anchor="middle">새 치료를 직접 시도</text>
+          <rect class="bx" x="420" y="40" width="190" height="64" rx="10"/><text class="t" x="515" y="68" text-anchor="middle">환경 (환자)</text><text class="s" x="515" y="88" text-anchor="middle">반응을 즉시 관찰</text>
+          <path class="ln ac" d="M212 58 H416" marker-end="url(#mAc)"/><text class="lb-ac s" x="314" y="52" text-anchor="middle">행동 a</text>
+          <path class="ln st" d="M418 88 H214" marker-end="url(#mSt)"/><text class="lb-st s" x="314" y="104" text-anchor="middle">다음 상태 s′ · <tspan class="lb-rw">보상 r</tspan></text>
+          <text class="s" x="640" y="66">의료에서는 위험·비용·윤리 문제로</text><text class="s" x="640" y="84">새로운 시도를 마음대로 할 수 없다</text>
+
+          <text class="tag" x="10" y="146">오프라인 RL — 이미 쌓인 기록만으로 배운다</text>
+          <rect class="bx" x="10" y="164" width="150" height="64" rx="10"/><text class="t" x="85" y="192" text-anchor="middle">행동 정책 π<tspan font-size="10" dy="4">β</tspan></text><text class="s" x="85" y="212" text-anchor="middle">과거 의료진의 결정</text>
+          <rect class="bx" x="200" y="164" width="190" height="64" rx="10"/><text class="t" x="295" y="192" text-anchor="middle">데이터셋 D</text><text class="s" x="295" y="212" text-anchor="middle">(s, a, r, s′) 기록 모음</text>
+          <rect class="bx" x="430" y="164" width="190" height="64" rx="10"/><text class="t" x="525" y="192" text-anchor="middle">오프라인 학습기</text><text class="s" x="525" y="212" text-anchor="middle">BC · CQL · IQL</text>
+          <rect class="bx" x="660" y="164" width="150" height="64" rx="10"/><text class="t" x="735" y="192" text-anchor="middle">새 정책 π</text><text class="s" x="735" y="212" text-anchor="middle">배포 전 검증</text>
+          <path class="ln ac" d="M162 196 H196" marker-end="url(#mAc)"/>
+          <path class="ln st" d="M392 196 H426" marker-end="url(#mSt)"/>
+          <path class="ln vl" d="M622 196 H656" marker-end="url(#mVl)"/>
+          <path class="ln ng" d="M525 160 V110" marker-end="url(#mNg)"/>
+          <text class="lb-ng s" x="540" y="132" font-weight="700">학습 중에는 환경에 새로 물어볼 수 없음</text>
+          <text class="lb-ng s" x="540" y="148">데이터에 없는 (s, a)의 결과는 확인 불가</text>
+        </svg>
+      </div>
+      <p class="sk-note"><b>치료 경로 격자</b> — 왼쪽 아래 <b>S</b>(입원)에서 오른쪽 아래 <b>G</b>(회복·퇴원)까지 가는 문제입니다. 하루(한 걸음)마다 보상 −1, 아래 줄 <b>H</b>는 공격적 치료의 중증 합병증(보상 −100, 종료)입니다. 위쪽 길은 안전하지만 오래 걸리고, H 바로 위 길이 가장 빠릅니다. 행동은 0↑ 1→ 2↓ 3← 네 가지, γ = 0.99, 한 에피소드 최대 50걸음.</p>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>과거 기록 모으기 — 행동 정책과 데이터 범위</h2><span class="sk-hint">칸을 누르면 그 상태를 선택합니다</span></div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">행동 정책</span>
+          <div class="sk-seg" role="group" aria-label="행동 정책" id="segKind">
+            <button type="button" data-v="random" aria-pressed="false">무작위</button>
+            <button type="button" data-v="medium" aria-pressed="false">중간(보수적)</button>
+            <button type="button" data-v="expert" aria-pressed="true">전문가</button>
+            <button type="button" data-v="mixed" aria-pressed="false">혼합</button>
+          </div>
+        </div>
+        <label class="sk-slider"><span class="sk-sl-head">행동 잡음 ε <b id="vEps">0.10</b></span><input type="range" id="sEps" min="0" max="0.5" step="0.05" value="0.1"></label>
+        <label class="sk-slider"><span class="sk-sl-head">에피소드 수 <b id="vEp">50</b></span><input type="range" id="sEp" min="10" max="200" step="10" value="50"></label>
+        <label class="sk-slider"><span class="sk-sl-head">seed <b id="vSeed">1</b></span><input type="range" id="sSeed" min="1" max="30" step="1" value="1"></label>
+      </div>
+      <p class="sk-lead" id="kindDesc"></p>
+      <div class="ol-split">
+        <div class="ol-col">
+          <canvas class="ol-cv" id="cvData" aria-label="데이터 범위 지도: 칸 색은 방문 횟수, 가장자리 숫자는 그 방향 행동이 기록된 횟수"></canvas>
+          <div class="sk-legend ol-legend"><span><i style="background:var(--cat-rl)"></i>방문 많은 상태</span><span><i style="background:var(--rl-action)"></i>기록된 행동 n(s,a)</span><span><i class="dash"></i>기록 없는 행동</span><span><i class="hat"></i>한 번도 기록되지 않은 상태</span></div>
+        </div>
+        <div class="ol-col">
+          <div class="sk-stats">
+            <div class="sk-stat"><b id="stN">0</b><span>전이 (s,a,r,s′)</span></div>
+            <div class="sk-stat"><b id="stCov">0</b><span>덮은 (s,a) / 116</span></div>
+            <div class="sk-stat"><b id="stGoal">0</b><span>회복 도달 에피소드</span></div>
+            <div class="sk-stat"><b id="stBeh">0</b><span>행동 정책 평균 리턴</span></div>
+          </div>
+          <div id="selData"></div>
+          <div class="ol-log" tabindex="0" aria-label="기록 일부"><table class="sk-table" id="tblSample"></table></div>
+        </div>
+      </div>
+      <p class="sk-note">오프라인 RL의 성패는 <b>데이터 범위(coverage)</b>에 달려 있습니다. 전문가 기록은 좋은 길만 촘촘히 덮고 나머지는 비어 있고, 무작위 기록은 넓게 덮지만 좋은 길이 드뭅니다. 빈 칸(빨간 점선)의 결과는 데이터로 알 수 없습니다.</p>
+    </div>
+  </section>
+
+  <!-- 2. 분포 이동 -->
+  <section id="pane-shift" role="tabpanel" aria-labelledby="tab-shift" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>단순 오프라인 Q 학습이 실패하는 이유 — 분포 이동</h2><span class="sk-hint">→ 키 = 다음 반복</span></div>
+      <div class="ol-cur" data-cur></div>
+      <div class="sk-formula">Q(s,a) ← <span class="c-reward">r</span> + γ · <b class="c-target">max<sub>a′</sub> Q(s′,a′)</b> &nbsp;&nbsp;(데이터에 있는 (s,a)만 갱신, max는 데이터에 없는 a′까지 포함)</div>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">기록 없는 행동의 초기 Q</span>
+          <div class="sk-seg" role="group" aria-label="초기 Q" id="segQ0">
+            <button type="button" data-v="zero" aria-pressed="true">0</button>
+            <button type="button" data-v="rand" aria-pressed="false">무작위 ±5 (신경망 외삽 흉내)</button>
+          </div>
+        </div>
+        <div class="sk-group">
+          <button class="sk-btn" type="button" id="nvFirst">처음</button>
+          <button class="sk-btn" type="button" id="nvPrev">이전</button>
+          <button class="sk-btn sk-btn--primary" type="button" id="nvNext">다음 반복</button>
+          <button class="sk-btn" type="button" id="nvPlay">재생</button>
+          <button class="sk-btn" type="button" id="nvLast">수렴</button>
+        </div>
+        <label class="sk-slider" style="min-width:140px"><span class="sk-sl-head">속도 <b id="vNvSpd">보통</b></span><input type="range" id="sNvSpd" min="1" max="3" step="1" value="2"></label>
+        <span class="sk-pill" id="nvStep">반복 0</span>
+      </div>
+      <div class="ol-split">
+        <div class="ol-col">
+          <canvas class="ol-cv" id="cvNaive" aria-label="단순 Q 학습 결과: 칸 가장자리 숫자는 행동별 Q, 빨간 점선은 데이터에 없는 행동"></canvas>
+          <div class="sk-legend ol-legend"><span><i style="background:var(--ink)"></i>탐욕 행동(굵게)</span><span><i class="dash"></i>데이터에 없는 행동의 Q</span><span><i class="hat"></i>데이터에 없는 상태</span><span><i style="background:var(--rl-action)"></i>학습된 정책 실행 경로</span></div>
+        </div>
+        <div class="ol-col">
+          <h3 id="nvSelTitle">선택한 상태</h3>
+          <div class="sk-scroll"><table class="sk-table" id="tblNaive"></table></div>
+          <div class="sk-formula" id="nvBackup"></div>
+        </div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>학습된 정책을 실제로 실행하면</h2><span class="sk-hint">데이터에 없는 행동이 나오는 순간 = 분포 이동</span></div>
+      <div class="sk-stats">
+        <div class="sk-stat"><b id="nvRet">0</b><span>실제 리턴</span></div>
+        <div class="sk-stat"><b id="nvV0" class="c-value">0</b><span>추정 V̂(S)</span></div>
+        <div class="sk-stat"><b id="nvVstar">0</b><span>실제 최적 V*(S)</span></div>
+        <div class="sk-stat"><b id="nvOod" class="c-neg">0</b><span>데이터 밖 행동 횟수</span></div>
+      </div>
+      <div class="ol-log" tabindex="0" aria-label="정책 실행 기록"><table class="sk-table" id="tblRoll"></table></div>
+      <p class="sk-note sk-note--warn">max는 <b>가장 큰 값</b>을 고릅니다. 데이터에 없는 행동의 Q는 한 번도 고쳐지지 않아 초기값(0)이나 외삽된 값이 그대로 남고, 실제 값(음수)보다 커서 max에 뽑힙니다. 이 과대추정이 앞 상태로 번지고(bootstrapping), 정책은 데이터 밖 행동을 고르며, 그 결과는 데이터로 확인할 수 없습니다. 실제 실행 결과는 제자리 맴돌기나 합병증입니다.</p>
+    </div>
+  </section>
+
+  <!-- 3. CQL -->
+  <section id="pane-cql" role="tabpanel" aria-labelledby="tab-cql" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>CQL — 데이터에 없는 행동의 Q를 눌러 내리기</h2><span class="sk-hint">Conservative Q-Learning</span></div>
+      <div class="ol-cur" data-cur></div>
+      <div class="sk-formula">L(Q) = <b class="c-neg">α</b> · E<sub>s~D</sub>[ <b>log Σ<sub>a</sub> exp Q(s,a)</b> − <b>E<sub>a~D</sub> Q(s,a)</b> ] + ½ · E<sub>(s,a,r,s′)~D</sub>[ (Q(s,a) − (<span class="c-reward">r</span> + γ·max<sub>a′</sub>Q(s′,a′)))² ]<br>
+      <span style="color:var(--muted)">앞 항: 모든 행동의 Q를 부드럽게 최대(log-sum-exp)로 누르고 데이터 행동의 Q는 올림 → 데이터 밖 행동만 내려감 · 뒤 항: 보통의 벨만 오차</span></div>
+      <div class="sk-controls">
+        <label class="sk-slider"><span class="sk-sl-head">보수성 α <b id="vAlpha">1</b></span><input type="range" id="sAlpha" min="0" max="8" step="1" value="5"></label>
+        <button class="sk-btn sk-btn--primary" type="button" id="cqlPlay">학습 과정 재생</button>
+        <button class="sk-btn" type="button" id="cqlStop">멈춤</button>
+        <label class="sk-slider" style="min-width:140px"><span class="sk-sl-head">속도 <b id="vCqlSpd">보통</b></span><input type="range" id="sCqlSpd" min="1" max="3" step="1" value="2"></label>
+        <span class="sk-pill" id="cqlStep">반복 0</span>
+      </div>
+      <div class="ol-split">
+        <div class="ol-col">
+          <canvas class="ol-cv" id="cvCql" aria-label="CQL 결과: 칸 가장자리 숫자는 행동별 Q"></canvas>
+          <div class="sk-legend ol-legend"><span><i style="background:var(--ink)"></i>탐욕 행동</span><span><i class="dash"></i>데이터에 없는 행동(눌러 내림)</span><span><i class="hat"></i>데이터에 없는 상태</span><span><i style="background:var(--rl-action)"></i>실행 경로</span></div>
+        </div>
+        <div class="ol-col">
+          <h3 id="cqlSelTitle">선택한 상태의 CQL 벌점</h3>
+          <div class="sk-scroll"><table class="sk-table" id="tblCql"></table></div>
+          <div class="sk-formula" id="cqlPen"></div>
+        </div>
+      </div>
+      <div class="sk-stats">
+        <div class="sk-stat"><b id="cqlRet">0</b><span>실제 리턴</span></div>
+        <div class="sk-stat"><b id="cqlV0" class="c-value">0</b><span>추정 V̂(S)</span></div>
+        <div class="sk-stat"><b id="cqlVstar">0</b><span>실제 최적 V*(S)</span></div>
+        <div class="sk-stat"><b id="cqlOod" class="c-neg">0</b><span>데이터 밖 행동 횟수</span></div>
+      </div>
+      <div class="ol-two">
+        <div><div class="sk-mat-label">실제 리턴 (탐욕 정책 실행)</div><canvas class="ol-cv" id="cvCqlRet" aria-label="학습 반복에 따른 실제 리턴"></canvas></div>
+        <div><div class="sk-mat-label">추정 V̂(S) — 점선 = 실제 최적 V*(S)</div><canvas class="ol-cv" id="cvCqlV" aria-label="학습 반복에 따른 시작 상태 추정 가치"></canvas></div>
+      </div>
+      <p class="sk-note">α = 0이면 단순 Q 학습과 같아 데이터 밖 행동이 0 근처에 남아 실패합니다. α를 키우면 데이터 밖 행동의 Q가 실제보다 크게 낮아지고(보수적), 데이터에 자주 나온 행동의 Q는 조금 올라가 정책이 <b>데이터 범위 안</b>에 머뭅니다. α가 너무 크면 데이터에 자주 나온 행동만 고르는 행동 복제(BC)에 가까워집니다.</p>
+    </div>
+  </section>
+
+  <!-- 4. IQL -->
+  <section id="pane-iql" role="tabpanel" aria-labelledby="tab-iql" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>IQL — max를 쓰지 않는 표본 내(in-sample) 학습</h2><span class="sk-hint">Implicit Q-Learning</span></div>
+      <div class="ol-cur" data-cur></div>
+      <div class="sk-formula">
+        ① V 학습: L<sub>V</sub> = E<sub>(s,a)~D</sub>[ L<sub>2</sub><sup>τ</sup>( Q(s,a) − V(s) ) ], &nbsp; L<sub>2</sub><sup>τ</sup>(u) = |τ − 1(u&lt;0)| · u² &nbsp;(기대분위 회귀)<br>
+        ② Q 학습: L<sub>Q</sub> = E<sub>(s,a,r,s′)~D</sub>[ ( <span class="c-reward">r</span> + γ · <b class="c-value">V(s′)</b> − Q(s,a) )² ] &nbsp;← max 대신 V(s′): 데이터에 없는 행동을 아예 쓰지 않음<br>
+        ③ 정책 추출: π(a|s) ∝ π<sub>β</sub>(a|s) · exp( <b>β</b> · (Q(s,a) − V(s)) ) &nbsp;(이점 가중 회귀, AWR)
+      </div>
+      <div class="sk-controls">
+        <label class="sk-slider"><span class="sk-sl-head">기대분위 τ <b id="vTau">0.90</b></span><input type="range" id="sTau" min="0.5" max="0.99" step="0.01" value="0.9"></label>
+        <label class="sk-slider"><span class="sk-sl-head">온도 역수 β <b id="vBeta">3.0</b></span><input type="range" id="sBeta" min="0" max="10" step="0.5" value="3"></label>
+        <button class="sk-btn sk-btn--primary" type="button" id="iqlPlay">학습 과정 재생</button>
+        <span class="sk-pill" id="iqlStep">반복 0</span>
+      </div>
+      <div class="ol-split">
+        <div class="ol-col">
+          <div class="sk-mat-label">비대칭 손실 L₂^τ(u) — 보라 = 현재 τ, 회색 점선 = τ 0.5(보통 제곱)</div>
+          <canvas class="ol-cv" id="cvExp" aria-label="기대분위 손실 곡선"></canvas>
+          <p class="sk-lead" style="font-size:13px">u = Q − V &gt; 0 (V보다 좋은 행동)에는 τ, u &lt; 0에는 1−τ 무게를 줍니다. τ가 1에 가까울수록 V는 <b>데이터에 있는 행동들 중 최댓값</b>에 다가갑니다. 점 = 선택한 상태의 u 값.</p>
+        </div>
+        <div class="ol-col">
+          <canvas class="ol-cv" id="cvIql" aria-label="IQL 결과: 칸 색과 숫자는 V, 화살표 굵기는 정책 확률"></canvas>
+          <div class="sk-legend ol-legend"><span>칸 숫자 = V(s)</span><span><i class="hat"></i>데이터에 없는 상태</span><span>화살표 = π(a|s) (데이터에 있는 행동만)</span></div>
+        </div>
+      </div>
+      <h3 id="iqlSelTitle">선택한 상태의 계산</h3>
+      <div class="sk-scroll"><table class="sk-table" id="tblIql"></table></div>
+      <div class="sk-formula" id="iqlCalc"></div>
+      <div class="sk-stats">
+        <div class="sk-stat"><b id="iqlRet">0</b><span>실제 리턴</span></div>
+        <div class="sk-stat"><b id="iqlV0" class="c-value">0</b><span>V(S)</span></div>
+        <div class="sk-stat"><b id="iqlOod" class="c-neg">0</b><span>데이터 밖 행동 횟수</span></div>
+      </div>
+      <p class="sk-note">IQL은 학습 내내 <b>데이터에 실제로 있는 (s,a)</b>의 값만 씁니다. τ = 0.5이면 V는 행동 정책의 평균(SARSA와 비슷), τ → 1이면 데이터 안에서의 max가 되어, 데이터 밖을 건드리지 않고도 행동 정책보다 나은 길을 찾습니다.</p>
+    </div>
+  </section>
+
+  <!-- 5. 성능 비교 -->
+  <section id="pane-compare" role="tabpanel" aria-labelledby="tab-compare" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>데이터 품질별 성능 — BC · 단순 Q · CQL · IQL</h2><span class="sk-hint">seed 5개 평균, 모두 브라우저에서 표 기반으로 계산</span></div>
+      <div class="sk-controls">
+        <button class="sk-btn sk-btn--primary" type="button" id="cmpRun">다시 계산</button>
+        <span class="ol-progress" id="cmpProg"></span>
+      </div>
+      <p class="sk-lead" id="cmpDesc"></p>
+      <div class="sk-scroll"><table class="sk-table" id="tblCmp"></table></div>
+      <canvas class="ol-bars" id="cvCmp" aria-label="데이터 품질별 방법 비교 막대그래프"></canvas>
+      <div class="sk-legend" id="cmpLegend"></div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>현재 데이터에서 α · τ 바꿔 보기</h2><span class="sk-hint" id="sweepHint"></span></div>
+      <div class="ol-two">
+        <div><div class="sk-mat-label">CQL α에 따른 실제 리턴(주황) · 추정 V̂(S)(보라)</div><canvas class="ol-cv" id="cvSweepA" aria-label="알파에 따른 성능"></canvas></div>
+        <div><div class="sk-mat-label">IQL τ에 따른 실제 리턴(주황) · V(S)(보라)</div><canvas class="ol-cv" id="cvSweepT" aria-label="타우에 따른 성능"></canvas></div>
+      </div>
+      <p class="sk-note">읽는 법: 실제 리턴은 회복까지 걸린 날수에 −1을 곱한 값입니다(최적 −7, 보수적 길 −13). −50은 50걸음 안에 회복하지 못하고 맴돈 경우, −100 아래는 합병증입니다. 회색 점선 = 실제 최적 V*(S).</p>
+    </div>
+  </section>
+
+  <!-- 6. 파이썬 코드 -->
+  <section id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>파이썬 코드 — 현재 설정 반영</h2><button class="sk-btn sk-btn--sm" type="button" id="btnCopy">복사</button></div>
+      <p class="sk-lead">numpy로 같은 격자·데이터 수집·CQL·IQL을 표 기반으로 구현한 코드입니다. 행동 순서는 0↑ 1→ 2↓ 3← 로 Gymnasium CliffWalking과 같습니다(FrozenLake는 0← 1↓ 2→ 3↑ 순서라 다름). 신경망 버전은 아래 d3rlpy 부분을 참고하세요.</p>
+      <pre class="ol-code" id="code" tabindex="0"></pre>
+    </div>
+  </section>
+
+  <!-- 7. 알고리즘 구성도 -->
+  <section id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">오프라인 설정·분포 이동 · CQL · IQL 3장 · 강의용 도식</span></div><div data-ds-diagrams="offline-rl"></div></section>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20261007a"></script>
+<script src="../../assets/js/rl-kit.js?v=20261007a"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261007a"></script>
+<script src="../../assets/diagrams/offline-rl.js?v=20261007a"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const RM = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------------- 안쪽 탭 (URL 해시 연동, ←/→ 키 이동) ---------------- */
+  const tabs = [...document.querySelectorAll(".sk-tab")];
+  let curTab = "data";
+  function show(t) {
+    tabs.forEach(b => { const on = b === t; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1;
+      document.getElementById(b.getAttribute("aria-controls")).hidden = !on; });
+    curTab = t.id.replace("tab-", "");
+    history.replaceState(null, "", "#" + curTab);
+    stopAll();
+    renderTab();
+  }
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => show(b));
+    b.addEventListener("keydown", e => {
+      const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return;
+      const n = tabs[(i + d + tabs.length) % tabs.length]; show(n); n.focus(); e.preventDefault();
+    });
+  });
+
+  /* ---------------- 공통 계산 ---------------- */
+  const ROWS = 5, COLS = 7, START = 28, GOAL = 34, HOLES = [29, 30, 31, 32, 33], GAMMA = 0.99, CAP = 50, NA = 4;
+  const env = new RL.GridEnv({ name: "치료 경로 격자 5×7", kind: "grid", rows: ROWS, cols: COLS, start: START, holes: HOLES, goals: { 34: 0 }, holeR: -100, stepR: -1, maxSteps: CAP });
+  const NS = env.nS;
+  const VALID = []; for (let s = 0; s < NS; s++) if (!env.terminal[s]) VALID.push(s);
+  const AR = RL.ACTIONS;
+  const TR = (s, a) => env.P[s][a][0]; /* [확률, s′, r, 종료] — 결정적 환경 */
+  const minus = v => (v < 0 ? "−" : "") + Math.abs(v);
+  function f(v, d) { if (v == null || Number.isNaN(v)) return "–"; d = d == null ? 2 : d; const r = Math.abs(v) < 0.5 * Math.pow(10, -d) ? 0 : v; return (r < 0 ? "−" : "") + Math.abs(r).toFixed(d); }
+  function fq(v) { return Math.abs(v) >= 100 ? f(v, 0) : Math.abs(v) >= 10 ? f(v, 1) : f(v, 1); }
+  function rc(s) { return "(" + Math.floor(s / COLS) + "," + (s % COLS) + ")"; }
+  function vmax(Q, s) { if (env.terminal[s]) return 0; let m = -Infinity; for (let a = 0; a < NA; a++) if (Q[s * NA + a] > m) m = Q[s * NA + a]; return m; }
+  function amax(Q, s) { let b = 0; for (let a = 1; a < NA; a++) if (Q[s * NA + a] > Q[s * NA + b] + 1e-12) b = a; return b; }
+
+  /* 실제 최적 Q* (가치 반복) */
+  const QSTAR = (function () {
+    const Q = new Float64Array(NS * NA);
+    for (let it = 0; it < 5000; it++) { let d = 0;
+      for (const s of VALID) for (let a = 0; a < NA; a++) { const t = TR(s, a), v = t[2] + (t[3] ? 0 : GAMMA * vmax(Q, t[1])); d = Math.max(d, Math.abs(v - Q[s * NA + a])); Q[s * NA + a] = v; }
+      if (d < 1e-12) break; }
+    return Q;
+  })();
+  const OPT = new Array(NS).fill(0); VALID.forEach(s => { OPT[s] = amax(QSTAR, s); });
+  function safeAct(s) { const r = Math.floor(s / COLS), c = s % COLS; if (c === COLS - 1) return 2; if (r > 0) return 0; return 1; }
+
+  const KIND = {
+    random: { name: "무작위", eps: null, desc: "모든 행동을 1/4 확률로 고르는 기록입니다. 넓게 퍼지지만 대부분 합병증(H)으로 끝나고 회복까지 간 기록은 드뭅니다." },
+    medium: { name: "중간(보수적)", eps: 0.25, desc: "맨 위 줄로 돌아가는 보수적 진료 습관(13일)에 잡음 ε가 섞인 기록입니다. 안전하지만 최적(7일)보다 깁니다." },
+    expert: { name: "전문가", eps: 0.1, desc: "최적 경로(H 바로 위로 7일)를 따르는 숙련의 기록에 잡음 ε가 섞인 기록입니다. 좋은 길만 촘촘하고 나머지는 거의 비어 있습니다." },
+    mixed: { name: "혼합", eps: 0.1, desc: "에피소드의 절반은 전문가(잡음 ε), 절반은 무작위 기록입니다." }
+  };
+  const S = { kind: "expert", eps: 0.1, nEp: 50, seed: 1, q0: "zero", sel: START, alphaIdx: 5, tau: 0.9, beta: 3, nvStep: 0, cqlRow: null, nvRow: null };
+  const ALPHAS = [0, 0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30];
+  const alpha = () => ALPHAS[S.alphaIdx];
+
+  function collect(kind, eps, nEp, seed) {
+    const rng = RL.rng(seed * 7919 + 13), D = []; let tot = 0, hits = 0;
+    for (let e = 0; e < nEp; e++) {
+      const ek = kind === "mixed" ? (e % 2 ? "random" : "expert") : kind;
+      let s = env.reset(), R = 0;
+      for (let t = 0; t < CAP; t++) {
+        let a;
+        if (ek === "random") a = rng.int(NA);
+        else { const base = ek === "expert" ? OPT[s] : safeAct(s); a = rng.random() < eps ? rng.int(NA) : base; }
+        const o = env.step(a, rng);
+        D.push({ ep: e, t: t, s: s, a: a, r: o.r, s2: o.s, done: o.done });
+        R += o.r; s = o.s;
+        if (o.done) { if (o.s === GOAL) hits++; break; }
+      }
+      tot += R;
+    }
+    return summarize(D, tot / nEp, hits);
+  }
+  function summarize(D, behRet, hits) {
+    const n = new Float64Array(NS * NA), ns = new Float64Array(NS), nx = new Array(NS * NA).fill(null);
+    D.forEach(t => { const k = t.s * NA + t.a; n[k]++; ns[t.s]++; if (!nx[k]) nx[k] = { r: t.r, s2: t.s2, done: t.done }; });
+    const mu = new Float64Array(NS * NA); let cov = 0;
+    for (let s = 0; s < NS; s++) for (let a = 0; a < NA; a++) { if (ns[s]) mu[s * NA + a] = n[s * NA + a] / ns[s]; if (n[s * NA + a]) cov++; }
+    return { D: D, n: n, ns: ns, nx: nx, mu: mu, cov: cov, behRet: behRet, hits: hits };
+  }
+  const seen = (data, s, a) => data.n[s * NA + a] > 0;
+
+  /* 탐욕 정책 실행 (결정적 환경 → 한 번이면 충분) */
+  function rollout(pol, data) {
+    let s = env.reset(), R = 0, ood = 0; const path = [s], log = [];
+    for (let t = 0; t < CAP; t++) {
+      const a = pol(s), o = env.step(a), inD = data ? seen(data, s, a) : true;
+      if (!inD) ood++;
+      log.push({ t: t + 1, s: s, a: a, r: o.r, s2: o.s, inD: inD });
+      R += o.r; s = o.s; path.push(s);
+      if (o.done) return { R: R, reached: s === GOAL, path: path, log: log, ood: ood, hole: s !== GOAL };
+    }
+    return { R: R, reached: false, path: path, log: log, ood: ood, hole: false };
+  }
+  const bcPolicy = data => s => { if (!data.ns[s]) return 0; let b = 0; for (let a = 1; a < NA; a++) if (data.n[s * NA + a] > data.n[s * NA + b]) b = a; return b; };
+
+  /* 단순 오프라인 Q 학습 (표 기반, 동기식 반복) */
+  function naiveInit(mode, seed) { const Q = new Float64Array(NS * NA); if (mode === "rand") { const r = RL.rng(seed * 31 + 5); for (let i = 0; i < Q.length; i++) Q[i] = r.uniform(-5, 5); } return Q; }
+  function naiveSweep(Q, data) {
+    const Qn = Float64Array.from(Q); let d = 0;
+    for (const s of VALID) for (let a = 0; a < NA; a++) { const t = data.nx[s * NA + a]; if (!t) continue;
+      const y = t.r + (t.done ? 0 : GAMMA * vmax(Q, t.s2)); d = Math.max(d, Math.abs(y - Q[s * NA + a])); Qn[s * NA + a] = y; }
+    return { Q: Qn, d: d };
+  }
+  function naiveRun(data, mode, seed, keep) {
+    let Q = naiveInit(mode, seed); const snaps = [Q]; let k = 0;
+    for (; k < 3000; k++) { const r = naiveSweep(Q, data); Q = r.Q; if (keep && k < keep) snaps.push(Q); if (r.d < 1e-9) { k++; break; } }
+    return { Q: Q, snaps: snaps, conv: k };
+  }
+
+  /* CQL (표 기반 경사 하강, 목표값은 반복마다 고정) */
+  function cqlLR(al) { return 0.5 / Math.max(1, al / 2); }
+  function cqlSweep(Q, data, al, lr) {
+    const V = new Float64Array(NS); for (let s = 0; s < NS; s++) V[s] = vmax(Q, s);
+    const p = new Float64Array(NA);
+    for (const s of VALID) {
+      if (!data.ns[s]) continue;
+      let m = -Infinity; for (let a = 0; a < NA; a++) m = Math.max(m, Q[s * NA + a]);
+      let Z = 0; for (let a = 0; a < NA; a++) { p[a] = Math.exp(Q[s * NA + a] - m); Z += p[a]; }
+      for (let a = 0; a < NA; a++) {
+        const k = s * NA + a, mu = data.mu[k];
+        let g = al * (p[a] / Z - mu);
+        if (mu > 0) { const t = data.nx[k]; g += mu * (Q[k] - (t.r + (t.done ? 0 : GAMMA * V[t.s2]))); }
+        Q[k] -= lr * g;
+      }
+    }
+  }
+  const CQL_SWEEPS = 1500, CQL_EVERY = 15;
+  function cqlRun(data, al, onEval) {
+    const Q = new Float64Array(NS * NA), lr = cqlLR(al);
+    for (let it = 1; it <= CQL_SWEEPS; it++) { cqlSweep(Q, data, al, lr); if (onEval && it % CQL_EVERY === 0) onEval(it, Q); }
+    return Q;
+  }
+  function cqlStats(Q, data, s, al) {
+    const q = [0, 1, 2, 3].map(a => Q[s * NA + a]), m = Math.max.apply(null, q);
+    const e = q.map(v => Math.exp(v - m)), Z = e.reduce((x, y) => x + y, 0), soft = e.map(v => v / Z);
+    const lse = m + Math.log(Z); let ed = 0; for (let a = 0; a < NA; a++) ed += data.mu[s * NA + a] * q[a];
+    const V = new Float64Array(NS); for (let x = 0; x < NS; x++) V[x] = vmax(Q, x);
+    const y = [0, 1, 2, 3].map(a => { const t = data.nx[s * NA + a]; return t ? t.r + (t.done ? 0 : GAMMA * V[t.s2]) : null; });
+    return { q: q, soft: soft, lse: lse, ed: ed, gap: lse - ed, pen: al * (lse - ed), y: y };
+  }
+
+  /* IQL (표 기반: 기대분위 V ↔ Q 번갈아, 정책은 이점 가중) */
+  function expectile(vals, w, tau) {
+    let v = 0, sw = 0; vals.forEach((x, i) => { v += w[i] * x; sw += w[i]; }); v /= sw;
+    for (let k = 0; k < 200; k++) { let nw = 0, dw = 0; vals.forEach((x, i) => { const c = w[i] * (x < v ? 1 - tau : tau); nw += c * x; dw += c; }); const v2 = nw / dw; if (Math.abs(v2 - v) < 1e-13) { v = v2; break; } v = v2; }
+    return v;
+  }
+  function iqlIter(st, data, tau) {
+    for (const s of VALID) for (let a = 0; a < NA; a++) { const t = data.nx[s * NA + a]; if (t) st.Q[s * NA + a] = t.r + (t.done ? 0 : GAMMA * st.V[t.s2]); }
+    for (const s of VALID) { if (!data.ns[s]) continue; const vals = [], w = [];
+      for (let a = 0; a < NA; a++) if (data.n[s * NA + a]) { vals.push(st.Q[s * NA + a]); w.push(data.mu[s * NA + a]); }
+      st.V[s] = expectile(vals, w, tau); }
+  }
+  function iqlPolicy(st, data, beta) {
+    const pi = new Array(NS).fill(null);
+    for (const s of VALID) { if (!data.ns[s]) continue; const lw = [];
+      for (let a = 0; a < NA; a++) lw.push(data.n[s * NA + a] ? Math.log(data.mu[s * NA + a]) + beta * (st.Q[s * NA + a] - st.V[s]) : -Infinity);
+      const m = Math.max.apply(null, lw), e = lw.map(v => v === -Infinity ? 0 : Math.exp(v - m)), z = e.reduce((x, y) => x + y, 0); pi[s] = e.map(v => v / z); }
+    return pi;
+  }
+  const IQL_ITERS = 200;
+  function iqlRun(data, tau, beta, onIter) {
+    const st = { Q: new Float64Array(NS * NA).fill(NaN), V: new Float64Array(NS) };
+    for (let it = 1; it <= IQL_ITERS; it++) { iqlIter(st, data, tau); if (onIter) onIter(it, st); }
+    st.pi = iqlPolicy(st, data, beta); return st;
+  }
+  const piArgmax = pi => s => pi[s] ? RL.argmax(pi[s]) : 0;
+
+  /* ---------------- 상태 ---------------- */
+  let data, naive, cql, iql;
+  function rebuildData() {
+    data = collect(S.kind, S.eps, S.nEp, S.seed);
+    rebuildNaive(); rebuildCql(); rebuildIql();
+  }
+  function rebuildNaive() { naive = naiveRun(data, S.q0, S.seed, 40); S.nvStep = naive.snaps.length; /* 마지막 = 수렴 */ }
+  function rebuildCql() {
+    const curve = { x: [], ret: [], v0: [] };
+    const Q = cqlRun(data, alpha(), (it, Qc) => { curve.x.push(it); curve.ret.push(rollout(s => amax(Qc, s), data).R); curve.v0.push(vmax(Qc, START)); });
+    cql = { Q: Q, curve: curve, shown: CQL_SWEEPS, Qshow: Q };
+  }
+  function rebuildIql() {
+    const curve = { x: [], ret: [], v0: [] }, snaps = [];
+    const st = iqlRun(data, S.tau, S.beta, (it, s) => { if (it <= 60) { const sn = { Q: Float64Array.from(s.Q), V: Float64Array.from(s.V) }; sn.pi = iqlPolicy(sn, data, S.beta); snaps.push(sn); curve.x.push(it); curve.ret.push(rollout(piArgmax(sn.pi), data).R); curve.v0.push(s.V[START]); } });
+    iql = { st: st, curve: curve, snaps: snaps, shown: IQL_ITERS };
+  }
+
+  /* ---------------- 그리기 ---------------- */
+  function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+  function boardSize(cv) { const w = (cv.parentNode && cv.parentNode.clientWidth) || 600; return Math.max(34, Math.min(84, Math.floor(w / COLS))); }
+  const EDGE = [[0.5, 0.14], [0.81, 0.5], [0.5, 0.86], [0.19, 0.5]], EDGE_S = [[0.5, 0.07], [0.93, 0.5], [0.5, 0.93], [0.07, 0.5]];
+  function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+  function selBox(g, c, s, T) { const x = (s % COLS) * c, y = Math.floor(s / COLS) * c; g.strokeStyle = T.ink; g.lineWidth = 3; g.strokeRect(x + 2, y + 2, c - 4, c - 4); }
+  /* 데이터에 한 번도 나오지 않은 상태: 빗금 */
+  function hatch(g, c, s, T) {
+    const x = (s % COLS) * c, y = Math.floor(s / COLS) * c;
+    g.save(); g.beginPath(); g.rect(x + 1, y + 1, c - 2, c - 2); g.clip();
+    g.fillStyle = T.bg2; g.fillRect(x, y, c, c); g.strokeStyle = T.line; g.lineWidth = 1;
+    for (let k = -c; k < c; k += 9) { g.beginPath(); g.moveTo(x + k, y + c); g.lineTo(x + k + c, y); g.stroke(); }
+    g.restore(); g.strokeStyle = T.line; g.strokeRect(x + 0.5, y + 0.5, c - 1, c - 1);
+  }
+  /* 행동별 값(또는 횟수)을 칸 가장자리에 표시 */
+  function drawEdges(cv, opts) {
+    const T = RL.theme(), size = boardSize(cv);
+    const Vh = opts.Q ? Array.from({ length: NS }, (_, s) => data.ns[s] ? vmax(opts.Q, s) : 0) : null;
+    const res = RL.drawGrid(cv, env, { V: Vh, heat: false, fmt: () => "", arrows: false, size: size, visits: opts.visits });
+    const c = res.cell, g = cv.getContext("2d"), big = c >= 62, fs = Math.max(10, Math.round(c * 0.13));
+    const neg = css("--rl-neg"), act = css("--rl-action"), mono = css("--mono") || "monospace";
+    VALID.forEach(s => { if (!data.ns[s]) hatch(g, c, s, T); });
+    g.textAlign = "center"; g.textBaseline = "middle";
+    for (const s of VALID) {
+      const x0 = (s % COLS) * c, y0 = Math.floor(s / COLS) * c, vis = data.ns[s] > 0, gr = opts.Q ? amax(opts.Q, s) : -1;
+      if (!vis && (opts.counts || !big)) continue;
+      let nmax = 1; for (let a = 0; a < NA; a++) nmax = Math.max(nmax, data.n[s * NA + a]);
+      for (let a = 0; a < NA; a++) {
+        const E = big ? EDGE[a] : EDGE_S[a], px = x0 + E[0] * c, py = y0 + E[1] * c, inD = data.n[s * NA + a] > 0;
+        const w = big ? (a % 2 === 0 ? c * 0.42 : c * 0.34) : (a % 2 === 0 ? c * 0.3 : c * 0.09), h = big ? fs * 1.3 : (a % 2 === 0 ? c * 0.09 : c * 0.3);
+        if (vis && !inD) { g.save(); g.setLineDash([3, 2]); g.strokeStyle = neg; g.lineWidth = 1.2; roundRect(g, px - w / 2, py - h / 2, w, h, 3); g.stroke(); g.restore(); }
+        else if (vis && opts.counts) { g.globalAlpha = 0.2 + 0.6 * Math.log(1 + data.n[s * NA + a]) / Math.log(1 + nmax); g.fillStyle = act; roundRect(g, px - w / 2, py - h / 2, w, h, 3); g.fill(); g.globalAlpha = 1; }
+        if (big) {
+          let txt, col = T.text, wt = "500";
+          if (opts.counts) { txt = inD ? String(data.n[s * NA + a]) : "0"; col = inD ? T.ink : neg; wt = "600"; }
+          else { txt = fq(opts.Q[s * NA + a]); col = inD ? T.text : neg; if (!vis) g.globalAlpha = 0.6; if (vis && a === gr) { wt = "700"; col = inD ? T.ink : neg; } }
+          g.font = wt + " " + fs + "px " + mono; g.fillStyle = col; g.fillText(txt, px, py + 0.5); g.globalAlpha = 1;
+          if (!opts.counts && vis && a === gr) { g.strokeStyle = col; g.lineWidth = 1.6; roundRect(g, px - w / 2 - 1, py - h / 2 - 1, w + 2, h + 2, 3); g.stroke(); }
+        }
+      }
+      if (opts.Q && vis) { /* 가운데 탐욕 화살표 */
+        const cx = x0 + c / 2, cy = y0 + c / 2, L = c * 0.12, dx = [0, 1, 0, -1][gr], dy = [-1, 0, 1, 0][gr];
+        g.strokeStyle = seen(data, s, gr) ? T.ink : neg; g.fillStyle = g.strokeStyle; g.lineWidth = 2;
+        g.beginPath(); g.moveTo(cx - dx * L, cy - dy * L); g.lineTo(cx + dx * L * 0.4, cy + dy * L * 0.4); g.stroke();
+        const hx = cx + dx * L, hy = cy + dy * L, hs = c * 0.07; g.beginPath(); g.moveTo(hx, hy); g.lineTo(hx - dx * hs - dy * hs * 0.6, hy - dy * hs + dx * hs * 0.6); g.lineTo(hx - dx * hs + dy * hs * 0.6, hy - dy * hs - dx * hs * 0.6); g.closePath(); g.fill();
+      }
+    }
+    if (opts.path && opts.path.length > 1) { /* 실행 경로 */
+      g.strokeStyle = act; g.lineWidth = Math.max(2, c * 0.035); g.lineJoin = "round"; g.globalAlpha = 0.6; g.beginPath();
+      opts.path.forEach((st, i) => { const px = (st % COLS) * c + c / 2, py = Math.floor(st / COLS) * c + c / 2; if (i) g.lineTo(px, py); else g.moveTo(px, py); });
+      g.stroke(); g.globalAlpha = 1;
+      const last = opts.path[opts.path.length - 1]; g.fillStyle = act; g.beginPath(); g.arc((last % COLS) * c + c / 2, Math.floor(last / COLS) * c + c / 2, c * 0.1, 0, Math.PI * 2); g.fill();
+    }
+    selBox(g, c, S.sel, T);
+    return c;
+  }
+  /* 일반 선 그래프 (x 값 직접 지정 또는 범주) */
+  function xyChart(cv, o) {
+    const T = RL.theme(), fit = RL.fitCanvas(cv, Math.max(260, (cv.parentNode && cv.parentNode.clientWidth) || 560), o.h || 220), g = fit.g, W = fit.w, H = fit.h, pl = 48, pr = 12, pt = 14, pb = 34;
+    g.clearRect(0, 0, W, H);
+    const xs = o.cats ? o.cats.map((_, i) => i) : [].concat.apply([], o.series.map(s => s.x));
+    const ys = [].concat.apply([], o.series.map(s => s.y)).concat((o.hlines || []).map(h => h.y)).filter(v => Number.isFinite(v));
+    let x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs); if (x1 - x0 < 1e-9) x1 = x0 + 1;
+    let y0 = o.ymin != null ? o.ymin : Math.min.apply(null, ys), y1 = o.ymax != null ? o.ymax : Math.max.apply(null, ys);
+    if (!ys.length) { y0 = -1; y1 = 1; } if (y1 - y0 < 1e-9) { y0 -= 1; y1 += 1; }
+    if (o.ymin == null || o.ymax == null) { const pad = (y1 - y0) * 0.08; if (o.ymin == null) y0 -= pad; if (o.ymax == null) y1 += pad; }
+    const X = x => pl + (W - pl - pr) * (x - x0) / (x1 - x0), Y = y => pt + (H - pt - pb) * (1 - (Math.max(y0, Math.min(y1, y)) - y0) / (y1 - y0));
+    const mono = css("--mono") || "monospace";
+    g.font = "11px " + mono; g.lineWidth = 1;
+    for (let k = 0; k <= 4; k++) { const v = y0 + (y1 - y0) * k / 4, yy = Y(v); g.strokeStyle = T.line; g.beginPath(); g.moveTo(pl, yy); g.lineTo(W - pr, yy); g.stroke(); g.fillStyle = T.faint; g.textAlign = "right"; g.fillText(f(v, Math.abs(y1 - y0) > 20 ? 0 : 1), pl - 6, yy + 4); }
+    g.textAlign = "center"; g.fillStyle = T.faint;
+    if (o.cats) o.cats.forEach((c, i) => g.fillText(c, X(i), H - 18));
+    else { [x0, (x0 + x1) / 2, x1].forEach(v => g.fillText(String(Math.round(v)), X(v), H - 18)); }
+    if (o.xlabel) { g.fillStyle = T.muted; g.fillText(o.xlabel, (pl + W - pr) / 2, H - 3); }
+    (o.hlines || []).forEach(h => { g.strokeStyle = h.color || T.faint; g.setLineDash([5, 4]); g.beginPath(); g.moveTo(pl, Y(h.y)); g.lineTo(W - pr, Y(h.y)); g.stroke(); g.setLineDash([]); });
+    o.series.forEach(s => {
+      g.strokeStyle = s.color; g.lineWidth = s.width || 2; if (s.dash) g.setLineDash(s.dash);
+      g.beginPath(); let st = false;
+      s.y.forEach((v, i) => { if (!Number.isFinite(v)) return; const xx = X(o.cats ? i : s.x[i]), yy = Y(v); if (st) g.lineTo(xx, yy); else { g.moveTo(xx, yy); st = true; } });
+      g.stroke(); g.setLineDash([]);
+      if (s.dots) s.y.forEach((v, i) => { if (!Number.isFinite(v)) return; g.fillStyle = s.color; g.beginPath(); g.arc(X(o.cats ? i : s.x[i]), Y(v), 3.2, 0, Math.PI * 2); g.fill(); });
+    });
+    if (o.marker != null) { g.strokeStyle = T.ink; g.setLineDash([2, 3]); g.beginPath(); g.moveTo(X(o.marker), pt); g.lineTo(X(o.marker), H - pb); g.stroke(); g.setLineDash([]); }
+    let lx = pl + 8; o.series.forEach(s => { if (!s.label) return; g.fillStyle = s.color; g.fillRect(lx, pt + 2, 10, 10); g.fillStyle = T.text; g.textAlign = "left"; g.font = "600 11.5px " + (css("--sans") || "sans-serif"); g.fillText(s.label, lx + 14, pt + 11); lx += 26 + g.measureText(s.label).width; });
+  }
+
+  /* ---------------- 화면 1: 데이터 ---------------- */
+  function curLine() {
+    const k = KIND[S.kind];
+    const txt = '<span>현재 데이터: <b>' + k.name + '</b>' + (k.eps != null ? ' · ε ' + S.eps.toFixed(2) : '') + ' · 에피소드 <b>' + S.nEp + '</b> · seed ' + S.seed +
+      ' · 전이 <b>' + data.D.length + '</b>개 · (s,a) <b>' + data.cov + '</b>/116 · 회복 도달 <b>' + data.hits + '</b></span><button class="sk-btn sk-btn--sm" type="button" data-goto="data">데이터 바꾸기</button>';
+    document.querySelectorAll("[data-cur]").forEach(el => { el.innerHTML = txt; });
+  }
+  function renderData() {
+    $("kindDesc").textContent = KIND[S.kind].desc;
+    $("stN").textContent = data.D.length; $("stCov").textContent = data.cov; $("stGoal").textContent = data.hits + " / " + S.nEp; $("stBeh").textContent = f(data.behRet, 1);
+    drawEdges($("cvData"), { counts: true, visits: Array.from(data.ns) });
+    const s = S.sel;
+    let h = '<h3>선택한 상태 ' + rc(s) + (s === START ? " · S(입원)" : "") + ' — 방문 ' + data.ns[s] + '회</h3><div class="sk-scroll"><table class="sk-table"><tr><th>행동</th><th>기록 n(s,a)</th><th>비율 π<sub>β</sub>(a|s)</th><th>결과 (r, s′)</th></tr>';
+    for (let a = 0; a < NA; a++) { const k = s * NA + a, t = data.nx[k], inD = data.n[k] > 0;
+      h += '<tr><td>' + AR[a] + ' ' + RL.ACTION_NAMES[a] + '</td><td class="n' + (inD ? '' : ' ood') + '">' + data.n[k] + '</td><td class="n">' + (data.ns[s] ? data.mu[k].toFixed(3) : '–') + '</td><td' + (inD ? '' : ' class="ood"') + '>' + (inD ? minus(t.r) + ', ' + rc(t.s2) : '데이터 없음 — 알 수 없음') + '</td></tr>'; }
+    $("selData").innerHTML = h + '</table></div>';
+    let tb = '<tr><th>#</th><th>에피소드</th><th class="c-state">s</th><th class="c-action">a</th><th class="c-reward">r</th><th class="c-state">s′</th><th>종료</th></tr>';
+    data.D.slice(0, 40).forEach((t, i) => { tb += '<tr><td class="n">' + (i + 1) + '</td><td class="n">' + (t.ep + 1) + '</td><td class="n">' + rc(t.s) + '</td><td>' + AR[t.a] + '</td><td class="n' + (t.r < 0 ? ' c-neg' : '') + '">' + minus(t.r) + '</td><td class="n">' + rc(t.s2) + '</td><td>' + (t.done ? (t.s2 === GOAL ? "회복" : "합병증") : "") + '</td></tr>'; });
+    $("tblSample").innerHTML = tb;
+  }
+
+  /* ---------------- 화면 2: 단순 Q ---------------- */
+  function naiveQ() { return S.nvStep >= naive.snaps.length ? naive.Q : naive.snaps[S.nvStep]; }
+  function renderNaive() {
+    const Q = naiveQ(), last = S.nvStep >= naive.snaps.length;
+    $("nvStep").textContent = last ? "수렴 (" + naive.conv + "회 반복)" : "반복 " + S.nvStep;
+    const ro = rollout(s => amax(Q, s), data);
+    drawEdges($("cvNaive"), { Q: Q, path: ro.path });
+    const s = S.sel, gr = amax(Q, s), row = S.nvRow == null ? gr : S.nvRow;
+    $("nvSelTitle").textContent = "선택한 상태 " + rc(s) + (s === START ? " · S" : "") + " — 행을 누르면 그 행동의 갱신식";
+    let h = '<tr><th>행동</th><th>기록 n</th><th class="c-value">추정 Q̂</th><th>실제 Q*</th><th>Q̂ − Q*</th></tr>';
+    for (let a = 0; a < NA; a++) { const k = s * NA + a, inD = data.n[k] > 0, diff = Q[k] - QSTAR[k];
+      h += '<tr class="pick' + (a === row ? ' is-sel' : '') + '" data-a="' + a + '"><td>' + AR[a] + (a === gr ? ' <b>탐욕</b>' : '') + '</td><td class="n' + (inD ? '' : ' ood') + '">' + data.n[k] + '</td><td class="n' + (inD ? '' : ' ood') + '">' + f(Q[k]) + '</td><td class="n">' + f(QSTAR[k]) + '</td><td class="n' + (diff > 0.5 ? ' ood' : '') + '">' + (diff > 0 ? "+" : "") + f(diff) + '</td></tr>'; }
+    $("tblNaive").innerHTML = h;
+    const k = s * NA + row, t = data.nx[k];
+    let b;
+    if (!t) b = '<b class="c-neg">(s,a) = (' + rc(s) + ', ' + AR[row] + ')는 데이터에 없음</b> → 한 번도 갱신되지 않아 Q̂ = ' + f(Q[k]) + ' (초기값) 그대로.<br>실제로 해 보면 Q* = ' + f(QSTAR[k]) + ' → 과대추정 <b class="c-neg">' + (Q[k] - QSTAR[k] > 0 ? "+" : "") + f(Q[k] - QSTAR[k]) + '</b>';
+    else {
+      const src = Q;
+      if (t.done) b = 'y = <span class="c-reward">r</span> = ' + minus(t.r) + ' (s′ = ' + rc(t.s2) + ' 종료) → Q̂ = ' + f(Q[k]);
+      else {
+        const qs = [0, 1, 2, 3].map(a => src[t.s2 * NA + a]), am = amax(src, t.s2), inD2 = seen(data, t.s2, am);
+        b = 'y = <span class="c-reward">r</span> + γ · max Q̂(s′,·) = ' + minus(t.r) + ' + 0.99 × max(' + qs.map((v, a) => (seen(data, t.s2, a) ? '' : '<span class="c-neg">') + AR[a] + ' ' + f(v) + (seen(data, t.s2, a) ? '' : '</span>')).join(", ") + ')<br>= ' + minus(t.r) + ' + 0.99 × ' + f(qs[am]) + ' = <b>' + f(t.r + GAMMA * qs[am]) + '</b> &nbsp; (s′ = ' + rc(t.s2) + ', max 행동 ' + AR[am] + ' ' + (inD2 ? '<span class="ol-chip in">데이터 안</span>' : '<span class="ol-chip out">데이터 밖 → 과대추정이 번짐</span>') + ')';
+        b += '<br><span style="color:var(--muted)">' + (last ? '수렴: 목표값 y와 현재 Q̂(s,a) = ' + f(Q[k]) + '가 같음' : '지금 값으로 계산한 목표 y → 다음 반복의 Q̂(s,a) (지금 ' + f(Q[k]) + ')') + '</span>';
+      }
+    }
+    $("nvBackup").innerHTML = b;
+    $("nvRet").textContent = f(ro.R, 0) + (ro.reached ? "" : ro.hole ? " 합병증" : " 맴돎");
+    $("nvV0").textContent = f(vmax(Q, START)); $("nvVstar").textContent = f(vmax(QSTAR, START)); $("nvOod").textContent = ro.ood;
+    rollTable($("tblRoll"), ro);
+  }
+  function rollTable(el, ro) {
+    let h = '<tr><th>t</th><th class="c-state">s</th><th class="c-action">a</th><th>데이터에?</th><th class="c-reward">r</th><th class="c-state">s′</th></tr>';
+    ro.log.forEach(l => { h += '<tr><td class="n">' + l.t + '</td><td class="n">' + rc(l.s) + '</td><td>' + AR[l.a] + '</td><td>' + (l.inD ? '<span class="ol-chip in">있음</span>' : '<span class="ol-chip out">데이터 밖</span>') + '</td><td class="n' + (l.r < 0 ? ' c-neg' : '') + '">' + minus(l.r) + '</td><td class="n">' + rc(l.s2) + (l.s2 === GOAL ? ' 회복' : HOLES.indexOf(l.s2) >= 0 ? ' 합병증' : '') + '</td></tr>'; });
+    el.innerHTML = h;
+  }
+
+  /* ---------------- 화면 3: CQL ---------------- */
+  function renderCql() {
+    const Q = cql.Qshow, al = alpha();
+    $("cqlStep").textContent = "반복 " + cql.shown + " / " + CQL_SWEEPS;
+    const ro = rollout(s => amax(Q, s), data);
+    drawEdges($("cvCql"), { Q: Q, path: ro.path });
+    const s = S.sel, cs = cqlStats(Q, data, s, al), gr = amax(Q, s);
+    $("cqlSelTitle").textContent = "선택한 상태 " + rc(s) + (s === START ? " · S" : "") + "의 CQL 벌점";
+    let h = '<tr><th>행동</th><th>π<sub>β</sub>(a|s)</th><th class="c-value">Q(s,a)</th><th>softmax Q</th><th>기울기 α(p−π<sub>β</sub>)</th><th>실제 Q*</th></tr>';
+    for (let a = 0; a < NA; a++) { const k = s * NA + a, inD = data.n[k] > 0;
+      h += '<tr><td>' + AR[a] + (a === gr ? ' <b>탐욕</b>' : '') + '</td><td class="n' + (inD ? '' : ' ood') + '">' + data.mu[k].toFixed(3) + '</td><td class="n' + (inD ? '' : ' ood') + '">' + f(Q[k]) + '</td><td class="n">' + cs.soft[a].toFixed(3) + '</td><td class="n">' + f(al * (cs.soft[a] - data.mu[k]), 3) + '</td><td class="n">' + f(QSTAR[k]) + '</td></tr>'; }
+    $("tblCql").innerHTML = h;
+    if (!data.ns[s]) $("cqlPen").innerHTML = '이 상태는 데이터에 한 번도 나오지 않아 CQL 항도 벨만 항도 없습니다(값이 0으로 남음).';
+    else $("cqlPen").innerHTML =
+      'log Σ exp Q = log(' + cs.q.map(v => 'e<sup>' + f(v) + '</sup>').join(' + ') + ') = <b>' + f(cs.lse, 3) + '</b><br>' +
+      'E<sub>a~D</sub>[Q] = ' + [0, 1, 2, 3].filter(a => data.mu[s * NA + a] > 0).map(a => data.mu[s * NA + a].toFixed(3) + '×' + f(cs.q[a])).join(' + ') + ' = <b>' + f(cs.ed, 3) + '</b><br>' +
+      '벌점 = α × (' + f(cs.lse, 3) + ' − ' + f(cs.ed, 3) + ') = ' + al + ' × ' + f(cs.gap, 3) + ' = <b class="c-neg">' + f(cs.pen, 3) + '</b>' +
+      '<br><span style="color:var(--muted)">기울기가 양수인 행동은 Q가 내려가고(데이터 밖, 또는 데이터보다 과하게 큰 값), 음수인 행동은 올라갑니다.</span>';
+    $("cqlRet").textContent = f(ro.R, 0) + (ro.reached ? "" : ro.hole ? " 합병증" : " 맴돎");
+    $("cqlV0").textContent = f(vmax(Q, START)); $("cqlVstar").textContent = f(vmax(QSTAR, START)); $("cqlOod").textContent = ro.ood;
+    const n = cql.curve.x.filter(x => x <= cql.shown).length, T = RL.theme();
+    xyChart($("cvCqlRet"), { series: [{ x: cql.curve.x.slice(0, n), y: cql.curve.ret.slice(0, n), color: css("--rl-action"), label: "CQL α=" + al }], xlabel: "반복(sweep)", ymin: -110, ymax: 0, hlines: [{ y: -7, color: T.faint }], h: 200 });
+    xyChart($("cvCqlV"), { series: [{ x: cql.curve.x.slice(0, n), y: cql.curve.v0.slice(0, n), color: css("--rl-value"), label: "V̂(S)" }], xlabel: "반복(sweep)", hlines: [{ y: vmax(QSTAR, START), color: T.faint }], h: 200 });
+  }
+
+  /* ---------------- 화면 4: IQL ---------------- */
+  function iqlShown() { return iql.shown >= IQL_ITERS ? iql.st : iql.snaps[Math.max(0, iql.shown - 1)]; }
+  function renderIql() {
+    const st = iqlShown(), s = S.sel, T = RL.theme();
+    $("iqlStep").textContent = "반복 " + Math.min(iql.shown, IQL_ITERS) + " / " + IQL_ITERS;
+    const ro = rollout(piArgmax(st.pi), data);
+    const V = Array.from({ length: NS }, (_, x) => data.ns[x] ? st.V[x] : 0);
+    const pol = st.pi.map(p => p ? p : null);
+    const gres = RL.drawGrid($("cvIql"), env, { V: V, policy: pol, path: ro.path, pathColor: css("--rl-action"), size: boardSize($("cvIql")), fmt: v => Math.abs(v) >= 10 ? f(v, 0) : f(v, 1) });
+    VALID.forEach(x => { if (!data.ns[x]) hatch($("cvIql").getContext("2d"), gres.cell, x, T); });
+    selBox($("cvIql").getContext("2d"), gres.cell, s, T);
+    /* 손실 곡선 */
+    const us = [], seenA = [];
+    for (let a = 0; a < NA; a++) if (data.n[s * NA + a]) { us.push(st.Q[s * NA + a] - st.V[s]); seenA.push(a); }
+    drawExpectile($("cvExp"), S.tau, us);
+    $("iqlSelTitle").textContent = "선택한 상태 " + rc(s) + (s === START ? " · S" : "") + "의 계산 (반복 " + Math.min(iql.shown, IQL_ITERS) + ")";
+    let h = '<tr><th>행동</th><th>기록 n</th><th>π<sub>β</sub></th><th class="c-value">Q = r + γV(s′)</th><th>u = Q − V</th><th>손실 무게 |τ−1(u&lt;0)|</th><th>exp(βA)</th><th class="c-action">π(a|s)</th></tr>';
+    for (let a = 0; a < NA; a++) { const k = s * NA + a, inD = data.n[k] > 0;
+      if (!inD) { h += '<tr><td>' + AR[a] + '</td><td class="n ood">0</td><td class="n ood">0</td><td class="ood" colspan="5">데이터 없음 — IQL은 이 행동의 값을 만들지도, 쓰지도 않음</td></tr>'; continue; }
+      const u = st.Q[k] - st.V[s];
+      h += '<tr><td>' + AR[a] + '</td><td class="n">' + data.n[k] + '</td><td class="n">' + data.mu[k].toFixed(3) + '</td><td class="n">' + f(st.Q[k]) + '</td><td class="n">' + f(u, 3) + '</td><td class="n">' + (u < 0 ? (1 - S.tau).toFixed(2) : S.tau.toFixed(2)) + '</td><td class="n">' + Math.exp(Math.min(50, S.beta * u)).toPrecision(3) + '</td><td class="n">' + (st.pi[s] ? st.pi[s][a].toFixed(3) : '–') + '</td></tr>'; }
+    $("tblIql").innerHTML = h;
+    if (!data.ns[s]) $("iqlCalc").innerHTML = "이 상태는 데이터에 없어 V를 학습하지 않습니다.";
+    else {
+      const terms = seenA.map(a => { const k = s * NA + a, w = data.mu[k] * (st.Q[k] < st.V[s] ? 1 - S.tau : S.tau); return { w: w, q: st.Q[k] }; });
+      const sw = terms.reduce((x, t) => x + t.w, 0);
+      $("iqlCalc").innerHTML = 'V(s)는 Σ π<sub>β</sub>(a|s)·|τ−1(u&lt;0)|·(Q − V) = 0 을 만족하는 값(가중 평균 꼴): V = Σ wQ / Σ w = (' +
+        terms.map(t => t.w.toFixed(3) + '×' + f(t.q)).join(' + ') + ') / ' + sw.toFixed(3) + ' = <b class="c-value">' + f(st.V[s], 3) + '</b>' +
+        '<br>단순 평균(τ=0.5와 같음) = ' + f(seenA.reduce((x, a) => x + data.mu[s * NA + a] * st.Q[s * NA + a], 0), 3) + ' · 데이터 안 최댓값 = ' + f(Math.max.apply(null, seenA.map(a => st.Q[s * NA + a])), 3);
+    }
+    $("iqlRet").textContent = f(ro.R, 0) + (ro.reached ? "" : ro.hole ? " 합병증" : " 맴돎");
+    $("iqlV0").textContent = f(st.V[START]); $("iqlOod").textContent = ro.ood;
+  }
+  function drawExpectile(cv, tau, us) {
+    const T = RL.theme(), fit = RL.fitCanvas(cv, Math.max(260, Math.min(520, (cv.parentNode && cv.parentNode.clientWidth) || 460)), 230), g = fit.g, W = fit.w, H = fit.h, pl = 40, pr = 12, pt = 12, pb = 28;
+    g.clearRect(0, 0, W, H);
+    const inner = us.filter(u => Math.abs(u) < 30), umax = Math.max(3, Math.min(30, Math.ceil(Math.max.apply(null, inner.map(Math.abs).concat([0])) * 1.3)));
+    const L = (u, t) => Math.abs(t - (u < 0 ? 1 : 0)) * u * u, ymax = Math.max(L(-umax, tau), L(umax, tau), L(umax, 0.5));
+    const X = u => pl + (W - pl - pr) * (u + umax) / (2 * umax), Y = y => pt + (H - pt - pb) * (1 - y / ymax);
+    g.strokeStyle = T.line; g.lineWidth = 1; g.beginPath(); g.moveTo(pl, Y(0)); g.lineTo(W - pr, Y(0)); g.moveTo(X(0), pt); g.lineTo(X(0), H - pb); g.stroke();
+    const mono = css("--mono") || "monospace"; g.fillStyle = T.faint; g.font = "11px " + mono; g.textAlign = "center";
+    [-umax, -umax / 2, 0, umax / 2, umax].forEach(u => g.fillText(f(u, umax >= 10 ? 0 : 1), X(u), H - 12));
+    g.fillStyle = T.muted; g.fillText("u = Q − V", W - 50, H - 1);
+    [[0.5, T.faint, [5, 4]], [tau, css("--rl-value"), null]].forEach(c => {
+      g.strokeStyle = c[1]; g.lineWidth = c[2] ? 1.5 : 2.5; if (c[2]) g.setLineDash(c[2]); g.beginPath();
+      for (let i = 0; i <= 200; i++) { const u = -umax + 2 * umax * i / 200, xx = X(u), yy = Y(L(u, c[0])); if (i) g.lineTo(xx, yy); else g.moveTo(xx, yy); }
+      g.stroke(); g.setLineDash([]);
+    });
+    g.textAlign = "left"; g.font = "600 12px " + (css("--sans") || "sans-serif"); g.fillStyle = css("--rl-value");
+    g.fillText("u>0 무게 τ = " + tau.toFixed(2), X(0) + 8, pt + 14); g.textAlign = "right"; g.fillText("u<0 무게 1−τ = " + (1 - tau).toFixed(2), X(0) - 8, pt + 14);
+    us.forEach(u => { const uc = Math.max(-umax, Math.min(umax, u)); g.fillStyle = css("--rl-action"); g.beginPath(); g.arc(X(uc), Y(L(uc, tau)), 4.5, 0, Math.PI * 2); g.fill(); if (uc !== u) { g.fillStyle = T.muted; g.textAlign = uc < 0 ? "left" : "right"; g.font = "11px " + mono; g.fillText("← " + f(u, 0), X(uc) + (uc < 0 ? 7 : -7), Y(L(uc, tau)) + 14); } });
+  }
+
+  /* ---------------- 화면 5: 비교 ---------------- */
+  const KINDS = ["random", "medium", "expert", "mixed"], METHODS = [["beh", "행동 정책(데이터)"], ["bc", "BC"], ["naive", "단순 Q"], ["cql", "CQL"], ["iql", "IQL"]];
+  let cmp = null, cmpJob = 0;
+  function runCompare() {
+    const job = ++cmpJob, res = {}, al = alpha(), tau = S.tau, beta = S.beta, q0 = S.q0, nEp = S.nEp;
+    $("cmpDesc").innerHTML = '데이터 품질마다 seed ' + S.seed + '~' + (S.seed + 4) + '로 기록 ' + nEp + '에피소드씩 모아(ε: 중간 0.25 · 전문가/혼합 0.10) 네 방법을 학습한 뒤, 탐욕 정책을 실제 격자에서 실행한 리턴의 평균입니다. 설정: CQL α = ' + al + ', IQL τ = ' + tau.toFixed(2) + ' · β = ' + beta + ', 단순 Q 초기값 ' + (q0 === "zero" ? "0" : "무작위") + '.';
+    let ki = 0;
+    function next() {
+      if (job !== cmpJob) return;
+      if (ki >= KINDS.length) { cmp = res; $("cmpProg").textContent = "완료"; drawCompare(); return; }
+      const kind = KINDS[ki], acc = { beh: [], bc: [], naive: [], cql: [], iql: [], ok: { beh: 0, bc: 0, naive: 0, cql: 0, iql: 0 } };
+      for (let k = 0; k < 5; k++) {
+        const d = collect(kind, KIND[kind].eps || 0, nEp, S.seed + k);
+        acc.beh.push(d.behRet); acc.ok.beh += d.hits / nEp;
+        const r1 = rollout(bcPolicy(d), d), r2 = rollout((Q => s => amax(Q, s))(naiveRun(d, q0, S.seed + k).Q), d);
+        const r3 = rollout((Q => s => amax(Q, s))(cqlRun(d, al)), d), r4 = rollout(piArgmax(iqlRun(d, tau, beta).pi), d);
+        [["bc", r1], ["naive", r2], ["cql", r3], ["iql", r4]].forEach(p => { acc[p[0]].push(p[1].R); if (p[1].reached) acc.ok[p[0]]++; });
+      }
+      res[kind] = acc; ki++;
+      $("cmpProg").textContent = "계산 중 " + ki + " / 4";
+      setTimeout(next, 0);
+    }
+    $("cmpProg").textContent = "계산 중 0 / 4"; setTimeout(next, 10);
+  }
+  const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
+  function drawCompare() {
+    if (!cmp) return;
+    let h = '<tr><th>데이터</th>' + METHODS.map(m => '<th>' + m[1] + '</th>').join("") + '</tr>';
+    KINDS.forEach(k => { const r = cmp[k]; const best = Math.max(mean(r.bc), mean(r.naive), mean(r.cql), mean(r.iql));
+      h += '<tr><td><b>' + KIND[k].name + '</b></td>' + METHODS.map(m => { const v = mean(r[m[0]]); const okTxt = m[0] === "beh" ? ' <span style="color:var(--faint)">(도달 ' + Math.round(r.ok.beh * 100 / 5) + '%)</span>' : ' <span style="color:var(--faint)">(' + r.ok[m[0]] + '/5)</span>';
+        return '<td class="n' + (m[0] !== "beh" && Math.abs(v - best) < 1e-9 ? '" style="font-weight:700' : '') + '">' + f(v, 1) + okTxt + '</td>'; }).join("") + '</tr>'; });
+    $("tblCmp").innerHTML = h;
+    const cols = { beh: css("--m-beh"), bc: css("--m-bc"), naive: css("--m-naive"), cql: css("--m-cql"), iql: css("--m-iql") };
+    $("cmpLegend").innerHTML = METHODS.map(m => '<span><i style="background:' + cols[m[0]] + '"></i>' + m[1] + '</span>').join("") + '<span>막대 길이 = 평균 리턴(0에 가까울수록 좋음, −120에서 자름)</span>';
+    const T = RL.theme(), cv = $("cvCmp"), fit = RL.fitCanvas(cv, Math.max(320, cv.parentNode.clientWidth - 2), 260), g = fit.g, W = fit.w, H = fit.h, pl = 46, pb = 26, pt = 10;
+    g.clearRect(0, 0, W, H);
+    const lo = -120, Y = v => pt + (H - pt - pb) * (Math.max(lo, v) / lo);
+    g.font = "11px " + (css("--mono") || "monospace"); g.textAlign = "right";
+    [0, -30, -60, -90, -120].forEach(v => { g.strokeStyle = T.line; g.beginPath(); g.moveTo(pl, Y(v)); g.lineTo(W - 6, Y(v)); g.stroke(); g.fillStyle = T.faint; g.fillText(f(v, 0), pl - 6, Y(v) + 4); });
+    const gw = (W - pl - 10) / 4;
+    KINDS.forEach((k, i) => { const x0 = pl + i * gw + gw * 0.08, bw = gw * 0.84 / 5;
+      METHODS.forEach((m, j) => { const v = mean(cmp[k][m[0]]); g.fillStyle = cols[m[0]]; g.fillRect(x0 + j * bw + 1, Y(0), bw - 3, Y(v) - Y(0)); });
+      g.fillStyle = T.text; g.textAlign = "center"; g.font = "600 12px " + (css("--sans") || "sans-serif"); g.fillText(KIND[k].name, pl + i * gw + gw / 2, H - 6); g.font = "11px " + (css("--mono") || "monospace"); });
+  }
+  function drawSweeps() {
+    $("sweepHint").textContent = KIND[S.kind].name + " · " + S.nEp + "에피소드 · seed " + S.seed;
+    const T = RL.theme(), ra = [], va = [];
+    ALPHAS.forEach(al => { const Q = cqlRun(data, al); ra.push(rollout(s => amax(Q, s), data).R); va.push(vmax(Q, START)); });
+    xyChart($("cvSweepA"), { cats: ALPHAS.map(String), series: [{ y: ra, color: css("--rl-action"), label: "실제 리턴", dots: true }, { y: va, color: css("--rl-value"), label: "V̂(S)", dots: true, dash: [5, 3] }], ymin: -110, ymax: 2, hlines: [{ y: vmax(QSTAR, START), color: T.faint }], xlabel: "α", h: 220, marker: S.alphaIdx });
+    const TAUS = [0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99], rt = [], vt = [];
+    TAUS.forEach(t => { const st = iqlRun(data, t, S.beta); rt.push(rollout(piArgmax(st.pi), data).R); vt.push(st.V[START]); });
+    let mk = 0; TAUS.forEach((t, i) => { if (Math.abs(t - S.tau) < Math.abs(TAUS[mk] - S.tau)) mk = i; });
+    xyChart($("cvSweepT"), { cats: TAUS.map(String), series: [{ y: rt, color: css("--rl-action"), label: "실제 리턴", dots: true }, { y: vt, color: css("--rl-value"), label: "V(S)", dots: true, dash: [5, 3] }], ymin: -110, ymax: 2, hlines: [{ y: vmax(QSTAR, START), color: T.faint }], xlabel: "τ", h: 220, marker: mk });
+  }
+
+  /* ---------------- 화면 6: 코드 ---------------- */
+  function codeText() {
+    const k = S.kind, al = alpha();
+    return [
+      "import numpy as np",
+      "",
+      "# 치료 경로 격자 5x7: S=(4,0) 입원, G=(4,6) 회복, H=(4,1..5) 합병증(-100, 종료), 매 걸음 -1",
+      "ROWS, COLS, GAMMA, CAP = 5, 7, 0.99, 50",
+      "START, GOAL, HOLES = 28, 34, {29, 30, 31, 32, 33}",
+      "DR, DC = [-1, 0, 1, 0], [0, 1, 0, -1]          # 0 up, 1 right, 2 down, 3 left (CliffWalking과 같은 순서)",
+      "",
+      "def step(s, a):",
+      "    r, c = divmod(s, COLS)",
+      "    r2, c2 = min(max(r + DR[a], 0), ROWS - 1), min(max(c + DC[a], 0), COLS - 1)",
+      "    s2 = r2 * COLS + c2",
+      "    if s2 in HOLES: return s2, -100.0, True",
+      "    if s2 == GOAL:  return s2, 0.0, True",
+      "    return s2, -1.0, False",
+      "",
+      "# 1) 행동 정책으로 기록 모으기 (" + KIND[k].name + ", 에피소드 " + S.nEp + (KIND[k].eps != null ? ", eps " + S.eps.toFixed(2) : "") + ")",
+      "rng = np.random.default_rng(" + S.seed + ")",
+      "def behaviour(s, ep):",
+      k === "random" ? "    return rng.integers(4)" :
+      k === "medium" ? "    r, c = divmod(s, COLS)\n    base = 2 if c == COLS - 1 else (0 if r > 0 else 1)   # 맨 위 줄로 도는 보수적 경로\n    return rng.integers(4) if rng.random() < " + S.eps.toFixed(2) + " else base" :
+      (k === "mixed" ? "    if ep % 2 == 1: return rng.integers(4)                # 절반은 무작위 기록\n" : "") + "    base = OPT[s]                                          # 최적 정책(가치 반복으로 구함)\n    return rng.integers(4) if rng.random() < " + S.eps.toFixed(2) + " else base",
+      "",
+      "D = []   # (s, a, r, s2, done)",
+      "for ep in range(" + S.nEp + "):",
+      "    s = START",
+      "    for t in range(CAP):",
+      "        a = behaviour(s, ep); s2, r, done = step(s, a)",
+      "        D.append((s, a, r, s2, done)); s = s2",
+      "        if done: break",
+      "",
+      "N = np.zeros((35, 4)); NEXT = {}",
+      "for s, a, r, s2, d in D: N[s, a] += 1; NEXT[(s, a)] = (r, s2, d)",
+      "mu = N / np.maximum(N.sum(1, keepdims=True), 1)            # 데이터의 행동 비율 pi_beta(a|s)",
+      "",
+      "# 2) CQL: alpha * (logsumexp Q - E_D[Q]) + 1/2 * 벨만 오차",
+      "alpha, lr = " + al + ", " + cqlLR(al) + "",
+      "Q = np.zeros((35, 4))",
+      "for it in range(" + CQL_SWEEPS + "):",
+      "    V = Q.max(1); V[[GOAL, *HOLES]] = 0",
+      "    for s in range(35):",
+      "        if N[s].sum() == 0: continue",
+      "        p = np.exp(Q[s] - Q[s].max()); p /= p.sum()",
+      "        g = alpha * (p - mu[s])",
+      "        for a in np.nonzero(N[s])[0]:",
+      "            r, s2, d = NEXT[(s, a)]",
+      "            g[a] += mu[s, a] * (Q[s, a] - (r + (0 if d else GAMMA * V[s2])))",
+      "        Q[s] -= lr * g",
+      "",
+      "# 3) IQL: 기대분위 V, max 없는 Q, 이점 가중 정책",
+      "tau, beta = " + S.tau.toFixed(2) + ", " + S.beta + "",
+      "def expectile(q, w, tau):",
+      "    v = np.average(q, weights=w)",
+      "    for _ in range(200):",
+      "        c = w * np.where(q < v, 1 - tau, tau); v = (c * q).sum() / c.sum()",
+      "    return v",
+      "Vi, Qi = np.zeros(35), np.full((35, 4), np.nan)",
+      "for it in range(" + IQL_ITERS + "):",
+      "    for (s, a), (r, s2, d) in NEXT.items(): Qi[s, a] = r + (0 if d else GAMMA * Vi[s2])",
+      "    for s in range(35):",
+      "        seen = N[s] > 0",
+      "        if seen.any(): Vi[s] = expectile(Qi[s, seen], mu[s, seen], tau)",
+      "pi = mu * np.exp(beta * np.nan_to_num(Qi - Vi[:, None], nan=-1e9))   # 데이터에 없는 행동은 확률 0",
+      "",
+      "# --- 신경망 버전 (d3rlpy 2.x) ---",
+      "# import d3rlpy",
+      "# ds = d3rlpy.dataset.MDPDataset(observations, actions, rewards, terminals)",
+      "# cql = d3rlpy.algos.DiscreteCQLConfig(alpha=" + al + ", gamma=0.99).create(device='cpu:0')",
+      "# cql.fit(ds, n_steps=10000)",
+      "# iql = d3rlpy.algos.IQLConfig(expectile=" + S.tau.toFixed(2) + ", weight_temp=" + S.beta + ").create()   # 연속 행동용"
+    ].join("\n");
+  }
+
+  /* ---------------- 그리기 묶음 ---------------- */
+  function renderTab() {
+    curLine();
+    if (curTab === "data") renderData();
+    else if (curTab === "shift") renderNaive();
+    else if (curTab === "cql") renderCql();
+    else if (curTab === "iql") renderIql();
+    else if (curTab === "compare") { if (!cmp) runCompare(); else drawCompare(); drawSweeps(); }
+    else if (curTab === "code") $("code").textContent = codeText();
+  }
+
+  /* ---------------- 애니메이션 ---------------- */
+  let timer = null;
+  function stopAll() { if (timer) { clearTimeout(timer); timer = null; } $("nvPlay").textContent = "재생"; }
+  const SPD = { 1: ["느리게", 700], 2: ["보통", 320], 3: ["빠르게", 110] };
+  function nvPlay() {
+    if (timer) { stopAll(); return; }
+    if (S.nvStep >= naive.snaps.length) S.nvStep = 0;
+    $("nvPlay").textContent = "멈춤";
+    const tick = () => { S.nvStep++; renderNaive(); if (S.nvStep >= naive.snaps.length) { stopAll(); return; } timer = setTimeout(tick, SPD[$("sNvSpd").value][1]); };
+    timer = setTimeout(tick, 60);
+  }
+  function cqlPlay() {
+    stopAll(); cql.shown = 0; cql.Qshow = new Float64Array(NS * NA);
+    const Q = cql.Qshow, al = alpha(), lr = cqlLR(al), per = { 1: 5, 2: 15, 3: 60 }[$("sCqlSpd").value];
+    const tick = () => { for (let i = 0; i < per && cql.shown < CQL_SWEEPS; i++) { cqlSweep(Q, data, al, lr); cql.shown++; } renderCql(); if (cql.shown >= CQL_SWEEPS) { timer = null; return; } timer = setTimeout(tick, RM ? 120 : 40); };
+    tick();
+  }
+  function iqlPlay() {
+    stopAll(); iql.shown = 0;
+    const tick = () => { iql.shown++; if (iql.shown > iql.snaps.length) iql.shown = IQL_ITERS; renderIql(); if (iql.shown >= IQL_ITERS) { timer = null; return; } timer = setTimeout(tick, RM ? 250 : 160); };
+    tick();
+  }
+
+  /* ---------------- 이벤트 ---------------- */
+  function seg(id, key, cb) {
+    const el = $(id); el.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+      el.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); cb(b.getAttribute("data-v")); });
+  }
+  seg("segKind", "kind", v => { S.kind = v; if (KIND[v].eps != null) { S.eps = KIND[v].eps; $("sEps").value = S.eps; } $("sEps").disabled = v === "random"; $("vEps").textContent = v === "random" ? "–" : S.eps.toFixed(2); dataChanged(); });
+  seg("segQ0", "q0", v => { S.q0 = v; stopAll(); rebuildNaive(); cmp = null; renderTab(); });
+  function dataChanged() { stopAll(); rebuildData(); cmp = null; S.nvRow = null; renderTab(); }
+  $("sEps").addEventListener("input", e => { S.eps = +e.target.value; $("vEps").textContent = S.eps.toFixed(2); dataChanged(); });
+  $("sEp").addEventListener("input", e => { S.nEp = +e.target.value; $("vEp").textContent = S.nEp; dataChanged(); });
+  $("sSeed").addEventListener("input", e => { S.seed = +e.target.value; $("vSeed").textContent = S.seed; dataChanged(); });
+  $("sAlpha").addEventListener("input", e => { S.alphaIdx = +e.target.value; $("vAlpha").textContent = alpha(); stopAll(); rebuildCql(); cmp = null; renderTab(); });
+  $("sTau").addEventListener("input", e => { S.tau = +e.target.value; $("vTau").textContent = S.tau.toFixed(2); stopAll(); rebuildIql(); cmp = null; renderTab(); });
+  $("sBeta").addEventListener("input", e => { S.beta = +e.target.value; $("vBeta").textContent = S.beta.toFixed(1); stopAll(); rebuildIql(); cmp = null; renderTab(); });
+  $("sNvSpd").addEventListener("input", e => { $("vNvSpd").textContent = SPD[e.target.value][0]; });
+  $("sCqlSpd").addEventListener("input", e => { $("vCqlSpd").textContent = SPD[e.target.value][0]; });
+  $("nvFirst").onclick = () => { stopAll(); S.nvStep = 0; renderNaive(); };
+  $("nvPrev").onclick = () => { stopAll(); S.nvStep = Math.max(0, Math.min(S.nvStep, naive.snaps.length) - 1); renderNaive(); };
+  $("nvNext").onclick = () => { stopAll(); S.nvStep = Math.min(naive.snaps.length, S.nvStep + 1); renderNaive(); };
+  $("nvLast").onclick = () => { stopAll(); S.nvStep = naive.snaps.length; renderNaive(); };
+  $("nvPlay").onclick = nvPlay;
+  $("cqlPlay").onclick = cqlPlay;
+  $("cqlStop").onclick = () => { stopAll(); };
+  $("iqlPlay").onclick = iqlPlay;
+  $("cmpRun").onclick = () => { cmp = null; runCompare(); drawSweeps(); };
+  $("tblNaive").addEventListener("click", e => { const tr = e.target.closest("tr[data-a]"); if (!tr) return; S.nvRow = +tr.getAttribute("data-a"); renderNaive(); });
+  document.addEventListener("click", e => { const b = e.target.closest("[data-goto]"); if (b) { const t = $("tab-" + b.getAttribute("data-goto")); show(t); t.focus(); } });
+  ["cvData", "cvNaive", "cvCql", "cvIql"].forEach(id => $(id).addEventListener("click", ev => { const s = RL.gridHit($(id), env, ev); if (s < 0 || env.terminal[s]) return; S.sel = s; S.nvRow = null; renderTab(); }));
+  document.addEventListener("keydown", e => {
+    if (curTab !== "shift" || e.key !== "ArrowRight") return;
+    const t = e.target; if (t.closest && (t.closest(".sk-tabs") || /INPUT|SELECT|TEXTAREA/.test(t.tagName))) return;
+    stopAll(); S.nvStep = Math.min(naive.snaps.length, S.nvStep + 1); renderNaive(); e.preventDefault();
+  });
+  $("btnCopy").onclick = () => {
+    const txt = $("code").textContent, done = () => { $("btnCopy").textContent = "복사됨"; setTimeout(() => { $("btnCopy").textContent = "복사"; }, 1400); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, () => { fallbackCopy(txt); done(); }); else { fallbackCopy(txt); done(); }
+  };
+  function fallbackCopy(txt) { const ta = document.createElement("textarea"); ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (e) {} ta.remove(); }
+  RL.onTheme(() => renderTab());
+  let rz = null; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(renderTab, 120); });
+
+  /* ---------------- 시작 ---------------- */
+  rebuildData();
+  const start = document.getElementById("tab-" + location.hash.slice(1));
+  if (start) show(start); else renderTab();
+})();
+</script>
+</body>
+</html>

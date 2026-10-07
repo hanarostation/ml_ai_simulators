@@ -1,0 +1,1219 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Model-based RL (Dyna-Q · World Models · Dreamer · MuZero) | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261007a">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+:root{
+  --sk-accent: var(--cat-rl);
+  --rl-state:#2563EB; --rl-act:#EA580C; --rl-rew:#16A34A; --rl-neg:#DC2626; --rl-val:#7C3AED;
+  --rl-td:#DB2777; --rl-exp:#B7791F; --rl-model:#0D9488; --rl-imag:#C026D3;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --rl-state:#79A6F6; --rl-act:#F59A5C; --rl-rew:#5CCB82; --rl-neg:#F07A7A; --rl-val:#B597FF;
+  --rl-td:#F472B6; --rl-exp:#E3B455; --rl-model:#45CFBF; --rl-imag:#E879F9; } }
+:root[data-theme="dark"]{
+  --rl-state:#79A6F6; --rl-act:#F59A5C; --rl-rew:#5CCB82; --rl-neg:#F07A7A; --rl-val:#B597FF;
+  --rl-td:#F472B6; --rl-exp:#E3B455; --rl-model:#45CFBF; --rl-imag:#E879F9; }
+
+.mb-pane{display:flex;flex-direction:column;gap:16px}
+.mb-cv{display:block;width:100%;max-width:100%}
+.mb-svg{display:block;width:100%;height:auto}
+.mb-svg text{font-family:var(--sans)}
+.mb-formula{white-space:pre-wrap;margin:0}
+.mb-code{white-space:pre;margin:0;max-height:620px;overflow:auto;font-size:12.5px;line-height:1.6}
+.mb-flash{font-size:13px;color:var(--rl-rew);font-weight:600}
+.mb-prog{font-size:13px;color:var(--muted);font-family:var(--mono)}
+.mb-sub{font-size:13px;color:var(--muted);margin:0}
+.mb-mini{font-size:12.5px;color:var(--faint)}
+.mb-c-s{color:var(--rl-state);font-weight:700} .mb-c-a{color:var(--rl-act);font-weight:700} .mb-c-r{color:var(--rl-rew);font-weight:700}
+.mb-c-v{color:var(--rl-val);font-weight:700} .mb-c-td{color:var(--rl-td);font-weight:700} .mb-c-m{color:var(--rl-model);font-weight:700}
+.mb-c-i{color:var(--rl-imag);font-weight:700} .mb-c-ex{color:var(--rl-exp);font-weight:700} .mb-c-n{color:var(--rl-neg);font-weight:700}
+.mb-legend i.s{background:var(--rl-state)} .mb-legend i.a{background:var(--rl-act)} .mb-legend i.r{background:var(--rl-rew)} .mb-legend i.v{background:var(--rl-val)}
+.mb-legend i.td{background:var(--rl-td)} .mb-legend i.m{background:var(--rl-model)} .mb-legend i.i{background:var(--rl-imag)} .mb-legend i.ex{background:var(--rl-exp)}
+.mb-legend i.n{background:var(--rl-neg)} .mb-legend i.g{background:var(--faint)}
+.mb-two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+.mb-side{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.mb-two,.mb-side{grid-template-columns:minmax(0,1fr)}}
+.mb-grid{max-width:560px}
+.mb-model{max-height:240px;overflow:auto}
+.sk-table td.hl{background:color-mix(in srgb,var(--sk-accent) 14%,var(--surface))}
+.sk-table td.new{background:color-mix(in srgb,var(--rl-model) 16%,var(--surface))}
+.mb-blk{cursor:pointer}
+.mb-blk:focus-visible{outline:none}
+.mb-blk:focus-visible rect{stroke-width:3.5}
+.mb-panel{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--surface-2);font-size:14px}
+.mb-panel h3{margin:0 0 6px;font-size:15px}
+.mb-panel p{margin:4px 0;color:var(--text)}
+.mb-panel .sk-formula{margin-top:8px}
+.sk-seg{max-width:100%}
+@media (max-width:620px){.sk-seg{flex-wrap:wrap}.sk-seg button{flex:1 1 auto}}
+.mb-pend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;max-width:520px}
+.mb-pend figure{margin:0}
+.mb-pend figcaption{font-size:12.5px;color:var(--muted);text-align:center;font-weight:600}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+      <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a href="../../index.html#rl" style="--c:var(--cat-rl)" aria-current="page">강화학습</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#rl" style="--c:var(--cat-rl)">강화학습</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">Model-based RL (Dyna-Q · World Models · Dreamer · MuZero)</h1>
+      <p class="ds-hero__lede">환경의 모형(다음 상태와 보상을 예측하는 함수)을 배워 두면, 실제로 움직이지 않고도 머릿속에서 경험을 만들어 계획할 수 있습니다. 미로의 Dyna-Q부터 학습된 모형이 틀릴 때의 위험, 상상 속에서 배우는 World Models·Dreamer, 학습된 모형 위에서 트리 탐색을 하는 MuZero까지 작은 문제로 직접 계산해 봅니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button class="sk-tab" role="tab" id="tab-dyna" aria-controls="pane-dyna" aria-selected="true"><span class="sk-num">1</span>Dyna-Q 미로</button>
+    <button class="sk-tab" role="tab" id="tab-risk" aria-controls="pane-risk" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>모형의 오차와 위험</button>
+    <button class="sk-tab" role="tab" id="tab-wm" aria-controls="pane-wm" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>World Models</button>
+    <button class="sk-tab" role="tab" id="tab-dreamer" aria-controls="pane-dreamer" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>Dreamer</button>
+    <button class="sk-tab" role="tab" id="tab-muzero" aria-controls="pane-muzero" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>MuZero · MCTS</button>
+    <button class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>코드</button>
+    <button class="sk-tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>알고리즘 구성도</button>
+  </nav>
+
+  <!-- ================= 1. Dyna-Q ================= -->
+  <section class="mb-pane" id="pane-dyna" role="tabpanel" aria-labelledby="tab-dyna">
+    <div class="sk-card">
+      <div class="sk-head"><h2>Dyna-Q — 실제 한 걸음마다 상상(계획) n걸음</h2><span class="sk-hint">Sutton &amp; Barto 그림 8.2 미로 · γ = 0.95 · α = 0.1 · ε = 0.1</span></div>
+      <p class="sk-lead">실제로 한 걸음 움직이면 ① 그 경험으로 Q를 갱신하고 ② 모형 표에 (s, a) → (r, s′)를 적어 둔 뒤 ③ 모형 표에서 이미 본 (s, a)를 n번 무작위로 꺼내 Q를 더 갱신합니다. 목표에 도착할 때만 보상 +1, 최단 경로는 14걸음입니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">계획 단계 n</span>
+          <div class="sk-seg" id="dyN"><button type="button" data-v="0" aria-pressed="false">0 (Q-learning)</button><button type="button" data-v="5" aria-pressed="true">5</button><button type="button" data-v="10" aria-pressed="false">10</button><button type="button" data-v="50" aria-pressed="false">50</button></div></div>
+        <label class="sk-slider"><span class="sk-sl-head">seed <b id="dySeedV">1</b></span><input type="range" id="dySeed" min="1" max="30" step="1" value="1"></label>
+        <div class="sk-group">
+          <button class="sk-btn" type="button" id="dyReset">처음</button>
+          <button class="sk-btn sk-btn--primary" type="button" id="dyNext">다음 걸음</button>
+          <button class="sk-btn" type="button" id="dyPlay">재생</button>
+          <button class="sk-btn" type="button" id="dyEp">에피소드 끝까지</button>
+        </div>
+        <div class="sk-group"><span class="sk-label">속도</span>
+          <div class="sk-seg" id="dySpeed"><button type="button" data-v="300" aria-pressed="false">느리게</button><button type="button" data-v="90" aria-pressed="true">보통</button><button type="button" data-v="15" aria-pressed="false">빠르게</button></div></div>
+      </div>
+      <div class="mb-side">
+        <div>
+          <div class="mb-grid"><canvas class="mb-cv" id="dyGrid" aria-label="Dyna 미로: 칸 색은 max Q, 화살표는 탐욕 정책"></canvas></div>
+          <div class="sk-legend mb-legend" style="margin-top:8px"><span><i class="a"></i>에이전트·이번 에피소드 경로</span><span><i class="i"></i>방금 계획(상상)으로 갱신한 칸</span><span><i class="r"></i>칸 색 = max Q</span></div>
+          <div class="sk-stats" id="dyStats" style="margin-top:10px"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+          <svg class="mb-svg" id="dyLoop" viewBox="0 0 440 210" role="img" aria-label="Dyna 구조: 실제 경험, 직접 강화학습, 모형 학습, 계획"></svg>
+          <div class="sk-formula mb-formula" id="dyFormula"></div>
+          <div>
+            <div class="sk-mat-label">모형 표 Model(s, a) → (r, s′) — 최근에 적은 순</div>
+            <div class="mb-model"><table class="sk-table" id="dyModel"></table></div>
+          </div>
+        </div>
+      </div>
+      <canvas class="mb-cv" id="dyLive" aria-label="이 화면에서 진행한 에피소드별 걸음 수"></canvas>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>계획 단계 수에 따른 학습 곡선</h2><span class="sk-hint">그림 8.2 · 에피소드별 걸음 수 (2번째 에피소드부터)</span></div>
+      <div class="sk-controls">
+        <label class="sk-slider"><span class="sk-sl-head">반복 횟수 <b id="dyRunsV">10</b></span><input type="range" id="dyRuns" min="5" max="30" step="5" value="10"></label>
+        <div class="sk-group"><button class="sk-btn sk-btn--primary" type="button" id="dyCurveBtn">다시 계산</button><span class="mb-prog" id="dyProg" role="status"></span></div>
+      </div>
+      <p class="sk-note"><b>브라우저용 축소 설정</b> — 교재 그림은 30회 반복 평균입니다. 여기서는 기본 10회로 줄였습니다(최대 30회).</p>
+      <canvas class="mb-cv" id="dyCurve" aria-label="계획 단계 수별 학습 곡선"></canvas>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>두 번째 에피소드 중간의 정책</h2><span class="sk-hint">그림 8.3 · 같은 seed · 화살표 = 가치가 0보다 큰 칸의 탐욕 행동</span></div>
+      <div class="mb-two">
+        <div><h3 style="margin:0 0 6px;font-size:15px">계획 없음 (n = 0)</h3><canvas class="mb-cv" id="dySnap0" aria-label="n=0 정책"></canvas><p class="mb-sub" id="dySnap0T"></p></div>
+        <div><h3 style="margin:0 0 6px;font-size:15px">계획 50번 (n = 50)</h3><canvas class="mb-cv" id="dySnap50" aria-label="n=50 정책"></canvas><p class="mb-sub" id="dySnap50T"></p></div>
+      </div>
+      <p class="sk-note">첫 에피소드에서는 목표를 찾기 전까지 모든 보상이 0이라 둘 다 같은 방식으로 헤맵니다. 목표를 한 번 찾은 뒤 n = 0은 한 에피소드에 한 칸씩만 가치가 뒤로 전해지지만, n = 50은 모형 표를 되풀이해 읽으며 넓은 영역의 정책을 한꺼번에 만듭니다.</p>
+    </div>
+  </section>
+
+  <!-- ================= 2. 모형의 오차와 위험 ================= -->
+  <section class="mb-pane" id="pane-risk" role="tabpanel" aria-labelledby="tab-risk" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>환경이 바뀌었는데 모형은 그대로라면</h2><span class="sk-hint">그림 8.4 (막힌 미로) · 8.5 (지름길 미로) · n = 10 · α = 1 · γ = 0.95 · ε = 0.1</span></div>
+      <p class="sk-lead">Dyna-Q의 모형 표는 한 번 본 결과를 계속 믿습니다. 길이 막히면 실제 경험으로 곧 알아채지만, <b>새 지름길이 열리는 것</b>은 그쪽으로 가 보지 않는 한 영영 모릅니다. Dyna-Q+는 오래 시도하지 않은 (s, a)에 보너스 κ√τ를 얹어 다시 가 보게 합니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">미로</span>
+          <div class="sk-seg" id="rkMaze"><button type="button" data-v="short" aria-pressed="true">지름길이 열림 (3000걸음)</button><button type="button" data-v="block" aria-pressed="false">길이 막힘 (1000걸음)</button></div></div>
+        <div class="sk-group"><span class="sk-label">보너스 κ</span>
+          <div class="sk-seg" id="rkKappa"><button type="button" data-v="0.0001" aria-pressed="false">0.0001</button><button type="button" data-v="0.001" aria-pressed="true">0.001</button><button type="button" data-v="0.01" aria-pressed="false">0.01</button></div></div>
+        <label class="sk-slider"><span class="sk-sl-head">반복 횟수 <b id="rkRunsV">10</b></span><input type="range" id="rkRuns" min="5" max="30" step="5" value="10"></label>
+        <div class="sk-group"><button class="sk-btn sk-btn--primary" type="button" id="rkRun">실행</button><span class="mb-prog" id="rkProg" role="status"></span></div>
+      </div>
+      <div class="mb-side">
+        <div><canvas class="mb-cv" id="rkChart" aria-label="누적 보상"></canvas><p class="mb-sub" id="rkSum"></p></div>
+        <div class="mb-two">
+          <div><div class="sk-mat-label">바뀌기 전</div><canvas class="mb-cv" id="rkG1" aria-label="바뀌기 전 미로"></canvas></div>
+          <div><div class="sk-mat-label">바뀐 뒤</div><canvas class="mb-cv" id="rkG2" aria-label="바뀐 뒤 미로"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>표본이 적은 모형으로 계획하면 — 지나친 자신감</h2><span class="sk-hint">FrozenLake 4×4 (미끄러움) · γ = 0.99 · 최적 V*(시작) = 0.5420</span></div>
+      <p class="sk-lead">각 (s, a)를 k번씩만 실제로 해 보고 그 빈도로 전이 확률을 추정한 뒤, 그 모형으로 가치 반복(계획)을 합니다. 계획기가 믿는 성공 확률(모형 속 V̂)과, 그 정책을 진짜 환경에서 썼을 때의 성공 확률을 비교합니다.</p>
+      <div class="sk-controls">
+        <label class="sk-slider" style="min-width:240px"><span class="sk-sl-head">(s, a)당 표본 k <b id="flKV">3</b></span><input type="range" id="flK" min="0" max="8" step="1" value="2"></label>
+        <label class="sk-slider"><span class="sk-sl-head">모형 seed <b id="flSeedV">1</b></span><input type="range" id="flSeed" min="1" max="30" step="1" value="1"></label>
+      </div>
+      <div class="mb-side">
+        <div><canvas class="mb-cv" id="flChart" aria-label="표본 수에 따른 믿음과 실제"></canvas>
+          <div class="sk-legend mb-legend"><span><i class="i"></i>모형 속 믿음 V̂(시작) (30개 모형 평균)</span><span><i class="s"></i>그 정책의 실제 가치 V<sup>π̂</sup>(시작)</span><span><i class="g"></i>최적 0.5420</span></div></div>
+        <div><canvas class="mb-cv" id="flGrid" aria-label="추정 모형으로 세운 정책"></canvas><div class="sk-stats" id="flStats" style="margin-top:10px"></div></div>
+      </div>
+      <p class="sk-note sk-note--warn"><b>모형 착취(model exploitation)</b> — 계획기는 모형이 틀린 곳(우연히 구멍에 빠지지 않았던 칸)을 "안전한 지름길"로 믿고 그쪽으로 정책을 몰아갑니다. 표본이 적을수록 믿음은 부풀고 실제 성과는 낮습니다. 대책: 표본을 더 모으기, 불확실성(앙상블 불일치)만큼 벌점 주기, 짧은 상상 구간만 쓰기(MBPO), 매 걸음 다시 계획하기(MPC).</p>
+    </div>
+  </section>
+
+  <!-- ================= 3. World Models ================= -->
+  <section class="mb-pane" id="pane-wm" role="tabpanel" aria-labelledby="tab-wm" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>World Models — 보고(V) · 기억하고 예측하고(M) · 움직인다(C)</h2><span class="sk-hint">Ha &amp; Schmidhuber (2018) · CarRacing 설정 숫자 · 블록을 누르면 설명</span></div>
+      <div class="mb-side">
+        <div class="sk-scroll"><svg class="mb-svg" id="wmSvg" style="min-width:560px" viewBox="0 0 640 300" role="img" aria-label="World Models의 V, M, C 구조"></svg></div>
+        <div class="mb-panel" id="wmInfo" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>작은 세계 모형을 직접 학습하기 — 진자(Pendulum)</h2><span class="sk-hint">입력 (cos θ, sin θ, θ̇, 토크) → 다음 상태의 변화량 · 신경망 3개(앙상블)</span></div>
+      <p class="sk-lead">실제 진자를 무작위 토크로 흔들어 전이 데이터를 모은 뒤, 작은 신경망이 (Δθ, Δθ̇)를 예측하도록 학습합니다. 그다음 같은 처음 상태·같은 행동으로 실제와 "상상(모형만으로 굴리기)"을 나란히 굴려 봅니다. 영상(VAE)·MDN-RNN 대신 상태를 직접 쓰는 결정적 MLP로 단순화했습니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">데이터를 모은 곳</span>
+          <div class="sk-seg" id="wmRange"><button type="button" data-v="wide" aria-pressed="true">넓게 (모든 각도)</button><button type="button" data-v="bottom" aria-pressed="false">아래쪽만 (늘어진 근처)</button></div></div>
+        <div class="sk-group"><span class="sk-label">전이 개수</span>
+          <div class="sk-seg" id="wmN"><button type="button" data-v="300" aria-pressed="false">300</button><button type="button" data-v="1500" aria-pressed="true">1,500</button><button type="button" data-v="4000" aria-pressed="false">4,000</button></div></div>
+        <div class="sk-group"><button class="sk-btn sk-btn--primary" type="button" id="wmTrain">데이터 모으고 학습</button><span class="mb-prog" id="wmProg" role="status"></span></div>
+      </div>
+      <p class="sk-note"><b>브라우저용 축소 설정</b> — 신경망 4→32→32→2 (tanh) 3개, Adam(lr 0.003), 배치 32, 모형마다 1,200번 갱신.</p>
+      <div class="mb-two">
+        <div><div class="sk-mat-label">학습 손실 (MSE, 정규화된 변화량)</div><canvas class="mb-cv" id="wmLoss" aria-label="학습 손실"></canvas></div>
+        <div><div class="sk-mat-label">데이터가 덮은 상태 공간 (가로 θ, 세로 θ̇)</div><canvas class="mb-cv" id="wmData" aria-label="데이터 분포"></canvas></div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>상상 굴리기 vs 실제 굴리기</h2><span class="sk-hint">모형은 자기 예측을 다시 입력으로 써서 굴림 → 오차가 쌓임</span></div>
+      <div class="sk-controls">
+        <label class="sk-slider"><span class="sk-sl-head">처음 각도 θ₀ <b id="wmTh0V">3.00</b></span><input type="range" id="wmTh0" min="-3.14" max="3.14" step="0.02" value="3"></label>
+        <label class="sk-slider"><span class="sk-sl-head">처음 각속도 θ̇₀ <b id="wmTd0V">0.00</b></span><input type="range" id="wmTd0" min="-4" max="4" step="0.1" value="0"></label>
+        <div class="sk-group"><span class="sk-label">행동</span>
+          <div class="sk-seg" id="wmAct"><button type="button" data-v="pump" aria-pressed="true">흔들어 올리기 u = 2·sign(θ̇)</button><button type="button" data-v="sine" aria-pressed="false">사인파 토크</button><button type="button" data-v="rand" aria-pressed="false">무작위 토크</button></div></div>
+        <label class="sk-slider"><span class="sk-sl-head">굴리는 길이 H <b id="wmHV">100</b></span><input type="range" id="wmH" min="10" max="200" step="10" value="100"></label>
+      </div>
+      <canvas class="mb-cv" id="wmRoll" aria-label="실제와 상상의 진자 높이 궤적"></canvas>
+      <div class="sk-legend mb-legend"><span><i class="s"></i>실제 (환경)</span><span><i class="i"></i>상상 (모형 3개, 진한 선 = 모형 1)</span><span><i class="g"></i>cos θ = 1 위로 선 자세 · −1 아래로 늘어짐</span></div>
+      <div class="sk-controls">
+        <label class="sk-slider" style="min-width:260px"><span class="sk-sl-head">시점 t <b id="wmTV">0</b></span><input type="range" id="wmT" min="0" max="100" step="1" value="0"></label>
+        <button class="sk-btn" type="button" id="wmPlay">재생</button>
+      </div>
+      <div class="mb-two">
+        <div class="mb-pend">
+          <figure><canvas class="mb-cv" id="wmPR" aria-label="실제 진자"></canvas><figcaption>실제</figcaption></figure>
+          <figure><canvas class="mb-cv" id="wmPI" aria-label="상상 진자 (모형 1)"></canvas><figcaption>상상 (모형 1)</figcaption></figure>
+        </div>
+        <div><div class="sk-mat-label">굴린 길이에 따른 오차 (무작위 시작 40개 · 무작위 토크)</div><canvas class="mb-cv" id="wmErr" aria-label="길이별 오차"></canvas>
+          <div class="sk-legend mb-legend"><span><i class="td"></i>실제와의 각도 오차 (모형 1)</span><span><i class="ex"></i>모형 3개끼리의 불일치</span></div></div>
+      </div>
+      <p class="sk-note" id="wmNote">한 걸음 예측은 거의 정확해도, 자기 예측을 계속 입력으로 쓰면 작은 오차가 쌓여 몇십 걸음 뒤에는 실제와 갈라집니다(오차 누적, compounding error). 데이터를 "아래쪽만" 모으면 진자를 위로 흔들어 올리는 순간 모형이 본 적 없는 곳으로 나가 상상이 크게 틀립니다. 모형 3개의 불일치가 커지는 곳이 바로 믿으면 안 되는 곳입니다.</p>
+    </div>
+  </section>
+
+  <!-- ================= 4. Dreamer ================= -->
+  <section class="mb-pane" id="pane-dreamer" role="tabpanel" aria-labelledby="tab-dreamer" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>Dreamer — 잠재 공간의 상상 속에서 actor-critic을 학습</h2><span class="sk-hint">Hafner et al. (DreamerV1~V3) · 상상 길이 H = 15 · λ = 0.95</span></div>
+      <div class="mb-side">
+        <div class="sk-scroll"><svg class="mb-svg" id="drSvg" style="min-width:560px" viewBox="0 0 640 300" role="img" aria-label="Dreamer의 세계 모형 학습과 상상 속 학습"></svg></div>
+        <div class="mb-panel">
+          <h3>세 가지를 번갈아 반복</h3>
+          <p><span class="mb-c-s">① 실제 경험 수집</span> — 지금의 actor로 환경에서 몇 에피소드를 돌려 리플레이에 쌓습니다.</p>
+          <p><span class="mb-c-m">② 세계 모형 학습</span> — RSSM: 결정적 상태 h<sub>t</sub> = f(h<sub>t−1</sub>, z<sub>t−1</sub>, a<sub>t−1</sub>), 확률적 상태 z<sub>t</sub>. 관측 복원 + 보상 예측 + KL(사후‖사전)을 최소화합니다.</p>
+          <p><span class="mb-c-i">③ 상상 속 학습</span> — 리플레이의 상태에서 출발해 모형만으로 H걸음 상상하고, 그 궤적의 λ-수익으로 critic v를 맞추고 actor π가 λ-수익을 키우게 합니다. 환경은 전혀 건드리지 않습니다.</p>
+          <div class="sk-formula">V<sup>λ</sup><sub>t</sub> = r̂<sub>t</sub> + γ[(1−λ) v(ŝ<sub>t+1</sub>) + λ V<sup>λ</sup><sub>t+1</sub>],  V<sup>λ</sup><sub>H</sub> = v(ŝ<sub>H</sub>)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>작은 Dreamer — 표로 만든 모형 속에서 actor-critic</h2><span class="sk-hint">5×5 격자 · 미끄러짐 10% · 목표 +1 · 구멍 −1 · γ = 0.95</span></div>
+      <p class="sk-lead">신경망 대신 표를 씁니다: 모형 = 지금까지 본 전이의 빈도표, critic = 상태별 v, actor = 상태별 softmax 정책(REINFORCE + 엔트로피, DreamerV2의 이산 행동 방식). 한 라운드 = 실제 에피소드 4개 수집 → 모형 갱신 → 상상 궤적 16개 × 60번 학습. 실제 성과는 정책을 진짜 전이 확률로 정확히 평가한 값입니다.</p>
+      <div class="sk-controls">
+        <label class="sk-slider"><span class="sk-sl-head">상상 길이 H <b id="drHV">10</b></span><input type="range" id="drH" min="1" max="20" step="1" value="10"></label>
+        <label class="sk-slider"><span class="sk-sl-head">λ <b id="drLamV">0.95</b></span><input type="range" id="drLam" min="0" max="1" step="0.05" value="0.95"></label>
+        <label class="sk-slider"><span class="sk-sl-head">seed <b id="drSeedV">1</b></span><input type="range" id="drSeed" min="1" max="20" step="1" value="1"></label>
+        <div class="sk-group">
+          <button class="sk-btn" type="button" id="drReset">초기화</button>
+          <button class="sk-btn sk-btn--primary" type="button" id="drRound">한 라운드</button>
+          <button class="sk-btn" type="button" id="drAuto">12 라운드 자동</button>
+        </div>
+      </div>
+      <div class="mb-side">
+        <div>
+          <div class="mb-grid"><canvas class="mb-cv" id="drGrid" aria-label="격자: 정책 화살표와 상상 궤적"></canvas></div>
+          <div class="sk-legend mb-legend" style="margin-top:8px"><span><i class="i"></i>최근 상상 궤적</span><span><i class="m"></i>칸 색 진하기 = 모형이 본 전이 수</span><span><i class="a"></i>화살표 = actor 확률</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+          <canvas class="mb-cv" id="drChart" aria-label="실제 성과와 critic의 믿음"></canvas>
+          <div class="sk-legend mb-legend"><span><i class="s"></i>실제 가치 V<sup>π</sup>(시작)</span><span><i class="v"></i>critic v(시작)</span><span><i class="g"></i>최적 V*</span></div>
+          <div class="sk-stats" id="drStats"></div>
+        </div>
+      </div>
+      <div class="sk-mat-label">마지막 상상 궤적의 λ-수익 계산 (뒤에서부터)</div>
+      <div class="sk-scroll"><table class="sk-table" id="drTable"></table></div>
+      <p class="sk-note" id="drNote">상상 길이 H가 너무 짧으면 목표의 보상이 상상 안에 들어오지 않아 critic만 믿어야 하고, λ가 0이면 매 걸음 critic에 기대 편향이 커집니다. 실제 경험이 목표에 한 번도 닿지 않으면 모형도 목표를 모르므로 상상만으로는 배울 수 없습니다 — seed를 바꿔 보면 가끔 "구멍만 피하는" 정책에 머무는 경우가 있습니다.</p>
+    </div>
+  </section>
+
+  <!-- ================= 5. MuZero ================= -->
+  <section class="mb-pane" id="pane-muzero" role="tabpanel" aria-labelledby="tab-muzero" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>MuZero — 규칙을 모르는 채로, 학습된 모형 위에서 트리 탐색</h2><span class="sk-hint">Schrittwieser et al. (2020) · h 표현 · g 역학 · f 예측</span></div>
+      <div class="mb-side">
+        <div class="sk-scroll"><svg class="mb-svg" id="mzSvg" style="min-width:560px" viewBox="0 0 640 260" role="img" aria-label="MuZero의 h, g, f 함수"></svg></div>
+        <div class="mb-panel">
+          <h3>세 함수</h3>
+          <p><span class="mb-c-s">h (표현)</span>: 관측 o<sub>1..t</sub> → 은닉 상태 s⁰</p>
+          <p><span class="mb-c-m">g (역학)</span>: (s<sup>k−1</sup>, a<sup>k</sup>) → 보상 r<sup>k</sup>, 다음 은닉 상태 s<sup>k</sup></p>
+          <p><span class="mb-c-v">f (예측)</span>: s<sup>k</sup> → 정책 p<sup>k</sup>, 가치 v<sup>k</sup></p>
+          <p>은닉 상태는 화면을 복원할 필요가 없고, <b>보상·가치·정책을 맞히는 데 필요한 것만</b> 담도록 학습됩니다. 학습 목표: K = 5걸음 펼쳐서 r̂ ↔ 실제 보상, v̂ ↔ n-step 수익(n = 10, Atari), p̂ ↔ MCTS 방문 비율.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>진짜로 돌아가는 작은 MCTS (pUCT)</h2><span class="sk-hint">5×5 결정적 격자 · 목표 +1 · 함정 −1 · γ = 0.9</span></div>
+      <p class="sk-lead">g 자리에는 이 격자의 정확한 전이를, f 자리에는 아래에서 고른 사전확률·가치를 넣었습니다(학습된 신경망 대신 쓰는 <b>모의 출력</b>). 선택·확장·역전파와 pUCT 점수, 방문 수로 만든 정책은 MuZero 의사코드와 같은 식으로 실제 계산합니다. 사전확률을 "균등"으로 바꾸면 매 걸음 50회 탐색으로는 헤매기 쉽고, f의 정책이 좋으면 같은 탐색 횟수로 바로 최단 경로(8걸음)를 찾습니다 — 학습된 정책이 탐색을 이끄는 것이 MuZero(AlphaZero 계열)의 핵심입니다.</p>
+      <div class="sk-controls">
+        <div class="sk-group"><span class="sk-label">f의 사전확률 p</span>
+          <div class="sk-seg" id="mzPrior"><button type="button" data-v="uniform" aria-pressed="false">균등</button><button type="button" data-v="good" aria-pressed="true">대략 맞음 (모의)</button><button type="button" data-v="bad" aria-pressed="false">틀림 (모의)</button></div></div>
+        <div class="sk-group"><span class="sk-label">f의 가치 v</span>
+          <div class="sk-seg" id="mzValue"><button type="button" data-v="zero" aria-pressed="false">0 (모름)</button><button type="button" data-v="noisy" aria-pressed="true">V* + 잡음 (모의)</button><button type="button" data-v="exact" aria-pressed="false">정확한 V*</button></div></div>
+        <label class="sk-check"><input type="checkbox" id="mzNoise"> 뿌리 디리클레 잡음 (α 0.3, 25%)</label>
+      </div>
+      <div class="sk-controls">
+        <div class="sk-group">
+          <button class="sk-btn" type="button" id="mzClear">트리 초기화</button>
+          <button class="sk-btn sk-btn--primary" type="button" id="mzSim1">시뮬레이션 1회</button>
+          <button class="sk-btn" type="button" id="mzSim10">+10회</button>
+          <button class="sk-btn" type="button" id="mzSim50">+50회</button>
+        </div>
+        <div class="sk-group"><span class="sk-label">행동 고르는 온도 T</span>
+          <div class="sk-seg" id="mzTemp"><button type="button" data-v="1" aria-pressed="false">1</button><button type="button" data-v="0.5" aria-pressed="false">0.5</button><button type="button" data-v="0" aria-pressed="true">0 (최다 방문)</button></div></div>
+        <div class="sk-group">
+          <button class="sk-btn" type="button" id="mzAct">행동 실행</button>
+          <button class="sk-btn" type="button" id="mzEpisode">에피소드 (매 걸음 50회 탐색)</button>
+          <button class="sk-btn" type="button" id="mzRestart">처음 위치로</button>
+        </div>
+      </div>
+      <div class="mb-side">
+        <div>
+          <div class="mb-grid" style="max-width:380px"><canvas class="mb-cv" id="mzGrid" aria-label="격자: 현재 위치와 마지막 시뮬레이션 경로"></canvas></div>
+          <div class="sk-legend mb-legend" style="margin-top:8px"><span><i class="a"></i>에이전트·실제 경로</span><span><i class="i"></i>마지막 시뮬레이션이 상상한 경로</span><span><i class="n"></i>함정</span><span>칸 숫자 = f가 내놓는 가치 v</span></div>
+          <div class="sk-stats" id="mzStats" style="margin-top:10px"></div>
+        </div>
+        <div style="min-width:0">
+          <div class="sk-mat-label">탐색 트리 (깊이 2까지 · 원 크기 = 방문 수 N)</div>
+          <div class="sk-scroll"><svg class="mb-svg" id="mzTree" style="min-width:520px" viewBox="0 0 640 230" role="img" aria-label="탐색 트리"></svg></div>
+        </div>
+      </div>
+      <div class="sk-scroll"><table class="sk-table" id="mzTable"></table></div>
+      <div class="sk-formula mb-formula" id="mzFormula"></div>
+    </div>
+  </section>
+
+  <!-- ================= 6. 코드 ================= -->
+  <section class="mb-pane" id="pane-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>파이썬 코드 (numpy · Gymnasium · PyTorch)</h2>
+        <div class="sk-group"><button class="sk-btn sk-btn--primary sk-btn--sm" type="button" id="codeCopy">복사</button><span class="mb-flash" id="codeMsg" role="status"></span></div></div>
+      <div class="sk-controls">
+        <div class="sk-seg" id="codeSel"><button type="button" data-v="dyna" aria-pressed="true">Dyna-Q / Dyna-Q+</button><button type="button" data-v="wm" aria-pressed="false">세계 모형 학습 (PyTorch)</button><button type="button" data-v="mcts" aria-pressed="false">MuZero식 MCTS</button></div>
+        <span class="sk-hint">다른 탭의 현재 설정(n, κ, 데이터 양, 사전확률·가치 등)이 반영됩니다.</span>
+      </div>
+      <pre class="sk-formula mb-code" id="codeOut"></pre>
+      <p class="sk-note" id="codeNote"></p>
+    </div>
+  </section>
+
+  <!-- ================= 7. 구성도 ================= -->
+  <section class="mb-pane" id="pane-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">Dyna-Q · 모형 오차 · World Models와 Dreamer · MuZero를 강의 슬라이드로 정리</span></div><div data-ds-diagrams="model-based-rl"></div></section>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20261007a"></script>
+<script src="../../assets/js/rl-kit.js?v=20261007a"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261007a"></script>
+<script src="../../assets/diagrams/model-based-rl.js?v=20261007a"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const f = (v, d) => { if (!isFinite(v)) return v > 0 ? "∞" : "−∞"; const s = v.toFixed(d == null ? 3 : d); return (s.startsWith("-") && +s !== 0 ? "−" + s.slice(1) : s.replace("-", "")); };
+  function col() { const t = RL.theme(); t.td = cssv("--rl-td"); t.model = cssv("--rl-model"); t.imag = cssv("--rl-imag"); t.val = cssv("--rl-val"); t.rew = cssv("--rl-rew"); t.state = cssv("--rl-state"); t.act = cssv("--rl-act"); t.exp = cssv("--rl-exp"); t.neg = cssv("--rl-neg"); return t; }
+  function fit(cv, h) {
+    const dpr = window.devicePixelRatio || 1, w = Math.max(200, cv.clientWidth || (cv.parentNode && cv.parentNode.clientWidth) || 600);
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.height = h + "px";
+    const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h); return { g, w, h };
+  }
+  const FONT = () => cssv("--sans") || "sans-serif", MONO = () => cssv("--mono") || "monospace";
+  function xyChart(cv, o) {
+    const th = col(), F = fit(cv, o.h || 260), g = F.g, W = F.w, H = F.h;
+    const pl = 50, pr = 14, pt = (o.legend === false ? 12 : 30) + (o.ylabel && o.legend === false ? 12 : 0), pb = 34;
+    const x0 = o.xmin, x1 = o.xmax, y0 = o.ymin, y1 = o.ymax;
+    const X = x => pl + (W - pl - pr) * (x - x0) / ((x1 - x0) || 1), Y = y => pt + (H - pt - pb) * (1 - (y - y0) / ((y1 - y0) || 1));
+    g.font = "11px " + MONO(); g.lineWidth = 1;
+    (o.yticks || []).forEach(v => { g.strokeStyle = th.line; g.beginPath(); g.moveTo(pl, Y(v)); g.lineTo(W - pr, Y(v)); g.stroke(); g.fillStyle = th.faint; g.textAlign = "right"; g.fillText(o.fmtY ? o.fmtY(v) : f(v, 2), pl - 6, Y(v) + 4); });
+    g.strokeStyle = th.lineStrong; g.beginPath(); g.moveTo(pl, pt); g.lineTo(pl, H - pb); g.lineTo(W - pr, H - pb); g.stroke();
+    g.fillStyle = th.faint; g.textAlign = "center";
+    (o.xticks || []).forEach(v => { g.fillText(o.fmtX ? o.fmtX(v) : String(v), X(v), H - pb + 15); });
+    if (o.xlabel) { g.fillStyle = th.muted; g.font = "600 11.5px " + FONT(); g.textAlign = "right"; g.fillText(o.xlabel, W - pr, H - 4); }
+    if (o.ylabel && o.legend === false) { g.fillStyle = th.muted; g.font = "600 11.5px " + FONT(); g.textAlign = "left"; g.fillText(o.ylabel, 6, 12); }
+    g.save(); g.beginPath(); g.rect(pl, pt - 1, W - pl - pr, H - pt - pb + 2); g.clip();
+    (o.bands || []).forEach(b => { g.fillStyle = b.color; g.globalAlpha = b.alpha || 0.12; g.fillRect(X(b.x0), pt, X(b.x1) - X(b.x0), H - pt - pb); g.globalAlpha = 1; });
+    (o.hlines || []).forEach(h => { g.strokeStyle = h.color; g.lineWidth = 1.5; g.setLineDash(h.dash || [5, 4]); g.beginPath(); g.moveTo(pl, Y(h.y)); g.lineTo(W - pr, Y(h.y)); g.stroke(); g.setLineDash([]);
+      if (h.label) { g.fillStyle = h.color; g.font = "600 11px " + FONT(); g.textAlign = "right"; g.fillText(h.label, W - pr - 4, Y(h.y) + (h.below ? 13 : -4)); } });
+    (o.vlines || []).forEach(h => { g.strokeStyle = h.color; g.lineWidth = 1.5; g.setLineDash(h.dash || [4, 4]); g.beginPath(); g.moveTo(X(h.x), pt); g.lineTo(X(h.x), H - pb); g.stroke(); g.setLineDash([]);
+      if (h.label) { g.fillStyle = h.color; g.font = "600 11px " + FONT(); g.textAlign = "left"; g.fillText(h.label, X(h.x) + 4, pt + 12); } });
+    (o.series || []).forEach(s => {
+      g.strokeStyle = s.color; g.fillStyle = s.color; g.lineWidth = s.width || 2; g.setLineDash(s.dash || []); g.globalAlpha = s.alpha || 1;
+      if (s.line !== false) { g.beginPath(); let pen = false;
+        s.x.forEach((xv, i) => { const yv = s.y[i]; if (yv == null || !isFinite(yv) || (s.breakAt && s.breakAt(i))) { pen = false; return; }
+          const yy = Math.max(pt - 6, Math.min(H - pb + 6, Y(yv))); if (pen) g.lineTo(X(xv), yy); else g.moveTo(X(xv), yy); pen = true; }); g.stroke(); }
+      g.setLineDash([]);
+      if (s.pts) s.x.forEach((xv, i) => { const yv = s.y[i]; if (yv == null || !isFinite(yv)) return; g.beginPath(); g.arc(X(xv), Y(yv), s.r || 3, 0, Math.PI * 2); g.fill(); });
+      g.globalAlpha = 1;
+    });
+    (o.marks || []).forEach(m => { g.fillStyle = m.color; g.strokeStyle = th.bg; g.lineWidth = 2; g.beginPath(); g.arc(X(m.x), Y(m.y), m.r || 5, 0, Math.PI * 2); g.fill(); g.stroke(); });
+    g.restore();
+    if (o.legend !== false) { let lx = pl; g.font = "600 11.5px " + FONT(); g.textAlign = "left"; let ly = 14;
+      (o.series || []).forEach(s => { if (!s.label) return; const tw = g.measureText(s.label).width; if (lx + tw + 30 > W) { lx = pl; ly += 15; } g.fillStyle = s.color; g.fillRect(lx, ly - 8, 10, 10); g.fillStyle = th.text; g.fillText(s.label, lx + 14, ly + 1); lx += tw + 26; }); }
+    return { X, Y };
+  }
+  function seg(id, cb) {
+    const el = $(id), bs = [...el.querySelectorAll("button")];
+    const set = v => bs.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === String(v))));
+    bs.forEach(b => b.addEventListener("click", () => { set(b.dataset.v); cb && cb(b.dataset.v); }));
+    return { get: () => (bs.find(b => b.getAttribute("aria-pressed") === "true") || bs[0]).dataset.v, set };
+  }
+  function slider(id, fmt, cb) {
+    const el = $(id), out = $(id + "V"); const upd = () => { out.textContent = fmt ? fmt(+el.value) : el.value; };
+    el.addEventListener("input", () => { upd(); cb && cb(+el.value); }); upd();
+    return { get: () => +el.value, set: v => { el.value = v; upd(); }, el };
+  }
+  const maxQ = q => Math.max(q[0], q[1], q[2], q[3]);
+  const AR = RL.ACTIONS;
+
+  /* ================= 1. Dyna-Q ================= */
+  const MC = 9, mi = (r, c) => r * MC + c;
+  function makeMaze() { return new RL.GridEnv({ rows: 6, cols: 9, start: mi(2, 0), goals: { [mi(0, 8)]: 1 }, walls: [mi(1, 2), mi(2, 2), mi(3, 2), mi(4, 5), mi(0, 7), mi(1, 7), mi(2, 7)], maxSteps: 1e9, name: "Dyna 미로" }); }
+  const egreedy = (Q, s, eps, rng) => rng.random() < eps ? rng.int(4) : RL.argmax(Q[s], rng);
+  const DY = { n: 5, eps: 0.1, alpha: 0.1, gamma: 0.95, seed: 1, speed: 90 };
+  function dyNew() {
+    DY.rng = RL.rng(DY.seed * 31 + 7); DY.env = makeMaze(); DY.Q = Array.from({ length: DY.env.nS }, () => [0, 0, 0, 0]);
+    DY.model = new Map(); DY.seen = []; DY.order = []; DY.ep = 1; DY.k = 0; DY.s = DY.env.reset(); DY.path = [DY.s]; DY.steps = []; DY.last = null; DY.totalPlan = 0;
+  }
+  function dyStep() {
+    const env = DY.env, Q = DY.Q, rng = DY.rng, s = DY.s, a = egreedy(Q, s, DY.eps, rng), o = env.step(a, rng);
+    const old = Q[s][a], mx = o.done ? 0 : maxQ(Q[o.s]), tgt = o.r + DY.gamma * mx; Q[s][a] += DY.alpha * (tgt - old);
+    const key = s * 4 + a, isNew = !DY.model.has(key); if (isNew) DY.seen.push(key);
+    DY.model.set(key, [o.r, o.s, o.done]); DY.order = DY.order.filter(x => x !== key); DY.order.unshift(key);
+    const plans = [], pst = {};
+    for (let i = 0; i < DY.n; i++) {
+      const kk = DY.seen[rng.int(DY.seen.length)], m = DY.model.get(kk), ps = kk >> 2, pa = kk & 3;
+      const po = Q[ps][pa], pm = m[2] ? 0 : maxQ(Q[m[1]]), pt = m[0] + DY.gamma * pm; Q[ps][pa] += DY.alpha * (pt - po);
+      if (Math.abs(Q[ps][pa] - po) > 1e-12) pst[ps] = true;
+      if (plans.length < 1 || (Math.abs(Q[ps][pa] - po) > 1e-12 && plans.length < 2 && plans[0].same)) plans.push({ ps, pa, r: m[0], s2: m[1], done: m[2], po, pm, pt, pn: Q[ps][pa], same: Math.abs(Q[ps][pa] - po) < 1e-12 });
+    }
+    DY.totalPlan += DY.n;
+    DY.last = { s, a, r: o.r, s2: o.s, done: o.done, old, mx, tgt, nw: Q[s][a], isNew, plans, pst, changed: Object.keys(pst).length };
+    DY.k++;
+    if (o.done) { DY.steps.push(DY.k); DY.ep++; DY.k = 0; DY.s = env.reset(); DY.path = [DY.s]; DY.last.endEp = true; }
+    else { DY.s = o.s; DY.path.push(o.s); }
+  }
+  function dyPolicy(Q) { return Q.map(q => maxQ(q) > 1e-9 ? RL.argmax(q) : null); }
+  function drawDyGrid(cv, env, Q, extra) {
+    const th = col(), hl = {};
+    if (extra && extra.pst) Object.keys(extra.pst).forEach(s => hl[s] = th.imag);
+    RL.drawGrid(cv, env, Object.assign({ Q, policy: dyPolicy(Q), fmt: v => (v > 0.0005 ? v.toFixed(2) : ""), highlight: hl, pathColor: th.act }, extra || {}));
+  }
+  function drawDyLoop() {
+    const th = col();
+    const box = (x, y, w, h, c, t1, t2) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" fill="${th.bg}" stroke="${c}" stroke-width="2"/><text x="${x + w / 2}" y="${y + h / 2 - (t2 ? 3 : -5)}" text-anchor="middle" font-size="13" font-weight="700" fill="${c}">${t1}</text>` + (t2 ? `<text x="${x + w / 2}" y="${y + h / 2 + 14}" text-anchor="middle" font-size="11" fill="${th.muted}">${t2}</text>` : "");
+    const L = DY.last, hot = c => c;
+    $("dyLoop").innerHTML = `<defs><marker id="dyAh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${th.muted}"/></marker></defs>` +
+      box(150, 8, 140, 46, th.val, "가치 · 정책 Q", "π = ε-greedy(Q)") +
+      box(10, 118, 130, 46, th.state, "실제 경험", "(s, a, r, s′)") +
+      box(300, 118, 130, 46, th.model, "모형 표", "Model(s,a)") +
+      `<path d="M140 80 C 120 60 130 40 150 32" fill="none" stroke="${th.state}" stroke-width="2" marker-end="url(#dyAh)"/><text x="54" y="84" font-size="11.5" font-weight="700" fill="${th.state}">① 직접 RL</text>` +
+      `<path d="M290 32 C 320 40 330 60 312 80" fill="none" stroke="${th.imag}" stroke-width="2" stroke-dasharray="5 4" marker-start="url(#dyAh)"/><text x="324" y="84" font-size="11.5" font-weight="700" fill="${th.imag}">③ 계획 ×${DY.n}</text>` +
+      `<path d="M140 141 L300 141" fill="none" stroke="${th.model}" stroke-width="2" marker-end="url(#dyAh)"/><text x="220" y="134" text-anchor="middle" font-size="11.5" font-weight="700" fill="${th.model}">② 모형 학습</text>` +
+      `<path d="M75 164 C 75 200 220 206 220 172" fill="none" stroke="${th.muted}" stroke-width="1.6" stroke-dasharray="3 3"/><text x="230" y="200" font-size="11" fill="${th.muted}">행동 a → 환경 (미로)</text>`;
+  }
+  function drawDy() {
+    if ($("pane-dyna").hidden) return;
+    const th = col(), L = DY.last;
+    drawDyGrid($("dyGrid"), DY.env, DY.Q, { agent: DY.s, path: DY.path, pst: L ? L.pst : null });
+    drawDyLoop();
+    $("dyStats").innerHTML = `<div class="sk-stat"><b>${DY.ep}</b><span>에피소드</span></div><div class="sk-stat"><b>${DY.k}</b><span>이번 걸음 수</span></div>` +
+      `<div class="sk-stat"><b>${DY.model.size}</b><span>모형 표 칸 (최대 ${(54 - 7) * 4})</span></div><div class="sk-stat"><b>${DY.totalPlan}</b><span>누적 계획 갱신</span></div>`;
+    let t = "";
+    if (!L) t = "아직 움직이지 않았습니다. [다음 걸음]을 누르세요. 모든 Q가 0이라 처음에는 무작위로 헤맵니다.";
+    else {
+      t += `<span class="mb-c-s">① 실제</span>  s = ${L.s} 에서 ${AR[L.a]} → r = ${L.r}, s′ = ${L.s2}${L.done ? " (목표!)" : ""}\n`;
+      t += `   Q(${L.s},${AR[L.a]}) ← ${f(L.old, 3)} + ${DY.alpha} × [<span class="mb-c-td">${L.r} + ${DY.gamma} × ${f(L.mx, 3)} − ${f(L.old, 3)}</span>] = <b>${f(L.nw, 4)}</b>\n`;
+      t += `<span class="mb-c-m">② 모형</span>  Model(${L.s},${AR[L.a]}) ← (r = ${L.r}, s′ = ${L.s2})${L.isNew ? "  · 새로 적음" : "  · 같은 값으로 덮어씀"}\n`;
+      if (DY.n === 0) t += `<span class="mb-c-i">③ 계획</span>  n = 0 → 상상 없음 (순수 Q-learning)`;
+      else { const p = L.plans[L.plans.length - 1];
+        t += `<span class="mb-c-i">③ 계획 ×${DY.n}</span>  예: 모형에서 (${p.ps},${AR[p.pa]}) → (r = ${p.r}, s′ = ${p.s2}) 를 꺼내\n   Q(${p.ps},${AR[p.pa]}) ← ${f(p.po, 3)} + ${DY.alpha} × [${p.r} + ${DY.gamma} × ${f(p.pm, 3)} − ${f(p.po, 3)}] = <b>${f(p.pn, 4)}</b>\n   이번 계획에서 값이 바뀐 칸 ${L.changed}개 (보라색)`; }
+    }
+    $("dyFormula").innerHTML = t;
+    $("dyModel").innerHTML = "<tr><th>s</th><th>a</th><th>→ r</th><th>→ s′</th></tr>" + DY.order.slice(0, 10).map((k, i) => { const m = DY.model.get(k); return `<tr><td class="n${i === 0 && L ? " new" : ""}">${k >> 2}</td><td>${AR[k & 3]}</td><td class="n">${m[0]}</td><td class="n">${m[1]}${m[2] ? " (끝)" : ""}</td></tr>`; }).join("") +
+      (DY.order.length > 10 ? `<tr><td colspan="4" class="mb-mini">… 외 ${DY.order.length - 10}칸</td></tr>` : "");
+    const xs = DY.steps.map((_, i) => i + 1), mx = Math.max(50, ...DY.steps);
+    xyChart($("dyLive"), { h: 170, xmin: 0, xmax: Math.max(10, DY.steps.length), ymin: 0, ymax: mx * 1.05, yticks: [0, Math.round(mx / 2), Math.round(mx)], fmtY: v => String(Math.round(v)), xticks: [0, Math.max(10, DY.steps.length)], xlabel: "끝낸 에피소드 →", ylabel: "에피소드별 걸음 수 (이 화면)", legend: false,
+      series: [{ x: xs, y: DY.steps, color: th.act, pts: true, r: 3 }], hlines: [{ y: 14, color: th.rew, label: "최단 14", below: true }] });
+  }
+  let dyTimer = null;
+  function dyStop() { if (dyTimer) { clearInterval(dyTimer); dyTimer = null; $("dyPlay").textContent = "재생"; } }
+  seg("dyN", v => { DY.n = +v; drawDy(); codeUpdate(); });
+  slider("dySeed", null, v => { DY.seed = v; dyStop(); dyNew(); drawDy(); });
+  seg("dySpeed", v => { DY.speed = +v; if (dyTimer) { dyStop(); $("dyPlay").click(); } });
+  $("dyReset").onclick = () => { dyStop(); dyNew(); drawDy(); };
+  $("dyNext").onclick = () => { dyStop(); dyStep(); drawDy(); };
+  $("dyPlay").onclick = () => { if (dyTimer) { dyStop(); return; } $("dyPlay").textContent = "멈춤"; dyTimer = setInterval(() => { dyStep(); drawDy(); }, reduceMotion ? Math.max(300, DY.speed) : DY.speed); };
+  $("dyEp").onclick = () => { dyStop(); const e = DY.ep; let g = 0; while (DY.ep === e && g < 20000) { dyStep(); g++; } drawDy(); };
+
+  /* 학습 곡선 (그림 8.2) */
+  function dynaRun(n, nEp, rng, snapEp) {
+    const env = makeMaze(), Q = Array.from({ length: env.nS }, () => [0, 0, 0, 0]), model = new Map(), seen = [], steps = []; let snaps = null;
+    for (let e = 0; e < nEp; e++) {
+      let s = env.reset(), k = 0; const rec = (snapEp === e + 1) ? [] : null;
+      for (;;) {
+        const a = egreedy(Q, s, 0.1, rng), o = env.step(a, rng);
+        Q[s][a] += 0.1 * (o.r + (o.done ? 0 : 0.95 * maxQ(Q[o.s])) - Q[s][a]);
+        const key = s * 4 + a; if (!model.has(key)) seen.push(key); model.set(key, [o.r, o.s, o.done]);
+        for (let i = 0; i < n; i++) { const kk = seen[rng.int(seen.length)], m = model.get(kk), ps = kk >> 2, pa = kk & 3; Q[ps][pa] += 0.1 * (m[0] + (m[2] ? 0 : 0.95 * maxQ(Q[m[1]])) - Q[ps][pa]); }
+        k++; if (rec) rec.push({ Q: Q.map(q => q.slice()), s: o.done ? null : o.s });
+        if (o.done) break; s = o.s;
+      }
+      steps.push(k); if (rec) { const mid = rec[Math.floor(rec.length / 2)]; snaps = { Q: mid.Q, s: mid.s, len: rec.length, at: Math.floor(rec.length / 2) }; }
+    }
+    return { steps, snaps };
+  }
+  const DC = { runs: 10, res: null, busy: false };
+  function runDyCurve() {
+    if (DC.busy) return; DC.busy = true; $("dyCurveBtn").disabled = true;
+    const ns = [0, 5, 50], acc = ns.map(() => new Array(50).fill(0)); let r = 0;
+    function chunk() { const t0 = performance.now();
+      while (r < DC.runs && performance.now() - t0 < 40) { ns.forEach((n, i) => { const st = dynaRun(n, 50, RL.rng(1000 + r * 13)).steps; st.forEach((v, j) => acc[i][j] += v / DC.runs); }); r++; }
+      $("dyProg").textContent = "반복 " + r + " / " + DC.runs;
+      if (r < DC.runs) { setTimeout(chunk, 0); return; }
+      DC.res = { ns, acc }; DC.busy = false; $("dyCurveBtn").disabled = false; $("dyProg").textContent = "완료 · " + DC.runs + "회 평균"; drawDyCurve(); }
+    chunk();
+  }
+  function drawDyCurve() {
+    if (!DC.res) return; const th = col(), xs = []; for (let e = 2; e <= 50; e++) xs.push(e);
+    const cs = [th.gray, th.state, th.imag];
+    xyChart($("dyCurve"), { h: 300, xmin: 2, xmax: 50, ymin: 0, ymax: 800, yticks: [14, 200, 400, 600, 800], fmtY: v => String(v), xticks: [2, 10, 20, 30, 40, 50], xlabel: "에피소드 →",
+      series: DC.res.ns.map((n, i) => ({ x: xs, y: DC.res.acc[i].slice(1), color: cs[i], width: 2.2, label: n === 0 ? "계획 0 (Q-learning)" : "계획 " + n + "번" })),
+      hlines: [{ y: 14, color: th.rew, label: "최단 14", dash: [3, 3] }] });
+  }
+  slider("dyRuns", null, v => { DC.runs = v; });
+  $("dyCurveBtn").onclick = runDyCurve;
+  let snapCache = null;
+  function drawSnaps() {
+    if (!snapCache) snapCache = [0, 50].map(n => dynaRun(n, 2, RL.rng(4242), 2).snaps);
+    const env = makeMaze();
+    [["dySnap0", "dySnap0T", 0], ["dySnap50", "dySnap50T", 1]].forEach(([c, t, i]) => { const sn = snapCache[i];
+      drawDyGrid($(c), env, sn.Q, { agent: sn.s, showValues: false });
+      const cnt = sn.Q.filter(q => maxQ(q) > 1e-9).length; $(t).textContent = `2번째 에피소드 ${sn.len}걸음 중 ${sn.at}걸음째 · 정책이 생긴 칸 ${cnt}개`; });
+  }
+
+  /* ================= 2. 모형의 오차 ================= */
+  function changingMaze(kind) {
+    const w1 = [], w2 = [];
+    if (kind === "block") { for (let c = 0; c < 8; c++) w1.push(mi(3, c)); for (let c = 1; c < 9; c++) w2.push(mi(3, c)); }
+    else { for (let c = 1; c < 9; c++) w1.push(mi(3, c)); for (let c = 1; c < 8; c++) w2.push(mi(3, c)); }
+    const mk = w => new RL.GridEnv({ rows: 6, cols: 9, start: mi(5, 3), goals: { [mi(0, 8)]: 1 }, walls: w, maxSteps: 1e9 });
+    return { a: mk(w1), b: mk(w2), switchAt: kind === "block" ? 1000 : 3000, total: kind === "block" ? 3000 : 6000 };
+  }
+  function dynaPlusRun(cm, n, kappa, plus, rng) {
+    let env = cm.a; const nS = env.nS, Q = Array.from({ length: nS }, () => [0, 0, 0, 0]), model = new Map(), seenS = [], seenSet = new Set(), last = new Float64Array(nS * 4), cum = new Float64Array(cm.total);
+    let total = 0, t = 0, s = env.reset();
+    while (t < cm.total) {
+      if (t === cm.switchAt) { env = cm.b; env.s = s; env.t = 0; }
+      const a = egreedy(Q, s, 0.1, rng), o = env.step(a, rng); t++;
+      Q[s][a] += 1.0 * (o.r + (o.done ? 0 : 0.95 * maxQ(Q[o.s])) - Q[s][a]);
+      model.set(s * 4 + a, [o.r, o.s, o.done]); last[s * 4 + a] = t; if (!seenSet.has(s)) { seenSet.add(s); seenS.push(s); }
+      total += o.r; cum[t - 1] = total;
+      for (let i = 0; i < n; i++) {
+        const ps = seenS[rng.int(seenS.length)]; let pa, m;
+        if (plus) { pa = rng.int(4); m = model.get(ps * 4 + pa) || [0, ps, false]; }
+        else { const acts = [0, 1, 2, 3].filter(x => model.has(ps * 4 + x)); pa = acts[rng.int(acts.length)]; m = model.get(ps * 4 + pa); }
+        const bonus = plus ? kappa * Math.sqrt(t - last[ps * 4 + pa]) : 0;
+        Q[ps][pa] += 1.0 * (m[0] + bonus + (m[2] ? 0 : 0.95 * maxQ(Q[m[1]])) - Q[ps][pa]);
+      }
+      s = o.done ? env.reset() : o.s;
+    }
+    return cum;
+  }
+  const RK = { kind: "short", kappa: 0.001, runs: 10, res: null, busy: false };
+  function runRK() {
+    if (RK.busy) { RK.pending = true; return; } RK.busy = true; RK.pending = false; $("rkRun").disabled = true;
+    const kind = RK.kind, kap = RK.kappa, runs = RK.runs, cmT = changingMaze(kind), accQ = new Float64Array(cmT.total), accP = new Float64Array(cmT.total); let r = 0;
+    function chunk() { const t0 = performance.now();
+      while (r < runs && performance.now() - t0 < 40) {
+        const a = dynaPlusRun(changingMaze(kind), 10, kap, false, RL.rng(77 + r * 11)), b = dynaPlusRun(changingMaze(kind), 10, kap, true, RL.rng(77 + r * 11));
+        for (let i = 0; i < a.length; i++) { accQ[i] += a[i] / runs; accP[i] += b[i] / runs; } r++; }
+      $("rkProg").textContent = "반복 " + r + " / " + runs;
+      if (r < runs) { setTimeout(chunk, 0); return; }
+      RK.res = { kind, kap, cm: cmT, accQ, accP }; RK.busy = false; $("rkRun").disabled = false; $("rkProg").textContent = "완료 · " + runs + "회 평균"; drawRK(); if (RK.pending) runRK(); }
+    chunk();
+  }
+  function drawRK() {
+    if (!RK.res || $("pane-risk").hidden) return; const th = col(), R = RK.res, n = R.accQ.length, step = Math.max(1, Math.floor(n / 300)), xs = [], yq = [], yp = [];
+    for (let i = 0; i < n; i += step) { xs.push(i + 1); yq.push(R.accQ[i]); yp.push(R.accP[i]); }
+    const mx = Math.max(R.accQ[n - 1], R.accP[n - 1]) * 1.08;
+    xyChart($("rkChart"), { h: 280, xmin: 0, xmax: n, ymin: 0, ymax: mx, yticks: [0, Math.round(mx / 3), Math.round(2 * mx / 3), Math.round(mx)], fmtY: v => String(Math.round(v)), xticks: [0, R.cm.switchAt, n], xlabel: "실제 걸음 수 →",
+      series: [{ x: xs, y: yq, color: th.gray, width: 2.2, label: "Dyna-Q" }, { x: xs, y: yp, color: th.imag, width: 2.2, label: "Dyna-Q+ (κ = " + R.kap + ")" }],
+      vlines: [{ x: R.cm.switchAt, color: th.neg, label: R.kind === "short" ? "지름길 열림" : "길 막힘" }] });
+    const sw = R.cm.switchAt - 1, gQ = R.accQ[n - 1] - R.accQ[sw], gP = R.accP[n - 1] - R.accP[sw], per = R.cm.total - R.cm.switchAt;
+    $("rkSum").innerHTML = `바뀐 뒤 ${per}걸음 동안 얻은 보상: Dyna-Q <b>${f(gQ, 1)}</b> (목표 1번에 평균 ${f(per / Math.max(gQ, 1e-9), 1)}걸음) · Dyna-Q+ <b class="mb-c-i">${f(gP, 1)}</b> (${f(per / Math.max(gP, 1e-9), 1)}걸음)` +
+      (R.kind === "short" ? ". 지름길로 가면 10걸음, 옛길은 16걸음입니다." : ". 막힌 뒤 새 길은 16걸음입니다.");
+    RL.drawGrid($("rkG1"), R.cm.a, { showValues: false }); RL.drawGrid($("rkG2"), R.cm.b, { showValues: false });
+  }
+  seg("rkMaze", v => { RK.kind = v; runRK(); codeUpdate(); });
+  seg("rkKappa", v => { RK.kappa = +v; runRK(); codeUpdate(); });
+  slider("rkRuns", null, v => { RK.runs = v; });
+  $("rkRun").onclick = runRK;
+
+  /* FrozenLake 표본 모형 */
+  const FL = { env: RL.FrozenLake({ map: "4x4" }), gamma: 0.99, ks: [1, 2, 3, 5, 10, 20, 50, 100, 300], kIdx: 2, seed: 1, curve: null };
+  function VI(P, nS, g) {
+    const V = new Float64Array(nS);
+    for (let it = 0; it < 5000; it++) { let d = 0;
+      for (let s = 0; s < nS; s++) { let b = -Infinity; for (let a = 0; a < 4; a++) { let q = 0; P[s][a].forEach(o => q += o[0] * (o[2] + (o[3] ? 0 : g * V[o[1]]))); if (q > b) b = q; } d = Math.max(d, Math.abs(b - V[s])); V[s] = b; }
+      if (d < 1e-10) break; }
+    const pi = []; for (let s = 0; s < nS; s++) { let bq = -Infinity, ba = 0; for (let a = 0; a < 4; a++) { let q = 0; P[s][a].forEach(o => q += o[0] * (o[2] + (o[3] ? 0 : g * V[o[1]]))); if (q > bq + 1e-12) { bq = q; ba = a; } } pi.push(ba); }
+    return { V, pi };
+  }
+  function evalPol(P, nS, pi, g) { const V = new Float64Array(nS); for (let it = 0; it < 20000; it++) { let d = 0; for (let s = 0; s < nS; s++) { let q = 0; P[s][pi[s]].forEach(o => q += o[0] * (o[2] + (o[3] ? 0 : g * V[o[1]]))); d = Math.max(d, Math.abs(q - V[s])); V[s] = q; } if (d < 1e-11) break; } return V; }
+  function learnModel(env, k, rng) {
+    const P = [];
+    for (let s = 0; s < env.nS; s++) { P.push([]); for (let a = 0; a < 4; a++) {
+      if (env.terminal[s]) { P[s].push([[1, s, 0, true]]); continue; }
+      const cnt = new Map();
+      for (let i = 0; i < k; i++) { env.s = s; const o = env.step(a, rng), key = o.s + "|" + o.r + "|" + (o.done ? 1 : 0); cnt.set(key, (cnt.get(key) || 0) + 1); }
+      P[s].push([...cnt.entries()].map(([key, c]) => { const p = key.split("|"); return [c / k, +p[0], +p[1], p[2] === "1"]; }));
+    } }
+    return P;
+  }
+  const FLopt = VI(FL.env.P, FL.env.nS, FL.gamma);
+  function flCurve() {
+    if (FL.curve) return FL.curve; const R = 30;
+    FL.curve = FL.ks.map(k => { let b = 0, r = 0; for (let i = 0; i < R; i++) { const P = learnModel(FL.env, k, RL.rng(10 + i * 31)), pl = VI(P, 16, FL.gamma); b += pl.V[0] / R; r += evalPol(FL.env.P, 16, pl.pi, FL.gamma)[0] / R; } return { k, b, r }; });
+    return FL.curve;
+  }
+  function drawFL() {
+    if ($("pane-risk").hidden) return; const th = col(), C = flCurve(), xs = C.map((_, i) => i);
+    xyChart($("flChart"), { h: 260, xmin: 0, xmax: C.length - 1, ymin: 0, ymax: 0.8, yticks: [0, 0.2, 0.4, 0.5420, 0.8], fmtY: v => v.toFixed(2), xticks: xs, fmtX: i => String(C[i].k), xlabel: "(s, a)당 표본 수 k →", legend: false,
+      series: [{ x: xs, y: C.map(c => c.b), color: th.imag, pts: true }, { x: xs, y: C.map(c => c.r), color: th.state, pts: true }],
+      hlines: [{ y: 0.5420, color: th.gray, label: "V* = 0.5420", below: true }], vlines: [{ x: FL.kIdx, color: th.act }] });
+    const k = FL.ks[FL.kIdx], P = learnModel(FL.env, k, RL.rng(10 + (FL.seed - 1) * 31)), pl = VI(P, 16, FL.gamma), real = evalPol(FL.env.P, 16, pl.pi, FL.gamma);
+    RL.drawGrid($("flGrid"), FL.env, { V: Array.from(pl.V), policy: pl.pi, fmt: v => v.toFixed(2) });
+    let wrong = 0; for (let s = 0; s < 16; s++) if (!FL.env.terminal[s] && pl.pi[s] !== FLopt.pi[s]) wrong++;
+    $("flStats").innerHTML = `<div class="sk-stat"><b class="mb-c-i">${f(pl.V[0], 3)}</b><span>모형 속 믿음 V̂(시작)</span></div><div class="sk-stat"><b class="mb-c-s">${f(real[0], 3)}</b><span>실제 가치 V<sup>π̂</sup>(시작)</span></div><div class="sk-stat"><b>${wrong}</b><span>최적과 다른 칸 (12칸 중)</span></div>`;
+  }
+  slider("flK", v => String(FL.ks[v]), v => { FL.kIdx = v; drawFL(); });
+  slider("flSeed", null, v => { FL.seed = v; drawFL(); });
+
+  /* ================= 3. World Models ================= */
+  const WMB = {
+    V: { t: "V — 시각 모형 (VAE)", c: "state", d: "64×64×3 화면을 32차원 잠재 벡터 z로 압축합니다. 복원 손실 + KL로 학습하며, 보상과 상관없이 '화면을 요약하는 법'만 배웁니다.", m: "z ~ N(μ(o), σ(o)),  손실 = ‖o − ô‖² + KL(q(z|o) ‖ N(0, I))" },
+    M: { t: "M — 기억·예측 모형 (MDN-RNN)", c: "model", d: "은닉 256개 LSTM이 (z_t, a_t, h_t)를 받아 다음 z_t+1의 분포를 가우시안 5개의 혼합으로 예측합니다. 온도 τ를 올리면 더 불확실한(어려운) 꿈을 꿉니다.", m: "P(z_t+1 | a_t, z_t, h_t) = Σ_k π_k N(μ_k, σ_k² τ)" },
+    C: { t: "C — 컨트롤러 (선형)", c: "act", d: "[z_t, h_t] (32 + 256 = 288차원)를 받아 행동 3개를 내는 선형 함수입니다. 매개변수는 288 × 3 + 3 = 867개뿐이라 기울기 없이 CMA-ES로 찾습니다.", m: "a_t = W_c [z_t ; h_t] + b_c,   |θ_C| = 867" },
+    E: { t: "환경 / 꿈", c: "imag", d: "실제 환경에서 데이터를 모아 V와 M을 학습한 뒤, C는 M이 만든 '꿈' 속에서만 훈련할 수도 있습니다. 꿈에서 배운 정책이 실제에서도 통하려면 M이 그 영역을 잘 알아야 합니다(3번 탭 아래 실험).", m: "꿈: z_t+1 ~ M(z_t, a_t, h_t), 보상·종료도 M이 예측" }
+  };
+  let wmSel = "M";
+  function drawWMSvg() {
+    const th = col(), C = k => th[WMB[k].c] || th.ink;
+    const blk = (k, x, y, w, h, t1, t2) => `<g class="mb-blk" data-k="${k}" tabindex="0" role="button" aria-label="${WMB[k].t}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12" fill="${wmSel === k ? th.bg2 : th.bg}" stroke="${C(k)}" stroke-width="${wmSel === k ? 3.2 : 2}"/><text x="${x + w / 2}" y="${y + 26}" text-anchor="middle" font-size="15" font-weight="800" fill="${C(k)}">${t1}</text><text x="${x + w / 2}" y="${y + 46}" text-anchor="middle" font-size="11.5" fill="${th.muted}">${t2}</text></g>`;
+    const ar = (d, c, dash) => `<path d="${d}" fill="none" stroke="${c}" stroke-width="2" ${dash ? 'stroke-dasharray="5 4"' : ""} marker-end="url(#wmAh)"/>`;
+    const lab = (x, y, t, c) => `<text x="${x}" y="${y}" text-anchor="middle" font-size="12" font-weight="700" fill="${c}">${t}</text>`;
+    $("wmSvg").innerHTML = `<defs><marker id="wmAh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${th.muted}"/></marker></defs>` +
+      `<rect x="14" y="40" width="88" height="88" rx="6" fill="${th.bg2}" stroke="${th.lineStrong}"/><text x="58" y="88" text-anchor="middle" font-size="12" fill="${th.muted}">화면 o_t</text><text x="58" y="148" text-anchor="middle" font-size="11.5" fill="${th.muted}">64×64×3</text>` +
+      blk("V", 130, 52, 120, 64, "V (VAE)", "인코더") + blk("M", 300, 52, 140, 64, "M (MDN-RNN)", "LSTM 256 · 혼합 5") + blk("C", 486, 52, 132, 64, "C (선형)", "867개 매개변수") +
+      ar("M102 84 L128 84", th.muted) + ar("M250 84 L298 84", th.state) + lab(274, 46, "z_t (32)", th.state) +
+      ar("M440 84 L484 84", th.model) + lab(462, 46, "h_t", th.model) +
+      `<path d="M250 100 C 300 150 440 150 484 104" fill="none" stroke="${th.state}" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#wmAh)"/>` + lab(370, 150, "z_t도 C로", th.state) +
+      blk("E", 240, 196, 200, 64, "환경 (또는 꿈)", "실제 화면 / M이 만든 다음 z") +
+      ar("M552 116 C 552 200 470 228 442 228", th.act) + lab(560, 180, "a_t", th.act) +
+      ar("M240 228 C 120 228 58 200 58 152", th.state, false) + lab(140, 214, "다음 화면", th.state) +
+      `<path d="M440 210 C 470 170 420 140 400 118" fill="none" stroke="${th.imag}" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#wmAh)"/>` + lab(470, 160, "꿈: M이 대신", th.imag) +
+      lab(320, 20, "보는 것(V) → 기억·예측(M) → 행동(C)", th.text);
+    $("wmSvg").querySelectorAll(".mb-blk").forEach(el => { const go = () => { wmSel = el.dataset.k; drawWMSvg(); drawWMInfo(); };
+      el.addEventListener("click", go); el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } }); });
+  }
+  function drawWMInfo() { const b = WMB[wmSel]; $("wmInfo").innerHTML = `<h3>${b.t}</h3><p>${b.d}</p><div class="sk-formula">${b.m}</div>`; }
+
+  const WM = { range: "wide", N: 1500, models: null, data: null, loss: null, busy: false, th0: 3, td0: 0, act: "pump", H: 100, t: 0 };
+  const DT = 0.05;
+  function wrapA(x) { return RL.Pendulum.angleNorm(x); }
+  function realStep(pend, th, td, u) { pend.th = th; pend.thd = td; pend.t = 0; pend.step(u); return [pend.th, pend.thd]; }
+  function feat(th, td, u) { return [Math.cos(th), Math.sin(th), td / 8, u / 2]; }
+  function genData(range, N, seed) {
+    const rng = RL.rng(seed), pend = new RL.Pendulum(RL.rng(seed + 1)), X = [], Y = [], pts = [];
+    while (X.length < N) {
+      let th, td, L;
+      if (range === "wide") { th = rng.uniform(-Math.PI, Math.PI); td = rng.uniform(-6, 6); L = 10; }
+      else { th = Math.PI + rng.uniform(-0.6, 0.6); td = rng.uniform(-1, 1); L = 25; }
+      for (let i = 0; i < L && X.length < N; i++) { const u = rng.uniform(-2, 2), n = realStep(pend, th, td, u);
+        X.push(feat(th, td, u)); Y.push([(n[0] - th) / 0.4, (n[1] - td)]); pts.push([wrapA(th), td]); th = n[0]; td = n[1]; }
+    }
+    return { X, Y, pts };
+  }
+  function trainWM() {
+    if (WM.busy) { WM.pending = true; return; } WM.busy = true; WM.pending = false; $("wmTrain").disabled = true;
+    const data = genData(WM.range, WM.N, 5 + (WM.range === "wide" ? 0 : 100)), K = 3, IT = 1200, B = 32;
+    const models = [], opts = [], loss = [[], [], []];
+    for (let m = 0; m < K; m++) { const net = new RL.MLP([4, 32, 32, 2], { act: "tanh", rng: RL.rng(300 + m * 17) }); models.push(net); opts.push(new RL.Adam(net, { lr: 0.003 })); }
+    const rng = RL.rng(909); let m = 0, it = 0, run = 0;
+    function chunk() { const t0 = performance.now();
+      while (m < K && performance.now() - t0 < 35) {
+        const net = models[m], opt = opts[m]; let L = 0;
+        for (let b = 0; b < B; b++) { const i = rng.int(data.X.length), fw = net.forward(data.X[i]), y = fw.y, t = data.Y[i];
+          const d = [y[0] - t[0], y[1] - t[1]]; L += (d[0] * d[0] + d[1] * d[1]) / 2; net.backward(fw.cache, d); }
+        opt.step(1 / B); run = it === 0 ? L / B : 0.96 * run + 0.04 * (L / B); it++;
+        if (it % 20 === 0) loss[m].push(run);
+        if (it >= IT) { m++; it = 0; run = 0; }
+      }
+      $("wmProg").textContent = m < K ? `모형 ${m + 1}/3 학습 중 · ${it}/${IT}` : "완료 · 전이 " + data.X.length + "개";
+      if (m < K) { setTimeout(chunk, 0); return; }
+      WM.models = models; WM.data = data; WM.loss = loss; WM.busy = false; $("wmTrain").disabled = false; WM.errCurve = null;
+      if (WM.pending) { trainWM(); return; }
+      drawWM();
+    }
+    chunk();
+  }
+  function modelStep(net, th, td, u) { const y = net.predict(feat(th, td, u)); return [th + 0.4 * y[0], td + y[1]]; }
+  function actFn(kind, t, td, rng) { if (kind === "pump") return td >= 0 ? 2 : -2; if (kind === "sine") return 2 * Math.sin(t / 7); return rng.uniform(-2, 2); }
+  function rollouts() {
+    const H = WM.H, pend = new RL.Pendulum(RL.rng(3)), rngA = RL.rng(55);
+    const us = []; for (let t = 0; t < H; t++) us.push(rngA.uniform(-2, 2));
+    const real = [[WM.th0, WM.td0]]; let th = WM.th0, td = WM.td0;
+    for (let t = 0; t < H; t++) { const u = WM.act === "rand" ? us[t] : actFn(WM.act, t, td); const n = realStep(pend, th, td, u); th = n[0]; td = n[1]; real.push([th, td]); }
+    const imag = WM.models.map(net => { const out = [[WM.th0, WM.td0]]; let a = WM.th0, b = WM.td0;
+      for (let t = 0; t < H; t++) { const u = WM.act === "rand" ? us[t] : actFn(WM.act, t, b); const n = modelStep(net, a, b, u); a = n[0]; b = n[1]; out.push([a, b]); } return out; });
+    return { real, imag };
+  }
+  function errCurve() {
+    if (WM.errCurve) return WM.errCurve;
+    const H = 60, R = 40, rng = RL.rng(808), pend = new RL.Pendulum(RL.rng(9)), err = new Array(H + 1).fill(0), dis = new Array(H + 1).fill(0);
+    for (let r = 0; r < R; r++) {
+      let th = rng.uniform(-Math.PI, Math.PI), td = rng.uniform(-3, 3); const st = WM.models.map(() => [th, td]);
+      for (let t = 1; t <= H; t++) { const u = rng.uniform(-2, 2); const n = realStep(pend, th, td, u); th = n[0]; td = n[1];
+        WM.models.forEach((net, k) => { st[k] = modelStep(net, st[k][0], st[k][1], u); });
+        err[t] += Math.abs(wrapA(st[0][0] - th)) / R;
+        const c = st.map(s => [Math.cos(s[0]), Math.sin(s[0])]), mc = [c.reduce((a, b) => a + b[0], 0) / 3, c.reduce((a, b) => a + b[1], 0) / 3];
+        dis[t] += Math.sqrt(c.reduce((a, b) => a + (b[0] - mc[0]) ** 2 + (b[1] - mc[1]) ** 2, 0) / 3) / R; }
+    }
+    WM.errCurve = { err, dis }; return WM.errCurve;
+  }
+  function drawWM() {
+    if ($("pane-wm").hidden) return; const th = col();
+    drawWMSvg(); drawWMInfo();
+    if (!WM.models) { if (!WM.busy) trainWM(); return; }
+    /* 손실 */
+    const L = WM.loss, n = L[0].length, xs = L[0].map((_, i) => (i + 1) * 20), mx = Math.max(...L.map(a => Math.max(...a.slice(2)))) * 1.1;
+    xyChart($("wmLoss"), { h: 200, xmin: 0, xmax: xs[n - 1], ymin: 0, ymax: mx, yticks: [0, mx / 2, mx], fmtY: v => v.toFixed(3), xticks: [0, xs[n - 1]], xlabel: "갱신 횟수 →",
+      series: L.map((a, k) => ({ x: xs, y: a, color: [th.imag, th.val, th.td][k], width: 1.8, label: "모형 " + (k + 1) })) });
+    /* 데이터 분포 */
+    const F = fit($("wmData"), 200), g = F.g, W = F.w, H = F.h, pl = 40, pb = 24, X = a => pl + (W - pl - 10) * (a + Math.PI) / (2 * Math.PI), Y = v => 8 + (H - 8 - pb) * (1 - (v + 8) / 16);
+    g.strokeStyle = th.lineStrong; g.strokeRect(pl, 8, W - pl - 10, H - 8 - pb);
+    g.fillStyle = th.state; g.globalAlpha = 0.35; WM.data.pts.forEach(p => { g.fillRect(X(p[0]) - 1, Y(p[1]) - 1, 2, 2); }); g.globalAlpha = 1;
+    const R = rollouts(); g.strokeStyle = th.act; g.lineWidth = 1.5; g.beginPath(); R.real.forEach((p, i) => { const x = X(wrapA(p[0])), y = Y(Math.max(-8, Math.min(8, p[1]))); if (i && Math.abs(wrapA(p[0]) - wrapA(R.real[i - 1][0])) < 3) g.lineTo(x, y); else g.moveTo(x, y); }); g.stroke();
+    g.fillStyle = th.faint; g.font = "11px " + MONO(); g.textAlign = "center"; [["−π", -Math.PI], ["0 (위)", 0], ["π", Math.PI]].forEach(([t, v]) => g.fillText(t, X(v), H - 8)); g.textAlign = "right"; g.fillText("8", pl - 4, Y(8) + 8); g.fillText("−8", pl - 4, Y(-8));
+    g.fillStyle = th.act; g.textAlign = "left"; g.font = "600 11px " + FONT(); g.fillText("주황 = 아래 실제 굴리기 궤적", pl + 6, 22);
+    /* 굴리기 */
+    const Hh = WM.H, ts = []; for (let t = 0; t <= Hh; t++) ts.push(t);
+    const yr = R.real.map(p => Math.cos(p[0])), yi = R.imag.map(a => a.map(p => Math.cos(p[0])));
+    xyChart($("wmRoll"), { h: 260, xmin: 0, xmax: Hh, ymin: -1.1, ymax: 1.1, yticks: [-1, -0.5, 0, 0.5, 1], fmtY: v => f(v, 1), xticks: [0, Math.round(Hh / 2), Hh], xlabel: "걸음 t (Δt = 0.05초) →", ylabel: "끝의 높이 cos θ (+1 위 · −1 아래)", legend: false,
+      series: yi.map((y, k) => ({ x: ts, y, color: th.imag, width: k ? 1.4 : 2.2, alpha: k ? 0.55 : 1 })).concat([{ x: ts, y: yr, color: th.state, width: 2.6 }]),
+      hlines: [{ y: 1, color: th.gray, dash: [2, 4] }, { y: -1, color: th.gray, dash: [2, 4] }], vlines: [{ x: WM.t, color: th.act }] });
+    $("wmT").max = Hh; if (WM.t > Hh) { WM.t = Hh; wmTS.set(Hh); }
+    const t = WM.t;
+    RL.drawPendulum($("wmPR"), R.real[t][0], { w: 240, h: 200, label: "θ = " + f(wrapA(R.real[t][0]), 2) });
+    RL.drawPendulum($("wmPI"), R.imag[0][t][0], { w: 240, h: 200, label: "θ = " + f(wrapA(R.imag[0][t][0]), 2) });
+    const E = errCurve(), es = E.err.map((_, i) => i);
+    const emx = Math.max(0.5, ...E.err, ...E.dis) * 1.1;
+    xyChart($("wmErr"), { h: 200, xmin: 0, xmax: 60, ymin: 0, ymax: emx, yticks: [0, emx / 2, emx], fmtY: v => v.toFixed(2), xticks: [1, 10, 20, 30, 40, 50, 60], xlabel: "굴린 길이 k →", legend: false,
+      series: [{ x: es, y: E.err, color: th.td, width: 2.2 }, { x: es, y: E.dis, color: th.exp, width: 2, dash: [5, 3] }] });
+  }
+  seg("wmRange", v => { WM.range = v; WM.models = null; trainWM(); codeUpdate(); });
+  seg("wmN", v => { WM.N = +v; WM.models = null; trainWM(); codeUpdate(); });
+  $("wmTrain").onclick = () => { WM.models = null; trainWM(); };
+  slider("wmTh0", v => v.toFixed(2), v => { WM.th0 = v; if (WM.models) drawWM(); });
+  slider("wmTd0", v => v.toFixed(2), v => { WM.td0 = v; if (WM.models) drawWM(); });
+  seg("wmAct", v => { WM.act = v; if (WM.models) drawWM(); });
+  slider("wmH", null, v => { WM.H = v; if (WM.models) drawWM(); });
+  const wmTS = slider("wmT", null, v => { WM.t = v; if (WM.models) drawWM(); });
+  let wmTimer = null;
+  function wmStop() { if (wmTimer) { clearInterval(wmTimer); wmTimer = null; $("wmPlay").textContent = "재생"; } }
+  $("wmPlay").onclick = () => { if (wmTimer) { wmStop(); return; } if (!WM.models) return; if (WM.t >= WM.H) WM.t = 0; $("wmPlay").textContent = "멈춤";
+    wmTimer = setInterval(() => { if (WM.t >= WM.H) { wmStop(); return; } WM.t++; wmTS.set(WM.t); drawWM(); }, reduceMotion ? 200 : 50); };
+
+  /* ================= 4. Dreamer ================= */
+  const GC5 = 5, gi5 = (r, c) => r * GC5 + c;
+  const drEnv = new RL.GridEnv({ rows: 5, cols: 5, start: gi5(4, 0), goals: { [gi5(0, 4)]: 1 }, holes: [gi5(2, 2)], holeR: -1, slip: 0.1, maxSteps: 60, name: "작은 격자" });
+  const DR = { H: 10, lam: 0.95, seed: 1, gamma: 0.95, B: 16, iters: 60, realEp: 4, av: 0.2, ap: 0.3, ent: 0.003 };
+  function evalStoch(P, nS, pi, g) { const V = new Float64Array(nS); for (let it = 0; it < 5000; it++) { let d = 0; for (let s = 0; s < nS; s++) { let v = 0; for (let a = 0; a < 4; a++) { if (pi[s][a] < 1e-12) continue; let q = 0; P[s][a].forEach(o => q += o[0] * (o[2] + (o[3] ? 0 : g * V[o[1]]))); v += pi[s][a] * q; } d = Math.max(d, Math.abs(v - V[s])); V[s] = v; } if (d < 1e-10) break; } return V; }
+  const drOpt = VI(drEnv.P, drEnv.nS, DR.gamma).V[drEnv.start];
+  function drNew() {
+    DR.rng = RL.rng(DR.seed); DR.logits = Array.from({ length: drEnv.nS }, () => [0, 0, 0, 0]); DR.V = new Float64Array(drEnv.nS);
+    DR.cnt = Array.from({ length: drEnv.nS * 4 }, () => new Map()); DR.starts = []; DR.round = 0; DR.realEps = 0;
+    DR.hist = [{ e: 0, real: drEval(), critic: 0 }]; DR.imag = []; DR.lastTraj = null; DR.realPaths = [];
+  }
+  const drPol = s => RL.softmax(DR.logits[s]);
+  function drEval() { const pi = DR.logits.map(l => RL.softmax(l)); return evalStoch(drEnv.P, drEnv.nS, pi, DR.gamma)[drEnv.start]; }
+  function drSample(s, a) { const m = DR.cnt[s * 4 + a]; if (!m.size) return { s, r: 0, done: false, unk: true }; let tot = 0; m.forEach(v => tot += v); let x = DR.rng.random() * tot;
+    for (const [k, v] of m) { x -= v; if (x <= 0) { const p = k.split("|"); return { s: +p[0], r: +p[1], done: p[2] === "1" }; } } const p = [...m.keys()][0].split("|"); return { s: +p[0], r: +p[1], done: p[2] === "1" }; }
+  function drRound() {
+    const rng = DR.rng;
+    DR.realPaths = [];
+    for (let e = 0; e < DR.realEp; e++) { let s = drEnv.reset(); const path = [s];
+      for (;;) { const a = rng.choice(drPol(s)), o = drEnv.step(a, rng), key = o.s + "|" + o.r + "|" + (o.done ? 1 : 0), m = DR.cnt[s * 4 + a]; m.set(key, (m.get(key) || 0) + 1); DR.starts.push(s); s = o.s; path.push(s); if (o.done || o.truncated) break; }
+      DR.realPaths.push(path); DR.realEps++; }
+    DR.imag = [];
+    for (let it = 0; it < DR.iters; it++) for (let b = 0; b < DR.B; b++) {
+      let s = DR.starts[rng.int(DR.starts.length)]; if (drEnv.terminal[s]) { if (it === DR.iters - 1 && b === 0) DR.lastTraj = DR.lastTraj || null; continue; }
+      const S = [s], A = [], R = [], D = [];
+      for (let h = 0; h < DR.H; h++) { const a = rng.choice(drPol(s)), o = drSample(s, a); A.push(a); R.push(o.r); D.push(o.done); S.push(o.s); s = o.s; if (o.done) break; }
+      const L = A.length, G = new Array(L), vNext = [];
+      let next = D[L - 1] ? 0 : DR.V[S[L]];
+      for (let t = L - 1; t >= 0; t--) { const boot = D[t] ? 0 : DR.V[S[t + 1]]; vNext[t] = boot; G[t] = R[t] + (D[t] ? 0 : DR.gamma * ((1 - DR.lam) * boot + DR.lam * next)); next = G[t]; }
+      if (it === DR.iters - 1 && (b === 0 || L >= DR.lastTraj.A.length)) DR.lastTraj = { S: S.slice(), A: A.slice(), R: R.slice(), D: D.slice(), G: G.slice(), vNext: vNext.slice() };
+      if (it >= DR.iters - 2 && DR.imag.length < 6) DR.imag.push(S.slice());
+      for (let t = 0; t < L; t++) { const st = S[t], adv = G[t] - DR.V[st]; DR.V[st] += DR.av * (G[t] - DR.V[st]);
+        const p = drPol(st); for (let a = 0; a < 4; a++) DR.logits[st][a] += DR.ap * (adv * ((a === A[t] ? 1 : 0) - p[a]) - DR.ent * p[a] * Math.log(p[a] + 1e-9)); }
+    }
+    DR.round++; DR.hist.push({ e: DR.realEps, real: drEval(), critic: DR.V[drEnv.start] });
+  }
+  function drawDR() {
+    if ($("pane-dreamer").hidden) return; const th = col();
+    drawDRSvg();
+    /* 모형이 본 전이 수 → 칸 강조 */
+    const vis = new Array(drEnv.nS).fill(0); for (let s = 0; s < drEnv.nS; s++) for (let a = 0; a < 4; a++) DR.cnt[s * 4 + a].forEach(v => vis[s] += v);
+    const vm = Math.max(1, ...vis), hl = {}; const pol = DR.logits.map(l => RL.softmax(l));
+    RL.drawGrid($("drGrid"), drEnv, { V: Array.from(DR.V), policy: pol, fmt: v => f(v, 2), heat: false, paths: DR.imag.slice(0, 5).map((p, i) => ({ path: p, color: th.imag, offset: (i - 2) * 3 })), agent: drEnv.start });
+    const cv = $("drGrid"), g = cv.getContext("2d"), dpr = window.devicePixelRatio || 1, cell = cv.clientWidth / 5; g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (let s = 0; s < drEnv.nS; s++) { if (drEnv.terminal[s] || !vis[s]) continue; const r = Math.floor(s / 5), c = s % 5; g.fillStyle = th.model; g.globalAlpha = 0.08 + 0.3 * Math.sqrt(vis[s] / vm); g.fillRect(c * cell + 2, r * cell + 2, cell - 4, 6); g.globalAlpha = 1; }
+    const xs = DR.hist.map(h => h.e);
+    xyChart($("drChart"), { h: 240, xmin: 0, xmax: Math.max(48, xs[xs.length - 1]), ymin: -1, ymax: 1, yticks: [-1, -0.5, 0, 0.5, 1], fmtY: v => f(v, 1), xticks: [0, Math.max(48, xs[xs.length - 1])], xlabel: "사용한 실제 에피소드 수 →", legend: false,
+      series: [{ x: xs, y: DR.hist.map(h => h.real), color: th.state, pts: true, width: 2.2 }, { x: xs, y: DR.hist.map(h => h.critic), color: th.val, dash: [5, 3], pts: true, r: 2.5 }],
+      hlines: [{ y: drOpt, color: th.gray, label: "V* = " + f(drOpt, 3), below: true }] });
+    const last = DR.hist[DR.hist.length - 1];
+    $("drStats").innerHTML = `<div class="sk-stat"><b>${DR.round}</b><span>라운드</span></div><div class="sk-stat"><b>${DR.realEps}</b><span>실제 에피소드</span></div><div class="sk-stat"><b>${DR.round * DR.iters * DR.B}</b><span>상상 궤적 수</span></div><div class="sk-stat"><b class="mb-c-s">${f(last.real, 3)}</b><span>실제 V<sup>π</sup>(시작)</span></div>`;
+    const T = DR.lastTraj;
+    if (!T) { $("drTable").innerHTML = "<tr><td>[한 라운드]를 누르면 상상 궤적의 λ-수익 계산이 나옵니다.</td></tr>"; return; }
+    let rows = ""; for (let t = T.A.length - 1; t >= 0; t--) rows = `<tr><td class="n">${t}</td><td class="n">${T.S[t]}</td><td>${AR[T.A[t]]}</td><td class="n">${T.S[t + 1]}${T.D[t] ? " (끝)" : ""}</td><td class="n">${f(T.R[t], 0)}</td><td class="n">${T.D[t] ? "0 (끝)" : f(T.vNext[t], 3)}</td><td class="n"><b>${f(T.G[t], 3)}</b></td><td class="mb-mini" style="white-space:normal">${f(T.R[t], 0)} + ${DR.gamma}·[${f(1 - DR.lam, 2)}·${T.D[t] ? "0" : f(T.vNext[t], 3)} + ${f(DR.lam, 2)}·${t === T.A.length - 1 ? (T.D[t] ? "0" : f(T.vNext[t], 3)) : f(T.G[t + 1], 3)}]</td></tr>` + rows;
+    $("drTable").innerHTML = "<tr><th>t</th><th>ŝ_t</th><th>a</th><th>ŝ_t+1</th><th>r̂</th><th>v(ŝ_t+1)</th><th>V<sup>λ</sup><sub>t</sub></th><th>계산</th></tr>" + rows;
+  }
+  function drawDRSvg() {
+    const th = col();
+    const box = (x, y, w, h, c, t1, t2) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" fill="${th.bg}" stroke="${c}" stroke-width="2"/><text x="${x + w / 2}" y="${y + (t2 ? 20 : 26)}" text-anchor="middle" font-size="13" font-weight="700" fill="${c}">${t1}</text>` + (t2 ? `<text x="${x + w / 2}" y="${y + 37}" text-anchor="middle" font-size="11" fill="${th.muted}">${t2}</text>` : "");
+    const ar = (x1, y1, x2, y2, c, dash) => `<path d="M${x1} ${y1} L${x2} ${y2}" stroke="${c}" stroke-width="1.8" ${dash ? 'stroke-dasharray="5 4"' : ""} marker-end="url(#drAh)"/>`;
+    let s = `<defs><marker id="drAh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${th.muted}"/></marker></defs>`;
+    s += `<text x="12" y="20" font-size="12.5" font-weight="800" fill="${th.model}">① 세계 모형 학습 (실제 데이터로)</text>`;
+    for (let i = 0; i < 3; i++) { const x = 30 + i * 130;
+      s += box(x, 34, 92, 46, th.model, "h_" + (i + 1) + ", z_" + (i + 1), "RSSM");
+      s += `<rect x="${x + 16}" y="104" width="60" height="26" rx="6" fill="${th.bg2}" stroke="${th.state}"/><text x="${x + 46}" y="122" text-anchor="middle" font-size="11.5" fill="${th.state}">x_${i + 1}</text>`;
+      s += ar(x + 46, 104, x + 46, 82, th.state);
+      s += `<text x="${x + 46}" y="96" text-anchor="middle" font-size="10.5" fill="${th.muted}">     </text>`;
+      if (i < 2) s += ar(x + 92, 57, x + 128, 57, th.model) + `<text x="${x + 110}" y="50" text-anchor="middle" font-size="10.5" fill="${th.act}">a_${i + 1}</text>`; }
+    s += `<text x="430" y="56" font-size="11.5" fill="${th.muted}">x̂ 복원 · r̂ 보상</text><text x="430" y="72" font-size="11.5" fill="${th.muted}">KL(사후 ‖ 사전)</text>`;
+    s += `<line x1="10" y1="150" x2="630" y2="150" stroke="${th.line}"/>`;
+    s += `<text x="12" y="172" font-size="12.5" font-weight="800" fill="${th.imag}">② 상상 속 학습 (환경 없이 H걸음)</text>`;
+    for (let i = 0; i < 4; i++) { const x = 30 + i * 120;
+      s += box(x, 186, 84, 46, th.imag, "ŝ_" + i, i ? "r̂ · v(ŝ)" : "출발 상태");
+      if (i < 3) s += ar(x + 84, 209, x + 118, 209, th.imag, true) + `<text x="${x + 101}" y="201" text-anchor="middle" font-size="10.5" fill="${th.act}">π</text>`; }
+    s += `<text x="520" y="206" font-size="12" font-weight="700" fill="${th.td}">V^λ 목표</text><text x="520" y="224" font-size="11" fill="${th.muted}">critic: v → V^λ</text><text x="520" y="240" font-size="11" fill="${th.muted}">actor: V^λ ↑</text>`;
+    s += `<text x="300" y="272" text-anchor="middle" font-size="11.5" fill="${th.muted}">상상 궤적의 λ-수익으로 actor와 critic을 함께 학습 (n-step · TD(λ) 페이지의 λ-수익과 같은 식)</text>`;
+    $("drSvg").innerHTML = s;
+  }
+  slider("drH", null, v => { DR.H = v; });
+  slider("drLam", v => v.toFixed(2), v => { DR.lam = v; });
+  slider("drSeed", null, v => { DR.seed = v; drNew(); drawDR(); });
+  $("drReset").onclick = () => { drNew(); drawDR(); };
+  $("drRound").onclick = () => { drRound(); drawDR(); };
+  let drBusy = false;
+  $("drAuto").onclick = () => { if (drBusy) return; drBusy = true; let k = 0; $("drAuto").disabled = true;
+    const go = () => { drRound(); drawDR(); k++; if (k < 12) setTimeout(go, reduceMotion ? 0 : 120); else { drBusy = false; $("drAuto").disabled = false; } }; go(); };
+
+  /* ================= 5. MuZero / MCTS ================= */
+  const mzEnv = new RL.GridEnv({ rows: 5, cols: 5, start: gi5(4, 0), goals: { [gi5(0, 4)]: 1 }, holes: [gi5(1, 3), gi5(2, 1), gi5(3, 3)], holeR: -1, maxSteps: 40, name: "MCTS 격자" });
+  const MZ = { gamma: 0.9, prior: "good", value: "noisy", noise: false, temp: 0, c1: 1.25, c2: 19652, root: null, cur: mzEnv.start, path: [mzEnv.start], lastSim: null, done: false, ret: 0, steps: 0 };
+  const mzV = VI(mzEnv.P, mzEnv.nS, MZ.gamma).V;
+  const mzNoiseV = (() => { const r = RL.rng(2026); return Array.from({ length: mzEnv.nS }, () => r.normal(0, 0.1)); })();
+  function g_dyn(s, a) { const o = mzEnv.P[s][a][0]; return { r: o[2], s: o[1], done: o[3] }; }
+  function qStar(s, a) { const o = g_dyn(s, a); return o.r + (o.done ? 0 : MZ.gamma * mzV[o.s]); }
+  function f_pred(s) {
+    let logits = [0, 0, 0, 0];
+    if (MZ.prior === "good") logits = [0, 1, 2, 3].map(a => qStar(s, a) / 0.08);
+    if (MZ.prior === "bad") logits = [0, 1, 2, 3].map(a => -qStar(s, a) / 0.08);
+    const p = RL.softmax(logits);
+    const v = MZ.value === "zero" ? 0 : MZ.value === "exact" ? mzV[s] : Math.max(-1, Math.min(1, mzV[s] + mzNoiseV[s]));
+    return { p, v };
+  }
+  const Node = P => ({ P, N: 0, W: 0, kids: null, r: 0, s: -1, term: false });
+  function MinMax() { return { lo: Infinity, hi: -Infinity, upd(v) { if (v < this.lo) this.lo = v; if (v > this.hi) this.hi = v; }, norm(v) { return this.hi > this.lo ? (v - this.lo) / (this.hi - this.lo) : v; } }; }
+  function expand(node, s) { const o = f_pred(s); node.s = s; node.kids = o.p.map(p => Node(p)); node.v = o.v; return o.v; }
+  function ucbParts(par, ch) {
+    const pb = (Math.log((par.N + MZ.c2 + 1) / MZ.c2) + MZ.c1) * Math.sqrt(par.N) / (ch.N + 1);
+    const qraw = ch.N > 0 ? ch.r + MZ.gamma * ch.W / ch.N : null, q = qraw == null ? 0 : MZ.mm.norm(qraw);
+    return { u: ch.P * pb, q, qraw, score: q + ch.P * pb, pb };
+  }
+  function mzNewRoot() {
+    MZ.root = Node(1); MZ.mm = MinMax(); expand(MZ.root, MZ.cur); MZ.lastSim = null; MZ.simCount = 0;
+    if (MZ.noise) { const r = RL.rng(31 + MZ.steps), d = [0, 1, 2, 3].map(() => r.gamma(0.3)), sd = d.reduce((a, b) => a + b, 0); MZ.root.kids.forEach((k, i) => k.P = 0.75 * k.P + 0.25 * d[i] / sd); }
+  }
+  function mzSim() {
+    const root = MZ.root; let node = root; const path = [root], acts = [], sel = [];
+    while (node.kids) {
+      let best = -Infinity, ba = 0, parts = null;
+      node.kids.forEach((ch, a) => { const u = ucbParts(node, ch); if (u.score > best + 1e-12) { best = u.score; ba = a; parts = u; } });
+      if (node === root) sel.push({ a: ba, parts, N: node.N });
+      acts.push(ba); node = node.kids[ba]; path.push(node);
+    }
+    const par = path[path.length - 2], tr = g_dyn(par.s, acts[acts.length - 1]);
+    node.r = tr.r; let v;
+    if (tr.done) { node.s = tr.s; node.term = true; v = 0; } else v = expand(node, tr.s);
+    for (let i = path.length - 1; i >= 0; i--) { const nd = path[i]; nd.W += v; nd.N++; if (i > 0) MZ.mm.upd(nd.r + MZ.gamma * nd.W / nd.N); v = nd.r + MZ.gamma * v; }
+    MZ.simCount++;
+    const states = [root.s]; let nd2 = root; acts.forEach(a => { nd2 = nd2.kids ? nd2.kids[a] : nd2; states.push(nd2.s); });
+    MZ.lastSim = { acts, states, sel: sel[0], leafR: tr.r, leafDone: tr.done };
+  }
+  function rootPolicy() {
+    const N = MZ.root.kids.map(k => k.N), tot = N.reduce((a, b) => a + b, 0);
+    if (!tot) return [0.25, 0.25, 0.25, 0.25];
+    if (MZ.temp === 0) { const m = Math.max(...N), idx = N.map((n, i) => n === m ? i : -1).filter(i => i >= 0); return N.map((n, i) => idx.indexOf(i) >= 0 ? 1 / idx.length : 0); }
+    const e = N.map(n => Math.pow(n, 1 / MZ.temp)), s = e.reduce((a, b) => a + b, 0); return e.map(x => x / s);
+  }
+  function mzAct() {
+    if (MZ.done) return; if (!MZ.root.N) for (let i = 0; i < 50; i++) mzSim();
+    const pi = rootPolicy(), a = MZ.temp === 0 ? pi.indexOf(Math.max(...pi)) : MZ.rng.choice(pi);
+    const o = g_dyn(MZ.cur, a); MZ.ret += Math.pow(MZ.gamma, MZ.steps) * o.r; MZ.steps++; MZ.cur = o.s; MZ.path.push(o.s);
+    MZ.lastAct = { a, pi };
+    if (o.done || MZ.steps >= 40) MZ.done = true;
+    mzNewRoot();
+  }
+  function mzRestart() { MZ.cur = mzEnv.start; MZ.path = [MZ.cur]; MZ.done = false; MZ.ret = 0; MZ.steps = 0; MZ.rng = RL.rng(77); MZ.lastAct = null; mzNewRoot(); }
+  function drawMZSvg() {
+    const th = col();
+    const box = (x, y, w, h, c, t1, t2) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" fill="${th.bg}" stroke="${c}" stroke-width="2"/><text x="${x + w / 2}" y="${y + (t2 ? 20 : 27)}" text-anchor="middle" font-size="13" font-weight="700" fill="${c}">${t1}</text>` + (t2 ? `<text x="${x + w / 2}" y="${y + 37}" text-anchor="middle" font-size="11" fill="${th.muted}">${t2}</text>` : "");
+    const ar = (x1, y1, x2, y2, c) => `<path d="M${x1} ${y1} L${x2} ${y2}" stroke="${c}" stroke-width="1.8" marker-end="url(#mzAh)"/>`;
+    let s = `<defs><marker id="mzAh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${th.muted}"/></marker></defs>`;
+    s += box(10, 100, 70, 44, th.state, "o_1..t", "관측") + ar(80, 122, 104, 122, th.state);
+    s += box(106, 100, 54, 44, th.state, "h", "표현") + ar(160, 122, 184, 122, th.state);
+    for (let k = 0; k < 3; k++) { const x = 186 + k * 150;
+      s += `<circle cx="${x + 24}" cy="122" r="24" fill="${th.bg2}" stroke="${th.model}" stroke-width="2"/><text x="${x + 24}" y="127" text-anchor="middle" font-size="13" font-weight="700" fill="${th.model}">s${["⁰", "¹", "²"][k]}</text>`;
+      s += ar(x + 24, 98, x + 24, 66, th.val) + box(x - 4, 18, 56, 46, th.val, "f", "p" + ["⁰", "¹", "²"][k] + ", v" + ["⁰", "¹", "²"][k]);
+      if (k < 2) { s += ar(x + 48, 122, x + 82, 122, th.model) + box(x + 84, 100, 40, 44, th.model, "g", "") + ar(x + 124, 122, x + 148, 122, th.model);
+        s += `<text x="${x + 104}" y="166" text-anchor="middle" font-size="11.5" font-weight="700" fill="${th.act}">a${["¹", "²"][k]} ↑</text><text x="${x + 104}" y="186" text-anchor="middle" font-size="11.5" font-weight="700" fill="${th.rew}">r${["¹", "²"][k]} ↓</text>`; } }
+    s += `<text x="320" y="226" text-anchor="middle" font-size="12" fill="${th.muted}">MCTS는 실제 환경 대신 g를 따라 은닉 상태 위에서 미래를 펼쳐 본다 (화면 복원 없음)</text>`;
+    s += `<text x="320" y="246" text-anchor="middle" font-size="12" fill="${th.muted}">학습: K걸음 펼쳐 (r, v, p) 예측을 (실제 보상, n-step 수익, 방문 비율)에 맞춤</text>`;
+    $("mzSvg").innerHTML = s;
+  }
+  function drawMZ() {
+    if ($("pane-muzero").hidden) return; const th = col(), root = MZ.root;
+    drawMZSvg();
+    const L = MZ.lastSim;
+    RL.drawGrid($("mzGrid"), mzEnv, { V: Array.from(f_vals()), fmt: v => f(v, 2), heat: false, paths: [{ path: MZ.path, color: th.act }].concat(L ? [{ path: L.states, color: th.imag, offset: 4 }] : []), agent: MZ.cur });
+    /* 트리 */
+    const W0 = 640, tot = Math.max(1, root.N), rr = n => n ? 6 + 13 * Math.sqrt(n / tot) : 5;
+    let s = "";
+    const rx = W0 / 2, ry = 28, cx = i => 80 + i * 160, gx = (i, j) => 80 + i * 160 - 60 + j * 40;
+    const onPath = (lvl, i, j) => L && L.acts[0] === i && (lvl === 1 || L.acts[1] === j);
+    const fillOf = nd => nd.term ? (nd.r > 0 ? th.goal : th.cliff) : (nd.N ? th.bg2 : th.bg);
+    root.kids.forEach((ch, i) => {
+      s += `<line x1="${rx}" y1="${ry}" x2="${cx(i)}" y2="104" stroke="${onPath(1, i) ? th.imag : th.lineStrong}" stroke-width="${onPath(1, i) ? 3 : 1.4}"/>`;
+      if (ch.kids) ch.kids.forEach((gc, j) => { s += `<line x1="${cx(i)}" y1="104" x2="${gx(i, j)}" y2="186" stroke="${onPath(2, i, j) && L.acts.length > 1 ? th.imag : th.line}" stroke-width="${onPath(2, i, j) && L.acts.length > 1 ? 3 : 1.2}"/>`; });
+    });
+    root.kids.forEach((ch, i) => {
+      if (ch.kids) ch.kids.forEach((gc, j) => { s += `<circle cx="${gx(i, j)}" cy="186" r="${rr(gc.N)}" fill="${fillOf(gc)}" stroke="${gc.N ? th.val : th.line}" stroke-width="1.6"/>`;
+        s += `<text x="${gx(i, j)}" y="${186 + rr(gc.N) + 12}" text-anchor="middle" font-size="10.5" fill="${th.muted}">${AR[j]}${gc.N ? " " + gc.N : ""}</text>`; });
+      s += `<circle cx="${cx(i)}" cy="104" r="${rr(ch.N)}" fill="${fillOf(ch)}" stroke="${ch.N ? th.val : th.line}" stroke-width="2"/>`;
+      s += `<text x="${cx(i)}" y="108" text-anchor="middle" font-size="12" font-weight="700" fill="${th.ink}">${ch.N || ""}</text>`;
+      s += `<text x="${cx(i) - rr(ch.N) - 6}" y="86" text-anchor="end" font-size="13" font-weight="800" fill="${th.act}">${AR[i]}</text>`;
+    });
+    s += `<circle cx="${rx}" cy="${ry}" r="16" fill="${th.state}"/><text x="${rx}" y="${ry + 4}" text-anchor="middle" font-size="11.5" font-weight="700" fill="${th.bg}">${root.N}</text><text x="${rx + 24}" y="${ry + 5}" font-size="12" fill="${th.muted}">뿌리 s⁰ = 칸 ${root.s}</text>`;
+    $("mzTree").innerHTML = s;
+    /* 표 */
+    const pi = rootPolicy(), tot2 = root.kids.reduce((a, k) => a + k.N, 0);
+    $("mzTable").innerHTML = "<tr><th>행동</th><th>사전확률 P</th><th>방문 N</th><th>Q = r + γ·W/N</th><th>정규화 Q̄</th><th>탐험항 U</th><th>점수 Q̄ + U</th><th>정책 π (T = " + MZ.temp + ")</th><th>참고: Q*</th></tr>" +
+      root.kids.map((ch, a) => { const u = ucbParts(root, ch); const hl = L && L.sel && L.sel.a === a ? ' class="n hl"' : ' class="n"';
+        return `<tr><td>${AR[a]} ${RL.ACTION_NAMES[a]}</td><td class="n">${f(ch.P, 3)}</td><td class="n">${ch.N}</td><td class="n">${u.qraw == null ? "—" : f(u.qraw, 3)}</td><td class="n">${u.qraw == null ? "0 (미방문)" : f(u.q, 3)}</td><td class="n">${f(u.u, 3)}</td><td${hl}>${f(u.score, 3)}</td><td class="n">${f(pi[a], 3)}</td><td class="n">${f(qStar(root.s, a), 3)}</td></tr>`; }).join("");
+    let t = `pUCT(s, a) = Q̄(s, a) + P(s, a) · √N(s) / (1 + N(s, a)) · [c₁ + ln((N(s) + c₂ + 1) / c₂)],  c₁ = 1.25, c₂ = 19652\n`;
+    if (L && L.sel) { const p = L.sel.parts, a = L.sel.a, ch = root.kids[a];
+      t += `마지막 시뮬레이션의 뿌리 선택 (그때 N(s) = ${L.sel.N}): ${AR[a]} → ${f(p.q, 3)} + ${f(ch.P, 3)} × √${L.sel.N} / (1 + ${ch.N - 1}) × ${f(Math.log((L.sel.N + MZ.c2 + 1) / MZ.c2) + MZ.c1, 4)} = <b>${f(p.score, 3)}</b>\n`;
+      t += `→ ${L.acts.map(x => AR[x]).join(" ")} 로 내려가 잎에서 ${L.leafDone ? (L.leafR > 0 ? "목표(+1, 끝)" : "함정(−1, 끝)") : "g로 (r, s′)를 얻고 f로 (p, v)를 예측"} → 경로를 따라 G = r + γG 로 역전파\n`; }
+    else t += `[시뮬레이션 1회]를 누르면 선택 → 확장 → 역전파가 한 번 일어납니다.\n`;
+    t += `방문 정책 π(a) = N(a)^(1/T) / Σ N^(1/T)  → 학습 때는 이 π가 f의 정책 p의 목표가 됨.  시뮬레이션 ${tot2}회 · min-max Q 범위 [${isFinite(MZ.mm.lo) ? f(MZ.mm.lo, 3) : "—"}, ${isFinite(MZ.mm.hi) ? f(MZ.mm.hi, 3) : "—"}]`;
+    $("mzFormula").innerHTML = t;
+    $("mzStats").innerHTML = `<div class="sk-stat"><b>${MZ.steps}</b><span>실제 걸음</span></div><div class="sk-stat"><b>${f(MZ.ret, 3)}</b><span>할인 수익</span></div><div class="sk-stat"><b>${MZ.done ? (MZ.ret > 0 ? "목표" : MZ.ret < 0 ? "함정" : "40걸음 제한") : "진행 중"}</b><span>상태</span></div>`;
+  }
+  function f_vals() { return Array.from({ length: mzEnv.nS }, (_, s) => mzEnv.terminal[s] ? 0 : f_pred(s).v); }
+  seg("mzPrior", v => { MZ.prior = v; mzRestart(); for (let i = 0; i < 30; i++) mzSim(); drawMZ(); codeUpdate(); });
+  seg("mzValue", v => { MZ.value = v; mzRestart(); for (let i = 0; i < 30; i++) mzSim(); drawMZ(); codeUpdate(); });
+  $("mzNoise").addEventListener("change", e => { MZ.noise = e.target.checked; mzNewRoot(); drawMZ(); });
+  seg("mzTemp", v => { MZ.temp = +v; drawMZ(); });
+  $("mzClear").onclick = () => { mzNewRoot(); drawMZ(); };
+  const mzGuard = () => { if (MZ.done) mzRestart(); };
+  $("mzSim1").onclick = () => { mzGuard(); mzSim(); drawMZ(); };
+  $("mzSim10").onclick = () => { mzGuard(); for (let i = 0; i < 10; i++) mzSim(); drawMZ(); };
+  $("mzSim50").onclick = () => { mzGuard(); for (let i = 0; i < 50; i++) mzSim(); drawMZ(); };
+  $("mzAct").onclick = () => { mzGuard(); mzAct(); drawMZ(); };
+  $("mzRestart").onclick = () => { mzRestart(); drawMZ(); };
+  let mzBusy = false;
+  $("mzEpisode").onclick = () => { if (mzBusy) return; mzRestart(); mzBusy = true;
+    const go = () => { for (let i = 0; i < 50; i++) mzSim(); drawMZ(); setTimeout(() => { mzAct(); drawMZ(); if (!MZ.done) setTimeout(go, reduceMotion ? 0 : 250); else mzBusy = false; }, reduceMotion ? 0 : 250); }; go(); };
+
+  /* ================= 6. 코드 ================= */
+  let codeSel = "dyna";
+  function codeUpdate() {
+    let c = "", note = "";
+    if (codeSel === "dyna") {
+      c = `import numpy as np
+
+# Sutton & Barto 그림 8.2 미로 (6×9), 행동 0↑ 1→ 2↓ 3←
+ROWS, COLS = 6, 9
+WALLS = {(1, 2), (2, 2), (3, 2), (4, 5), (0, 7), (1, 7), (2, 7)}
+START, GOAL = (2, 0), (0, 8)
+MOVES = [(-1, 0), (0, 1), (1, 0), (0, -1)]
+GAMMA, ALPHA, EPS, N_PLAN = 0.95, 0.1, 0.1, ${DY.n}
+KAPPA, PLUS = ${RK.kappa}, False                      # PLUS=True 이면 Dyna-Q+ (보너스 κ√τ)
+rng = np.random.default_rng(0)
+
+def step(s, a):
+    r, c = s[0] + MOVES[a][0], s[1] + MOVES[a][1]
+    if not (0 <= r < ROWS and 0 <= c < COLS) or (r, c) in WALLS:
+        r, c = s                                      # 벽·바깥이면 제자리
+    return (r, c), float((r, c) == GOAL), (r, c) == GOAL
+
+Q = np.zeros((ROWS, COLS, 4))
+model, last_t, t = {}, {}, 0                          # model[(s,a)] = (r, s2, done)
+
+def greedy(s):
+    q = Q[s]; return int(rng.choice(np.flatnonzero(q == q.max())))   # 동점은 무작위
+
+for ep in range(50):
+    s, done, steps = START, False, 0
+    while not done:
+        a = int(rng.integers(4)) if rng.random() < EPS else greedy(s)
+        s2, r, done = step(s, a); t += 1; steps += 1
+        Q[s][a] += ALPHA * (r + (0 if done else GAMMA * Q[s2].max()) - Q[s][a])   # ① 직접 RL
+        model[(s, a)] = (r, s2, done); last_t[(s, a)] = t                          # ② 모형 학습
+        keys = list(model)
+        for _ in range(N_PLAN):                                                    # ③ 계획
+            ps, pa = keys[rng.integers(len(keys))]
+            pr, ps2, pdone = model[(ps, pa)]
+            if PLUS: pr += KAPPA * np.sqrt(t - last_t[(ps, pa)])
+            Q[ps][pa] += ALPHA * (pr + (0 if pdone else GAMMA * Q[ps2].max()) - Q[ps][pa])
+        s = s2
+    print(ep + 1, steps)`;
+      note = "Gymnasium의 격자 환경(FrozenLake, CliffWalking)은 행동 번호가 0←, 1↓, 2→, 3↑ 입니다. 이 사이트의 격자(rl-kit)와 위 코드는 0↑, 1→, 2↓, 3← 순서이니 옮겨 쓸 때 주의하세요. 교재의 Dyna-Q+는 계획 때 아직 해 보지 않은 행동도 (보상 0, 제자리)로 가정해 꺼낼 수 있게 합니다.";
+    } else if (codeSel === "wm") {
+      c = `import numpy as np, torch, torch.nn as nn
+import gymnasium as gym
+
+env = gym.make("Pendulum-v1")
+X, Y = [], []
+obs, _ = env.reset(seed=0)
+for t in range(${WM.N}):                              # 무작위 토크로 전이 ${WM.N}개 수집
+    u = env.action_space.sample()
+    th, thd = np.arctan2(obs[1], obs[0]), obs[2]
+    obs2, r, term, trunc, _ = env.step(u)
+    th2, thd2 = np.arctan2(obs2[1], obs2[0]), obs2[2]
+    dth = (th2 - th + np.pi) % (2 * np.pi) - np.pi
+    X.append([obs[0], obs[1], thd / 8, u[0] / 2]); Y.append([dth / 0.4, thd2 - thd])
+    obs = obs2
+    if term or trunc: obs, _ = env.reset()
+X, Y = torch.tensor(X, dtype=torch.float32), torch.tensor(Y, dtype=torch.float32)
+
+def make():                                           # 작은 동역학 모형 f(s, a) → Δs
+    return nn.Sequential(nn.Linear(4, 32), nn.Tanh(), nn.Linear(32, 32), nn.Tanh(), nn.Linear(32, 2))
+ensemble = [make() for _ in range(3)]                  # 앙상블: 불일치 = 불확실성
+for net in ensemble:
+    opt = torch.optim.Adam(net.parameters(), lr=3e-3)
+    for it in range(1200):
+        idx = torch.randint(len(X), (32,))
+        loss = ((net(X[idx]) - Y[idx]) ** 2).mean()
+        opt.zero_grad(); loss.backward(); opt.step()
+
+@torch.no_grad()
+def imagine(net, th, thd, actions):                   # 상상 굴리기: 자기 예측을 다시 입력으로
+    traj = [th]
+    for u in actions:
+        d = net(torch.tensor([[np.cos(th), np.sin(th), thd / 8, u / 2]], dtype=torch.float32))[0]
+        th, thd = th + 0.4 * d[0].item(), thd + d[1].item()
+        traj.append(th)
+    return np.array(traj)`;
+      note = "World Models 원 논문은 화면을 VAE로 32차원 z로 줄이고, MDN-RNN(LSTM 256, 가우시안 5개 혼합)으로 다음 z의 분포를 예측합니다. 위 코드는 상태를 직접 쓰는 결정적 MLP로 줄인 버전입니다(3번 탭과 같은 설정).";
+    } else {
+      c = `import math, numpy as np
+
+C1, C2, GAMMA = 1.25, 19652, ${MZ.gamma}
+
+class Node:
+    def __init__(self, prior):
+        self.P, self.N, self.W, self.r, self.kids, self.s = prior, 0, 0.0, 0.0, None, None
+    def q(self): return self.r + GAMMA * self.W / self.N if self.N else None
+
+class MinMax:                                          # 트리 안에서 본 Q로 0~1 정규화
+    def __init__(self): self.lo, self.hi = math.inf, -math.inf
+    def update(self, v): self.lo, self.hi = min(self.lo, v), max(self.hi, v)
+    def norm(self, v): return (v - self.lo) / (self.hi - self.lo) if self.hi > self.lo else v
+
+def pucb(parent, child, mm):
+    pb = (math.log((parent.N + C2 + 1) / C2) + C1) * math.sqrt(parent.N) / (child.N + 1)
+    q = mm.norm(child.q()) if child.N else 0.0
+    return q + child.P * pb
+
+def mcts(s0, h, g, f, n_sim=50):                       # h 표현, g 역학, f 예측 (학습된 신경망 자리)
+    root, mm = Node(1.0), MinMax()
+    root.s = h(s0); p, v = f(root.s); root.kids = [Node(pa) for pa in p]
+    for _ in range(n_sim):
+        node, path = root, [root]
+        while node.kids:                                # ① 선택
+            a = max(range(len(node.kids)), key=lambda i: pucb(node, node.kids[i], mm))
+            parent, node = node, node.kids[a]; path.append(node)
+        node.r, node.s = g(parent.s, a)                 # ② 확장: 보상과 다음 은닉 상태
+        p, v = f(node.s); node.kids = [Node(pa) for pa in p]   # 사전확률 "${MZ.prior}" · 가치 "${MZ.value}"
+        for nd in reversed(path):                       # ③ 역전파
+            nd.W += v; nd.N += 1
+            if nd is not root: mm.update(nd.q())
+            v = nd.r + GAMMA * v
+    visits = np.array([k.N for k in root.kids], dtype=float)
+    return visits / visits.sum()                        # 방문 비율 = 행동 정책이자 p의 학습 목표`;
+      note = "MuZero 원 논문의 의사코드와 같은 pUCT 상수(c₁ = 1.25, c₂ = 19652), min-max 정규화, 보상 포함 역전파입니다. 5번 탭에서는 끝(목표·함정)에 닿은 잎을 더 펼치지 않고 가치 0으로 둡니다.";
+    }
+    $("codeOut").textContent = c; $("codeNote").textContent = note;
+  }
+  seg("codeSel", v => { codeSel = v; codeUpdate(); });
+  async function copyText(txt, msgEl) { let ok = false;
+    try { await navigator.clipboard.writeText(txt); ok = true; } catch (e) { ok = false; }
+    if (!ok) { try { const ta = document.createElement("textarea"); ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); ok = document.execCommand("copy"); ta.remove(); } catch (e) { ok = false; } }
+    msgEl.textContent = ok ? "복사했습니다" : "복사하지 못했습니다. 직접 선택해 복사하세요"; setTimeout(() => { msgEl.textContent = ""; }, 2200); }
+  $("codeCopy").onclick = () => copyText($("codeOut").textContent, $("codeMsg"));
+
+  /* ================= 탭 ================= */
+  const tabs = [...document.querySelectorAll(".sk-tab")];
+  const RENDER = {
+    dyna: () => { drawDy(); if (!DC.res && !DC.busy) runDyCurve(); else drawDyCurve(); drawSnaps(); },
+    risk: () => { if (!RK.res && !RK.busy) runRK(); else drawRK(); drawFL(); },
+    wm: drawWM, dreamer: drawDR, muzero: drawMZ, code: codeUpdate, diagram: () => {}
+  };
+  let curTab = "dyna";
+  function show(t) {
+    tabs.forEach(b => { const on = b === t; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1;
+      document.getElementById(b.getAttribute("aria-controls")).hidden = !on; });
+    curTab = t.id.replace("tab-", ""); history.replaceState(null, "", "#" + curTab);
+    if (curTab !== "dyna") dyStop(); if (curTab !== "wm") wmStop();
+    RENDER[curTab] && RENDER[curTab]();
+  }
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => show(b));
+    b.addEventListener("keydown", e => {
+      const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!d) return;
+      const n = tabs[(i + d + tabs.length) % tabs.length]; show(n); n.focus(); e.preventDefault();
+    });
+  });
+  document.addEventListener("keydown", e => {
+    const ae = document.activeElement, tag = ae && ae.tagName;
+    if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || (ae && ae.classList && (ae.classList.contains("sk-tab") || ae.classList.contains("mb-blk")))) return;
+    if (ae && ae.closest && ae.closest(".dgv")) return;
+    if (e.key !== "ArrowRight") return;
+    if (curTab === "dyna") { $("dyNext").click(); e.preventDefault(); }
+    else if (curTab === "muzero") { $("mzSim1").click(); e.preventDefault(); }
+    else if (curTab === "dreamer") { $("drRound").click(); e.preventDefault(); }
+  });
+  function redraw() { const fn = { dyna: () => { drawDy(); drawDyCurve(); drawSnaps(); }, risk: () => { drawRK(); drawFL(); }, wm: () => { if (WM.models) drawWM(); else { drawWMSvg(); drawWMInfo(); } }, dreamer: drawDR, muzero: drawMZ }[curTab]; fn && fn(); }
+  RL.onTheme(redraw);
+  let rsz = null, lastW = window.innerWidth;
+  window.addEventListener("resize", () => { if (window.innerWidth === lastW) return; lastW = window.innerWidth; clearTimeout(rsz); rsz = setTimeout(redraw, 120); });
+
+  dyNew();
+  /* 열자마자 의미 있는 화면: 첫 에피소드를 끝내고 두 번째 에피소드를 10걸음 진행 */
+  while (DY.ep === 1) dyStep();
+  for (let i = 0; i < 10; i++) dyStep();
+  drNew(); for (let i = 0; i < 3; i++) drRound();
+  MZ.rng = RL.rng(77); mzNewRoot(); for (let i = 0; i < 30; i++) mzSim();
+  codeUpdate();
+  const start = document.getElementById("tab-" + location.hash.slice(1));
+  show(start || tabs[0]);
+})();
+</script>
+</body>
+</html>
