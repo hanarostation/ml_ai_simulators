@@ -5,7 +5,7 @@
      1) templates/simulator-template.html 을 복사해
         simulators/<분류 폴더>/<파일명>.html 로 저장하고 내용을 채웁니다.
      2) 아래 SIMULATORS 배열에 항목 하나를 추가합니다.
-        - category : "ml" | "nn" | "cv" | "nlp" | "ts" | "mm"  (CATEGORIES의 id)
+        - category : "ml" | "nn" | "cv" | "nlp" | "ts" | "mm" | "rl"  (CATEGORIES의 id)
         - href     : index.html 기준 상대 경로
         - title / summary / tags : 카드에 보이는 글
         - requires : (선택) TensorFlow.js를 쓰면 "tfjs"
@@ -24,7 +24,9 @@ window.DS_CATEGORIES = [
   { id: "ts",  label: "시계열 분석", en: "Time Series", folder: "simulators/ts/",
     blurb: "추세·계절성 분해부터 ETS·ARIMA·Prophet, 롤링 예측까지 시간 순서가 있는 데이터를 예측하는 과정을 따라갑니다." },
   { id: "mm",  label: "멀티모달", en: "Multi-Modal", folder: "simulators/mm/",
-    blurb: "영상과 문장, 영상과 시간축을 함께 다루는 실제 사례(Case Study)를 모형 구조도와 함께 단계별로 따라갑니다." }
+    blurb: "영상과 문장, 영상과 시간축을 함께 다루는 실제 사례(Case Study)를 모형 구조도와 함께 단계별로 따라갑니다." },
+  { id: "rl",  label: "강화학습", en: "Reinforcement Learning", folder: "simulators/rl/",
+    blurb: "보상을 받으며 시행착오로 배우는 에이전트를 표 기반 고전 RL부터 Deep RL, Actor-Critic, 연속 행동, LLM 정렬까지 단계별로 따라갑니다." }
 ];
 
 window.DS_SIMULATORS = [
@@ -355,5 +357,142 @@ window.DS_SIMULATORS = [
     summary: "VQA-RAD 방사선 영상으로 CLIP 제로샷 분류, 임베딩 코사인 유사도 기반 텍스트→영상·영상→영상 검색, BLIP 캡셔닝·VQA의 원리와 한계를 직접 조작해 봅니다.",
     tags: ["CLIP", "이미지 검색", "BLIP VQA", "VQA-RAD"],
     glyph: "retrieval"
+  },
+
+  /* ---------- 강화학습 (1단계 고전 RL → 5단계 심화 분기 순서) ---------- */
+  {
+    id: "multi-armed-bandit",
+    category: "rl",
+    href: "simulators/rl/multi-armed-bandit.html",
+    title: "Multi-armed Bandit (ε-greedy · UCB · Thompson Sampling)",
+    summary: "성공률을 모르는 치료법(팔) 중 하나를 매번 고르는 문제에서 ε-greedy·UCB·Thompson Sampling이 탐험과 활용의 균형을 잡는 과정을 숫자로 따라가고, 반복 실험의 누적 후회로 비교합니다.",
+    tags: ["1단계 · 고전 RL", "탐험과 활용", "UCB", "Thompson Sampling"],
+    glyph: "rl-bandit"
+  },
+  {
+    id: "dynamic-programming",
+    category: "rl",
+    href: "simulators/rl/dynamic-programming.html",
+    title: "동적 계획법 (Policy Iteration · Value Iteration)",
+    summary: "전이 확률 P와 보상 R을 아는 FrozenLake·GridWorld에서 칸 하나의 벨만 백업부터 정책 반복의 평가⇄개선, 가치 반복의 sweep별 수렴까지 따라가고 γ에 따른 차이를 비교합니다.",
+    tags: ["1단계 · 고전 RL", "벨만 방정식", "정책 반복", "가치 반복"],
+    glyph: "rl-dp"
+  },
+  {
+    id: "monte-carlo",
+    category: "rl",
+    href: "simulators/rl/monte-carlo.html",
+    title: "Monte Carlo 학습",
+    summary: "모델 없이 에피소드를 끝까지 해 보고 리턴 G의 평균으로 배웁니다. 리턴 역산, 첫 방문·모든 방문 예측, ε-탐욕 MC 제어, 중요도 샘플링을 DP 참값과 비교합니다.",
+    tags: ["1단계 · 고전 RL", "리턴 G", "MC 제어", "중요도 샘플링"],
+    glyph: "rl-mc"
+  },
+  {
+    id: "td-sarsa-q-learning",
+    category: "rl",
+    href: "simulators/rl/td-sarsa-q-learning.html",
+    title: "TD(0) → SARSA → Q-learning",
+    summary: "한 걸음마다 갱신하는 부트스트래핑을 숫자로 따라가고, on-policy SARSA와 off-policy Q-learning을 CliffWalking에서 나란히 학습시켜 안전한 길과 절벽 끝 길을 비교합니다.",
+    tags: ["1단계 · 고전 RL", "TD 오차", "SARSA · Q-learning", "CliffWalking"],
+    glyph: "rl-td"
+  },
+  {
+    id: "n-step-td-lambda",
+    category: "rl",
+    href: "simulators/rl/n-step-td-lambda.html",
+    title: "n-step TD · TD(λ)",
+    summary: "n-step 수익을 한 항씩 쌓고, 19-상태 랜덤 워크로 n과 λ의 효과를 비교합니다. λ-수익 가중치, 적격 흔적(누적/교체), 전방=후방 동등성, SARSA(λ)를 직접 계산합니다.",
+    tags: ["1단계 · 고전 RL", "n-step TD", "TD(λ)", "적격 흔적"],
+    glyph: "rl-nstep"
+  },
+  {
+    id: "dqn",
+    category: "rl",
+    href: "simulators/rl/dqn.html",
+    title: "DQN (Deep Q-Network)",
+    summary: "브라우저에서 CartPole을 실제 DQN으로 학습시키고 미니배치 한 번의 타깃·TD 오차·Huber 손실을 숫자로 따라갑니다. 경험 재생과 타깃망을 빼면 Q가 발산하는 모습을 같은 seed로 비교합니다.",
+    tags: ["2단계 · 가치 기반 Deep RL", "경험 재생", "타깃 네트워크", "CartPole · Atari"],
+    glyph: "rl-dqn"
+  },
+  {
+    id: "dqn-variants",
+    category: "rl",
+    href: "simulators/rl/dqn-variants.html",
+    title: "DQN 개선판 (Double · Dueling · PER · Rainbow)",
+    summary: "과대추정 편향, V·A 분해, 우선순위 추출과 합 트리, C51 분포 투영을 계산해 보고, DQN·Double·Dueling·PER을 CartPole에서 직접 학습시켜 비교합니다.",
+    tags: ["2단계 · 가치 기반 Deep RL", "Double · Dueling", "PER", "Rainbow"],
+    glyph: "rl-dqnv"
+  },
+  {
+    id: "reinforce",
+    category: "rl",
+    href: "simulators/rl/reinforce.html",
+    title: "REINFORCE (정책 경사 · baseline)",
+    summary: "softmax 정책의 ∇log π와 정책 경사 정리를 숫자로 유도하고, CartPole을 학습하며 baseline 없음·평균 리턴·가치 V(s)의 기울기 분산과 학습 곡선을 같은 seed로 비교합니다.",
+    tags: ["3단계 · 정책 기반 · Actor-Critic", "정책 경사", "baseline", "CartPole"],
+    glyph: "rl-reinforce"
+  },
+  {
+    id: "actor-critic",
+    category: "rl",
+    href: "simulators/rl/actor-critic.html",
+    title: "Actor-Critic · A2C/A3C · GAE",
+    summary: "TD 오차로 Advantage를 추정하는 Actor-Critic을 한 걸음씩 따라가고, 병렬 A2C·비동기 A3C로 CartPole을 학습하며 GAE의 λ에 따른 편향–분산과 엔트로피 보너스를 확인합니다.",
+    tags: ["3단계 · 정책 기반 · Actor-Critic", "Advantage", "A2C/A3C", "GAE"],
+    glyph: "rl-ac"
+  },
+  {
+    id: "trpo-ppo",
+    category: "rl",
+    href: "simulators/rl/trpo-ppo.html",
+    title: "TRPO → PPO (정책 업데이트 폭 제한)",
+    summary: "큰 정책 경사 걸음이 성능을 무너뜨리는 이유부터 중요도 비율, TRPO의 KL 신뢰 영역, PPO 클리핑까지 따라가고, CartPole을 PPO로 학습시키며 approx KL·clip fraction·엔트로피를 관찰합니다. RLHF와의 연결도 미니 예제로 돌려 봅니다.",
+    tags: ["3단계 · 정책 기반 · Actor-Critic", "PPO", "TRPO · KL 신뢰 영역", "RLHF"],
+    glyph: "rl-ppo"
+  },
+  {
+    id: "ddpg-td3-sac",
+    category: "rl",
+    href: "simulators/rl/ddpg-td3-sac.html",
+    title: "연속 행동 off-policy (DDPG → TD3 → SAC)",
+    summary: "행동이 연속값일 때 쓰는 DDPG의 결정적 정책 기울기, TD3의 세 가지 보완, 실무 기본값인 SAC의 최대 엔트로피·자동 α를 숫자로 따라가고 Pendulum 스윙업을 같은 seed로 학습시켜 비교합니다.",
+    tags: ["4단계 · 연속 행동", "DDPG · TD3", "SAC", "Pendulum"],
+    glyph: "rl-sac"
+  },
+  {
+    id: "model-based-rl",
+    category: "rl",
+    href: "simulators/rl/model-based-rl.html",
+    title: "Model-based RL (Dyna-Q · World Models · Dreamer · MuZero)",
+    summary: "환경 모형을 배워 상상 속에서 계획합니다. Dyna-Q 미로, 모형 오차의 위험, 진자 세계 모형의 상상 굴리기, 표 버전 Dreamer, 실제로 돌아가는 MuZero식 MCTS를 다룹니다.",
+    tags: ["5단계 · 심화 분기", "Dyna-Q", "World Models · Dreamer", "MuZero · MCTS"],
+    glyph: "rl-mbrl"
+  },
+  {
+    id: "offline-rl",
+    category: "rl",
+    href: "simulators/rl/offline-rl.html",
+    title: "Offline RL (CQL · IQL)",
+    summary: "과거 진료 기록만으로 치료 정책을 배우는 오프라인 강화학습. 데이터에 없는 행동의 Q 과대추정(분포 이동)을 보고, CQL의 보수성 벌점과 IQL의 기대분위 회귀가 이를 막는 과정을 숫자로 따라갑니다.",
+    tags: ["5단계 · 심화 분기", "분포 이동", "CQL", "IQL"],
+    glyph: "rl-offline"
+  },
+  {
+    id: "multi-agent-rl",
+    category: "rl",
+    href: "simulators/rl/multi-agent-rl.html",
+    title: "Multi-agent RL (MADDPG · QMIX)",
+    summary: "여러 에이전트가 함께 배울 때의 비정상성, 중앙 학습·분산 실행(CTDE), VDN·QMIX 가치 분해와 MADDPG 중앙 critic을 행렬 게임·협력 격자·입자 과제로 학습시켜 비교합니다.",
+    tags: ["5단계 · 심화 분기", "CTDE", "QMIX", "MADDPG"],
+    glyph: "rl-marl"
+  },
+  {
+    id: "llm-alignment",
+    category: "rl",
+    href: "simulators/rl/llm-alignment.html",
+    title: "LLM 정렬 (RLHF · DPO · GRPO)",
+    summary: "작은 언어 모형을 브라우저에서 직접 학습해 SFT → 보상 모델 → PPO · DPO · GRPO를 비교합니다. 보상 해킹과 KL 계수 β, 그룹 상대 이점, SFT 대비 승률을 숫자로 확인합니다.",
+    tags: ["5단계 · 심화 분기", "RLHF · PPO", "DPO", "GRPO"],
+    glyph: "rl-llm"
   }
 ];
