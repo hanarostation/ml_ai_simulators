@@ -1,0 +1,1690 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>하이퍼파라미터 튜닝 (Grid · Random · Bayesian Search) | ML &amp; AI 모형 시뮬레이터</title>
+<script>try{var t=localStorage.getItem("ds-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../assets/css/site.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/sim-kit.css?v=20261007a">
+<link rel="stylesheet" href="../../assets/css/diagram.css?v=20261007a">
+<style>
+/* ===== 이 시뮬레이터 전용 스타일 (공통 색·글꼴은 assets/css/site.css) ===== */
+/* 역할 색: 격자 탐색 파랑 · 무작위 탐색 주황(샘플링) · 베이즈 최적화 보라(튜닝) · 검증 점수 지도 청록 · 획득 함수 황토 · 최고점 초록 · 한계 빨강 */
+:root{ --sk-accent: var(--cat-ml);
+  --grid:#2563EB; --rand:#EA580C; --bayes:#7C3AED; --val:#0D9488; --acq:#B45309; --ok:#16A34A; --bad:#DC2626; --train:#2563EB;
+  --map0:#F2F5F8; --map1:#BFE6DE; --map2:#5CB8A9; --map3:#138074; --map4:#0B4A44;
+  --sd0:#F6F4FB; --sd1:#CDBFF2; --sd2:#9A7FE6; --sd3:#6A44CF; --sd4:#3F1F96;
+  --acq0:#FBF7EE; --acq1:#F6DDA6; --acq2:#E9AE4A; --acq3:#B7700F; --acq4:#7A4504; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --grid:#6AA5FF; --rand:#FF914D; --bayes:#B294FF; --val:#33D1BD; --acq:#F2C14E; --ok:#4ADE80; --bad:#F87171; --train:#6AA5FF;
+  --map0:#18202B; --map1:#1D4744; --map2:#2A8577; --map3:#4CCAB6; --map4:#B6F2E6;
+  --sd0:#1A1A29; --sd1:#33285E; --sd2:#5B45A8; --sd3:#9A82F0; --sd4:#DCD0FF;
+  --acq0:#1F1B14; --acq1:#4A3612; --acq2:#8A5E14; --acq3:#D9A23A; --acq4:#FBE3A6; } }
+:root[data-theme="dark"]{
+  --grid:#6AA5FF; --rand:#FF914D; --bayes:#B294FF; --val:#33D1BD; --acq:#F2C14E; --ok:#4ADE80; --bad:#F87171; --train:#6AA5FF;
+  --map0:#18202B; --map1:#1D4744; --map2:#2A8577; --map3:#4CCAB6; --map4:#B6F2E6;
+  --sd0:#1A1A29; --sd1:#33285E; --sd2:#5B45A8; --sd3:#9A82F0; --sd4:#DCD0FF;
+  --acq0:#1F1B14; --acq1:#4A3612; --acq2:#8A5E14; --acq3:#D9A23A; --acq4:#FBE3A6; }
+
+.hp-pane{display:flex;flex-direction:column;gap:16px}
+.hp-two{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,1fr);gap:18px;align-items:start}
+.hp-two.even{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:900px){.hp-two,.hp-two.even{grid-template-columns:minmax(0,1fr)}}
+.hp-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.hp-global .sk-controls{gap:10px 20px}
+.hp-global .sk-seg{flex-wrap:wrap}
+.hp-status{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;font-size:13px;color:var(--muted)}
+.hp-prog{width:150px;height:7px;border-radius:4px;background:var(--surface-2);border:1px solid var(--line);overflow:hidden;flex:none}
+.hp-prog i{display:block;height:100%;width:0;background:var(--val);transition:width .15s}
+.hp-map{width:100%;display:block;border-radius:8px;touch-action:manipulation}
+.hp-map.click{cursor:crosshair}
+.hp-legend{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;font-size:12.5px;color:var(--muted);margin-top:6px}
+.hp-ramp{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px}
+.hp-ramp i{display:inline-block;width:86px;height:10px;border-radius:3px;border:1px solid var(--line)}
+.hp-ramp.map i{background:linear-gradient(90deg,var(--map0),var(--map1),var(--map2),var(--map3),var(--map4))}
+.hp-ramp.sd i{background:linear-gradient(90deg,var(--sd0),var(--sd1),var(--sd2),var(--sd3),var(--sd4))}
+.hp-ramp.acq i{background:linear-gradient(90deg,var(--acq0),var(--acq1),var(--acq2),var(--acq3),var(--acq4))}
+.hp-sw{display:inline-block;width:11px;height:11px;margin-right:5px;vertical-align:-1px;border-radius:2px}
+.hp-sw.c{border-radius:50%} .hp-sw.d{transform:rotate(45deg) scale(.82)} .hp-sw.h{background:none!important;border:2px solid currentColor;border-radius:50%}
+.hp-sw.ln{height:3px;width:16px;vertical-align:3px} .hp-sw.dash{height:0;width:16px;border-top:2px dashed currentColor;background:none!important;vertical-align:3px;border-radius:0}
+.t-grid{color:var(--grid)} .t-rand{color:var(--rand)} .t-bayes{color:var(--bayes)} .t-val{color:var(--val)} .t-acq{color:var(--acq)} .t-ok{color:var(--ok)} .t-bad{color:var(--bad)} .t-muted{color:var(--muted)} .t-ink{color:var(--ink)}
+.bg-grid{background:var(--grid)} .bg-rand{background:var(--rand)} .bg-bayes{background:var(--bayes)} .bg-val{background:var(--val)} .bg-acq{background:var(--acq)} .bg-ok{background:var(--ok)} .bg-ink{background:var(--ink)}
+.hp-ctl{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px 18px;align-items:end}
+.hp-ctl .sk-slider{min-width:0}
+.hp-player{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.hp-player .sk-label{margin-left:6px}
+.hp-chart{width:100%;min-width:0}
+.hp-chart svg{display:block;max-width:100%;height:auto}
+.hp-chart .gl{stroke:var(--line);stroke-width:1}
+.hp-chart .fr{fill:none;stroke:var(--line-strong);stroke-width:1}
+.hp-chart .ax{fill:var(--muted);font-size:11px;font-family:var(--mono)}
+.hp-chart .axl{fill:var(--muted);font-size:12px;font-family:var(--sans);font-weight:600}
+.hp-chart .lb{font-size:11.5px;font-family:var(--sans);font-weight:700;paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round}
+.hp-chart .ln{fill:none;stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
+.hp-chart .thin{stroke-width:1.4}
+.hp-chart .dsh{stroke-dasharray:5 4}
+.hp-chart .s-grid{stroke:var(--grid)} .hp-chart .s-rand{stroke:var(--rand)} .hp-chart .s-bayes{stroke:var(--bayes)} .hp-chart .s-true{stroke:var(--muted)} .hp-chart .s-acq{stroke:var(--acq)} .hp-chart .s-ok{stroke:var(--ok)} .hp-chart .s-bad{stroke:var(--bad)} .hp-chart .s-ink{stroke:var(--ink)} .hp-chart .s-val{stroke:var(--val)}
+.hp-chart .f-grid{fill:var(--grid)} .hp-chart .f-rand{fill:var(--rand)} .hp-chart .f-bayes{fill:var(--bayes)} .hp-chart .f-acq{fill:var(--acq)} .hp-chart .f-ok{fill:var(--ok)} .hp-chart .f-bad{fill:var(--bad)} .hp-chart .f-ink{fill:var(--ink)} .hp-chart .f-true{fill:var(--muted)} .hp-chart .f-val{fill:var(--val)} .hp-chart .f-surf{fill:var(--surface)} .hp-chart .f-train{fill:var(--train)}
+.hp-chart .band{opacity:.17;stroke:none}
+.hp-chart .pt{stroke:var(--surface);stroke-width:1.5}
+.hp-folds{display:grid;gap:4px;font-size:12px;font-weight:700;text-align:center}
+.hp-folds span{border-radius:5px;padding:4px 2px;white-space:nowrap;overflow:hidden}
+.hp-folds .tr{background:color-mix(in srgb,var(--train) 16%,var(--surface));color:var(--train)}
+.hp-folds .va{background:var(--val);color:var(--on-ink)}
+.hp-folds .lab{background:none;color:var(--muted);font-weight:600;text-align:right;padding-right:6px}
+.hp-log{max-height:290px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.hp-log .sk-table th{top:0}
+.hp-log tr.best td{font-weight:700;color:var(--ink)}
+.hp-log tr.cur td{background:color-mix(in srgb,var(--sk-accent) 12%,var(--surface))}
+.hp-mini{font-size:13px;color:var(--muted);margin:0}
+.hp-kv2{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:4px 12px;font-size:13.5px;margin:0}
+.hp-kv2 dt{color:var(--muted)} .hp-kv2 dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);text-align:right}
+@media (max-width:520px){.hp-kv2{grid-template-columns:auto 1fr}}
+.hp-step{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--ink)}
+.hp-maps3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:1080px){.hp-maps3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:700px){.hp-maps3{grid-template-columns:minmax(0,1fr)}}
+.hp-maps3 h3,.hp-sub{margin:0 0 4px;font-size:14px;font-weight:700;color:var(--ink)}
+.hp-maps3 h3 small,.hp-sub small{font-weight:600;color:var(--muted);font-size:12px;margin-left:4px}
+.hp-code{margin:0;font-family:var(--mono);font-size:13px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;color:var(--ink);white-space:pre;tab-size:4}
+.hp-code .cm{color:var(--muted)}
+.hp-axisdemo text{font-family:var(--mono);font-size:11px;fill:var(--muted)}
+.hp-axisdemo .tk{stroke:var(--line-strong)} .hp-axisdemo .base{stroke:var(--line-strong);stroke-width:1.2}
+.hp-sel{font-weight:700}
+.sk-stepper li.done{color:var(--muted)}
+.hp-pill{display:inline-block;font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;border:1px solid currentColor;margin-left:6px;vertical-align:1px}
+.hp-big{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--ink)}
+.sk-formula b{color:var(--ink)}
+.hp-small{font-size:12.5px;color:var(--faint)}
+@media (prefers-reduced-motion: reduce){.hp-prog i{transition:none}}
+</style>
+</head>
+<body>
+<a class="ds-skip" href="#main">본문으로 건너뛰기</a>
+
+<!-- ===== 공통 머리글 (로고 → 메인) ===== -->
+<header class="ds-header">
+  <div class="ds-header__inner">
+    <a class="ds-brand" href="../../index.html" aria-label="메인으로">
+      <!-- 로고: 밝은 화면 logo1.png / 어두운 화면 logo2.png -->
+      <img class="ds-brand__logo ds-brand__logo--light" src="../../image/logo1.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-light')">
+      <img class="ds-brand__logo ds-brand__logo--dark" src="../../image/logo2.png" alt="데이터스테이션" onerror="this.setAttribute('data-fail','1');this.closest('.ds-brand').classList.add('no-logo-dark')">
+      <span class="ds-brand__fallback">DATA STATION</span>
+      <span class="ds-brand__sep" aria-hidden="true"></span>
+      <span class="ds-brand__site">ML &amp; AI 모형 시뮬레이터</span>
+    </a>
+    <nav class="ds-nav" aria-label="분류">
+      <a href="../../index.html#ml" style="--c:var(--cat-ml)" aria-current="page">머신러닝</a>
+      <a href="../../index.html#nn" style="--c:var(--cat-nn)">신경망</a>
+      <a href="../../index.html#cv" style="--c:var(--cat-cv)">컴퓨터 비전</a>
+      <a href="../../index.html#nlp" style="--c:var(--cat-nlp)">자연어처리</a>
+      <a href="../../index.html#ts" style="--c:var(--cat-ts)">시계열 분석</a>
+      <a href="../../index.html#mm" style="--c:var(--cat-mm)">멀티모달</a>
+      <a href="../../index.html#rl" style="--c:var(--cat-rl)">강화학습</a>
+      <a class="ds-nav__dg" href="../../diagrams.html">알고리즘 구성도</a>
+    </nav>
+    <button class="ds-theme" type="button" data-ds-theme aria-label="화면 밝기 전환"></button>
+  </div>
+</header>
+
+<!-- ===== 공통 페이지 머리 ===== -->
+<section class="ds-hero">
+  <nav class="ds-crumbs" aria-label="위치">
+    <a href="../../index.html">홈</a><span aria-hidden="true">›</span>
+    <a class="ds-cat" href="../../index.html#ml" style="--c:var(--cat-ml)">머신러닝</a>
+  </nav>
+  <div class="ds-hero__row">
+    <div>
+      <h1 class="ds-hero__title">하이퍼파라미터 튜닝 (Grid · Random · Bayesian Search)</h1>
+      <p class="ds-hero__lede">당뇨 예측 모형(RBF 커널 릿지 분류기)의 C와 γ를 K겹 교차검증 점수로 직접 평가하면서, 격자 탐색 · 무작위 탐색 · 베이즈 최적화(가우스 과정 + 획득 함수)가 같은 평가 예산에서 최적점을 얼마나 빨리 찾는지 비교합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 시뮬레이터 본문 ===== -->
+<main class="sk-wrap" id="main">
+  <section class="sk-card hp-global" aria-label="공통 설정">
+    <div class="sk-controls">
+      <div class="sk-group"><span class="sk-label">목적 함수</span>
+        <div class="sk-seg" id="gObj" role="group" aria-label="목적 함수">
+          <button type="button" data-v="cv" aria-pressed="true">당뇨 · 교차검증</button>
+          <button type="button" data-v="branin" aria-pressed="false">Branin 함수</button>
+          <button type="button" data-v="lowdim" aria-pressed="false">한 축만 중요</button>
+          <button type="button" data-v="bumpy" aria-pressed="false">봉우리 여럿</button>
+        </div>
+      </div>
+      <div class="sk-group" id="gMetricW"><span class="sk-label">점수</span>
+        <div class="sk-seg" id="gMetric" role="group" aria-label="점수 지표">
+          <button type="button" data-v="auc" aria-pressed="true">ROC AUC</button>
+          <button type="button" data-v="acc" aria-pressed="false">정확도</button>
+        </div>
+      </div>
+      <div class="sk-group" id="gKW"><span class="sk-label">K겹</span>
+        <div class="sk-seg" id="gK" role="group" aria-label="교차검증 겹 수">
+          <button type="button" data-v="3" aria-pressed="false">3</button>
+          <button type="button" data-v="5" aria-pressed="true">5</button>
+          <button type="button" data-v="10" aria-pressed="false">10</button>
+        </div>
+      </div>
+    </div>
+    <div class="hp-status"><div class="hp-prog" aria-hidden="true"><i id="mapBar"></i></div><span id="mapStatus" aria-live="polite">점수 지형 준비 중</span></div>
+  </section>
+
+  <nav class="sk-tabs" role="tablist" aria-label="실험 화면">
+    <button type="button" class="sk-tab" role="tab" id="tab-problem" aria-controls="pane-problem" aria-selected="true"><span class="sk-num">1</span>문제 정의</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-grid" aria-controls="pane-grid" aria-selected="false" tabindex="-1"><span class="sk-num">2</span>격자 탐색 (Grid)</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-random" aria-controls="pane-random" aria-selected="false" tabindex="-1"><span class="sk-num">3</span>무작위 탐색 (Random)</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-bayes" aria-controls="pane-bayes" aria-selected="false" tabindex="-1"><span class="sk-num">4</span>베이즈 최적화 (Bayes)</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-compare" aria-controls="pane-compare" aria-selected="false" tabindex="-1"><span class="sk-num">5</span>비교 실험</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-code" aria-controls="pane-code" aria-selected="false" tabindex="-1"><span class="sk-num">6</span>코드</button>
+    <button type="button" class="sk-tab" role="tab" id="tab-diagram" aria-controls="pane-diagram" aria-selected="false" tabindex="-1"><span class="sk-num">7</span>알고리즘 구성도</button>
+  </nav>
+
+  <!-- ============ 1. 문제 정의 ============ -->
+  <section id="pane-problem" class="hp-pane" role="tabpanel" aria-labelledby="tab-problem">
+    <p class="sk-note sk-note--warn" id="pSynth" hidden>합성 함수 모드: 데이터와 모형 없이 함수 값을 바로 점수로 씁니다(평가 비용 ≈ 0). 데이터 · 모형 설명은 [당뇨 · 교차검증]을 기준으로 합니다.</p>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>파라미터 vs 하이퍼파라미터</h2><span class="sk-hint">누가 값을 정하는가</span></div>
+        <div class="sk-scroll"><table class="sk-table">
+          <thead><tr><th>구분</th><th>파라미터 (Parameter)</th><th>하이퍼파라미터 (Hyperparameter)</th></tr></thead>
+          <tbody>
+            <tr><td>정하는 주체</td><td>학습(fit)이 데이터로 계산</td><td>사람(또는 탐색 알고리즘)이 학습 전에 지정</td></tr>
+            <tr><td>이 페이지 모형</td><td>계수 α₁ … αₙ (학습 행 수만큼)</td><td>C (규제 세기의 역수) · γ (RBF 폭)</td></tr>
+            <tr><td>선형/로지스틱</td><td>가중치 w, 절편 b</td><td>규제 C, penalty(l1/l2)</td></tr>
+            <tr><td>결정 트리 · 숲</td><td>분할 변수 · 분할 값</td><td>max_depth, min_samples_leaf, n_estimators</td></tr>
+            <tr><td>신경망</td><td>가중치 · 편향</td><td>학습률, 층 수, 배치 크기, dropout</td></tr>
+            <tr><td>고르는 기준</td><td>학습 손실 최소화</td><td><b>검증 점수</b> 최대화 (교차검증)</td></tr>
+          </tbody></table></div>
+        <p class="sk-note">하이퍼파라미터 튜닝 = <b>검증 점수를 돌려주는 블랙박스 함수 f(C, γ)</b>의 최댓값 찾기. 기울기가 없고, 한 번 계산(평가)할 때마다 모형을 K번 학습해야 하므로 <b>비싸다</b>.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>이 페이지의 모형 — RBF 커널 릿지 분류기</h2><span class="sk-hint">최소제곱 SVM과 같은 식</span></div>
+        <div class="sk-formula">K(x, z) = exp(−γ · ‖x − z‖²)<br>α = (K + I / C)⁻¹ · y ,  y ∈ {−1, +1}<br>f(x) = Σᵢ αᵢ · K(xᵢ, x)  →  f(x) &gt; 0 이면 당뇨로 분류</div>
+        <ul class="hp-mini" style="padding-left:18px;margin:0;display:grid;gap:4px">
+          <li><b class="t-ink">C</b>가 크면 규제가 약해 학습 데이터에 딱 맞춤(과적합 쪽), 작으면 단순해짐.</li>
+          <li><b class="t-ink">γ</b>가 크면 점 하나의 영향 반경이 좁아 경계가 구불구불, 작으면 거의 직선에 가까움.</li>
+          <li>둘 다 <b class="t-ink">10배 단위</b>로 효과가 바뀌므로 로그 눈금(10⁻², 10⁻¹, …)으로 탐색한다.</li>
+        </ul>
+        <div id="alphaBox" class="hp-mini"></div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>데이터와 목적 함수 — K겹 교차검증 점수</h2><span class="sk-hint">seed 고정 생성 · 튜닝용 150명 + 독립 테스트 600명</span></div>
+      <div class="hp-two">
+        <div class="hp-col">
+          <div class="sk-scroll"><table class="sk-table" id="dataTbl"></table></div>
+          <div class="sk-stats" id="dataStats"></div>
+          <div class="sk-controls"><button type="button" class="sk-btn sk-btn--sm" id="csvBtn">튜닝용 150명 CSV 저장</button><span class="hp-small">코드 탭의 예시가 이 파일을 읽습니다.</span></div>
+        </div>
+        <div class="hp-col">
+          <h3 class="hp-sub">목적 함수 = <span class="t-val">K겹 교차검증 평균 점수</span> <small id="foldHint"></small></h3>
+          <div class="hp-folds" id="foldGrid" aria-label="교차검증 폴드 구성"></div>
+          <div class="sk-formula" id="objFormula"></div>
+          <p class="hp-mini">폴드마다 <b class="t-ink">표준화(StandardScaler)를 학습 쪽 평균 · 표준편차로</b> 다시 맞춘다(Pipeline과 같음). 검증 폴드 정보가 학습에 새지 않게 하기 위해서다.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>평가 1회 해 보기 · 점수 지형</h2><span class="sk-hint">지도를 누르거나 슬라이더로 한 점을 골라 평가</span></div>
+      <div class="hp-two">
+        <div><canvas id="pMap" class="hp-map click" role="img" aria-label="하이퍼파라미터 공간의 교차검증 점수 지도. 누르면 그 점을 평가"></canvas><div class="hp-legend" id="pLeg"></div></div>
+        <div class="hp-col">
+          <div class="hp-ctl">
+            <label class="sk-slider"><span class="sk-sl-head"><span id="pU_l">log₁₀ C</span><b id="pU_v"></b></span><input type="range" id="pU" min="0" max="120" step="1" value="60"></label>
+            <label class="sk-slider"><span class="sk-sl-head"><span id="pV_l">log₁₀ γ</span><b id="pV_v"></b></span><input type="range" id="pV" min="0" max="80" step="1" value="60"></label>
+          </div>
+          <div class="sk-controls">
+            <button type="button" class="sk-btn sk-btn--primary" id="pEval">이 점 평가</button>
+            <button type="button" class="sk-btn" id="pOpt">지도 최고점으로</button>
+          </div>
+          <div class="sk-stats" id="pStats"></div>
+          <div class="hp-chart" id="pFolds"></div>
+          <h3 class="hp-sub">평가 예산과 비용 <small id="pCostHint"></small></h3>
+          <div class="sk-scroll"><table class="sk-table" id="pBudget"></table></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>탐색 공간 설계</h2><span class="sk-hint">자료형 · 범위 · 눈금(scale)</span></div>
+      <div class="hp-two">
+        <div class="sk-scroll"><table class="sk-table">
+          <thead><tr><th>하이퍼파라미터</th><th>자료형</th><th>범위 · 후보</th><th>눈금</th><th>scipy / skopt 표현</th></tr></thead>
+          <tbody>
+            <tr><td><b>C</b></td><td>연속</td><td>10⁻² ~ 10⁴</td><td>로그</td><td class="sk-mono">loguniform(1e-2, 1e4)</td></tr>
+            <tr><td><b>γ (gamma)</b></td><td>연속</td><td>10⁻³ ~ 10¹</td><td>로그</td><td class="sk-mono">Real(1e-3, 1e1, "log-uniform")</td></tr>
+            <tr><td>학습률</td><td>연속</td><td>10⁻⁴ ~ 10⁻¹</td><td>로그</td><td class="sk-mono">loguniform(1e-4, 1e-1)</td></tr>
+            <tr><td>max_depth</td><td>정수</td><td>2 ~ 12</td><td>선형</td><td class="sk-mono">randint(2, 13) · Integer(2, 12)</td></tr>
+            <tr><td>subsample</td><td>연속</td><td>0.5 ~ 1.0</td><td>선형</td><td class="sk-mono">uniform(0.5, 0.5)</td></tr>
+            <tr><td>kernel</td><td>범주</td><td>rbf, poly, linear</td><td>—</td><td class="sk-mono">["rbf", "poly"] · Categorical([...])</td></tr>
+          </tbody></table></div>
+        <div class="hp-col">
+          <h3 class="hp-sub">같은 9개 후보, 다른 눈금 <small>C ∈ [10⁻², 10⁴]</small></h3>
+          <div class="hp-chart hp-axisdemo" id="axisDemo"></div>
+          <p class="hp-mini">선형 간격으로 9개를 고르면 10⁻²~10³ 사이(6단위 중 5단위)에 후보가 <b class="t-bad">한 개뿐</b>이다. 효과가 배수로 바뀌는 값은 <b class="t-ink">로그 간격 · 로그 균등(log-uniform) 분포</b>로 잡는다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2. 격자 탐색 ============ -->
+  <section id="pane-grid" class="hp-pane" role="tabpanel" aria-labelledby="tab-grid" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>격자 탐색 (Grid Search) — 모든 조합을 차례로</h2><span class="sk-hint">GridSearchCV · 축마다 후보 k개 → k₁ × k₂ 번 평가</span></div>
+      <div class="hp-ctl">
+        <label class="sk-slider"><span class="sk-sl-head"><span id="gK1_l">C 후보 수 k₁</span><b id="gK1_v">5</b></span><input type="range" id="gK1" min="2" max="12" step="1" value="5"></label>
+        <label class="sk-slider"><span class="sk-sl-head"><span id="gK2_l">γ 후보 수 k₂</span><b id="gK2_v">5</b></span><input type="range" id="gK2" min="2" max="12" step="1" value="5"></label>
+        <div class="sk-group"><span class="sk-label">간격</span><div class="sk-seg" id="gScale" role="group" aria-label="격자 간격"><button type="button" data-v="log" aria-pressed="true">로그 간격</button><button type="button" data-v="lin" aria-pressed="false">선형 간격</button></div></div>
+      </div>
+      <div class="hp-player" id="gPlayer"></div>
+      <div class="hp-two">
+        <div><canvas id="gMap" class="hp-map" role="img" aria-label="격자 탐색 평가 점 지도"></canvas><div class="hp-legend" id="gLeg"></div></div>
+        <div class="hp-col">
+          <div class="sk-stats" id="gStats"></div>
+          <p class="sk-note" id="gNote"></p>
+          <div class="hp-log"><table class="sk-table" id="gLog"></table></div>
+        </div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>차원의 저주 — 축이 늘면 평가 수가 곱으로 늘어난다</h2><span class="sk-hint">평가 수 = k^d · 학습 횟수 = k^d × K</span></div>
+      <div class="hp-ctl">
+        <label class="sk-slider"><span class="sk-sl-head"><span>축마다 후보 수 k</span><b id="dK_v">5</b></span><input type="range" id="dK" min="2" max="10" step="1" value="5"></label>
+        <div class="sk-group"><span class="sk-label">학습 1회 시간</span><div class="sk-seg" id="dCost" role="group" aria-label="학습 1회 시간"><button type="button" data-v="0" aria-pressed="false">이 페이지 측정값</button><button type="button" data-v="60" aria-pressed="true">1분</button><button type="button" data-v="600" aria-pressed="false">10분</button></div></div>
+      </div>
+      <div class="sk-scroll"><table class="sk-table" id="dimTbl"></table></div>
+      <p class="hp-mini">축 하나를 더할 때마다 평가 수가 k배. 그래서 격자 탐색은 축 2~3개, 후보 몇 개일 때만 현실적이다.</p>
+    </div>
+  </section>
+
+  <!-- ============ 3. 무작위 탐색 ============ -->
+  <section id="pane-random" class="hp-pane" role="tabpanel" aria-labelledby="tab-random" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>무작위 탐색 (Random Search) — 분포에서 n번 뽑기</h2><span class="sk-hint">RandomizedSearchCV · 예산 n_iter를 직접 정함</span></div>
+      <div class="hp-ctl">
+        <label class="sk-slider"><span class="sk-sl-head"><span>예산 n (평가 횟수)</span><b id="rN_v">25</b></span><input type="range" id="rN" min="5" max="100" step="1" value="25"></label>
+        <div class="sk-group"><span class="sk-label" id="rDC_l">C 분포</span><div class="sk-seg" id="rDC" role="group" aria-label="첫째 축 분포"><button type="button" data-v="log" aria-pressed="true">로그 균등</button><button type="button" data-v="uni" aria-pressed="false">균등</button></div></div>
+        <div class="sk-group"><span class="sk-label" id="rDG_l">γ 분포</span><div class="sk-seg" id="rDG" role="group" aria-label="둘째 축 분포"><button type="button" data-v="log" aria-pressed="true">로그 균등</button><button type="button" data-v="uni" aria-pressed="false">균등</button></div></div>
+        <div class="sk-group"><span class="sk-label">seed <b class="sk-mono t-ink" id="rSeed_v">1</b></span><button type="button" class="sk-btn sk-btn--sm" id="rSeed">새 seed</button></div>
+      </div>
+      <div class="hp-player" id="rPlayer"></div>
+      <div class="hp-two">
+        <div><canvas id="rMap" class="hp-map" role="img" aria-label="무작위 탐색 평가 점 지도 (축 위 눈금 = 투영)"></canvas><div class="hp-legend" id="rLeg"></div></div>
+        <div class="hp-col">
+          <div class="sk-stats" id="rStats"></div>
+          <p class="sk-note" id="rNote"></p>
+          <div class="hp-log"><table class="sk-table" id="rLog"></table></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sk-card">
+      <div class="sk-head"><h2>왜 무작위가 격자보다 나은가 — 축에 투영해 보기</h2><span class="sk-hint">Bergstra &amp; Bengio (2012) · 중요한 축은 보통 몇 개뿐</span></div>
+      <div class="hp-ctl">
+        <label class="sk-slider"><span class="sk-sl-head"><span>격자 k × k 와 무작위 k² 개</span><b id="bgK_v">5</b></span><input type="range" id="bgK" min="3" max="8" step="1" value="5"></label>
+      </div>
+      <div class="hp-two even">
+        <div><h3 class="hp-sub t-grid">격자 <span id="bgGT"></span></h3><canvas id="bgGrid" class="hp-map" role="img" aria-label="격자 점과 축 투영"></canvas></div>
+        <div><h3 class="hp-sub t-rand">무작위 <span id="bgRT"></span></h3><canvas id="bgRand" class="hp-map" role="img" aria-label="무작위 점과 축 투영"></canvas></div>
+      </div>
+      <div class="hp-two even">
+        <div><h3 class="hp-sub" id="bgP1t"></h3><div class="hp-chart" id="bgP1"></div></div>
+        <div><h3 class="hp-sub" id="bgP2t"></h3><div class="hp-chart" id="bgP2"></div></div>
+      </div>
+      <div class="sk-scroll"><table class="sk-table" id="bgTbl"></table></div>
+      <p class="sk-note" id="bgNote"></p>
+    </div>
+
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>분포 고르기 — 균등 vs 로그 균등</h2><span class="sk-hint">2,000번 뽑은 히스토그램 (가로축 = 로그 눈금)</span></div>
+        <h3 class="hp-sub" id="hist1t"></h3><div class="hp-chart" id="hist1"></div>
+        <h3 class="hp-sub" id="hist2t"></h3><div class="hp-chart" id="hist2"></div>
+        <p class="hp-mini" id="histNote"></p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>상위 q% 영역에 한 번이라도 들어갈 확률</h2><span class="sk-hint">점마다 독립 · 확률 q</span></div>
+        <label class="sk-slider"><span class="sk-sl-head"><span>상위 q%</span><b id="pq_v">5%</b></span><input type="range" id="pq" min="1" max="20" step="1" value="5"></label>
+        <div class="sk-formula" id="probF"></div>
+        <div class="hp-chart" id="probChart"></div>
+        <div class="sk-stats" id="probStats"></div>
+        <p class="hp-mini" id="probNote"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4. 베이즈 최적화 ============ -->
+  <section id="pane-bayes" class="hp-pane" role="tabpanel" aria-labelledby="tab-bayes" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>베이즈 최적화 (Bayesian Search) — 대리 모형으로 다음 점을 고른다</h2><span class="sk-hint">가우스 과정(GP) 대리 모형 + 획득 함수 · BayesSearchCV</span></div>
+      <div class="hp-ctl">
+        <div class="sk-group"><span class="sk-label">획득 함수</span><div class="sk-seg" id="bAcqK" role="group" aria-label="획득 함수"><button type="button" data-v="ei" aria-pressed="true">EI</button><button type="button" data-v="ucb" aria-pressed="false">UCB</button><button type="button" data-v="pi" aria-pressed="false">PI</button></div></div>
+        <label class="sk-slider"><span class="sk-sl-head"><span>κ (UCB 탐색 가중)</span><b id="bKappa_v">1.96</b></span><input type="range" id="bKappa" min="0" max="5" step="0.02" value="1.96"></label>
+        <label class="sk-slider"><span class="sk-sl-head"><span>ξ (EI · PI 여유, 표준화 단위)</span><b id="bXi_v">0.01</b></span><input type="range" id="bXi" min="0" max="1" step="0.01" value="0.01"></label>
+        <div class="sk-group"><span class="sk-label">커널</span><div class="sk-seg" id="bKern" role="group" aria-label="GP 커널"><button type="button" data-v="matern" aria-pressed="true">Matérn 5/2</button><button type="button" data-v="rbf" aria-pressed="false">RBF</button></div></div>
+        <div class="sk-group"><span class="sk-label">길이 척도 ℓ</span><div class="sk-seg" id="bLsM" role="group" aria-label="길이 척도 정하기"><button type="button" data-v="auto" aria-pressed="true">최대우도</button><button type="button" data-v="man" aria-pressed="false">직접</button></div></div>
+        <label class="sk-slider" id="bLsW" hidden><span class="sk-sl-head"><span>ℓ (두 축 같게, 0~1 좌표)</span><b id="bLs_v">0.20</b></span><input type="range" id="bLs" min="0.03" max="1" step="0.01" value="0.2"></label>
+        <label class="sk-slider"><span class="sk-sl-head"><span>잡음 σₙ² (표준화 단위)</span><b id="bNoise_v">0.01</b></span><input type="range" id="bNoise" min="-6" max="-0.5" step="0.25" value="-2"></label>
+        <label class="sk-slider"><span class="sk-sl-head"><span>초기 무작위 점 n₀</span><b id="bN0_v">5</b></span><input type="range" id="bN0" min="2" max="10" step="1" value="5"></label>
+        <label class="sk-slider"><span class="sk-sl-head"><span>예산 (전체 평가 수)</span><b id="bBud_v">25</b></span><input type="range" id="bBud" min="10" max="50" step="1" value="25"></label>
+        <div class="sk-group"><span class="sk-label">seed <b class="sk-mono t-ink" id="bSeed_v">1</b></span><button type="button" class="sk-btn sk-btn--sm" id="bSeed">새 seed</button></div>
+      </div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>한 반복씩 따라가기</h2><span class="sk-hint" id="bIterHint"></span></div>
+      <ol class="sk-stepper" id="bStepper"><li>초기 무작위 점</li><li>① GP 적합</li><li>② 획득 함수 최대화</li><li>③ 평가 (K겹 CV)</li><li>④ 데이터 갱신</li></ol>
+      <div class="hp-player" id="bPlayer"></div>
+      <div class="hp-maps3">
+        <div><h3>GP 평균 μ(x) <small>대리 모형의 예측 점수</small></h3><canvas id="bMu" class="hp-map" role="img" aria-label="GP 사후 평균 지도"></canvas><div class="hp-legend" id="bMuL"></div></div>
+        <div><h3>GP 표준편차 σ(x) <small>불확실성</small></h3><canvas id="bSd" class="hp-map" role="img" aria-label="GP 사후 표준편차 지도"></canvas><div class="hp-legend" id="bSdL"></div></div>
+        <div><h3 id="bAcqT">획득 함수 <small>다음에 평가할 곳</small></h3><canvas id="bAcq" class="hp-map" role="img" aria-label="획득 함수 지도"></canvas><div class="hp-legend" id="bAcqL"></div></div>
+      </div>
+      <div class="hp-two">
+        <div class="hp-col">
+          <div class="sk-controls"><span class="sk-label">1차원 단면</span><div class="sk-seg" id="bSlice" role="group" aria-label="단면 방향"><button type="button" data-v="0" aria-pressed="true" id="bSlice0">C 방향</button><button type="button" data-v="1" aria-pressed="false" id="bSlice1">γ 방향</button></div><span class="hp-small" id="bSliceHint"></span></div>
+          <div class="hp-chart" id="bSliceC"></div>
+          <div class="hp-chart" id="bSliceA"></div>
+          <div class="sk-legend" id="bSliceL"></div>
+        </div>
+        <div class="hp-col">
+          <div id="bNums"></div>
+          <h3 class="hp-sub">평가 기록 <small>점 = 평가 점수 · 선 = 지금까지 최고</small></h3>
+          <div class="hp-chart" id="bHist"></div>
+        </div>
+      </div>
+    </div>
+    <div class="sk-grid2">
+      <div class="sk-card">
+        <div class="sk-head"><h2>획득 함수 세 가지</h2><span class="sk-hint">모두 최대화 · 표준화 y 단위</span></div>
+        <div class="sk-formula">z = (μ̃(x) − f̃* − ξ) / σ̃(x)<br><b>EI</b>(x) = (μ̃ − f̃* − ξ) · Φ(z) + σ̃ · φ(z)   기대 개선량<br><b>PI</b>(x) = Φ(z)   개선될 확률<br><b>UCB</b>(x) = μ̃(x) + κ · σ̃(x)   낙관적 상한</div>
+        <p class="hp-mini">f̃* = 지금까지 최고 점수(표준화), Φ · φ = 표준정규 누적분포 · 밀도. <b class="t-ink">활용(exploitation)</b> = μ가 높은 곳을 더 파기, <b class="t-ink">탐색(exploration)</b> = σ가 큰 곳 확인하기. κ · ξ를 키우면 탐색 쪽으로 기운다 — 슬라이더를 바꿔 획득 함수 지도가 어떻게 퍼지는지 보세요.</p>
+      </div>
+      <div class="sk-card">
+        <div class="sk-head"><h2>실무 도구</h2><span class="sk-hint">대리 모형이 다를 뿐 반복 구조는 같다</span></div>
+        <ul class="hp-mini" style="padding-left:18px;margin:0;display:grid;gap:6px">
+          <li><b class="t-ink">scikit-optimize BayesSearchCV</b>: GridSearchCV와 같은 사용법. 기본 대리 모형 GP(Matérn 커널, 길이 척도는 최대우도로 맞춤), 획득 함수 gp_hedge(EI · PI · LCB를 번갈아 씀), 초기 무작위 점 10개.</li>
+          <li><b class="t-ink">Optuna TPE</b>: 점수 분포를 직접 모형화하는 대신, 좋은 시도 집합의 밀도 l(x)와 나머지 밀도 g(x)를 따로 추정해 <b>l(x) / g(x)</b>가 큰 곳을 고른다. 범주형 · 조건부 공간에 강하고 빠르다. 가지치기(pruning)로 가망 없는 시도를 일찍 멈출 수 있다.</li>
+          <li>이 페이지의 GP는 신호 분산 1, y 정규화, 축별 길이 척도 ℓ₁ · ℓ₂(0.03~2, 최대우도 격자 탐색), 대각 잡음 σₙ² 로 직접 계산한다. 획득 함수는 41 × 41 격자 + 무작위 256점에서 고른 뒤 주변을 좁혀 가며 다듬는다.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 5. 비교 실험 ============ -->
+  <section id="pane-compare" class="hp-pane" role="tabpanel" aria-labelledby="tab-compare" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>같은 예산, 세 방법 — 지금까지 최고 점수</h2><span class="sk-hint">seed 여러 개 평균 · 선 = 평균, 음영 = 최소~최대</span></div>
+      <div class="hp-ctl">
+        <label class="sk-slider"><span class="sk-sl-head"><span>예산 n</span><b id="cN_v">25</b></span><input type="range" id="cN" min="9" max="60" step="1" value="25"></label>
+        <label class="sk-slider"><span class="sk-sl-head"><span>seed 수 R</span><b id="cR_v">10</b></span><input type="range" id="cR" min="3" max="20" step="1" value="10"></label>
+        <label class="sk-slider"><span class="sk-sl-head"><span>ε (최적과의 허용 차이)</span><b id="cE_v">0.005</b></span><input type="range" id="cE" min="0" max="100" step="1" value="47"></label>
+      </div>
+      <div class="sk-controls"><button type="button" class="sk-btn sk-btn--primary" id="cRun">다시 실행</button><span class="hp-small" id="cProg"></span></div>
+      <div class="sk-controls"><span class="sk-label">세로축</span><div class="sk-seg" id="cView" role="group" aria-label="세로축"><button type="button" data-v="score" aria-pressed="true">점수</button><button type="button" data-v="regret" aria-pressed="false">최적과의 차이 (로그)</button></div>
+        <div class="sk-legend"><span><i class="hp-sw ln bg-grid"></i>격자 (k × k, 순서 무작위)</span><span><i class="hp-sw ln bg-rand"></i>무작위 (로그 균등)</span><span><i class="hp-sw ln bg-bayes"></i>베이즈 (현재 4번 탭 설정)</span><span class="t-muted"><i class="hp-sw dash"></i>정밀 최적</span></div></div>
+      <div class="hp-chart" id="cChart"></div>
+      <div class="sk-scroll"><table class="sk-table" id="cTbl"></table></div>
+      <p class="sk-note" id="cNote"></p>
+    </div>
+    <div class="sk-card">
+      <div class="sk-head"><h2>튜닝도 과적합된다 — 검증 점수의 낙관 편향</h2><span class="sk-hint">고른 설정을 150명 전체로 다시 학습 → 독립 테스트 600명으로 채점</span></div>
+      <div class="hp-two">
+        <div class="hp-col">
+          <h3 class="hp-sub">무작위 탐색: 평가를 늘릴수록 <small>R개 seed 평균</small></h3>
+          <div class="hp-chart" id="oChart"></div>
+          <div class="sk-legend"><span><i class="hp-sw ln bg-val"></i>교차검증 최고 점수 (고를 때 본 값)</span><span><i class="hp-sw ln bg-ink"></i>그 설정의 테스트 점수</span></div>
+        </div>
+        <div class="hp-col">
+          <div class="sk-scroll"><table class="sk-table" id="oTbl"></table></div>
+          <h3 class="hp-sub">중첩 교차검증 (Nested CV) <small>바깥 5겹 × 안쪽 4겹 무작위 탐색 15회</small></h3>
+          <div class="hp-folds" id="nestGrid"></div>
+          <div id="nestOut" class="hp-mini"></div>
+        </div>
+      </div>
+      <p class="sk-note sk-note--warn" id="oNote">여러 설정 중 <b>가장 높은 검증 점수</b>를 고르면, 운 좋게 높게 나온 값을 고르는 효과 때문에 그 점수는 실제 성능보다 높게 나오기 쉽다. 튜닝에 쓴 점수를 최종 성능으로 보고하지 말고, <b>튜닝에 전혀 쓰지 않은 테스트 세트</b>나 <b>중첩 교차검증</b>(안쪽 = 튜닝, 바깥 = 평가)으로 따로 잰다.</p>
+    </div>
+  </section>
+
+  <!-- ============ 6. 코드 ============ -->
+  <section id="pane-code" class="hp-pane" role="tabpanel" aria-labelledby="tab-code" hidden>
+    <div class="sk-card">
+      <div class="sk-head"><h2>파이썬 코드 — 현재 설정 반영</h2><span class="sk-hint">scikit-learn · scipy · scikit-optimize · Optuna</span></div>
+      <div class="sk-controls">
+        <div class="sk-seg" id="codeSel" role="group" aria-label="코드 종류">
+          <button type="button" data-v="grid" aria-pressed="true">GridSearchCV</button>
+          <button type="button" data-v="rand" aria-pressed="false">RandomizedSearchCV</button>
+          <button type="button" data-v="bayes" aria-pressed="false">BayesSearchCV</button>
+          <button type="button" data-v="optuna" aria-pressed="false">Optuna</button>
+          <button type="button" data-v="nested" aria-pressed="false">중첩 CV</button>
+        </div>
+        <label class="sk-check"><input type="checkbox" id="codeSvc"> 모형을 SVC(kernel="rbf")로</label>
+        <button type="button" class="sk-btn sk-btn--sm" id="codeCopy">복사</button>
+      </div>
+      <pre class="hp-code" id="codePre"></pre>
+      <p class="hp-mini" id="codeNote"></p>
+    </div>
+  </section>
+
+  <!-- ============ 7. 알고리즘 구성도 ============ -->
+  <section id="pane-diagram" class="hp-pane" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+    <section class="sk-card"><div class="sk-head"><h2>알고리즘 구성도</h2><span class="sk-hint">문제 정의 · 격자와 무작위 · 베이즈 최적화 · 비교와 튜닝 과적합 4장 · 강의용 도식</span></div><div data-ds-diagrams="hyperparameter-tuning"></div></section>
+  </section>
+</main>
+
+<!-- ===== 공통 푸터 ===== -->
+<footer class="ds-footer">
+  <div class="ds-footer__inner">
+    <div class="ds-footer__meta">
+      <b>Machine Learning &amp; AI 모형 시뮬레이터</b>
+      <span>© <span data-ds-year>2026</span> 데이터스테이션</span>
+    </div>
+    <a class="ds-cta" href="https://www.data-station.co.kr/index" target="_blank" rel="noopener">
+      데이터스테이션 바로가기
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="../../assets/js/site.js?v=20261007a"></script>
+<script src="../../assets/js/diagram-kit.js?v=20261007a"></script>
+<script src="../../assets/diagrams/hyperparameter-tuning.js?v=20261007a"></script>
+<script>
+(function () {
+"use strict";
+const $ = id => document.getElementById(id);
+const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ===CORE-BEGIN=== */
+/* ---------- 난수 (seed 고정) ---------- */
+function makeRng(seed){
+  let a=(seed>>>0)||1, spare=null;
+  const u=()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;};
+  return {u,
+    n(){if(spare!==null){const s=spare;spare=null;return s;}let x,y,r;do{x=2*u()-1;y=2*u()-1;r=x*x+y*y;}while(r>=1||r===0);const f=Math.sqrt(-2*Math.log(r)/r);spare=y*f;return x*f;},
+    shuffle(arr){for(let i=arr.length-1;i>0;i--){const j=Math.floor(u()*(i+1));const t=arr[i];arr[i]=arr[j];arr[j]=t;}return arr;}};
+}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const sigm=z=>1/(1+Math.exp(-z));
+/* ---------- 당뇨 데이터: 나이 · BMI · 공복혈당 · 수축기 혈압 → 당뇨 여부 ---------- */
+function makeDiabetes(seed,n){
+  const r=makeRng(seed),rows=[];
+  for(let i=0;i<n;i++){
+    const age=Math.round(clamp(52+13*r.n(),25,85));
+    const bmi=Math.round(clamp(26+4.2*r.n()+0.03*(age-52),17,42)*10)/10;
+    const glu=Math.round(clamp(100+0.35*(age-52)+1.6*(bmi-26)+18*r.n(),70,220));
+    const sbp=Math.round(clamp(122+0.45*(age-52)+1.1*(bmi-26)+13*r.n(),90,190));
+    const zg=(glu-110)/18,zb=(bmi-26)/4.2,za=(age-52)/13,zs=(sbp-122)/13;
+    const logit=0.8*(-0.4+2.0*Math.tanh(3*(zg-0.2))+0.9*Math.tanh(2*(zb-0.3))+0.5*za+0.6*zs*Math.max(0,za));
+    rows.push([age,bmi,glu,sbp,r.u()<sigm(logit)?1:0]);
+  }
+  return rows;
+}
+/* 층화 K겹: 클래스별로 섞은 뒤 차례로 0,1,…,K−1 배정 */
+function stratFolds(y,K,seed){
+  const r=makeRng(seed),f=new Array(y.length);let c=0;
+  [0,1].forEach(cls=>{const idx=[];y.forEach((v,i)=>{if(v===cls)idx.push(i);});r.shuffle(idx);idx.forEach(i=>{f[i]=c%K;c++;});});
+  return f;
+}
+function scaleFit(X,idx){const d=X[0].length,mu=new Array(d).fill(0),sd=new Array(d).fill(0);
+  idx.forEach(i=>{for(let j=0;j<d;j++)mu[j]+=X[i][j];});for(let j=0;j<d;j++)mu[j]/=idx.length;
+  idx.forEach(i=>{for(let j=0;j<d;j++)sd[j]+=(X[i][j]-mu[j])**2;});for(let j=0;j<d;j++){sd[j]=Math.sqrt(sd[j]/idx.length)||1;}
+  return {mu,sd};}
+function sqd(A,B){const n=A.length,m=B.length,D=new Float64Array(n*m);
+  for(let i=0;i<n;i++)for(let j=0;j<m;j++){let s=0;const a=A[i],b=B[j];for(let t=0;t<a.length;t++){const q=a[t]-b[t];s+=q*q;}D[i*m+j]=s;}return D;}
+/* 학습/검증 쌍 하나: 표준화는 학습 쪽 평균 · 표준편차로 (Pipeline과 같음) */
+function prepSplit(X,y,tr,va){
+  const sc=scaleFit(X,tr),z=i=>X[i].map((v,j)=>(v-sc.mu[j])/sc.sd[j]);
+  const Ztr=tr.map(z),Zva=va.map(z);
+  return {m:tr.length,nv:va.length,Dtr:sqd(Ztr,Ztr),Dva:sqd(Zva,Ztr),ytr:Float64Array.from(tr,i=>y[i]?1:-1),yva:va.map(i=>y[i])};
+}
+function prepCV(X,y,folds,K){const S=[];for(let k=0;k<K;k++){const tr=[],va=[];folds.forEach((f,i)=>(f===k?va:tr).push(i));S.push(prepSplit(X,y,tr,va));}return S;}
+/* 촐레스키 분해 (하삼각, 제자리) */
+function chol(A,n){for(let j=0;j<n;j++){let s=A[j*n+j];for(let k=0;k<j;k++)s-=A[j*n+k]*A[j*n+k];if(s<=0)return false;const d=Math.sqrt(s);A[j*n+j]=d;
+  for(let i=j+1;i<n;i++){let t=A[i*n+j];for(let k=0;k<j;k++)t-=A[i*n+k]*A[j*n+k];A[i*n+j]=t/d;}}return true;}
+function cholSolve(L,n,b){const x=Float64Array.from(b);for(let i=0;i<n;i++){let s=x[i];for(let k=0;k<i;k++)s-=L[i*n+k]*x[k];x[i]=s/L[i*n+i];}
+  for(let i=n-1;i>=0;i--){let s=x[i];for(let k=i+1;k<n;k++)s-=L[k*n+i]*x[k];x[i]=s/L[i*n+i];}return x;}
+/* 커널 릿지 분류기 (RBF): α = (K + I/C)⁻¹ y,  f(x) = Σ αᵢ K(xᵢ, x) */
+function krrAlpha(sp,C,g){const m=sp.m,A=new Float64Array(m*m);
+  for(let i=0;i<m*m;i++)A[i]=Math.exp(-g*sp.Dtr[i]);for(let i=0;i<m;i++)A[i*m+i]+=1/C;
+  if(!chol(A,m))return null;return cholSolve(A,m,sp.ytr);}
+function krrDecision(sp,C,g){const al=krrAlpha(sp,C,g);if(!al)return null;const m=sp.m,f=new Float64Array(sp.nv);
+  for(let i=0;i<sp.nv;i++){let s=0;for(let j=0;j<m;j++)s+=al[j]*Math.exp(-g*sp.Dva[i*m+j]);f[i]=s;}return f;}
+function aucScore(y,f){const n=y.length,o=[...Array(n).keys()].sort((a,b)=>f[a]-f[b]),rk=new Array(n);
+  for(let i=0;i<n;){let j=i;while(j+1<n&&f[o[j+1]]===f[o[i]])j++;const r=(i+j)/2+1;for(let t=i;t<=j;t++)rk[o[t]]=r;i=j+1;}
+  let np=0,s=0;for(let i=0;i<n;i++)if(y[i]){np++;s+=rk[i];}const nn=n-np;if(!np||!nn)return 0.5;return (s-np*(np+1)/2)/(np*nn);}
+function accScore(y,f){let c=0;for(let i=0;i<y.length;i++)c+=((f[i]>0?1:0)===y[i])?1:0;return c/y.length;}
+/* 평가 1회 = K번 학습 → 폴드 점수 평균 (AUC · 정확도 함께) */
+function cvEvalBoth(S,C,g){const aucF=[],accF=[];
+  S.forEach(sp=>{const f=krrDecision(sp,C,g);aucF.push(f?aucScore(sp.yva,f):0);accF.push(f?accScore(sp.yva,f):0);});
+  const mean=a=>a.reduce((p,q)=>p+q,0)/a.length;return {auc:mean(aucF),acc:mean(accF),aucF,accF};}
+/* 대칭 행렬 고유분해 (Householder 삼중대각화 + QL) — 지도 계산용 */
+function symEig(A,n){
+  const V=new Array(n);for(let i=0;i<n;i++)V[i]=Float64Array.from(A.subarray(i*n,(i+1)*n));
+  const d=new Float64Array(n),e=new Float64Array(n);
+  for(let j=0;j<n;j++)d[j]=V[n-1][j];
+  for(let i=n-1;i>0;i--){
+    let scale=0,h=0;
+    for(let k=0;k<i;k++)scale+=Math.abs(d[k]);
+    if(scale===0){e[i]=d[i-1];for(let j=0;j<i;j++){d[j]=V[i-1][j];V[i][j]=0;V[j][i]=0;}}
+    else{
+      for(let k=0;k<i;k++){d[k]/=scale;h+=d[k]*d[k];}
+      let f=d[i-1],g=Math.sqrt(h);if(f>0)g=-g;
+      e[i]=scale*g;h-=f*g;d[i-1]=f-g;
+      for(let j=0;j<i;j++)e[j]=0;
+      for(let j=0;j<i;j++){f=d[j];V[j][i]=f;g=e[j]+V[j][j]*f;for(let k=j+1;k<=i-1;k++){g+=V[k][j]*d[k];e[k]+=V[k][j]*f;}e[j]=g;}
+      f=0;for(let j=0;j<i;j++){e[j]/=h;f+=e[j]*d[j];}
+      const hh=f/(h+h);for(let j=0;j<i;j++)e[j]-=hh*d[j];
+      for(let j=0;j<i;j++){f=d[j];g=e[j];for(let k=j;k<=i-1;k++)V[k][j]-=(f*e[k]+g*d[k]);d[j]=V[i-1][j];V[i][j]=0;}
+    }
+    d[i]=h;
+  }
+  for(let i=0;i<n-1;i++){
+    V[n-1][i]=V[i][i];V[i][i]=1;const h=d[i+1];
+    if(h!==0){for(let k=0;k<=i;k++)d[k]=V[k][i+1]/h;
+      for(let j=0;j<=i;j++){let g=0;for(let k=0;k<=i;k++)g+=V[k][i+1]*V[k][j];for(let k=0;k<=i;k++)V[k][j]-=g*d[k];}}
+    for(let k=0;k<=i;k++)V[k][i+1]=0;
+  }
+  for(let j=0;j<n;j++){d[j]=V[n-1][j];V[n-1][j]=0;}
+  V[n-1][n-1]=1;e[0]=0;
+  for(let i=1;i<n;i++)e[i-1]=e[i];e[n-1]=0;
+  let f=0,tst1=0;const eps=Math.pow(2,-52);
+  for(let l=0;l<n;l++){
+    tst1=Math.max(tst1,Math.abs(d[l])+Math.abs(e[l]));
+    let m=l;while(m<n){if(Math.abs(e[m])<=eps*tst1)break;m++;}
+    if(m>l){
+      do{
+        let g=d[l],p=(d[l+1]-g)/(2*e[l]),r=Math.hypot(p,1);if(p<0)r=-r;
+        d[l]=e[l]/(p+r);d[l+1]=e[l]*(p+r);const dl1=d[l+1];let h=g-d[l];
+        for(let i=l+2;i<n;i++)d[i]-=h;f+=h;
+        p=d[m];let c=1,c2=1,c3=1;const el1=e[l+1];let s=0,s2=0;
+        for(let i=m-1;i>=l;i--){
+          c3=c2;c2=c;s2=s;g=c*e[i];h=c*p;r=Math.hypot(p,e[i]);e[i+1]=s*r;s=e[i]/r;c=p/r;p=c*d[i]-s*g;d[i+1]=h+s*(c*g+s*d[i]);
+          for(let k=0;k<n;k++){h=V[k][i+1];V[k][i+1]=s*V[k][i]+c*h;V[k][i]=c*V[k][i]-s*h;}
+        }
+        p=-s*s2*c3*el1*e[l]/dl1;e[l]=s*p;d[l]=c*p;
+      }while(Math.abs(e[l])>eps*tst1);
+    }
+    d[l]+=f;e[l]=0;
+  }
+  return {d,V};
+}
+/* 한 γ · 한 폴드: 고유분해 한 번으로 모든 C를 계산  f = P · (b ./ (λ + 1/C)) */
+function gammaRowFold(sp,g,Cs){
+  const m=sp.m,E=new Float64Array(m*m);for(let i=0;i<m*m;i++)E[i]=Math.exp(-g*sp.Dtr[i]);
+  const {d,V}=symEig(E,m),b=new Float64Array(m);
+  for(let j=0;j<m;j++){let s=0;for(let k=0;k<m;k++)s+=V[k][j]*sp.ytr[k];b[j]=s;}
+  const P=new Float64Array(sp.nv*m),kv=new Float64Array(m);
+  for(let i=0;i<sp.nv;i++){for(let k=0;k<m;k++)kv[k]=Math.exp(-g*sp.Dva[i*m+k]);
+    for(let j=0;j<m;j++){let s=0;for(let k=0;k<m;k++)s+=kv[k]*V[k][j];P[i*m+j]=s;}}
+  const w=new Float64Array(m),f=new Float64Array(sp.nv),auc=new Float64Array(Cs.length),acc=new Float64Array(Cs.length);
+  Cs.forEach((C,ci)=>{const lam=1/C;for(let j=0;j<m;j++)w[j]=b[j]/(Math.max(d[j],0)+lam);
+    for(let i=0;i<sp.nv;i++){let s=0;for(let j=0;j<m;j++)s+=P[i*m+j]*w[j];f[i]=s;}
+    auc[ci]=aucScore(sp.yva,f);acc[ci]=accScore(sp.yva,f);});
+  return {auc,acc};
+}
+/* ---------- 가우스 과정(GP) 대리 모형 ---------- */
+function erfc(x){const z=Math.abs(x),t=1/(1+0.5*z);
+  const r=t*Math.exp(-z*z-1.26551223+t*(1.00002368+t*(0.37409196+t*(0.09678418+t*(-0.18628806+t*(0.27886807+t*(-1.13520398+t*(1.48851587+t*(-0.82215223+t*0.17087277)))))))));
+  return x>=0?r:2-r;}
+const normCdf=z=>0.5*erfc(-z/Math.SQRT2);
+const normPdf=z=>Math.exp(-0.5*z*z)/Math.sqrt(2*Math.PI);
+function kfun(a,b,ls,type){let r2=0;for(let d=0;d<a.length;d++){const q=(a[d]-b[d])/ls[d];r2+=q*q;}
+  if(type==="rbf")return Math.exp(-0.5*r2);const s=Math.sqrt(5*r2);return (1+s+s*s/3)*Math.exp(-s);}
+/* y 정규화(평균 0 · 표준편차 1) · 신호 분산 1 · 대각에 잡음 σn² */
+function gpFit(X,y,ls,noise,type){
+  const n=X.length;let ym=0;y.forEach(v=>ym+=v);ym/=n;let ys=0;y.forEach(v=>ys+=(v-ym)**2);ys=Math.sqrt(ys/n);if(!(ys>1e-12))ys=1;
+  const yt=Float64Array.from(y,v=>(v-ym)/ys),L=new Float64Array(n*n);
+  for(let i=0;i<n;i++)for(let j=0;j<=i;j++){const k=kfun(X[i],X[j],ls,type);L[i*n+j]=k;L[j*n+i]=k;}
+  for(let i=0;i<n;i++)L[i*n+i]+=noise;
+  if(!chol(L,n))return null;
+  const al=cholSolve(L,n,yt);let lml=-0.5*n*Math.log(2*Math.PI);
+  for(let i=0;i<n;i++){lml-=0.5*yt[i]*al[i]+Math.log(L[i*n+i]);}
+  return {X,n,L,al,ym,ys,ls,noise,type,lml,yt};
+}
+/* 길이 척도 ℓ = 최대우도 (축마다 0.03~2 로그 간격 10단계 격자) */
+const LS_GRID=[...Array(10).keys()].map(i=>Math.pow(10,Math.log10(0.03)+i*(Math.log10(2)-Math.log10(0.03))/9));
+function gpFitAuto(X,y,noise,type){let best=null;
+  LS_GRID.forEach(a=>LS_GRID.forEach(b=>{const g=gpFit(X,y,[a,b],noise,type);if(g&&(!best||g.lml>best.lml))best=g;}));return best;}
+function gpPredict(gp,x){const n=gp.n,ks=new Float64Array(n);for(let i=0;i<n;i++)ks[i]=kfun(gp.X[i],x,gp.ls,gp.type);
+  let mt=0;for(let i=0;i<n;i++)mt+=ks[i]*gp.al[i];
+  const v=ks;for(let i=0;i<n;i++){let s=v[i];for(let k=0;k<i;k++)s-=gp.L[i*n+k]*v[k];v[i]=s/gp.L[i*n+i];}
+  let vv=0;for(let i=0;i<n;i++)vv+=v[i]*v[i];const st=Math.sqrt(Math.max(1-vv,1e-12));
+  return {mt,st,mu:gp.ym+gp.ys*mt,sd:gp.ys*st};}
+/* 획득 함수 (최대화, 정규화 y 단위). ft = 지금까지 최고(정규화) */
+function acqValue(kind,mt,st,ft,xi,kappa){
+  if(kind==="ucb")return mt+kappa*st;
+  const imp=mt-ft-xi;if(st<1e-9)return kind==="pi"?(imp>0?1:0):Math.max(imp,0);
+  const z=imp/st;return kind==="pi"?normCdf(z):imp*normCdf(z)+st*normPdf(z);}
+/* ===CORE-END=== */
+
+/* =====================================================================
+   데이터 · 목적 함수
+   ===================================================================== */
+const DATA=makeDiabetes(20261016,750);
+const XA=DATA.map(r=>r.slice(0,4)), YA=DATA.map(r=>r[4]);
+const TUNE=[...Array(150).keys()], TEST=[...Array(600).keys()].map(i=>150+i);
+const X150=TUNE.map(i=>XA[i]), Y150=TUNE.map(i=>YA[i]);
+const G=41, FOLD_SEED=7;
+const LOG10=Math.log10;
+const DIRS8=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+function gauss2(u,v,a,b,s){return Math.exp(-((u-a)*(u-a)+(v-b)*(v-b))/(2*s*s));}
+const OBJ={
+  cv:{name:"당뇨 · 교차검증",cv:true,dec:4,
+    axes:[{key:"C",sym:"C",min:1e-2,max:1e4,log:true,steps:120,ticks:[-2,-1,0,1,2,3,4]},
+          {key:"gamma",sym:"γ",min:1e-3,max:10,log:true,steps:80,ticks:[-3,-2,-1,0,1]}],eps:[0.001,0.03,0.005]},
+  branin:{name:"Branin 함수",dec:3,
+    axes:[{key:"x1",sym:"x₁",min:-5,max:10,log:false,steps:150,ticks:[-5,0,5,10]},{key:"x2",sym:"x₂",min:0,max:15,log:false,steps:150,ticks:[0,5,10,15]}],eps:[0.05,5,0.5],
+    f:(u,v)=>{const x1=-5+15*u,x2=15*v,b=5.1/(4*Math.PI*Math.PI),c=5/Math.PI,t=1/(8*Math.PI);
+      return -((x2-b*x1*x1+c*x1-6)**2+10*(1-t)*Math.cos(x1)+10);}},
+  lowdim:{name:"한 축만 중요",dec:4,
+    axes:[{key:"x1",sym:"x₁",min:0,max:1,log:false,steps:100,ticks:[0,0.25,0.5,0.75,1]},{key:"x2",sym:"x₂",min:0,max:1,log:false,steps:100,ticks:[0,0.25,0.5,0.75,1]}],eps:[0.002,0.1,0.01],
+    f:(u,v)=>0.55+0.4*Math.exp(-0.5*((u-0.62)/0.07)**2)+0.02*Math.sin(2*Math.PI*v)},
+  bumpy:{name:"봉우리 여럿",dec:4,
+    axes:[{key:"x1",sym:"x₁",min:0,max:1,log:false,steps:100,ticks:[0,0.25,0.5,0.75,1]},{key:"x2",sym:"x₂",min:0,max:1,log:false,steps:100,ticks:[0,0.25,0.5,0.75,1]}],eps:[0.002,0.1,0.01],
+    f:(u,v)=>0.75*gauss2(u,v,0.25,0.7,0.18)+1.0*gauss2(u,v,0.8,0.22,0.08)+0.55*gauss2(u,v,0.62,0.85,0.1)+0.04*Math.sin(9*u)*Math.cos(7*v)}
+};
+function toRaw(ax,u){return ax.log?Math.pow(10,LOG10(ax.min)+u*(LOG10(ax.max)-LOG10(ax.min))):ax.min+u*(ax.max-ax.min);}
+function toU(ax,x){return ax.log?(LOG10(x)-LOG10(ax.min))/(LOG10(ax.max)-LOG10(ax.min)):(x-ax.min)/(ax.max-ax.min);}
+const SUP={"-":"⁻","0":"⁰","1":"¹","2":"²","3":"³","4":"⁴","5":"⁵","6":"⁶","7":"⁷","8":"⁸","9":"⁹"};
+const sup=n=>String(n).split("").map(c=>SUP[c]||c).join("");
+function fmtRaw(ax,x){
+  if(ax.log){ if(x>=1000) return Math.round(x).toLocaleString("en-US"); if(x>=100) return x.toFixed(0); if(x>=1) return String(+x.toPrecision(3)); return String(+x.toPrecision(2)); }
+  return ax.max-ax.min>2? x.toFixed(2) : x.toFixed(3);
+}
+function tickLab(ax,t){return ax.log?"10"+sup(t):String(t);}
+function tickU(ax,t){return ax.log?toU(ax,Math.pow(10,t)):toU(ax,t);}
+
+/* 현재 목적 함수 문맥 (작업마다 시작할 때 고정) */
+const S={obj:"cv",metric:"auc",K:5,
+  p:{u:0.5,v:0.75,last:null},
+  grid:{k1:5,k2:5,scale:"log",t:null},
+  rand:{n:25,d0:"log",d1:"log",seed:1,t:null},
+  bg:{k:5}, prob:{q:5},
+  bayes:{acq:"ei",kappa:1.96,xi:0.01,kernel:"matern",lsMode:"auto",ls:0.2,noise:0.01,n0:5,budget:25,seed:1,idx:2,slice:0},
+  cmp:{n:25,R:10,epsT:47,view:"score"},
+  dim:{k:5,cost:60},
+  code:{sel:"grid",svc:false},
+  speed:450
+};
+function curO(){const o=OBJ[S.obj];return {obj:S.obj,metric:S.metric,K:S.K,key:o.cv?`cv|${S.metric}|${S.K}`:S.obj,o};}
+const fs=(s,O)=>(s==null||isNaN(s))?"—":s.toFixed((O||curO()).o.dec);
+
+const CTX={};
+function ctxK(K){return CTX[K]||(CTX[K]=prepCV(X150,Y150,stratFolds(Y150,K,FOLD_SEED),K));}
+const ECACHE=new Map(); const EMS={sum:0,n:0};
+function evalP(O,u,v){
+  const key=O.key+"|"+u.toFixed(6)+"|"+v.toFixed(6);let e=ECACHE.get(key);if(e)return e;
+  if(O.o.cv){
+    const C=toRaw(O.o.axes[0],u),g=toRaw(O.o.axes[1],v),t0=performance.now(),r=cvEvalBoth(ctxK(O.K),C,g),ms=performance.now()-t0;
+    EMS.sum+=ms;EMS.n++;
+    const ea={u,v,s:r.auc,folds:r.aucF,ms,C,g},eb={u,v,s:r.acc,folds:r.accF,ms,C,g};
+    ECACHE.set(`cv|auc|${O.K}|`+u.toFixed(6)+"|"+v.toFixed(6),ea);ECACHE.set(`cv|acc|${O.K}|`+u.toFixed(6)+"|"+v.toFixed(6),eb);
+    e=O.metric==="acc"?eb:ea;
+  } else { e={u,v,s:O.o.f(u,v),folds:null,ms:0}; ECACHE.set(key,e); }
+  return e;
+}
+/* 독립 테스트(600명): 튜닝 150명 전체로 학습 */
+let TESTSP=null; const TCACHE=new Map();
+function testScore(O,u,v){
+  if(!O.o.cv) return null;
+  const key=O.metric+"|"+u.toFixed(6)+"|"+v.toFixed(6);if(TCACHE.has(key))return TCACHE.get(key);
+  if(!TESTSP) TESTSP=prepSplit(XA,YA,TUNE,TEST);
+  const f=krrDecision(TESTSP,toRaw(O.o.axes[0],u),toRaw(O.o.axes[1],v));
+  const s=f?(O.metric==="acc"?accScore(TESTSP.yva,f):aucScore(TESTSP.yva,f)):0;TCACHE.set(key,s);return s;
+}
+
+/* =====================================================================
+   작업 실행기 (UI가 멈추지 않게 잘게 나눠 계산)
+   ===================================================================== */
+const JOBS={};
+function startJob(name,gen,onStep,onDone){
+  cancelJob(name);const job={it:gen,alive:true};JOBS[name]=job;
+  const tick=()=>{ if(!job.alive) return; const t0=performance.now(); let r;
+    try{ do{ r=job.it.next(); }while(!r.done&&performance.now()-t0<14); }catch(err){ delete JOBS[name]; console.error(err); return; }
+    if(r.done){ delete JOBS[name]; if(onDone) onDone(r.value); } else { if(onStep) onStep(); setTimeout(tick,0); } };
+  setTimeout(tick,0);
+}
+function cancelJob(name){ if(JOBS[name]){ JOBS[name].alive=false; delete JOBS[name]; } }
+
+/* =====================================================================
+   점수 지형 (정밀 지도 41 × 41) + 정밀 최적
+   ===================================================================== */
+const MAPS={};
+function getMap(key){return MAPS[key]||(MAPS[key]={vals:new Float64Array(G*G),rows:0,done:false,opt:null});}
+function finalizeMap(m){
+  const a=Array.from(m.vals).sort((x,y)=>x-y),q=p=>a[Math.min(a.length-1,Math.floor(p*(a.length-1)))];
+  let bi=0;for(let i=1;i<m.vals.length;i++)if(m.vals[i]>m.vals[bi])bi=i;
+  m.min=a[0];m.max=a[a.length-1];m.q05=q(0.05);m.q80=q(0.8);m.q95=q(0.95);m.q99=q(0.99);m.sorted=a;
+  m.best={u:(bi%G)/(G-1),v:Math.floor(bi/G)/(G-1),s:m.vals[bi]};m.done=true;
+}
+function mapAt(m,u,v){
+  const x=clamp(u,0,1)*(G-1),y=clamp(v,0,1)*(G-1),i=Math.min(G-2,Math.floor(x)),j=Math.min(G-2,Math.floor(y)),fx=x-i,fy=y-j;
+  if(j+1>=m.rows&&!m.done) return NaN;
+  const a=m.vals[j*G+i],b=m.vals[j*G+i+1],c=m.vals[(j+1)*G+i],d=m.vals[(j+1)*G+i+1];
+  return a*(1-fx)*(1-fy)+b*fx*(1-fy)+c*(1-fx)*fy+d*fx*fy;
+}
+function fineQuant(m,p){ /* 지도를 보간한 200×200 값의 분위수 (면적 기준) */
+  if(!m.fine){const a=new Float64Array(200*200);for(let j=0;j<200;j++)for(let i=0;i<200;i++)a[j*200+i]=mapAt(m,(i+0.5)/200,(j+0.5)/200);m.fine=Array.from(a).sort((x,y)=>x-y);}
+  return m.fine[Math.min(m.fine.length-1,Math.floor(p*(m.fine.length-1)))];}
+function quantAbove(m,s){ /* s 이상인 지도 점 비율 */ const a=m.sorted;let lo=0,hi=a.length;while(lo<hi){const md=(lo+hi)>>1;if(a[md]<s)lo=md+1;else hi=md;}return (a.length-lo)/a.length; }
+function* cvMapGen(K){
+  const SP=ctxK(K),ax=OBJ.cv.axes,Cs=[...Array(G).keys()].map(i=>toRaw(ax[0],i/(G-1)));
+  const mA=getMap(`cv|auc|${K}`),mB=getMap(`cv|acc|${K}`);
+  for(let j=mA.rows;j<G;j++){
+    const g=toRaw(ax[1],j/(G-1)),ra=new Float64Array(G),rb=new Float64Array(G);
+    for(const sp of SP){ const r=gammaRowFold(sp,g,Cs); for(let i=0;i<G;i++){ra[i]+=r.auc[i]/SP.length;rb[i]+=r.acc[i]/SP.length;} yield; }
+    for(let i=0;i<G;i++){mA.vals[j*G+i]=ra[i];mB.vals[j*G+i]=rb[i];}
+    mA.rows=mB.rows=j+1;
+  }
+  finalizeMap(mA);finalizeMap(mB);
+}
+function synthMap(O){
+  const m=getMap(O.key);if(m.done)return m;
+  for(let j=0;j<G;j++)for(let i=0;i<G;i++)m.vals[j*G+i]=O.o.f(i/(G-1),j/(G-1));
+  m.rows=G;finalizeMap(m);
+  /* 정밀 최적: 201 × 201 → 주변 다듬기 */
+  let b={u:0,v:0,s:-Infinity};
+  for(let j=0;j<=200;j++)for(let i=0;i<=200;i++){const s=O.o.f(i/200,j/200);if(s>b.s)b={u:i/200,v:j/200,s};}
+  let st=1/400;for(let lev=0;lev<14;lev++){let imp=true,guard=0;while(imp&&guard++<50){imp=false;for(const[du,dv]of DIRS8){const u=clamp(b.u+du*st,0,1),v=clamp(b.v+dv*st,0,1),s=O.o.f(u,v);if(s>b.s+1e-15){b={u,v,s};imp=true;}}}st/=2;}
+  m.opt=b;return m;
+}
+function* refineGen(O,m){
+  let b={u:m.best.u,v:m.best.v,s:evalP(O,m.best.u,m.best.v).s};let st=1/(G-1)/2;
+  for(let lev=0;lev<5;lev++){let imp=true,guard=0;
+    while(imp&&guard++<12){imp=false;for(const[du,dv]of DIRS8){const u=clamp(b.u+du*st,0,1),v=clamp(b.v+dv*st,0,1),e=evalP(O,u,v);yield;if(e.s>b.s+1e-12){b={u,v,s:e.s};imp=true;}}}
+    st/=2;}
+  m.opt=b;
+}
+function curMap(){return MAPS[curO().key]||null;}
+function optOf(m){return m&&(m.opt||m.best);}
+function ensureMap(){
+  const O=curO();
+  if(!O.o.cv){ synthMap(O); setStatus(); return; }
+  const m=getMap(O.key);
+  if(!m.done){
+    startJob("map",cvMapGen(O.K),()=>{ setStatus(); requestDraw(); },()=>{ setStatus(); requestDraw(); ensureMap(); });
+    return;
+  }
+  if(!m.opt) startJob("refine",refineGen(O,m),null,()=>{ setStatus(); requestDraw(); });
+  setStatus();
+}
+function setStatus(){
+  const O=curO(),m=MAPS[O.key],bar=$("mapBar"),st=$("mapStatus"),ax=O.o.axes;
+  if(!m){bar.style.width="0";st.textContent="점수 지형 준비 중";return;}
+  bar.style.width=(100*m.rows/G).toFixed(0)+"%";
+  if(!m.done){ st.textContent=`점수 지형 계산 중 ${Math.round(100*m.rows/G)}% · ${ax[1].sym} ${G}줄 중 ${m.rows}줄 (줄마다 폴드 ${O.K}개 고유분해 한 번으로 C ${G}개를 한꺼번에)`; return; }
+  const o=optOf(m);
+  st.innerHTML=`점수 지형 ${G} × ${G} = ${G*G}점 완료 · 지도 최고 <b class="sk-mono t-ink">${fs(m.best.s,O)}</b> · 정밀 최적 <b class="sk-mono t-ink">${m.opt?fs(m.opt.s,O):"다듬는 중"}</b>${m.opt?` (${ax[0].sym} = ${fmtRaw(ax[0],toRaw(ax[0],o.u))}, ${ax[1].sym} = ${fmtRaw(ax[1],toRaw(ax[1],o.v))})`:""}`;
+}
+
+/* =====================================================================
+   그리기 도구 (캔버스 지도 · SVG 차트)
+   ===================================================================== */
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+function hexRgb(h){h=h.replace("#","");if(h.length===3)h=h.split("").map(c=>c+c).join("");const n=parseInt(h,16);return [(n>>16)&255,(n>>8)&255,n&255];}
+function ramp(name){const st=[0,1,2,3,4].map(i=>hexRgb(css(`--${name}${i}`)||"#888888"));
+  return t=>{t=clamp(isNaN(t)?0:t,0,1)*(st.length-1);const i=Math.min(st.length-2,Math.floor(t)),f=t-i,a=st[i],b=st[i+1];return [a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f,a[2]+(b[2]-a[2])*f];};}
+function fitCanvas(cv,ratio){
+  const w=Math.max(220,Math.round(cv.clientWidth||cv.parentElement.clientWidth||400)),h=Math.round(w*ratio),d=window.devicePixelRatio||1;
+  if(cv.width!==Math.round(w*d)||cv.height!==Math.round(h*d)){cv.width=Math.round(w*d);cv.height=Math.round(h*d);}
+  cv.style.height=h+"px";const g=cv.getContext("2d");g.setTransform(d,0,0,d,0,0);return {g,w,h};
+}
+function contourSegs(vals,lev){const segs=[];
+  for(let j=0;j<G-1;j++)for(let i=0;i<G-1;i++){
+    const v0=vals[j*G+i],v1=vals[j*G+i+1],v2=vals[(j+1)*G+i+1],v3=vals[(j+1)*G+i],pts=[];
+    [[v0,v1,t=>[i+t,j]],[v1,v2,t=>[i+1,j+t]],[v2,v3,t=>[i+1-t,j+1]],[v3,v0,t=>[i,j+1-t]]].forEach(([a,b,f])=>{if((a>=lev)!==(b>=lev))pts.push(f((lev-a)/(b-a)));});
+    if(pts.length===2)segs.push(pts);else if(pts.length===4){segs.push([pts[0],pts[1]]);segs.push([pts[2],pts[3]]);}
+  }return segs;}
+/* 지도 그리기. o: field{vals,rows,lo,hi,ramp}, levels[], pts[{u,v,k,lab}], rugX[{u,k}], rugY[{v,k}], ratio, small */
+function drawMap(cv,o){
+  const O=o.O||curO(),ax=O.o.axes,{g,w,h}=fitCanvas(cv,o.ratio||0.84);
+  const sm=w<380,L=sm?42:52,R=10,T=8,B=sm?36:40,pw=w-L-R,ph=h-T-B;
+  const X=u=>L+u*pw,Y=v=>T+(1-v)*ph;
+  g.clearRect(0,0,w,h);
+  const F=o.field,surf2=css("--surface-2");
+  if(F&&F.vals){
+    const N=Math.max(60,Math.min(180,Math.round(pw/2))),off=document.createElement("canvas");off.width=N;off.height=N;
+    const og=off.getContext("2d"),im=og.createImageData(N,N),rp=ramp(F.ramp||"map"),lo=F.lo,hi=F.hi,s2=hexRgb(surf2||"#eeeeee");
+    const GG=F.G||G,rows=F.rows==null?GG:F.rows;
+    for(let py=0;py<N;py++){const v=1-(py+0.5)/N,y=v*(GG-1),j=Math.min(GG-2,Math.floor(y)),fy=y-j;
+      for(let px=0;px<N;px++){const u=(px+0.5)/N,x=u*(GG-1),i=Math.min(GG-2,Math.floor(x)),fx=x-i,k=(py*N+px)*4;let c;
+        if(j+1>=rows&&rows<GG) c=s2;
+        else{const val=F.vals[j*GG+i]*(1-fx)*(1-fy)+F.vals[j*GG+i+1]*fx*(1-fy)+F.vals[(j+1)*GG+i]*(1-fx)*fy+F.vals[(j+1)*GG+i+1]*fx*fy;c=rp((val-lo)/((hi-lo)||1));}
+        im.data[k]=c[0];im.data[k+1]=c[1];im.data[k+2]=c[2];im.data[k+3]=255;}}
+    og.putImageData(im,0,0);g.imageSmoothingEnabled=true;g.drawImage(off,X(0),Y(1),pw,ph);
+    if(F.rows!=null&&F.rows<GG){g.fillStyle=css("--muted");g.font="600 13px "+css("--sans");g.textAlign="center";g.fillText("점수 지형 계산 중…",X(0.5),Y(0.5));}
+  } else { g.fillStyle=surf2;g.fillRect(X(0),Y(1),pw,ph); }
+  /* 등고선 */
+  if(o.levels&&F&&(F.rows==null||F.rows>=(F.G||G))){
+    g.strokeStyle=css("--ink");g.lineWidth=1.1;
+    o.levels.forEach((L2,li)=>{g.globalAlpha=0.55;g.setLineDash(li===0?[]:li===1?[5,3]:[2,3]);g.beginPath();
+      contourSegs(F.vals,L2).forEach(s=>{g.moveTo(X(s[0][0]/(G-1)),Y(s[0][1]/(G-1)));g.lineTo(X(s[1][0]/(G-1)),Y(s[1][1]/(G-1)));});g.stroke();});
+    g.globalAlpha=1;g.setLineDash([]);
+  }
+  /* 테두리 · 눈금 */
+  g.strokeStyle=css("--line-strong");g.lineWidth=1;g.strokeRect(X(0)+0.5,Y(1)+0.5,pw-1,ph-1);
+  g.fillStyle=css("--muted");g.font=(sm?"10.5px ":"11px ")+css("--mono");
+  g.textAlign="center";g.textBaseline="top";
+  ax[0].ticks.forEach(t=>{const x=X(tickU(ax[0],t));g.fillRect(x,Y(0),1,4);g.fillText(tickLab(ax[0],t),x,Y(0)+6);});
+  g.textAlign="right";g.textBaseline="middle";
+  ax[1].ticks.forEach(t=>{const y=Y(tickU(ax[1],t));g.fillRect(X(0)-4,y,4,1);g.fillText(tickLab(ax[1],t),X(0)-6,y);});
+  g.font="600 12px "+css("--sans");g.textAlign="center";g.textBaseline="alphabetic";
+  g.fillText(ax[0].sym+(ax[0].log?" (로그 눈금)":""),X(0.5),h-4);
+  g.save();g.translate(12,Y(0.5));g.rotate(-Math.PI/2);g.fillText(ax[1].sym+(ax[1].log?" (로그 눈금)":""),0,0);g.restore();
+  /* 투영 눈금(rug) */
+  const col={grid:css("--grid"),rand:css("--rand"),bayes:css("--bayes"),ink:css("--ink"),acq:css("--acq"),ok:css("--ok"),surf:css("--surface")};
+  (o.rugX||[]).forEach(r=>{g.fillStyle=col[r.k]||col.ink;g.globalAlpha=0.85;g.fillRect(X(r.u)-1,Y(0)-9,2,9);});
+  (o.rugY||[]).forEach(r=>{g.fillStyle=col[r.k]||col.ink;g.globalAlpha=0.85;g.fillRect(X(0),Y(r.v)-1,9,2);});
+  g.globalAlpha=1;
+  /* 점 */
+  (o.pts||[]).forEach(p=>{
+    const x=X(p.u),y=Y(p.v);g.lineWidth=1.6;g.strokeStyle=col.surf;
+    if(p.k==="grid"){g.fillStyle=col.grid;g.lineWidth=1.2;g.fillRect(x-5,y-5,10,10);g.strokeRect(x-5,y-5,10,10);}
+    else if(p.k==="gridTodo"){g.strokeStyle=col.grid;g.globalAlpha=0.7;g.lineWidth=1.4;g.strokeRect(x-4,y-4,8,8);g.globalAlpha=1;}
+    else if(p.k==="rand"){g.fillStyle=col.rand;g.beginPath();g.arc(x,y,4.6,0,7);g.fill();g.stroke();}
+    else if(p.k==="bInit"){g.fillStyle=col.surf;g.strokeStyle=col.bayes;g.lineWidth=2.2;g.beginPath();g.arc(x,y,4.8,0,7);g.fill();g.stroke();}
+    else if(p.k==="bayes"){g.fillStyle=col.bayes;g.beginPath();g.moveTo(x,y-6.5);g.lineTo(x+6.5,y);g.lineTo(x,y+6.5);g.lineTo(x-6.5,y);g.closePath();g.fill();g.stroke();}
+    else if(p.k==="cur"){g.strokeStyle=col.ink;g.lineWidth=2;g.beginPath();g.arc(x,y,10,0,7);g.stroke();}
+    else if(p.k==="best"){g.strokeStyle=col.ok;g.lineWidth=2.6;g.beginPath();g.arc(x,y,9.5,0,7);g.stroke();}
+    else if(p.k==="next"||p.k==="opt"){const r=p.k==="next"?10:8.5;g.beginPath();for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,rr=i%2?r*0.45:r;g.lineTo(x+rr*Math.cos(a),y+rr*Math.sin(a));}g.closePath();
+      g.fillStyle=p.k==="next"?col.acq:col.surf;g.fill();g.strokeStyle=col.ink;g.lineWidth=p.k==="next"?1.4:1.8;g.stroke();}
+    else if(p.k==="eval"){g.strokeStyle=col.ink;g.lineWidth=2;g.beginPath();g.arc(x,y,8,0,7);g.moveTo(x-13,y);g.lineTo(x-4,y);g.moveTo(x+4,y);g.lineTo(x+13,y);g.moveTo(x,y-13);g.lineTo(x,y-4);g.moveTo(x,y+4);g.lineTo(x,y+13);g.stroke();}
+    if(p.lab!=null){g.font="700 10.5px "+css("--mono");g.textAlign="left";g.textBaseline="middle";g.lineWidth=3;g.strokeStyle=col.surf;g.strokeText(p.lab,x+7,y-7);g.fillStyle=col.ink;g.fillText(p.lab,x+7,y-7);}
+  });
+  cv._view={inside:(mx,my)=>mx>=X(0)&&mx<=X(1)&&my>=Y(1)&&my<=Y(0),inv:(mx,my)=>[(mx-L)/pw,1-(my-T)/ph]};
+}
+function evXY(cv,e){const r=cv.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top];}
+function mapField(m,O){ if(!m) return null; const lo=m.done?m.q05:undefined; let lo2=lo,hi=m.done?m.max:undefined;
+  if(!m.done){let a=Infinity,b=-Infinity;for(let i=0;i<m.rows*G;i++){a=Math.min(a,m.vals[i]);b=Math.max(b,m.vals[i]);}lo2=a;hi=b;}
+  return {vals:m.vals,rows:m.done?G:m.rows,lo:lo2,hi:hi,ramp:"map"}; }
+function mapLevels(m){return m&&m.done?[m.q99,m.q95,m.q80]:null;}
+function legendMap(m,O,extra){
+  let s="";
+  if(m&&m.done) s+=`<span class="hp-ramp map"><span>${fs(m.q05,O)}</span><i></i><span>${fs(m.max,O)}</span></span><span>등고선: 상위 1% · 5% · 20% 영역</span>`;
+  return s+(extra||"");
+}
+const LEG={
+  grid:'<span><i class="hp-sw bg-grid"></i>격자 점(평가함)</span>',
+  rand:'<span><i class="hp-sw c bg-rand"></i>무작위 점</span>',
+  bInit:'<span class="t-bayes"><i class="hp-sw h"></i>초기 무작위 점</span>',
+  bayes:'<span><i class="hp-sw d bg-bayes"></i>베이즈가 고른 점</span>',
+  best:'<span class="t-ok"><i class="hp-sw h"></i>지금까지 최고</span>',
+  opt:'<span><span class="t-ink">★</span> 정밀 최적</span>',
+  next:'<span><span class="t-acq">★</span> 다음 평가 점</span>',
+  cur:'<span class="t-ink"><i class="hp-sw h"></i>방금 평가</span>'
+};
+/* SVG 차트 */
+function chart(el,o){
+  const W=Math.max(280,Math.round(el.clientWidth||600)),H=o.h||230,L=o.L||(o.yl?62:50),R=o.R||14,T=o.T||12,B=o.B||40,pw=W-L-R,ph=H-T-B;
+  const sx=v=>L+(v-o.x0)/((o.x1-o.x0)||1)*pw,sy=v=>T+(1-(v-o.y0)/((o.y1-o.y0)||1))*ph;
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${o.aria||""}">`;
+  (o.yt||[]).forEach(t=>{const y=sy(t.v).toFixed(1);s+=`<line class="gl" x1="${L}" x2="${W-R}" y1="${y}" y2="${y}"/><text class="ax" x="${L-6}" y="${+y+4}" text-anchor="end">${t.t}</text>`;});
+  (o.xt||[]).forEach(t=>{s+=`<text class="ax" x="${sx(t.v).toFixed(1)}" y="${H-B+16}" text-anchor="middle">${t.t}</text>`;});
+  s+=`<rect class="fr" x="${L}" y="${T}" width="${pw}" height="${ph}"/>`;
+  if(o.xl)s+=`<text class="axl" x="${L+pw/2}" y="${H-5}" text-anchor="middle">${o.xl}</text>`;
+  if(o.yl)s+=`<text class="axl" x="13" y="${T+ph/2}" transform="rotate(-90 13 ${T+ph/2})" text-anchor="middle">${o.yl}</text>`;
+  s+=o.body({sx,sy,L,T,pw,ph,W,H})+"</svg>";el.innerHTML=s;
+}
+const pathOf=(pts,sx,sy)=>pts.filter(p=>p&&!isNaN(p[1])).map((p,i)=>(i?"L":"M")+sx(p[0]).toFixed(1)+" "+sy(p[1]).toFixed(1)).join("");
+function niceTicks(a,b,n){const span=b-a||1,step0=span/(n||5),mag=Math.pow(10,Math.floor(LOG10(step0))),r=step0/mag,step=(r<1.5?1:r<3?2:r<7?5:10)*mag;
+  const out=[];for(let v=Math.ceil(a/step)*step;v<=b+step*1e-6;v+=step)out.push(+v.toFixed(10));return {ticks:out,step};}
+function fmtTick(v,step){const d=Math.max(0,-Math.floor(LOG10(step)+1e-9));return v.toFixed(d);}
+function axisTicksU(ax){return ax.ticks.map(t=>({v:tickU(ax,t),t:tickLab(ax,t)}));}
+
+/* =====================================================================
+   1. 문제 정의
+   ===================================================================== */
+function sliderSetup(){
+  const O=curO(),ax=O.o.axes;
+  [["pU",0],["pV",1]].forEach(([id,k])=>{const el=$(id);el.max=ax[k].steps;el.value=Math.round((k?S.p.v:S.p.u)*ax[k].steps);
+    $(id+"_l").textContent=ax[k].log?`log₁₀ ${ax[k].sym}`:ax[k].sym;});
+  pSliderText();
+}
+function pSliderText(){const O=curO(),ax=O.o.axes;
+  $("pU_v").textContent=(ax[0].log?(LOG10(toRaw(ax[0],S.p.u))).toFixed(2)+" → "+ax[0].sym+" = ":"")+fmtRaw(ax[0],toRaw(ax[0],S.p.u));
+  $("pV_v").textContent=(ax[1].log?(LOG10(toRaw(ax[1],S.p.v))).toFixed(2)+" → "+ax[1].sym+" = ":"")+fmtRaw(ax[1],toRaw(ax[1],S.p.v));}
+function pEvaluate(){const O=curO();S.p.last=evalP(O,S.p.u,S.p.v);renderProblem();}
+function renderData(){
+  const head=["#","나이","BMI","공복혈당","수축기 혈압","당뇨"];
+  let s="<thead><tr>"+head.map(h=>`<th>${h}</th>`).join("")+"</tr></thead><tbody>";
+  for(let i=0;i<7;i++){const r=DATA[i];s+=`<tr><td class="n">${i+1}</td><td class="n">${r[0]}</td><td class="n">${r[1].toFixed(1)}</td><td class="n">${r[2]}</td><td class="n">${r[3]}</td><td>${r[4]?'<b class="t-rand">1 (당뇨)</b>':'<span class="t-grid">0</span>'}</td></tr>`;}
+  s+=`<tr><td class="n">…</td><td colspan="5" class="t-muted">총 150명 (튜닝용) · 151~750번 600명은 독립 테스트</td></tr></tbody>`;$("dataTbl").innerHTML=s;
+  const pos=Y150.reduce((a,b)=>a+b,0),tpos=TEST.reduce((a,i)=>a+YA[i],0);
+  $("dataStats").innerHTML=`<div class="sk-stat"><b>150</b><span>튜닝용 (학습+검증)</span></div><div class="sk-stat"><b>${pos} (${(100*pos/150).toFixed(1)}%)</b><span>당뇨 1</span></div><div class="sk-stat"><b>600</b><span>독립 테스트 (당뇨 ${tpos})</span></div><div class="sk-stat"><b>4</b><span>설명변수</span></div>`;
+}
+function renderFolds(){
+  const K=S.K,f=stratFolds(Y150,K,FOLD_SEED),cnt=[...Array(K)].map((_,k)=>f.filter(v=>v===k).length);
+  const el=$("foldGrid");el.style.gridTemplateColumns=`64px repeat(${K},minmax(0,1fr)) 54px`;
+  let s="";for(let r=0;r<K;r++){s+=`<span class="lab">${r+1}회</span>`;for(let c=0;c<K;c++)s+=`<span class="${r===c?"va":"tr"}">${K>5?(r===c?"V":"T"):(r===c?"검증":"학습")}</span>`;s+=`<span class="lab sk-mono">${cnt[r]}명</span>`;}
+  el.innerHTML=s;$("foldHint").textContent=`${K}겹 · 층화 · 검증 ${cnt.join("/")}명`;
+  const met=S.metric==="acc"?"정확도":"AUC";
+  $("objFormula").innerHTML=`f(C, γ) = (1/${K}) · Σ<sub>k=1..${K}</sub> ${met}( 모형<sub>C,γ</sub>(학습 = 나머지 ${K-1}겹),  검증 = k번째 겹 )<br>평가 1회 = 학습 <b>${K}번</b> · 목표: <b>argmax f(C, γ)</b>`;
+}
+function renderProblem(){
+  const O=curO(),ax=O.o.axes,m=curMap();
+  $("pSynth").hidden=!!O.o.cv;
+  const e=S.p.last&&S.p.last.u===S.p.u&&S.p.last.v===S.p.v&&ECACHE.get(O.key+"|"+S.p.u.toFixed(6)+"|"+S.p.v.toFixed(6));
+  const pts=[];const o=optOf(m);if(o)pts.push({u:o.u,v:o.v,k:"opt"});pts.push({u:S.p.u,v:S.p.v,k:"eval"});
+  drawMap($("pMap"),{O,field:mapField(m,O),levels:mapLevels(m),pts});
+  $("pLeg").innerHTML=legendMap(m,O,LEG.opt+'<span class="t-ink">⊕ 고른 점</span>');
+  let st="";
+  if(e){ st+=`<div class="sk-stat"><b>${fs(e.s,O)}</b><span>${O.o.cv?(S.metric==="acc"?"CV 정확도":"CV AUC"):"점수 f(x)"}</span></div>`;
+    if(O.o.cv) st+=`<div class="sk-stat"><b>${e.ms.toFixed(1)} ms</b><span>평가 1회 (학습 ${O.K}번)</span></div>`;
+    if(m&&m.done){const o2=optOf(m);st+=`<div class="sk-stat"><b>${(Math.abs(o2.s-e.s)<0.5*Math.pow(10,-O.o.dec)?"":(o2.s-e.s>0?"−":"+"))+Math.abs(o2.s-e.s).toFixed(O.o.dec)}</b><span>정밀 최적 대비</span></div><div class="sk-stat"><b>상위 ${(100*quantAbove(m,e.s)).toFixed(1)}%</b><span>지도 전체 중 순위</span></div>`;}
+  } else st=`<div class="sk-stat"><b>?</b><span>[이 점 평가]를 누르세요</span></div>`;
+  $("pStats").innerHTML=st;
+  /* 폴드 점수 막대 */
+  if(e&&e.folds){
+    const K=e.folds.length,lo=Math.max(0,Math.min(...e.folds)-0.08),hi=Math.min(1,Math.max(...e.folds)+0.04),tk=niceTicks(lo,hi,4);
+    chart($("pFolds"),{h:180,x0:0,x1:K,y0:tk.ticks[0],y1:Math.max(hi,tk.ticks[tk.ticks.length-1]),yt:tk.ticks.map(v=>({v,t:fmtTick(v,tk.step)})),
+      xt:e.folds.map((_,k)=>({v:k+0.5,t:(k+1)+"겹"})),yl:S.metric==="acc"?"정확도":"AUC",aria:"폴드별 검증 점수",
+      body:({sx,sy})=>{let b="";const y0=sy(tk.ticks[0]);e.folds.forEach((s,k)=>{const x=sx(k+0.18),w=sx(k+0.82)-x;b+=`<rect class="f-val" x="${x.toFixed(1)}" y="${sy(s).toFixed(1)}" width="${w.toFixed(1)}" height="${(y0-sy(s)).toFixed(1)}" rx="3"/><text class="lb f-ink" x="${(x+w/2).toFixed(1)}" y="${(sy(s)-5).toFixed(1)}" text-anchor="middle">${s.toFixed(3)}</text>`;});
+        b+=`<line class="ln s-ink dsh thin" x1="${sx(0)}" x2="${sx(K)}" y1="${sy(e.s)}" y2="${sy(e.s)}"/>`;return b;}});
+  } else $("pFolds").innerHTML=O.o.cv?"":`<p class="hp-mini">합성 함수는 폴드가 없습니다. 점수 = f(x) 한 번 계산.</p>`;
+  /* α 보기 (150명 전체 학습) */
+  if(O.o.cv){
+    const sp=TESTSP||(TESTSP=prepSplit(XA,YA,TUNE,TEST)),C=toRaw(ax[0],S.p.u),g=toRaw(ax[1],S.p.v),al=krrAlpha(sp,C,g);
+    $("alphaBox").innerHTML=al?`현재 점 (C = ${fmtRaw(ax[0],C)}, γ = ${fmtRaw(ax[1],g)})에서 150명 전체로 학습하면 → <b class="t-ink">파라미터 α 150개</b>: α₁ = ${al[0].toFixed(3)}, α₂ = ${al[1].toFixed(3)}, α₃ = ${al[2].toFixed(3)}, … , α₁₅₀ = ${al[149].toFixed(3)}. 하이퍼파라미터는 <b class="t-ink">2개</b>뿐이지만, 이 2개가 α 150개의 모양을 정한다.`:"";
+  } else $("alphaBox").innerHTML="";
+  /* 예산 표 */
+  const ms=EMS.n?EMS.sum/EMS.n:null;
+  $("pCostHint").textContent=O.o.cv?(ms?`이 페이지 평균 ${ms.toFixed(1)} ms / 평가`:""):"합성 함수: 비용 ≈ 0";
+  const K=O.o.cv?O.K:5;
+  let b=`<thead><tr><th>예산 n</th><th>학습 횟수 n × ${K}</th><th>이 페이지</th><th>학습 1회 1분이면</th></tr></thead><tbody>`;
+  [10,25,50,100,500].forEach(n=>{b+=`<tr><td class="n">${n}</td><td class="n">${(n*K).toLocaleString()}</td><td class="n">${ms&&O.o.cv?fmtSec(n*ms/1000):"—"}</td><td class="n">${fmtSec(n*K*60)}</td></tr>`;});
+  $("pBudget").innerHTML=b+"</tbody>";
+  renderFolds();
+}
+function fmtSec(s){if(s<1)return (s*1000).toFixed(0)+" ms";if(s<60)return s.toFixed(1)+"초";if(s<3600)return (s/60).toFixed(1)+"분";if(s<86400)return (s/3600).toFixed(1)+"시간";if(s<86400*365)return (s/86400).toFixed(1)+"일";return (s/86400/365).toFixed(1)+"년";}
+function renderAxisDemo(){
+  const el=$("axisDemo"),ax=OBJ.cv.axes[0],W=Math.max(280,el.clientWidth||500),H=118,L=16,R=16,pw=W-L-R,X=u=>L+u*pw;
+  const lin=[...Array(9).keys()].map(i=>toU(ax,ax.min+i*(ax.max-ax.min)/8)),lg=[...Array(9).keys()].map(i=>i/8);
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="선형 간격과 로그 간격 후보 비교">`;
+  [[28,"선형 간격 np.linspace(1e-2, 1e4, 9)",lin,"f-rand"],[84,"로그 간격 np.logspace(-2, 4, 9)",lg,"f-grid"]].forEach(([y,t,us,cl])=>{
+    s+=`<text x="${L}" y="${y-14}" style="font-family:var(--sans);font-weight:700;fill:var(--ink);font-size:12px">${t}</text><line class="base" x1="${L}" x2="${W-R}" y1="${y}" y2="${y}"/>`;
+    ax.ticks.forEach(tk=>{const x=X(tickU(ax,tk));s+=`<line class="tk" x1="${x}" x2="${x}" y1="${y-4}" y2="${y+4}"/><text x="${x}" y="${y+17}" text-anchor="middle">10${sup(tk)}</text>`;});
+    us.forEach(u=>{s+=`<circle class="${cl}" cx="${X(u).toFixed(1)}" cy="${y}" r="5" style="stroke:var(--surface);stroke-width:1.5"/>`;});});
+  el.innerHTML=s+"</svg>";
+}
+
+/* =====================================================================
+   2. 격자 탐색
+   ===================================================================== */
+const RUN={};
+function lin(k){return [...Array(k).keys()].map(i=>k===1?0.5:i/(k-1));}
+function gridAxisU(ax,t,scale){return (ax.log&&scale==="lin")?toU(ax,ax.min+t*(ax.max-ax.min)):t;}
+function gridPoints(O,k1,k2,scale){const ax=O.o.axes,us=lin(k1).map(t=>gridAxisU(ax[0],t,scale)),vs=lin(k2).map(t=>gridAxisU(ax[1],t,scale)),pts=[];
+  us.forEach(u=>vs.forEach(v=>pts.push({u,v})));return pts;}
+function ensureGrid(){
+  const O=curO(),c=S.grid,sig=[O.key,c.k1,c.k2,c.scale].join("|");
+  if(RUN.grid&&RUN.grid.sig===sig&&(RUN.grid.done||JOBS.grid)) return RUN.grid;
+  const run={sig,O,pts:gridPoints(O,c.k1,c.k2,c.scale),ev:[],done:false};RUN.grid=run;c.t=null;
+  startJob("grid",(function*(){for(const p of run.pts){run.ev.push(evalP(O,p.u,p.v));yield;}run.done=true;})(),requestDraw,requestDraw);
+  return run;
+}
+function bestIdx(ev,n){let b=-1;for(let i=0;i<n;i++)if(b<0||ev[i].s>ev[b].s)b=i;return b;}
+function renderGrid(){
+  const O=curO(),ax=O.o.axes,run=ensureGrid(),m=curMap(),N=run.pts.length,t=S.grid.t==null?run.ev.length:Math.min(S.grid.t,run.ev.length);
+  $("gK1_l").textContent=`${ax[0].sym} 후보 수 k₁`;$("gK2_l").textContent=`${ax[1].sym} 후보 수 k₂`;
+  const bi=bestIdx(run.ev,t),pts=[];
+  run.pts.forEach((p,i)=>pts.push({u:p.u,v:p.v,k:i<t?"grid":"gridTodo"}));
+  const o=optOf(m);if(o)pts.push({u:o.u,v:o.v,k:"opt"});
+  if(bi>=0)pts.push({u:run.ev[bi].u,v:run.ev[bi].v,k:"best"});
+  if(t>0&&t<N)pts.push({u:run.ev[t-1].u,v:run.ev[t-1].v,k:"cur"});
+  drawMap($("gMap"),{O,field:mapField(m,O),levels:mapLevels(m),pts});
+  $("gLeg").innerHTML=legendMap(m,O,LEG.grid+'<span class="t-grid">□ 아직 평가 전</span>'+LEG.best+LEG.opt);
+  player("gPlayer",t,N,"grid");
+  const best=bi>=0?run.ev[bi]:null;
+  let st=`<div class="sk-stat"><b>${t} / ${N}</b><span>평가 (${S.grid.k1} × ${S.grid.k2})</span></div>`;
+  st+=`<div class="sk-stat"><b>${best?fs(best.s,O):"—"}</b><span>격자 최고</span></div>`;
+  if(o) st+=`<div class="sk-stat"><b>${fs(o.s,O)}</b><span>정밀 최적</span></div><div class="sk-stat"><b>${best?(o.s-best.s).toFixed(O.o.dec):"—"}</b><span>놓친 점수</span></div>`;
+  $("gStats").innerHTML=st;
+  /* 격자 사이에 빠진 최적점 */
+  if(o&&best&&run.ev.length===N){
+    const gu=[...new Set(run.pts.map(p=>p.u))],gv=[...new Set(run.pts.map(p=>p.v))];
+    const near=(arr,x)=>arr.reduce((a,b)=>Math.abs(b-x)<Math.abs(a-x)?b:a);
+    const du=Math.abs(near(gu,o.u)-o.u),dv=Math.abs(near(gv,o.v)-o.v);
+    const spanU=ax[0].log?LOG10(ax[0].max/ax[0].min):ax[0].max-ax[0].min,spanV=ax[1].log?LOG10(ax[1].max/ax[1].min):ax[1].max-ax[1].min;
+    $("gNote").innerHTML=`정밀 최적 (${ax[0].sym} = ${fmtRaw(ax[0],toRaw(ax[0],o.u))}, ${ax[1].sym} = ${fmtRaw(ax[1],toRaw(ax[1],o.v))})은 가장 가까운 격자선에서 ${ax[0].sym} 방향 <b>${(du*spanU).toFixed(2)}${ax[0].log?" 로그 단위":""}</b>, ${ax[1].sym} 방향 <b>${(dv*spanV).toFixed(2)}${ax[1].log?" 로그 단위":""}</b> 떨어져 있다. 격자는 <b>정해 둔 점만</b> 보므로 최적점이 격자 사이에 빠지면 아무리 오래 돌려도 찾지 못한다 (놓친 점수 ${(o.s-best.s).toFixed(O.o.dec)}).`+(S.grid.scale==="lin"&&ax[0].log?` <b class="t-bad">선형 간격</b>이라 후보가 큰 값 쪽에 몰려 작은 ${ax[0].sym} · ${ax[1].sym}를 거의 보지 않는다.`:"");
+  } else $("gNote").textContent=run.done?"정밀 최적을 계산하는 중입니다.":"격자 점을 평가하는 중…";
+  /* 기록 표 */
+  let s=`<thead><tr><th>#</th><th>${ax[0].sym}</th><th>${ax[1].sym}</th><th>점수</th><th>최고</th></tr></thead><tbody>`;
+  let runBest=-Infinity;
+  for(let i=0;i<t;i++){const e=run.ev[i];const nb=e.s>runBest;if(nb)runBest=e.s;
+    s+=`<tr class="${i===bi?"best":""} ${i===t-1&&t<N?"cur":""}"><td class="n">${i+1}</td><td class="n">${fmtRaw(ax[0],toRaw(ax[0],e.u))}</td><td class="n">${fmtRaw(ax[1],toRaw(ax[1],e.v))}</td><td class="n">${fs(e.s,O)}</td><td class="n">${fs(runBest,O)}${nb?' <span class="t-ok">▲</span>':""}</td></tr>`;}
+  $("gLog").innerHTML=s+"</tbody>";
+  const lg=$("gLog").parentElement;if(t<N)lg.scrollTop=lg.scrollHeight;
+  renderDim();
+}
+function renderDim(){
+  const O=curO(),k=S.dim.k,K=O.o.cv?O.K:5,ms=EMS.n?EMS.sum/EMS.n:4,cost=S.dim.cost;
+  let s=`<thead><tr><th>축 수 d</th><th>평가 수 ${k}^d</th><th>학습 횟수 × ${K}겹</th><th>${cost?`학습 1회 ${cost===60?"1분":"10분"}이면`:`이 페이지 (${ms.toFixed(1)} ms/평가)`}</th><th>예</th></tr></thead><tbody>`;
+  const ex=["C, γ","+ kernel","+ degree","+ tol","+ class_weight"];
+  for(let d=2;d<=6;d++){const n=Math.pow(k,d);s+=`<tr><td class="n">${d}</td><td class="n">${n.toLocaleString()}</td><td class="n">${(n*K).toLocaleString()}</td><td class="n">${cost?fmtSec(n*K*cost):fmtSec(n*ms/1000)}</td><td class="t-muted">${ex.slice(0,d-1).join(" ")}</td></tr>`;}
+  $("dimTbl").innerHTML=s+"</tbody>";
+}
+
+/* =====================================================================
+   단계 재생 (격자 · 무작위 · 베이즈 공통)
+   ===================================================================== */
+let PLAY=null;
+function player(id,t,N,which,extra){
+  const el=$(id);
+  if(!el._built){el._built=true;
+    el.innerHTML=`<button type="button" class="sk-btn sk-btn--sm" data-a="first">처음</button><button type="button" class="sk-btn sk-btn--sm" data-a="prev">이전</button><button type="button" class="sk-btn sk-btn--sm" data-a="next">다음</button><button type="button" class="sk-btn sk-btn--sm sk-btn--primary" data-a="play">재생</button><button type="button" class="sk-btn sk-btn--sm" data-a="last">끝까지</button><span class="sk-label">속도</span><div class="sk-seg" role="group" aria-label="재생 속도"><button type="button" data-s="900">느리게</button><button type="button" data-s="450">보통</button><button type="button" data-s="150">빠르게</button></div><span class="hp-step" data-r></span>`;
+    el.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+      if(b.dataset.s){S.speed=+b.dataset.s;document.querySelectorAll(".hp-player [data-s]").forEach(x=>x.setAttribute("aria-pressed",+x.dataset.s===S.speed));if(PLAY){const w=PLAY.which;stopPlay();startPlay(w);}return;}
+      stepAct(which,b.dataset.a);});
+  }
+  el.querySelectorAll("[data-s]").forEach(x=>x.setAttribute("aria-pressed",+x.dataset.s===S.speed));
+  el.querySelector("[data-a=play]").textContent=PLAY&&PLAY.which===which?"멈춤":"재생";
+  el.querySelector("[data-r]").textContent=extra||`${t} / ${N}`;
+}
+function stepInfo(which){
+  if(which==="grid"){const r=RUN.grid;return {t:S.grid.t==null?r.ev.length:S.grid.t,N:r.pts.length,set:v=>{S.grid.t=v;}};}
+  if(which==="rand"){const r=RUN.rand;return {t:S.rand.t==null?r.ev.length:S.rand.t,N:r.pts.length,set:v=>{S.rand.t=v;}};}
+  const r=RUN.bayes,N=bayesMaxIdx();return {t:Math.min(S.bayes.idx,N),N,set:v=>{S.bayes.idx=v;}};
+}
+function stepAct(which,a){
+  const I=stepInfo(which);
+  if(a==="play"){ if(PLAY&&PLAY.which===which) stopPlay(); else { if(I.t>=I.N) I.set(which==="bayes"?0:0); startPlay(which); } requestDraw(); return; }
+  stopPlay();
+  if(a==="first")I.set(0);else if(a==="last")I.set(I.N);else if(a==="next")I.set(Math.min(I.N,I.t+1));else if(a==="prev")I.set(Math.max(0,I.t-1));
+  requestDraw();
+}
+function startPlay(which){stopPlay();PLAY={which,h:setInterval(()=>{const I=stepInfo(which);if(I.t>=I.N){stopPlay();requestDraw();return;}I.set(I.t+1);requestDraw();},S.speed)};}
+function stopPlay(){if(PLAY){clearInterval(PLAY.h);PLAY=null;}}
+
+/* =====================================================================
+   3. 무작위 탐색
+   ===================================================================== */
+function sampleU(ax,dist,r){return (!ax.log||dist==="log")?r.u():toU(ax,ax.min+r.u()*(ax.max-ax.min));}
+function randPoints(O,n,d0,d1,seed){const r=makeRng(seed*1013+17),ax=O.o.axes,pts=[];for(let i=0;i<n;i++)pts.push({u:sampleU(ax[0],d0,r),v:sampleU(ax[1],d1,r)});return pts;}
+function ensureRand(){
+  const O=curO(),c=S.rand,sig=[O.key,c.n,c.d0,c.d1,c.seed].join("|");
+  if(RUN.rand&&RUN.rand.sig===sig&&(RUN.rand.done||JOBS.rand)) return RUN.rand;
+  const run={sig,O,pts:randPoints(O,c.n,c.d0,c.d1,c.seed),ev:[],done:false};RUN.rand=run;c.t=null;
+  startJob("rand",(function*(){for(const p of run.pts){run.ev.push(evalP(O,p.u,p.v));yield;}run.done=true;})(),requestDraw,requestDraw);
+  return run;
+}
+function renderRandom(){
+  const O=curO(),ax=O.o.axes,run=ensureRand(),m=curMap(),N=run.pts.length,t=S.rand.t==null?run.ev.length:Math.min(S.rand.t,run.ev.length);
+  ["rDC","rDG"].forEach((id,k)=>{$(id).querySelectorAll("button").forEach(b=>{b.disabled=!ax[k].log;});$(id+"_l").textContent=`${ax[k].sym} 분포`;});
+  const bi=bestIdx(run.ev,t),pts=[],rugX=[],rugY=[];
+  for(let i=0;i<t;i++){const e=run.ev[i];pts.push({u:e.u,v:e.v,k:"rand"});rugX.push({u:e.u,k:"rand"});rugY.push({v:e.v,k:"rand"});}
+  const o=optOf(m);if(o)pts.push({u:o.u,v:o.v,k:"opt"});
+  if(bi>=0)pts.push({u:run.ev[bi].u,v:run.ev[bi].v,k:"best"});
+  if(t>0&&t<N)pts.push({u:run.ev[t-1].u,v:run.ev[t-1].v,k:"cur"});
+  drawMap($("rMap"),{O,field:mapField(m,O),levels:mapLevels(m),pts,rugX,rugY});
+  $("rLeg").innerHTML=legendMap(m,O,LEG.rand+'<span class="t-rand">▮ 축 위 눈금 = 투영</span>'+LEG.best+LEG.opt);
+  player("rPlayer",t,N,"rand");
+  const best=bi>=0?run.ev[bi]:null;
+  let st=`<div class="sk-stat"><b>${t} / ${N}</b><span>평가</span></div><div class="sk-stat"><b>${best?fs(best.s,O):"—"}</b><span>무작위 최고</span></div>`;
+  if(o) st+=`<div class="sk-stat"><b>${fs(o.s,O)}</b><span>정밀 최적</span></div><div class="sk-stat"><b>${best?(o.s-best.s).toFixed(O.o.dec):"—"}</b><span>놓친 점수</span></div>`;
+  $("rStats").innerHTML=st;
+  const uq=k=>new Set(run.ev.slice(0,t).map(e=>(k?e.v:e.u).toFixed(6))).size;
+  $("rNote").innerHTML=`무작위 점 ${t}개는 ${ax[0].sym} 축에 <b>${uq(0)}개</b>, ${ax[1].sym} 축에 <b>${uq(1)}개</b>의 서로 다른 값을 시험한다 (같은 수의 격자라면 축마다 √${t} ≈ ${Math.sqrt(t).toFixed(1)}개). 예산 n을 정확히 원하는 만큼 정할 수 있고, 언제 멈춰도 그때까지의 최고가 남는다.`+(ax[0].log&&(S.rand.d0==="uni"||S.rand.d1==="uni")?` <b class="t-bad">균등 분포</b>를 고른 축은 점이 큰 값 끝에 몰린다.`:"");
+  let s=`<thead><tr><th>#</th><th>${ax[0].sym}</th><th>${ax[1].sym}</th><th>점수</th><th>최고</th></tr></thead><tbody>`;let rb=-Infinity;
+  for(let i=0;i<t;i++){const e=run.ev[i],nb=e.s>rb;if(nb)rb=e.s;s+=`<tr class="${i===bi?"best":""} ${i===t-1&&t<N?"cur":""}"><td class="n">${i+1}</td><td class="n">${fmtRaw(ax[0],toRaw(ax[0],e.u))}</td><td class="n">${fmtRaw(ax[1],toRaw(ax[1],e.v))}</td><td class="n">${fs(e.s,O)}</td><td class="n">${fs(rb,O)}${nb?' <span class="t-ok">▲</span>':""}</td></tr>`;}
+  $("rLog").innerHTML=s+"</tbody>";const lg=$("rLog").parentElement;if(t<N)lg.scrollTop=lg.scrollHeight;
+  renderBergstra();renderHist();renderProb();
+}
+/* 격자 k×k vs 무작위 k² — 투영 */
+function ensureBG(){
+  const O=curO(),k=S.bg.k,sig=O.key+"|"+k;
+  if(RUN.bg&&RUN.bg.sig===sig&&(RUN.bg.done||JOBS.bg))return RUN.bg;
+  const run={sig,O,g:gridPoints(O,k,k,"log"),r:randPoints(O,k*k,"log","log",3),ge:[],re:[],done:false};RUN.bg=run;
+  startJob("bg",(function*(){for(const p of run.g){run.ge.push(evalP(O,p.u,p.v));yield;}for(const p of run.r){run.re.push(evalP(O,p.u,p.v));yield;}run.done=true;})(),requestDraw,requestDraw);
+  return run;
+}
+function profile(m,axis){ /* 다른 축으로 최댓값 */ const out=[];for(let i=0;i<G;i++){let b=-Infinity;for(let j=0;j<G;j++){const v=axis===0?m.vals[j*G+i]:m.vals[i*G+j];if(v>b)b=v;}out.push(b);}return out;}
+function renderBergstra(){
+  const O=curO(),ax=O.o.axes,run=ensureBG(),m=curMap(),k=S.bg.k;
+  $("bgGT").textContent=`${k} × ${k} = ${k*k}점`;$("bgRT").textContent=`${k*k}점 (seed 3)`;
+  const mk=(ev,kind)=>({pts:ev.map(e=>({u:e.u,v:e.v,k:kind})),rugX:ev.map(e=>({u:e.u,k:kind})),rugY:ev.map(e=>({v:e.v,k:kind}))});
+  const A=mk(run.ge,"grid"),B=mk(run.re,"rand"),o=optOf(m);
+  if(o){A.pts.push({u:o.u,v:o.v,k:"opt"});B.pts.push({u:o.u,v:o.v,k:"opt"});}
+  const gb=bestIdx(run.ge,run.ge.length),rb=bestIdx(run.re,run.re.length);
+  if(gb>=0)A.pts.push({u:run.ge[gb].u,v:run.ge[gb].v,k:"best"});if(rb>=0)B.pts.push({u:run.re[rb].u,v:run.re[rb].v,k:"best"});
+  const F=mapField(m,O),lv=mapLevels(m);
+  drawMap($("bgGrid"),Object.assign({O,field:F,levels:lv,ratio:0.8},A));
+  drawMap($("bgRand"),Object.assign({O,field:F,levels:lv,ratio:0.8},B));
+  const imp=[0,1].map(a=>{ if(!m||!m.done) return null; const p=profile(m,a); return {p,range:Math.max(...p)-Math.min(...p)}; });
+  [0,1].forEach(a=>{
+    const el=$("bgP"+(a+1)),P=imp[a];
+    $("bgP"+(a+1)+"t").innerHTML=`${ax[a].sym} 축에 투영 <small>선 = 다른 축을 가장 잘 골랐을 때 최고 점수${P?` · 폭 ${P.range.toFixed(O.o.dec)}`:""}</small>`;
+    if(!P){el.innerHTML='<p class="hp-mini">점수 지형 계산이 끝나면 보입니다.</p>';return;}
+    const all=run.ge.concat(run.re).map(e=>e.s).concat(P.p),lo=Math.min(m.q05,...all.filter(v=>!isNaN(v))),hi=m.max,tk=niceTicks(lo,hi,4);
+    chart(el,{h:200,x0:0,x1:1,y0:lo,y1:hi+(hi-lo)*0.04,xt:axisTicksU(ax[a]),yt:tk.ticks.filter(v=>v>=lo&&v<=hi).map(v=>({v,t:fmtTick(v,tk.step)})),xl:ax[a].sym,aria:ax[a].sym+" 축 투영",
+      body:({sx,sy,T,ph})=>{let b=`<path class="ln s-true" d="${pathOf(P.p.map((v,i)=>[i/(G-1),v]),sx,sy)}"/>`;
+        run.re.forEach(e=>{const x=sx(a?e.v:e.u);b+=`<line class="ln s-rand thin" x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${T+ph}" y2="${T+ph-10}"/><circle class="f-rand pt" cx="${x.toFixed(1)}" cy="${sy(Math.max(lo,e.s)).toFixed(1)}" r="3.6"/>`;});
+        run.ge.forEach(e=>{const x=sx(a?e.v:e.u);b+=`<line class="ln s-grid thin" x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${T+ph}" y2="${T+ph-16}"/><rect class="f-grid pt" x="${(x-3.5).toFixed(1)}" y="${(sy(Math.max(lo,e.s))-3.5).toFixed(1)}" width="7" height="7"/>`;});
+        return b;}});
+  });
+  const uq=(ev,a)=>new Set(ev.map(e=>(a?e.v:e.u).toFixed(6))).size,bs=(ev)=>ev.length?Math.max(...ev.map(e=>e.s)):NaN;
+  let s=`<thead><tr><th></th><th>${ax[0].sym} 축 서로 다른 값</th><th>${ax[1].sym} 축 서로 다른 값</th><th>최고 점수</th><th>정밀 최적과 차이</th></tr></thead><tbody>`;
+  s+=`<tr><td><b class="t-grid">격자 ${k}×${k}</b></td><td class="n">${uq(run.ge,0)}</td><td class="n">${uq(run.ge,1)}</td><td class="n">${fs(bs(run.ge),O)}</td><td class="n">${o?(o.s-bs(run.ge)).toFixed(O.o.dec):"—"}</td></tr>`;
+  s+=`<tr><td><b class="t-rand">무작위 ${k*k}</b></td><td class="n">${uq(run.re,0)}</td><td class="n">${uq(run.re,1)}</td><td class="n">${fs(bs(run.re),O)}</td><td class="n">${o?(o.s-bs(run.re)).toFixed(O.o.dec):"—"}</td></tr>`;
+  $("bgTbl").innerHTML=s+"</tbody>";
+  if(imp[0]&&imp[1]){const big=imp[0].range>=imp[1].range?0:1,ratio=imp[big].range/Math.max(1e-9,imp[1-big].range);
+    $("bgNote").innerHTML=`투영 곡선의 폭(최고 − 최저)을 보면 <b>${ax[big].sym}</b> 축이 ${ratio.toFixed(1)}배 더 중요하다. 격자는 ${k*k}번 평가해도 중요한 축의 값을 <b>${k}개</b>만 시험하지만, 무작위는 <b>${k*k}개</b>를 시험한다. 덜 중요한 축에 쓴 평가가 낭비되지 않는다는 것이 Bergstra &amp; Bengio (2012)의 논점이다.`+(S.obj!=="lowdim"?` [한 축만 중요] 함수로 바꾸면 차이가 더 뚜렷하다.`:"");}
+  else $("bgNote").textContent="점수 지형 계산이 끝나면 축 중요도를 비교합니다.";
+}
+function renderHist(){
+  const O=curO(),ax=O.o.axes;
+  [0,1].forEach(a=>{
+    const el=$("hist"+(a+1)),A=ax[a],dist=a?S.rand.d1:S.rand.d0,r=makeRng(4242+a),NB=24,cnt=new Array(NB).fill(0),M=2000;
+    for(let i=0;i<M;i++){const u=sampleU(A,dist,r);cnt[Math.min(NB-1,Math.floor(u*NB))]++;}
+    const exp=[...Array(NB).keys()].map(b=>{ if(!A.log||dist==="log") return M/NB; const x0=toRaw(A,b/NB),x1=toRaw(A,(b+1)/NB);return M*(x1-x0)/(A.max-A.min); });
+    const mx=Math.max(...cnt,...exp)*1.08;
+    $("hist"+(a+1)+"t").innerHTML=`${A.sym}: <span class="t-rand">${(!A.log||dist==="log")?(A.log?"로그 균등 loguniform":"균등 uniform"):"균등 uniform (원래 눈금)"}</span>`;
+    const run=RUN.rand,t=run?(S.rand.t==null?run.ev.length:S.rand.t):0;
+    chart(el,{h:160,x0:0,x1:1,y0:0,y1:mx,xt:axisTicksU(A),yt:niceTicks(0,mx,3).ticks.map(v=>({v,t:String(v)})),yl:"개수",aria:A.sym+" 표본 히스토그램",B:34,
+      body:({sx,sy,T,ph})=>{let b="";cnt.forEach((c,i)=>{const x=sx(i/NB)+1,w=sx(1/NB)-sx(0)-2;b+=`<rect class="f-rand" opacity="0.75" x="${x.toFixed(1)}" y="${sy(c).toFixed(1)}" width="${w.toFixed(1)}" height="${(sy(0)-sy(c)).toFixed(1)}"/>`;});
+        b+=`<path class="ln s-ink thin dsh" d="${exp.map((e,i)=>`${i?"L":"M"}${sx(i/NB).toFixed(1)} ${sy(e).toFixed(1)} H${sx((i+1)/NB).toFixed(1)}`).join("")}"/>`;
+        if(run)for(let i=0;i<t;i++){const e=run.ev[i];const x=sx(a?e.v:e.u);b+=`<line class="ln s-ink thin" x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${T+ph}" y2="${T+ph-8}"/>`;}
+        return b;}});
+  });
+  const A=ax[0];
+  $("histNote").innerHTML=A.log?`점선 = 이론 분포, 아래 짧은 선 = 현재 무작위 탐색의 점. 원래 눈금에서 균등하게 뽑으면 C ∈ [10², 10⁴]일 확률이 ${(100*(A.max-100)/(A.max-A.min)).toFixed(1)}% — 6단위 중 2단위에 거의 모든 점이 몰린다. 로그 균등은 단위마다 같은 확률(1/6)을 준다.`:`합성 함수의 축은 선형 눈금이라 균등 분포만 씁니다. 로그 눈금 비교는 [당뇨 · 교차검증]에서 보세요.`;
+}
+let PROBSIM=null;
+function renderProb(){
+  const O=curO(),q=S.prob.q/100,n=S.rand.n,m=curMap(),P=n=>1-Math.pow(1-q,n),n95=Math.ceil(Math.log(0.05)/Math.log(1-q));
+  $("pq_v").textContent=S.prob.q+"%";
+  $("probF").innerHTML=`P(n개 중 하나 이상이 상위 ${S.prob.q}%) = 1 − (1 − ${q.toFixed(2)})<sup>n</sup><br>n = ${n} → 1 − ${(1-q).toFixed(2)}<sup>${n}</sup> = <b>${P(n).toFixed(4)}</b>  ·  95%가 되려면 n ≥ ln 0.05 / ln ${(1-q).toFixed(2)} = <b>${n95}</b>`;
+  chart($("probChart"),{h:200,x0:1,x1:100,y0:0,y1:1,xt:[1,20,40,60,80,100].map(v=>({v,t:String(v)})),yt:[0,0.25,0.5,0.75,1].map(v=>({v,t:v.toFixed(2)})),xl:"평가 횟수 n",yl:"확률",aria:"상위 영역 적중 확률",
+    body:({sx,sy})=>{const pts=[];for(let k=1;k<=100;k++)pts.push([k,P(k)]);let b=`<line class="ln s-bad thin dsh" x1="${sx(1)}" x2="${sx(100)}" y1="${sy(0.95)}" y2="${sy(0.95)}"/><path class="ln s-rand" d="${pathOf(pts,sx,sy)}"/>`;
+      b+=`<circle class="f-rand pt" cx="${sx(n)}" cy="${sy(P(n))}" r="5"/><text class="lb f-rand" x="${sx(n)+8}" y="${sy(P(n))+14}">n = ${n}: ${P(n).toFixed(3)}</text>`;
+      if(n95<=100)b+=`<circle class="f-bad pt" cx="${sx(n95)}" cy="${sy(P(n95))}" r="4"/><text class="lb f-bad" x="${sx(n95)}" y="${sy(0.95)-8}" text-anchor="middle">95% · n = ${n95}</text>`;return b;}});
+  let st=`<div class="sk-stat"><b>${P(n).toFixed(3)}</b><span>이론 (n = ${n})</span></div><div class="sk-stat"><b>${n95}</b><span>95% 필요한 n</span></div>`;
+  if(m&&m.done){
+    const sig=[O.key,S.prob.q,n,S.rand.d0,S.rand.d1].join("|");
+    if(!PROBSIM||PROBSIM.sig!==sig){const thr=fineQuant(m,1-q),r=makeRng(99),ax=O.o.axes,T=2000;let hit=0;
+      for(let t=0;t<T;t++){for(let i=0;i<n;i++){const u=sampleU(ax[0],S.rand.d0,r),v=sampleU(ax[1],S.rand.d1,r);if(mapAt(m,u,v)>=thr){hit++;break;}}}
+      PROBSIM={sig,rate:hit/T,area:quantAbove(m,thr)};}
+    st+=`<div class="sk-stat"><b>${PROBSIM.rate.toFixed(3)}</b><span>모의 실험 2,000회 (지도 기준)</span></div>`;
+    $("probNote").innerHTML=`모의 실험: 점수 지형에서 상위 ${S.prob.q}% 경계 이상인 곳에 점이 하나라도 떨어진 비율. 공식은 "점 하나가 그 영역에 들어갈 확률 = q"를 가정하므로, 상위 영역을 정한 눈금(여기서는 로그 눈금 면적)과 <b>같은 분포로 뽑을 때</b> 맞는다. 분포를 균등으로 바꾸면 모의 실험 값이 공식과 달라지는 것을 확인해 보세요. 이 공식은 차원 수와 무관하다 — 상위 5% 영역을 95% 확률로 맞히는 데 60번이면 충분하다.`;
+  } else $("probNote").textContent="점수 지형 계산이 끝나면 모의 실험 값이 함께 나옵니다.";
+  $("probStats").innerHTML=st;
+}
+
+/* =====================================================================
+   4. 베이즈 최적화
+   ===================================================================== */
+function bayesSig(O,c){return [O.key,c.acq,c.kappa,c.xi,c.kernel,c.lsMode,c.ls,c.noise,c.n0,c.budget,c.seed].join("|");}
+function* bayesGen(O,c,run,withFields){
+  const r=makeRng(c.seed*7919+11),X=[],Y=[];
+  for(let i=0;i<c.n0;i++){const u=r.u(),v=r.u(),e=evalP(O,u,v);X.push([u,v]);Y.push(e.s);run.init.push(e);yield;}
+  for(let it=c.n0;it<c.budget;it++){
+    const gp=c.lsMode==="auto"?gpFitAuto(X,Y,c.noise,c.kernel):gpFit(X,Y,[c.ls,c.ls],c.noise,c.kernel);yield;
+    if(!gp)break;
+    const ft=Math.max(...gp.yt),far=(u,v)=>X.every(p=>Math.abs(p[0]-u)+Math.abs(p[1]-v)>1e-4);
+    let best=null;const tryP=(u,v)=>{if(!far(u,v))return false;const p=gpPredict(gp,[u,v]),a=acqValue(c.acq,p.mt,p.st,ft,c.xi,c.kappa);if(!best||a>best.a){best={u,v,a,p};return true;}return false;};
+    let F=null;if(withFields)F={mu:new Float64Array(G*G),sd:new Float64Array(G*G),acq:new Float64Array(G*G)};
+    for(let j=0;j<G;j++)for(let i=0;i<G;i++){const u=i/(G-1),v=j/(G-1);
+      if(F){const p=gpPredict(gp,[u,v]);F.mu[j*G+i]=p.mu;F.sd[j*G+i]=p.sd;F.acq[j*G+i]=acqValue(c.acq,p.mt,p.st,ft,c.xi,c.kappa);}
+      tryP(u,v);}
+    for(let k=0;k<256;k++)tryP(r.u(),r.u());
+    yield;
+    let st=1/(G-1)/2;for(let lev=0;lev<6;lev++){let imp=true,guard=0;while(imp&&guard++<20){imp=false;const b0=best;for(const[du,dv]of DIRS8){tryP(clamp(b0.u+du*st,0,1),clamp(b0.v+dv*st,0,1));}if(best!==b0)imp=true;}st/=2;}
+    const e=evalP(O,best.u,best.v);
+    const z=(best.p.mt-ft-c.xi)/best.p.st;
+    run.steps.push({X:X.map(p=>p.slice()),Y:Y.slice(),gp,ft,next:{u:best.u,v:best.v,a:best.a,mt:best.p.mt,st:best.p.st,mu:best.p.mu,sd:best.p.sd,z},ev:e,F});
+    X.push([best.u,best.v]);Y.push(e.s);yield;
+  }
+  run.X=X;run.Y=Y;run.done=true;
+}
+function ensureBayes(){
+  const O=curO(),c=S.bayes,sig=bayesSig(O,c);
+  if(RUN.bayes&&RUN.bayes.sig===sig&&(RUN.bayes.done||JOBS.bayes))return RUN.bayes;
+  const run={sig,O,init:[],steps:[],done:false};RUN.bayes=run;
+  startJob("bayes",bayesGen(O,Object.assign({},c),run,true),requestDraw,requestDraw);
+  return run;
+}
+function bayesMaxIdx(){const c=S.bayes;return 1+4*(c.budget-c.n0)-1;}
+function bayesPos(){const idx=S.bayes.idx;if(idx<=0)return {it:-1,ph:4};const it=Math.floor((idx-1)/4),ph=(idx-1)%4;return {it,ph};}
+function renderBayes(){
+  const O=curO(),ax=O.o.axes,c=S.bayes,run=ensureBayes(),m=curMap(),N=bayesMaxIdx();
+  if(S.bayes.idx>N)S.bayes.idx=N;
+  let pos=bayesPos();
+  /* 아직 계산 안 된 반복이면 계산된 곳까지 */
+  const avail=run.steps.length;
+  if(pos.it>=avail){ pos={it:avail-1,ph:3}; }
+  const step=pos.it>=0?run.steps[pos.it]:null;
+  $("bSlice0").textContent=`${ax[0].sym} 방향`;$("bSlice1").textContent=`${ax[1].sym} 방향`;
+  $("bAcqT").innerHTML=`획득 함수 ${c.acq.toUpperCase()} <small>${c.acq==="ucb"?`κ = ${c.kappa.toFixed(2)}`:`ξ = ${c.xi.toFixed(2)}`}</small>`;
+  /* 단계 표시 */
+  const lis=$("bStepper").querySelectorAll("li");
+  lis.forEach((li,i)=>{li.className="";if(pos.it<0){if(i===0)li.className="on";}else{if(i===0)li.className="done";else if(i-1<pos.ph)li.className="done";else if(i-1===pos.ph)li.className="on";}});
+  const nIter=c.budget-c.n0;
+  player("bPlayer",S.bayes.idx,N,"bayes",pos.it<0?`초기 ${c.n0}점`:`반복 ${pos.it+1} / ${nIter} · 평가 ${c.n0+pos.it+(pos.ph>=2?1:0)} / ${c.budget}`);
+  $("bIterHint").textContent=run.done?`초기 무작위 ${c.n0}점 + 베이즈 ${nIter}회 = 평가 ${c.budget}회`:`계산 중… (반복 ${avail} / ${nIter})`;
+  /* 점 목록 */
+  const pts=[],nObs=pos.it<0?run.init.length:c.n0+pos.it+(pos.ph>=3?1:0);
+  const allEv=run.init.concat(run.steps.map(s=>s.ev));
+  for(let i=0;i<Math.min(nObs,allEv.length);i++){const e=allEv[i];pts.push({u:e.u,v:e.v,k:i<c.n0?"bInit":"bayes",lab:i>=c.n0?String(i+1):null});}
+  const bi=bestIdx(allEv,Math.min(nObs,allEv.length));
+  const o=optOf(m);
+  const extra=[];if(o)extra.push({u:o.u,v:o.v,k:"opt"});if(bi>=0)extra.push({u:allEv[bi].u,v:allEv[bi].v,k:"best"});
+  if(step&&pos.ph>=1)extra.push({u:step.next.u,v:step.next.v,k:"next"});
+  if(step&&pos.ph===2)extra.push({u:step.next.u,v:step.next.v,k:"cur"});
+  const all=pts.concat(extra);
+  const fieldMu=step&&step.F?{vals:step.F.mu,lo:m&&m.done?m.q05:Math.min(...step.F.mu),hi:m&&m.done?m.max:Math.max(...step.F.mu),ramp:"map"}:(m?mapField(m,O):null);
+  drawMap($("bMu"),{O,field:fieldMu,pts:all,ratio:0.86});
+  $("bMuL").innerHTML=step&&step.F?`<span class="hp-ramp map"><span>${fieldMu.lo.toFixed(3)}</span><i></i><span>${fieldMu.hi.toFixed(3)}</span></span><span>지도와 같은 색 범위</span>`:"초기 점 단계: 실제 점수 지형";
+  if(step&&step.F){
+    const sdM=Math.max(...step.F.sd),aM=Math.max(...step.F.acq),aL=Math.min(...step.F.acq);
+    drawMap($("bSd"),{O,field:{vals:step.F.sd,lo:0,hi:sdM,ramp:"sd"},pts:all,ratio:0.86});
+    drawMap($("bAcq"),{O,field:{vals:step.F.acq,lo:aL,hi:aM,ramp:"acq"},pts:pos.ph>=1?all:pts,ratio:0.86});
+    $("bSdL").innerHTML=`<span class="hp-ramp sd"><span>0</span><i></i><span>${sdM.toFixed(3)}</span></span><span>원 점수 단위</span>`;
+    $("bAcqL").innerHTML=`<span class="hp-ramp acq"><span>${aL.toFixed(3)}</span><i></i><span>${aM.toFixed(3)}</span></span><span>${pos.ph>=1?"★ = 최댓값 위치":"② 단계에서 최댓값 표시"}</span>`;
+  } else {
+    drawMap($("bSd"),{O,field:null,pts,ratio:0.86});drawMap($("bAcq"),{O,field:null,pts,ratio:0.86});
+    $("bSdL").textContent="[다음]을 누르면 GP를 맞춥니다";$("bAcqL").textContent="";
+  }
+  renderSlice(O,run,step,pos,allEv,nObs);
+  renderBayesNums(O,run,step,pos);
+  renderBayesHist(O,run,nObs);
+}
+function renderSlice(O,run,step,pos,allEv,nObs){
+  const ax=O.o.axes,a=S.bayes.slice,m=curMap(),elC=$("bSliceC"),elA=$("bSliceA");
+  if(!step){elC.innerHTML='<p class="hp-mini">초기 무작위 점을 평가한 상태입니다. [다음]을 누르면 GP 대리 모형을 맞추고 1차원 단면을 그립니다.</p>';elA.innerHTML="";$("bSliceL").innerHTML="";$("bSliceHint").textContent="";return;}
+  const fix=a===0?step.next.v:step.next.u,other=ax[1-a];
+  $("bSliceHint").textContent=`${other.sym} = ${fmtRaw(other,toRaw(other,fix))} 에 고정 (다음 평가 점을 지나는 단면)`;
+  const gp=step.gp,NS=121,xs=[],mu=[],lo=[],hi=[],tr=[],aq=[];
+  for(let i=0;i<NS;i++){const t=i/(NS-1),x=a===0?[t,fix]:[fix,t],p=gpPredict(gp,x);xs.push(t);mu.push(p.mu);lo.push(p.mu-2*p.sd);hi.push(p.mu+2*p.sd);
+    aq.push(acqValue(S.bayes.acq,p.mt,p.st,step.ft,S.bayes.xi,S.bayes.kappa));
+    tr.push(O.o.cv?(m?mapAt(m,x[0],x[1]):NaN):O.o.f(x[0],x[1]));}
+  const near=step.X.map((p,i)=>({p,y:step.Y[i],i})).filter(o=>Math.abs((a===0?o.p[1]:o.p[0])-fix)<0.06);
+  const vals=mu.concat(lo,hi,tr.filter(v=>!isNaN(v)),near.map(o=>o.y)),y0=Math.min(...vals),y1=Math.max(...vals),tk=niceTicks(y0,y1,4);
+  const nx=a===0?step.next.u:step.next.v;
+  const pad=(y1-y0)*0.04||0.01;
+  chart(elC,{h:220,x0:0,x1:1,y0:y0-pad,y1:y1+pad,xt:axisTicksU(ax[a]),yt:tk.ticks.filter(v=>v>=y0&&v<=y1).map(v=>({v,t:fmtTick(v,tk.step)})),xl:"",yl:"점수",aria:"GP 1차원 단면",
+    body:({sx,sy,T,ph})=>{let b=`<path class="band f-bayes" d="${pathOf(xs.map((x,i)=>[x,hi[i]]),sx,sy)} L${xs.slice().reverse().map((x,i)=>sx(x).toFixed(1)+" "+sy(lo[NS-1-i]).toFixed(1)).join(" L")} Z"/>`;
+      b+=`<path class="ln s-true thin dsh" d="${pathOf(xs.map((x,i)=>[x,tr[i]]),sx,sy)}"/><path class="ln s-bayes" d="${pathOf(xs.map((x,i)=>[x,mu[i]]),sx,sy)}"/>`;
+      b+=`<line class="ln s-acq thin dsh" x1="${sx(nx)}" x2="${sx(nx)}" y1="${T}" y2="${T+ph}"/>`;
+      near.forEach(o=>{b+=`<circle class="f-ink pt" cx="${sx(a===0?o.p[0]:o.p[1]).toFixed(1)}" cy="${sy(o.y).toFixed(1)}" r="4"/>`;});
+      if(pos.ph>=2)b+=`<circle class="f-acq pt" cx="${sx(nx).toFixed(1)}" cy="${sy(step.ev.s).toFixed(1)}" r="5.5"/>`;
+      return b;}});
+  const aMin=Math.min(...aq),aMax=Math.max(...aq),atk=niceTicks(aMin,aMax,3);
+  chart(elA,{h:130,x0:0,x1:1,y0:aMin,y1:aMax+(aMax-aMin)*0.08||1,xt:axisTicksU(ax[a]),yt:atk.ticks.filter(v=>v>=aMin&&v<=aMax).map(v=>({v,t:fmtTick(v,atk.step)})),xl:ax[a].sym,yl:S.bayes.acq.toUpperCase(),aria:"획득 함수 단면",T:8,
+    body:({sx,sy,T,ph})=>{let b=`<path class="ln s-acq" d="${pathOf(xs.map((x,i)=>[x,aq[i]]),sx,sy)}"/><line class="ln s-acq thin dsh" x1="${sx(nx)}" x2="${sx(nx)}" y1="${T}" y2="${T+ph}"/>`;
+      if(pos.ph>=1){const i=Math.round(nx*(NS-1));b+=`<circle class="f-acq pt" cx="${sx(nx).toFixed(1)}" cy="${sy(aq[i]).toFixed(1)}" r="4.5"/>`;}return b;}});
+  $("bSliceL").innerHTML=`<span><i class="hp-sw ln bg-bayes"></i>GP 평균 μ</span><span class="t-bayes"><i class="hp-sw" style="background:currentColor;opacity:.25"></i>μ ± 2σ</span><span class="t-muted"><i class="hp-sw dash"></i>실제 점수${O.o.cv?" (지도)":""}</span><span><i class="hp-sw c bg-ink"></i>근처(±0.06) 관측</span><span><i class="hp-sw ln bg-acq"></i>획득 함수 · 다음 점</span>`;
+}
+function renderBayesNums(O,run,step,pos){
+  const ax=O.o.axes,c=S.bayes,el=$("bNums");
+  if(!step){const best=run.init.length?Math.max(...run.init.map(e=>e.s)):NaN;
+    el.innerHTML=`<p class="sk-note">초기 무작위 점 <b>${run.init.length}개</b>를 평가했습니다 (최고 ${fs(best,O)}). GP는 이 점들로 시작합니다. 아무 정보 없이 시작하면 GP가 모든 곳을 똑같이 모르기 때문에, 먼저 공간 전체에 몇 점을 흩뿌린다.</p>`;return;}
+  const g=step.gp,n=step.next,lsTxt=g.ls.map((l,k)=>`ℓ${k?"₂":"₁"} = ${l.toFixed(3)}${ax[k].log?` (${(l*LOG10(ax[k].max/ax[k].min)).toFixed(2)} 로그 단위)`:""}`).join(" · ");
+  let s=`<dl class="hp-kv2"><dt>관측 점 수</dt><dd>${g.n}</dd><dt>log 주변우도</dt><dd>${g.lml.toFixed(3)}</dd><dt>ȳ (평균)</dt><dd>${g.ym.toFixed(4)}</dd><dt>s_y (표준편차)</dt><dd>${g.ys.toFixed(4)}</dd></dl>`;
+  s+=`<p class="hp-mini">① GP 적합: ${c.kernel==="rbf"?"RBF":"Matérn 5/2"} 커널, ${lsTxt}${c.lsMode==="auto"?" — 최대우도로 고름":" — 직접 지정"}, σₙ² = ${c.noise.toExponential(1)}</p>`;
+  s+=`<div class="sk-formula">μ̃(x) = k*ᵀ (K + σₙ²I)⁻¹ ỹ ,  σ̃²(x) = 1 − k*ᵀ (K + σₙ²I)⁻¹ k*<br>원래 단위: μ = ȳ + s_y·μ̃ ,  σ = s_y·σ̃</div>`;
+  if(pos.ph>=1){
+    const imp=n.mt-step.ft-c.xi;
+    s+=`<p class="hp-mini" style="margin-top:4px">② 획득 함수 최대화 → 다음 점 <b class="t-ink">${ax[0].sym} = ${fmtRaw(ax[0],toRaw(ax[0],n.u))}, ${ax[1].sym} = ${fmtRaw(ax[1],toRaw(ax[1],n.v))}</b></p>`;
+    s+=`<dl class="hp-kv2"><dt>μ̃ (표준화)</dt><dd>${n.mt.toFixed(4)}</dd><dt>σ̃</dt><dd>${n.st.toFixed(4)}</dd><dt>f̃* (지금 최고)</dt><dd>${step.ft.toFixed(4)}</dd><dt>μ ± σ (원 단위)</dt><dd>${n.mu.toFixed(4)} ± ${n.sd.toFixed(4)}</dd></dl>`;
+    if(c.acq==="ucb") s+=`<div class="sk-formula">UCB = μ̃ + κ·σ̃ = ${n.mt.toFixed(4)} + ${c.kappa.toFixed(2)} × ${n.st.toFixed(4)} = <b>${n.a.toFixed(4)}</b></div>`;
+    else { const Phi=normCdf(n.z),phi=normPdf(n.z);
+      s+=`<div class="sk-formula">z = (μ̃ − f̃* − ξ) / σ̃ = (${n.mt.toFixed(4)} − ${step.ft.toFixed(4)} − ${c.xi.toFixed(2)}) / ${n.st.toFixed(4)} = <b>${n.z.toFixed(4)}</b><br>Φ(z) = ${Phi.toFixed(4)} ,  φ(z) = ${phi.toFixed(4)}<br>`+
+        (c.acq==="pi"?`PI = Φ(z) = <b>${n.a.toFixed(4)}</b>`:`EI = ${imp.toFixed(4)} × ${Phi.toFixed(4)} + ${n.st.toFixed(4)} × ${phi.toFixed(4)} = <b>${n.a.toFixed(4)}</b>  (원 단위 ${(n.a*step.gp.ys).toFixed(5)})`)+`</div>`; }
+    const tilt=n.st>0.5?"σ가 큰 곳 → <b>탐색</b> 쪽 선택":(n.mt>step.ft-0.2?"μ가 높은 곳 근처 → <b>활용</b> 쪽 선택":"μ와 σ의 절충");
+    s+=`<p class="hp-mini">${tilt}</p>`;
+  }
+  if(pos.ph>=2){const e=step.ev,inB=Math.abs(e.s-n.mu)<=2*n.sd;
+    s+=`<p class="hp-mini">③ 평가: 실제 ${O.o.cv?`${O.K}겹 CV`:"함수"} 점수 = <b class="t-ink sk-mono">${fs(e.s,O)}</b>${e.folds?` (폴드 ${e.folds.map(v=>v.toFixed(3)).join(", ")})`:""} — 예측 구간 μ ± 2σ = [${(n.mu-2*n.sd).toFixed(4)}, ${(n.mu+2*n.sd).toFixed(4)}] ${inB?'<span class="t-ok">안</span>':'<span class="t-bad">밖</span>'}</p>`;}
+  if(pos.ph>=3){const prev=Math.max(...step.Y),now=Math.max(prev,step.ev.s);
+    s+=`<p class="hp-mini">④ 갱신: 관측 ${g.n+1}개, 최고 ${fs(prev,O)} → <b class="t-ink">${fs(now,O)}</b>${now>prev?' <span class="t-ok">개선</span>':" (그대로)"} → 다시 ①로</p>`;}
+  el.innerHTML=s;
+}
+function renderBayesHist(O,run,nObs){
+  const el=$("bHist"),ev=run.init.concat(run.steps.map(s=>s.ev)).slice(0,nObs),c=S.bayes,m=curMap(),o=optOf(m);
+  if(!ev.length){el.innerHTML="";return;}
+  const ys=ev.map(e=>e.s).concat(o?[o.s]:[]),lo=Math.min(...ys),hi=Math.max(...ys),tk=niceTicks(lo,hi,4);
+  chart(el,{h:190,x0:0.5,x1:c.budget+0.5,y0:lo-(hi-lo)*0.05,y1:hi+(hi-lo)*0.06,xt:niceTicks(1,c.budget,5).ticks.filter(v=>v>=1).map(v=>({v,t:String(v)})),yt:tk.ticks.filter(v=>v>=lo&&v<=hi).map(v=>({v,t:fmtTick(v,tk.step)})),xl:"평가 순서",yl:"점수",aria:"베이즈 최적화 평가 기록",
+    body:({sx,sy,T,ph})=>{let b=`<rect x="${sx(0.5)}" y="${T}" width="${(sx(c.n0+0.5)-sx(0.5)).toFixed(1)}" height="${ph}" style="fill:var(--surface-2)"/>`;
+      if(o)b+=`<line class="ln s-ink thin dsh" x1="${sx(0.5)}" x2="${sx(c.budget+0.5)}" y1="${sy(o.s)}" y2="${sy(o.s)}"/>`;
+      let best=-Infinity;const bp=ev.map((e,i)=>{best=Math.max(best,e.s);return [i+1,best];});
+      b+=`<path class="ln s-ok" d="${bp.map((p,i)=>(i?"H"+sx(p[0]).toFixed(1)+" V":"M"+sx(p[0]).toFixed(1)+" ")+sy(p[1]).toFixed(1)).join(" ")}"/>`;
+      ev.forEach((e,i)=>{b+=i<c.n0?`<circle class="f-surf" cx="${sx(i+1)}" cy="${sy(e.s)}" r="4" style="stroke:var(--bayes);stroke-width:2"/>`:`<circle class="f-bayes pt" cx="${sx(i+1)}" cy="${sy(e.s)}" r="4"/>`;});
+      b+=`<text class="lb f-ink" x="${sx(c.n0/2+0.5)}" y="${T+ph-6}" text-anchor="middle">초기</text>`;return b;}});
+}
+
+/* =====================================================================
+   5. 비교 실험
+   ===================================================================== */
+function cmpEps(O){const e=O.o.eps;return e[0]*Math.pow(e[1]/e[0],S.cmp.epsT/100);}
+function cmpSig(O){const c=S.cmp,b=S.bayes;return [O.key,c.n,c.R,b.acq,b.kappa,b.xi,b.kernel,b.lsMode,b.ls,b.noise,b.n0].join("|");}
+function curveOf(ev){let b=-Infinity,bi=-1;return ev.map((e,i)=>{if(e.s>b){b=e.s;bi=i;}return {s:b,i:bi};});}
+function* cmpGen(O,res){
+  const n=res.n,R=res.R,k=Math.max(2,Math.floor(Math.sqrt(n))),gpts=gridPoints(O,k,k,"log");res.k=k;
+  const total=gpts.length+R*n*2;let done=0;const prog=()=>{res.prog=done/total;};
+  const gev=[];for(const p of gpts){gev.push(evalP(O,p.u,p.v));done++;prog();yield;}
+  for(let s=1;s<=R;s++){const ord=makeRng(500+s).shuffle(gev.slice());res.grid.push({ev:ord,c:curveOf(ord)});}
+  for(let s=1;s<=R;s++){const pts=randPoints(O,n,"log","log",100+s),ev=[];for(const p of pts){ev.push(evalP(O,p.u,p.v));done++;prog();yield;}res.rand.push({ev,c:curveOf(ev)});}
+  const bc=Object.assign({},S.bayes,{budget:n});
+  for(let s=1;s<=R;s++){const run={init:[],steps:[]};const cfg=Object.assign({},bc,{seed:200+s,n0:Math.min(bc.n0,n-1)});
+    const it=bayesGen(O,cfg,run,false);let st;while(!(st=it.next()).done){done=Math.min(total,gpts.length+R*n+(s-1)*n+run.init.length+run.steps.length);prog();yield;}
+    const ev=run.init.concat(run.steps.map(x=>x.ev));res.bayes.push({ev,c:curveOf(ev)});}
+  res.prog=1;
+  if(O.o.cv){
+    /* 고른 설정의 테스트 점수 */
+    ["grid","rand","bayes"].forEach(mth=>res[mth].forEach(rn=>{const b=rn.c[rn.c.length-1],e=rn.ev[b.i];rn.test=testScore(O,e.u,e.v);}));
+    yield;
+    res.over=[];for(let t=0;t<n;t++){let a=0,b=0;res.rand.forEach(rn=>{const e=rn.ev[rn.c[t].i];a+=e.s;b+=testScore(O,e.u,e.v);});res.over.push([t+1,a/R,b/R]);if(t%5===4)yield;}
+    /* 중첩 교차검증 */
+    const of=stratFolds(Y150,5,11),outer=[];
+    for(let k=0;k<5;k++){
+      const tr=[],te=[];of.forEach((f,i)=>(f===k?te:tr).push(i));
+      const Xs=tr.map(i=>X150[i]),Ys=tr.map(i=>Y150[i]),inner=prepCV(Xs,Ys,stratFolds(Ys,4,13),4);
+      const r=makeRng(77+k);let best=null;
+      for(let t=0;t<15;t++){const u=r.u(),v=r.u(),C=toRaw(O.o.axes[0],u),g=toRaw(O.o.axes[1],v),sc=cvEvalBoth(inner,C,g),s=O.metric==="acc"?sc.acc:sc.auc;if(!best||s>best.s)best={u,v,s,C,g};yield;}
+      const sp=prepSplit(X150,Y150,tr,te),f=krrDecision(sp,best.C,best.g),os=O.metric==="acc"?accScore(sp.yva,f):aucScore(sp.yva,f);
+      outer.push({inner:best.s,outer:os,C:best.C,g:best.g});yield;}
+    res.nested=outer;
+  }
+  res.done=true;
+}
+function ensureCmp(force){
+  const O=curO(),sig=cmpSig(O);
+  if(!force&&RUN.cmp&&RUN.cmp.sig===sig&&(RUN.cmp.done||JOBS.cmp))return RUN.cmp;
+  const res={sig,O,n:S.cmp.n,R:S.cmp.R,grid:[],rand:[],bayes:[],prog:0,done:false};RUN.cmp=res;
+  startJob("cmp",cmpGen(O,res),requestDraw,requestDraw);return res;
+}
+function renderCompare(){
+  const O=curO(),ax=O.o.axes,res=ensureCmp(false),m=curMap(),o=optOf(m),eps=cmpEps(O);
+  $("cE_v").textContent=eps.toPrecision(2);
+  $("cProg").textContent=res.done?`완료 · 격자 ${res.k}×${res.k} = ${res.k*res.k}회, 무작위 · 베이즈 ${res.n}회 × seed ${res.R}개`:`계산 중 ${Math.round(100*res.prog)}%`;
+  const el=$("cChart");
+  if(!res.grid.length||!o){el.innerHTML=`<p class="hp-mini">계산 중… ${Math.round(100*res.prog)}%</p>`;$("cTbl").innerHTML="";$("cNote").textContent="";renderOver(O,res);return;}
+  const reg=S.cmp.view==="regret",n=res.n;
+  const agg=runs=>{const L=Math.max(...runs.map(r=>r.c.length)),out=[];for(let t=0;t<L;t++){const v=runs.filter(r=>r.c.length>t).map(r=>r.c[t].s);if(!v.length)break;out.push({t:t+1,mean:v.reduce((a,b)=>a+b,0)/v.length,lo:Math.min(...v),hi:Math.max(...v)});}return out;};
+  const A={grid:agg(res.grid),rand:agg(res.rand),bayes:res.bayes.length?agg(res.bayes):[]};
+  const tr=v=>reg?LOG10(Math.max(o.s-v,1e-4)):v;
+  let all=[];Object.values(A).forEach(a=>a.forEach(p=>{all.push(tr(p.lo),tr(p.hi));}));all.push(reg?LOG10(1e-4):o.s);
+  let y0=Math.min(...all),y1=Math.max(...all);if(!reg){y0=Math.max(y0,m.sorted[Math.floor(0.5*(m.sorted.length-1))]);}
+  const tk=reg?{ticks:[...Array(9).keys()].map(i=>i-4).filter(v=>v>=Math.floor(y0)&&v<=Math.ceil(y1)),step:1}:niceTicks(y0,y1,5);
+  if(reg){y0=Math.floor(y0);y1=Math.ceil(y1);}
+  chart(el,{h:300,x0:1,x1:n,y0,y1:y1+(y1-y0)*0.03,xt:niceTicks(1,n,6).ticks.filter(v=>v>=1).map(v=>({v,t:String(v)})),yt:tk.ticks.filter(v=>v>=y0&&v<=y1).map(v=>({v,t:reg?"10"+sup(v):fmtTick(v,tk.step)})),xl:"평가 횟수",yl:reg?"최적 − 지금까지 최고":"지금까지 최고 점수",aria:"세 방법 비교",
+    body:({sx,sy})=>{let b="";if(!reg)b+=`<line class="ln s-ink thin dsh" x1="${sx(1)}" x2="${sx(n)}" y1="${sy(o.s)}" y2="${sy(o.s)}"/><text class="lb f-ink" x="${sx(n)-4}" y="${sy(o.s)-6}" text-anchor="end">정밀 최적 ${fs(o.s,O)}</text>`;
+      else b+=`<line class="ln s-ink thin dsh" x1="${sx(1)}" x2="${sx(n)}" y1="${sy(LOG10(Math.max(eps,1e-4)))}" y2="${sy(LOG10(Math.max(eps,1e-4)))}"/><text class="lb f-ink" x="${sx(n)-4}" y="${sy(LOG10(Math.max(eps,1e-4)))-6}" text-anchor="end">ε = ${eps.toPrecision(2)}</text>`;
+      [["grid","grid"],["rand","rand"],["bayes","bayes"]].forEach(([k,cl])=>{const a=A[k];if(!a.length)return;
+        const cl2=v=>Math.max(y0,Math.min(y1,tr(v)));
+        b+=`<path class="band f-${cl}" d="${pathOf(a.map(p=>[p.t,cl2(p.hi)]),sx,sy)} L${a.slice().reverse().map(p=>sx(p.t).toFixed(1)+" "+sy(cl2(p.lo)).toFixed(1)).join(" L")} Z"/>`;
+        b+=`<path class="ln s-${cl}" d="${pathOf(a.map(p=>[p.t,cl2(p.mean)]),sx,sy)}"/>`;});
+      return b;}});
+  /* 표 */
+  const reach=runs=>{const ts=runs.map(r=>{const i=r.c.findIndex(p=>p.s>=o.s-eps);return i<0?null:i+1;});const ok=ts.filter(t=>t!=null);return {rate:ok.length/runs.length,mean:ok.length?ok.reduce((a,b)=>a+b,0)/ok.length:null};};
+  const fin=runs=>runs.map(r=>r.c[r.c.length-1].s);
+  let s=`<thead><tr><th>방법</th><th>평가 수</th><th>최종 최고 (평균)</th><th>최적과 차이</th><th>ε 이내 도달 seed</th><th>도달까지 평가 수 (평균)</th></tr></thead><tbody>`;
+  [["grid",`<b class="t-grid">격자 ${res.k}×${res.k}</b>`],["rand",'<b class="t-rand">무작위</b>'],["bayes",'<b class="t-bayes">베이즈</b>']].forEach(([k,lab])=>{const runs=res[k];if(!runs.length){s+=`<tr><td>${lab}</td><td colspan="5" class="t-muted">계산 중</td></tr>`;return;}
+    const f=fin(runs),mn=f.reduce((a,b)=>a+b,0)/f.length,rc=reach(runs);
+    s+=`<tr><td>${lab}</td><td class="n">${runs[0].c.length}</td><td class="n">${fs(mn,O)}</td><td class="n">${(o.s-mn).toFixed(O.o.dec)}</td><td class="n">${Math.round(rc.rate*runs.length)} / ${runs.length}</td><td class="n">${rc.mean!=null?rc.mean.toFixed(1):"—"}</td></tr>`;});
+  $("cTbl").innerHTML=s+"</tbody>";
+  if(res.done){const fm=k=>{const f=fin(res[k]);return f.reduce((a,b)=>a+b,0)/f.length;};const order=["grid","rand","bayes"].sort((a,b)=>fm(b)-fm(a)),nm={grid:"격자",rand:"무작위",bayes:"베이즈"};
+    const spread=fm(order[0])-fm(order[2]);let se=null;
+    if(O.o.cv){const f=evalP(O,o.u,o.v).folds,mu=f.reduce((x,y)=>x+y,0)/f.length;se=Math.sqrt(f.reduce((x,y)=>x+(y-mu)**2,0)/(f.length-1)/f.length);}
+    let t=`이번 설정에서 최종 평균 순위: <b>${order.map(k=>nm[k]).join(" > ")}</b> (1위와 3위 차이 ${spread.toFixed(O.o.dec)}). `;
+    if(se!=null&&spread<se) t+=`이 차이는 정밀 최적 점의 폴드 점수 표준오차 <b>≈ ${se.toFixed(3)}</b>보다 작다 — 교차검증 점수의 흔들림 안에서는 세 방법이 <b>사실상 같다</b>. 이 데이터의 점수 지형은 꼭대기가 넓은 고원이라 5 × 5 로그 격자로도 고원에 닿는다. `;
+    t+=`베이즈 최적화는 초기 ${Math.min(S.bayes.n0,n-1)}점 동안 무작위와 같고, 그 뒤 GP가 좋은 곳을 좁혀 간다. 격자는 순서를 바꿔도 끝 값이 정해져 있다(축마다 √n개 후보). ${O.o.cv?"꼭대기가 좁은 [봉우리 여럿] · [Branin]으로 바꾸면 차이가 뚜렷해진다. ":""}평가 1회가 비쌀수록 적은 평가로 좋은 점을 찾는 방법이 유리하다.`;
+    if(S.obj==="bumpy") t+=` [봉우리 여럿]처럼 좁은 봉우리가 있으면, 초기 점이 근처에 없을 때 GP가 그곳을 '낮고 평평하다'고 믿어 넓은 언덕만 파고들 수 있다(국소 최적에 갇힘). 4번 탭에서 ξ · κ나 n₀를 키운 뒤 [다시 실행]해 보세요.`;
+    $("cNote").innerHTML=t;}
+  else $("cNote").textContent="";
+  renderOver(O,res);
+}
+function renderOver(O,res){
+  const el=$("oChart");
+  if(!O.o.cv){el.innerHTML='<p class="hp-mini">튜닝 과적합 실험은 [당뇨 · 교차검증] 목적 함수에서만 합니다 (합성 함수에는 테스트 데이터가 없음).</p>';$("oTbl").innerHTML="";$("nestGrid").innerHTML="";$("nestOut").innerHTML="";return;}
+  if(!res.over){el.innerHTML=`<p class="hp-mini">비교 실험이 끝나면 계산합니다…</p>`;$("oTbl").innerHTML="";$("nestOut").innerHTML="";renderNestGrid();return;}
+  const ov=res.over,v=ov.flatMap(p=>[p[1],p[2]]),lo=Math.min(...v),hi=Math.max(...v),tk=niceTicks(lo,hi,4);
+  chart(el,{h:230,x0:1,x1:res.n,y0:lo-(hi-lo)*0.08,y1:hi+(hi-lo)*0.08,xt:niceTicks(1,res.n,6).ticks.filter(x=>x>=1).map(x=>({v:x,t:String(x)})),yt:tk.ticks.filter(x=>x>=lo-(hi-lo)*0.08&&x<=hi+(hi-lo)*0.08).map(x=>({v:x,t:fmtTick(x,tk.step)})),xl:"평가 횟수",yl:S.metric==="acc"?"정확도":"AUC",aria:"튜닝 과적합",
+    body:({sx,sy})=>`<path class="ln s-val" d="${pathOf(ov.map(p=>[p[0],p[1]]),sx,sy)}"/><path class="ln s-ink" d="${pathOf(ov.map(p=>[p[0],p[2]]),sx,sy)}"/>`+
+      `<text class="lb f-val" x="${sx(res.n)-4}" y="${sy(ov[ov.length-1][1])-7}" text-anchor="end">CV ${ov[ov.length-1][1].toFixed(4)}</text><text class="lb f-ink" x="${sx(res.n)-4}" y="${sy(ov[ov.length-1][2])+16}" text-anchor="end">테스트 ${ov[ov.length-1][2].toFixed(4)}</text>`});
+  let s=`<thead><tr><th>방법</th><th>CV 최고 (평균)</th><th>테스트 600명 (평균)</th><th>낙관 편향</th></tr></thead><tbody>`;
+  [["grid","격자","t-grid"],["rand","무작위","t-rand"],["bayes","베이즈","t-bayes"]].forEach(([k,l,cl])=>{const runs=res[k];if(!runs.length||runs[0].test==null)return;
+    const cvm=runs.reduce((a,r)=>a+r.c[r.c.length-1].s,0)/runs.length,tm=runs.reduce((a,r)=>a+r.test,0)/runs.length;
+    s+=`<tr><td><b class="${cl}">${l}</b></td><td class="n">${cvm.toFixed(4)}</td><td class="n">${tm.toFixed(4)}</td><td class="n ${cvm-tm>0?"t-bad":""}">${(cvm-tm>=0?"+":"")+(cvm-tm).toFixed(4)}</td></tr>`;});
+  $("oTbl").innerHTML=s+"</tbody>";
+  renderNestGrid();
+  if(res.nested){const N=res.nested,mo=N.reduce((a,b)=>a+b.outer,0)/N.length,mi=N.reduce((a,b)=>a+b.inner,0)/N.length,sd=Math.sqrt(N.reduce((a,b)=>a+(b.outer-mo)**2,0)/N.length);
+    const ts=res.rand.length?res.rand.reduce((a,r)=>a+r.test,0)/res.rand.length:null;
+    $("nestOut").innerHTML=`<div class="sk-scroll"><table class="sk-table"><thead><tr><th>바깥 겹</th><th>안쪽에서 고른 C</th><th>γ</th><th>안쪽 CV 최고</th><th>바깥 검증</th></tr></thead><tbody>${N.map((r,k)=>`<tr><td class="n">${k+1}</td><td class="n">${fmtRaw(O.o.axes[0],r.C)}</td><td class="n">${fmtRaw(O.o.axes[1],r.g)}</td><td class="n">${r.inner.toFixed(4)}</td><td class="n"><b>${r.outer.toFixed(4)}</b></td></tr>`).join("")}</tbody></table></div>`+
+      `<p class="hp-mini">안쪽 CV 최고 평균 <b class="t-val">${mi.toFixed(4)}</b> (낙관적) vs 중첩 CV 추정 <b class="t-ink">${mo.toFixed(4)} ± ${sd.toFixed(4)}</b>${ts!=null?` · 참고: 독립 테스트 평균 ${ts.toFixed(4)}`:""}. 중첩 CV는 "튜닝 절차 전체"의 성능을 재는 값이다. 바깥 겹마다 고른 C · γ가 다를 수 있다는 점도 보인다.</p>`;}
+}
+function renderNestGrid(){
+  const el=$("nestGrid");el.style.gridTemplateColumns="64px repeat(5,minmax(0,1fr))";let s="";
+  for(let r=0;r<5;r++){s+=`<span class="lab">바깥 ${r+1}</span>`;for(let c=0;c<5;c++)s+=r===c?`<span class="va">평가</span>`:`<span class="tr" style="color:var(--bayes);background:color-mix(in srgb,var(--bayes) 14%,var(--surface))">튜닝</span>`;}
+  el.innerHTML=s;
+}
+
+/* =====================================================================
+   6. 코드
+   ===================================================================== */
+function esc(s){return s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+function hl(code){return code.split("\n").map(l=>{const i=l.indexOf("#");return i>=0?esc(l.slice(0,i))+'<span class="cm">'+esc(l.slice(i))+"</span>":esc(l);}).join("\n");}
+function pyNum(x){if(x===0)return "0";const e=Math.floor(LOG10(Math.abs(x)));return Math.abs(e)>=3?x.toExponential(0).replace("+",""):String(+x.toPrecision(3));}
+function renderCode(){
+  const c=S.code,svc=c.svc,K=S.K,scoring=S.metric==="acc"?"accuracy":"roc_auc",step=svc?"svc":"kernelridgeclassifier",g=S.grid,r=S.rand,b=S.bayes;
+  const A=OBJ.cv.axes,lg=a=>LOG10(a.min)+", "+LOG10(a.max);
+  const head=[
+    "import numpy as np",
+    "import pandas as pd",
+    "from sklearn.pipeline import make_pipeline",
+    "from sklearn.preprocessing import StandardScaler",
+    "from sklearn.model_selection import StratifiedKFold",
+    svc?"from sklearn.svm import SVC":"from sklearn.base import BaseEstimator, ClassifierMixin\nfrom sklearn.kernel_ridge import KernelRidge",
+    "",
+    'df = pd.read_csv("diabetes_tuning_150.csv")       # 이 페이지 [문제 정의]에서 저장',
+    'X = df[["나이", "BMI", "공복혈당", "수축기혈압"]].to_numpy()',
+    'y = df["당뇨"].to_numpy()',
+    ""];
+  if(!svc) head.push(
+    "class KernelRidgeClassifier(ClassifierMixin, BaseEstimator):",
+    "    \"\"\"RBF 커널 릿지 분류기: alpha = (K + I/C)^-1 y, y = ±1 (이 페이지와 같은 모형)\"\"\"",
+    "    def __init__(self, C=1.0, gamma=0.1):",
+    "        self.C = C",
+    "        self.gamma = gamma",
+    "    def fit(self, X, y):",
+    "        self.classes_ = np.unique(y)",
+    "        t = np.where(y == self.classes_[1], 1.0, -1.0)",
+    "        self.krr_ = KernelRidge(alpha=1 / self.C, kernel=\"rbf\", gamma=self.gamma).fit(X, t)",
+    "        return self",
+    "    def decision_function(self, X):",
+    "        return self.krr_.predict(X)",
+    "    def predict(self, X):",
+    "        return self.classes_[(self.decision_function(X) > 0).astype(int)]",
+    "");
+  head.push(`pipe = make_pipeline(StandardScaler(), ${svc?'SVC(kernel="rbf")':"KernelRidgeClassifier()"})   # 폴드마다 표준화`,
+    `cv = StratifiedKFold(n_splits=${K}, shuffle=True, random_state=0)`,"");
+  let body=[];
+  const gax=(a,k,sc)=>sc==="log"?`np.logspace(${lg(a)}, ${k})`:`np.linspace(${pyNum(a.min)}, ${pyNum(a.max)}, ${k})`;
+  if(c.sel==="grid") body=["from sklearn.model_selection import GridSearchCV","",
+    "param_grid = {",
+    `    "${step}__C": ${gax(A[0],g.k1,g.scale)},${g.scale==="log"?"      # 로그 간격":"      # 선형 간격 (작은 값 거의 없음)"}`,
+    `    "${step}__gamma": ${gax(A[1],g.k2,g.scale)},`,
+    "}",
+    `search = GridSearchCV(pipe, param_grid, scoring="${scoring}", cv=cv, n_jobs=-1)`,
+    `search.fit(X, y)                                   # ${g.k1} × ${g.k2} = ${g.k1*g.k2}개 조합 × ${K}겹 = 학습 ${g.k1*g.k2*K}번`,
+    "print(search.best_params_, round(search.best_score_, 4))",
+    `res = pd.DataFrame(search.cv_results_)             # 조합별 mean_test_score · std_test_score`];
+  else if(c.sel==="rand"){const dist=(a,d)=>d==="log"?`loguniform(${pyNum(a.min)}, ${pyNum(a.max)})`:`uniform(${pyNum(a.min)}, ${pyNum(a.max-a.min)})   # loc, scale`;
+    body=["from sklearn.model_selection import RandomizedSearchCV","from scipy.stats import loguniform, uniform","",
+    "param_distributions = {",
+    `    "${step}__C": ${dist(A[0],r.d0)},`,
+    `    "${step}__gamma": ${dist(A[1],r.d1)},`,
+    "}",
+    `search = RandomizedSearchCV(pipe, param_distributions, n_iter=${r.n}, scoring="${scoring}",`,
+    `                            cv=cv, random_state=${r.seed}, n_jobs=-1)`,
+    `search.fit(X, y)                                   # ${r.n}개 조합 × ${K}겹 = 학습 ${r.n*K}번`,
+    "print(search.best_params_, round(search.best_score_, 4))"];}
+  else if(c.sel==="bayes"){const acq=b.acq==="ucb"?"LCB":b.acq.toUpperCase();
+    body=["# pip install scikit-optimize","from skopt import BayesSearchCV","from skopt.space import Real","",
+    "search_spaces = {",
+    `    "${step}__C": Real(${pyNum(A[0].min)}, ${pyNum(A[0].max)}, prior="log-uniform"),`,
+    `    "${step}__gamma": Real(${pyNum(A[1].min)}, ${pyNum(A[1].max)}, prior="log-uniform"),`,
+    "}",
+    `opt = BayesSearchCV(pipe, search_spaces, n_iter=${b.budget}, scoring="${scoring}", cv=cv,`,
+    `                    random_state=${b.seed}, n_jobs=-1,`,
+    `                    optimizer_kwargs={"base_estimator": "GP",          # 가우스 과정 대리 모형`,
+    `                                      "n_initial_points": ${b.n0},          # 초기 무작위 점`,
+    `                                      "acq_func": "${acq}",${b.acq==="ucb"?"            # 최소화 기준 LCB = 최대화 UCB":""}`,
+    `                                      "acq_func_kwargs": {"xi": ${b.xi}, "kappa": ${b.kappa}}})`,
+    `opt.fit(X, y)                                      # 평가 ${b.budget}회 × ${K}겹`,
+    "print(opt.best_params_, round(opt.best_score_, 4))",
+    "# skopt는 내부에서 -점수를 최소화한다. 기본 커널 = Matern(nu=2.5), 길이 척도는 최대우도로 맞춤"];}
+  else if(c.sel==="optuna") body=["# pip install optuna","import optuna","from sklearn.model_selection import cross_val_score","",
+    "def objective(trial):",
+    `    C = trial.suggest_float("C", ${pyNum(A[0].min)}, ${pyNum(A[0].max)}, log=True)`,
+    `    gamma = trial.suggest_float("gamma", ${pyNum(A[1].min)}, ${pyNum(A[1].max)}, log=True)`,
+    `    pipe.set_params(${step}__C=C, ${step}__gamma=gamma)`,
+    `    return cross_val_score(pipe, X, y, cv=cv, scoring="${scoring}").mean()`,
+    "",
+    `sampler = optuna.samplers.TPESampler(seed=${b.seed}, n_startup_trials=${b.n0})   # TPE: l(x)/g(x)`,
+    `# sampler = optuna.samplers.GPSampler(seed=${b.seed})                 # GP 기반 베이즈 최적화`,
+    'study = optuna.create_study(direction="maximize", sampler=sampler)',
+    `study.optimize(objective, n_trials=${b.budget})`,
+    "print(study.best_params, round(study.best_value, 4))"];
+  else body=["from sklearn.model_selection import RandomizedSearchCV, cross_val_score","from scipy.stats import loguniform","",
+    "inner = StratifiedKFold(n_splits=4, shuffle=True, random_state=1)   # 안쪽: 튜닝",
+    "outer = StratifiedKFold(n_splits=5, shuffle=True, random_state=2)   # 바깥: 평가",
+    `search = RandomizedSearchCV(pipe, {"${step}__C": loguniform(${pyNum(A[0].min)}, ${pyNum(A[0].max)}),`,
+    `                                   "${step}__gamma": loguniform(${pyNum(A[1].min)}, ${pyNum(A[1].max)})},`,
+    `                            n_iter=15, scoring="${scoring}", cv=inner, random_state=0)`,
+    `scores = cross_val_score(search, X, y, cv=outer, scoring="${scoring}")   # 바깥 겹마다 튜닝을 처음부터`,
+    'print("중첩 CV:", scores.mean().round(4), "±", scores.std().round(4))',
+    "# search.fit(X, y).best_score_ 는 낙관적 → 최종 보고는 중첩 CV 또는 독립 테스트 세트로"];
+  const code=head.concat(body).join("\n");
+  $("codePre").innerHTML=hl(code);$("codePre")._txt=code;
+  $("codeNote").textContent=`현재 설정: ${S.metric==="acc"?"정확도":"ROC AUC"} · ${K}겹 · 격자 ${g.k1}×${g.k2}(${g.scale==="log"?"로그":"선형"}) · 무작위 n = ${r.n} · 베이즈 ${b.acq.toUpperCase()} 예산 ${b.budget}(초기 ${b.n0}). 코드는 [당뇨 · 교차검증] 문제 기준이며, StratifiedKFold의 폴드 나눔이 이 페이지와 달라 점수가 조금 다를 수 있습니다 (같은 폴드를 쓰면 이 페이지와 소수 넷째 자리까지 같음).`;
+}
+
+/* =====================================================================
+   탭 · 공통 조작
+   ===================================================================== */
+const tabs=[...document.querySelectorAll(".sk-tab")];
+let curTab="problem";
+function show(t,noHash){
+  tabs.forEach(b=>{const on=b===t;b.setAttribute("aria-selected",on);b.tabIndex=on?0:-1;document.getElementById(b.getAttribute("aria-controls")).hidden=!on;});
+  curTab=t.id.replace("tab-","");if(!noHash)history.replaceState(null,"","#"+curTab);
+  if(PLAY&&!((PLAY.which==="grid"&&curTab==="grid")||(PLAY.which==="rand"&&curTab==="random")||(PLAY.which==="bayes"&&curTab==="bayes")))stopPlay();
+  requestDraw();
+}
+tabs.forEach((b,i)=>{
+  b.addEventListener("click",()=>show(b));
+  b.addEventListener("keydown",e=>{const d=e.key==="ArrowRight"?1:e.key==="ArrowLeft"?-1:0;if(!d)return;const n=tabs[(i+d+tabs.length)%tabs.length];show(n);n.focus();e.preventDefault();});
+});
+let rafId=0;
+function requestDraw(){cancelAnimationFrame(rafId);rafId=requestAnimationFrame(drawNow);}
+function drawNow(){
+  setStatus();
+  try{
+    if(curTab==="problem"){renderProblem();renderAxisDemo();}
+    else if(curTab==="grid")renderGrid();
+    else if(curTab==="random")renderRandom();
+    else if(curTab==="bayes")renderBayes();
+    else if(curTab==="compare")renderCompare();
+    else if(curTab==="code")renderCode();
+  }catch(err){console.error(err);}
+}
+function seg(id,fn){const el=$(id);el.addEventListener("click",e=>{const b=e.target.closest("button");if(!b||b.disabled)return;el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b));fn(b.dataset.v);});}
+function setSeg(id,v){$(id).querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x.dataset.v===String(v)));}
+function slider(id,fn,fmt){const el=$(id),out=$(id+"_v");const h=()=>{const v=+el.value;if(out)out.textContent=fmt?fmt(v):v;fn(v);};el.addEventListener("input",h);}
+
+function objChanged(){
+  stopPlay();["grid","rand","bayes","cmp","bg","refine"].forEach(cancelJob);
+  const O=curO();$("gMetricW").hidden=!O.o.cv;$("gKW").hidden=!O.o.cv;
+  if(!O.o.cv){S.grid.scale="log";setSeg("gScale","log");S.rand.d0=S.rand.d1="log";setSeg("rDC","log");setSeg("rDG","log");}
+  $("gScale").querySelectorAll("button").forEach(b=>b.disabled=!O.o.cv);
+  S.p.last=null;PROBSIM=null;sliderSetup();ensureMap();
+  if(O.o.cv&&!S.p.last)S.p.last=evalP(O,S.p.u,S.p.v);
+  requestDraw();
+}
+seg("gObj",v=>{S.obj=v;
+  if(v==="cv"){S.p.u=0.5;S.p.v=0.75;}else{S.p.u=0.5;S.p.v=0.5;}
+  objChanged();});
+seg("gMetric",v=>{S.metric=v;objChanged();});
+seg("gK",v=>{S.K=+v;cancelJob("map");objChanged();});
+
+/* 문제 정의 */
+$("pU").addEventListener("input",()=>{S.p.u=+$("pU").value/curO().o.axes[0].steps;pSliderText();requestDraw();});
+$("pV").addEventListener("input",()=>{S.p.v=+$("pV").value/curO().o.axes[1].steps;pSliderText();requestDraw();});
+$("pU").addEventListener("change",pEvaluate);$("pV").addEventListener("change",pEvaluate);
+$("pEval").onclick=pEvaluate;
+$("pOpt").onclick=()=>{const m=curMap(),o=optOf(m);if(!o)return;const ax=curO().o.axes;S.p.u=o.u;S.p.v=o.v;$("pU").value=Math.round(o.u*ax[0].steps);$("pV").value=Math.round(o.v*ax[1].steps);pSliderText();pEvaluate();};
+$("pMap").addEventListener("click",e=>{const cv=$("pMap"),V=cv._view;if(!V)return;const [mx,my]=evXY(cv,e);if(!V.inside(mx,my))return;const [u,v]=V.inv(mx,my),ax=curO().o.axes;
+  S.p.u=Math.round(clamp(u,0,1)*ax[0].steps)/ax[0].steps;S.p.v=Math.round(clamp(v,0,1)*ax[1].steps)/ax[1].steps;$("pU").value=Math.round(S.p.u*ax[0].steps);$("pV").value=Math.round(S.p.v*ax[1].steps);pSliderText();pEvaluate();});
+$("csvBtn").onclick=()=>{const rows=["나이,BMI,공복혈당,수축기혈압,당뇨"].concat(TUNE.map(i=>DATA[i].join(",")));
+  const blob=new Blob(["﻿"+rows.join("\n")],{type:"text/csv"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="diabetes_tuning_150.csv";document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);};
+
+/* 격자 */
+slider("gK1",v=>{S.grid.k1=v;stopPlay();requestDraw();});
+slider("gK2",v=>{S.grid.k2=v;stopPlay();requestDraw();});
+seg("gScale",v=>{S.grid.scale=v;stopPlay();requestDraw();});
+slider("dK",v=>{S.dim.k=v;renderDim();});
+seg("dCost",v=>{S.dim.cost=+v;renderDim();});
+/* 무작위 */
+slider("rN",v=>{S.rand.n=v;stopPlay();requestDraw();});
+seg("rDC",v=>{S.rand.d0=v;stopPlay();requestDraw();});
+seg("rDG",v=>{S.rand.d1=v;stopPlay();requestDraw();});
+$("rSeed").onclick=()=>{S.rand.seed++;$("rSeed_v").textContent=S.rand.seed;stopPlay();requestDraw();};
+slider("bgK",v=>{S.bg.k=v;requestDraw();});
+slider("pq",v=>{S.prob.q=v;renderProb();},v=>v+"%");
+/* 베이즈 */
+const bChanged=()=>{stopPlay();requestDraw();};
+seg("bAcqK",v=>{S.bayes.acq=v;bChanged();});
+slider("bKappa",v=>{S.bayes.kappa=v;bChanged();},v=>v.toFixed(2));
+slider("bXi",v=>{S.bayes.xi=v;bChanged();},v=>v.toFixed(2));
+seg("bKern",v=>{S.bayes.kernel=v;bChanged();});
+seg("bLsM",v=>{S.bayes.lsMode=v;$("bLsW").hidden=v!=="man";bChanged();});
+slider("bLs",v=>{S.bayes.ls=v;bChanged();},v=>v.toFixed(2));
+slider("bNoise",v=>{S.bayes.noise=Math.pow(10,v);bChanged();},v=>Math.pow(10,v).toExponential(1));
+slider("bN0",v=>{S.bayes.n0=v;if(S.bayes.budget<=v){S.bayes.budget=v+1;$("bBud").value=v+1;$("bBud_v").textContent=v+1;}bChanged();});
+slider("bBud",v=>{S.bayes.budget=Math.max(v,S.bayes.n0+1);bChanged();});
+$("bSeed").onclick=()=>{S.bayes.seed++;$("bSeed_v").textContent=S.bayes.seed;bChanged();};
+seg("bSlice",v=>{S.bayes.slice=+v;requestDraw();});
+$("bNoise_v").textContent="1.0e-2";
+/* 비교 */
+slider("cN",v=>{S.cmp.n=v;});slider("cR",v=>{S.cmp.R=v;});
+slider("cE",v=>{S.cmp.epsT=v;requestDraw();},v=>cmpEps(curO()).toPrecision(2));
+$("cN").addEventListener("change",requestDraw);$("cR").addEventListener("change",requestDraw);
+$("cRun").onclick=()=>{ensureCmp(true);requestDraw();};
+seg("cView",v=>{S.cmp.view=v;requestDraw();});
+/* 코드 */
+seg("codeSel",v=>{S.code.sel=v;renderCode();});
+$("codeSvc").addEventListener("change",e=>{S.code.svc=e.target.checked;renderCode();});
+$("codeCopy").onclick=()=>{
+  const txt=$("codePre")._txt||$("codePre").textContent,btn=$("codeCopy");
+  const done=()=>{btn.textContent="복사됨";setTimeout(()=>btn.textContent="복사",1400);};
+  const fallback=()=>{const ta=document.createElement("textarea");ta.value=txt;ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();try{document.execCommand("copy");}catch(_){}ta.remove();done();};
+  if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(txt).then(done,fallback);else fallback();
+};
+/* 키보드: 격자 · 무작위 · 베이즈 화면에서 → 다음, ← 이전 */
+document.addEventListener("keydown",e=>{
+  if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;
+  const w=curTab==="grid"?"grid":curTab==="random"?"rand":curTab==="bayes"?"bayes":null;if(!w)return;
+  if(e.target.closest&&e.target.closest("input,select,textarea,.sk-tabs,.sk-seg,button"))return;
+  if(e.altKey||e.ctrlKey||e.metaKey)return;
+  stepAct(w,e.key==="ArrowRight"?"next":"prev");e.preventDefault();
+});
+/* 테마 · 크기 변화 → 다시 그리기 */
+new MutationObserver(requestDraw).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",requestDraw);}catch(_){}
+let lastW=window.innerWidth;window.addEventListener("resize",()=>{if(window.innerWidth!==lastW){lastW=window.innerWidth;requestDraw();}});
+
+/* 처음 상태 */
+renderData();sliderSetup();
+const start=document.getElementById("tab-"+location.hash.slice(1));if(start)show(start,true);
+window.addEventListener("hashchange",()=>{const t=document.getElementById("tab-"+location.hash.slice(1));if(t&&t.getAttribute("aria-selected")!=="true")show(t,true);});
+objChanged();
+})();
+</script>
+</body>
+</html>
