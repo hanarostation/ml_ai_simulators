@@ -148,6 +148,15 @@ window.DS_SIMULATORS = [
     tags: ["Pipeline", "ColumnTransformer", "데이터 누수", "GridSearchCV"],
     glyph: "pipe"
   },
+  {
+    id: "hyperparameter-tuning",
+    category: "ml",
+    href: "simulators/ml/hyperparameter-tuning.html",
+    title: "하이퍼파라미터 튜닝 (Grid · Random · Bayesian Search)",
+    summary: "당뇨 예측 모형의 C · γ를 K겹 교차검증으로 직접 평가하며 격자 탐색 · 무작위 탐색 · 가우스 과정 베이즈 최적화(EI/UCB/PI)를 한 단계씩 따라가고, 같은 예산 비교와 중첩 교차검증으로 튜닝 과적합까지 확인합니다.",
+    tags: ["Grid Search", "Random Search", "베이즈 최적화", "중첩 CV"],
+    glyph: "hpt"
+  },
 
   /* ---------- 신경망 ---------- */
   {
